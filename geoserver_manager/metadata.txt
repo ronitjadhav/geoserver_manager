@@ -1,0 +1,27 @@
+[general]
+name=GeoServer Manager
+about=Manage GeoServer instances directly from QGIS
+category=Web
+hasProcessingProvider=False
+description=Connect to GeoServer instances to browse, create and manage workspaces, datastores, layers and styles — all without leaving QGIS. Powered by python-geoservercloud.
+icon=resources/images/default_icon.png
+tags=geoserver,wms,wfs,workspace,datastore
+
+# credits and contact
+author=Ronit Jadhav
+email=ronit.jadhav@camptocamp.com
+homepage=http://github.com/ronitjadhav/geoserver_manager/pages
+repository=http://github.com/ronitjadhav/geoserver_manager
+tracker=http://github.com/ronitjadhav/geoserver_manager/issues/
+
+# QGIS context
+deprecated=False
+experimental=True
+plugin_dependencies=
+qgisMinimumVersion=3.40
+qgisMaximumVersion=3.99
+supportsQt6=True
+
+# versioning
+version=0.1.0
+changelog=
