@@ -8,7 +8,7 @@ Plugin settings.
 from dataclasses import asdict, dataclass, fields
 
 # PyQGIS
-from qgis.core import Qgis, QgsSettings
+from qgis.core import Qgis, QgsApplication, QgsAuthMethodConfig, QgsSettings
 
 # package
 import geoserver_manager.toolbelt.log_handler as log_hdlr
@@ -50,6 +50,70 @@ class PlgSettingsStructure:
     # global
     debug_mode: bool = False
     version: str = __version__
+
+    # geoserver connection
+    geoserver_url: str = ""
+    geoserver_auth_cfg_id: str = ""
+
+    def has_credentials(self) -> bool:
+        """Check if GeoServer URL and auth config are set."""
+        return bool(self.geoserver_url and self.geoserver_auth_cfg_id)
+
+    def get_credentials(self) -> tuple:
+        """Retrieve username and password from QgsAuthManager.
+
+        :return: (username, password) tuple, empty strings if unavailable.
+        """
+        if not self.geoserver_auth_cfg_id:
+            return ("", "")
+        auth_mgr = QgsApplication.authManager()
+        auth_cfg = QgsAuthMethodConfig()
+        if auth_mgr.loadAuthenticationConfig(
+            self.geoserver_auth_cfg_id, auth_cfg, True
+        ):
+            config_map = auth_cfg.configMap()
+            return (
+                config_map.get("username", ""),
+                config_map.get("password", ""),
+            )
+        return ("", "")
+
+    def save_credentials(self, username: str, password: str) -> str:
+        """Store username/password in QgsAuthManager (encrypted).
+
+        Creates a new auth config or updates the existing one.
+
+        :param username: GeoServer username.
+        :param password: GeoServer password.
+        :return: the auth config ID.
+        """
+        auth_mgr = QgsApplication.authManager()
+        auth_cfg = QgsAuthMethodConfig()
+
+        if self.geoserver_auth_cfg_id:
+            # Try to load and update existing config
+            if auth_mgr.loadAuthenticationConfig(
+                self.geoserver_auth_cfg_id, auth_cfg, True
+            ):
+                auth_cfg.setConfig("username", username)
+                auth_cfg.setConfig("password", password)
+                auth_mgr.updateAuthenticationConfig(auth_cfg)
+                return self.geoserver_auth_cfg_id
+
+        # Create a new auth config
+        auth_cfg.setName("GeoServer Manager")
+        auth_cfg.setMethod("Basic")
+        auth_cfg.setConfig("username", username)
+        auth_cfg.setConfig("password", password)
+        auth_mgr.storeAuthenticationConfig(auth_cfg)
+        return auth_cfg.id()
+
+    def remove_credentials(self) -> None:
+        """Remove the auth config from QgsAuthManager."""
+        if self.geoserver_auth_cfg_id:
+            auth_mgr = QgsApplication.authManager()
+            auth_mgr.removeAuthenticationConfig(self.geoserver_auth_cfg_id)
+            self.geoserver_auth_cfg_id = ""
 
 class PlgOptionsManager:
     @staticmethod
