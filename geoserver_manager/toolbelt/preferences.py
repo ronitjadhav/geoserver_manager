@@ -8,7 +8,7 @@ Plugin settings.
 from dataclasses import asdict, dataclass, fields
 
 # PyQGIS
-from qgis.core import Qgis, QgsApplication, QgsAuthMethodConfig, QgsSettings
+from qgis.core import QgsApplication, QgsAuthMethodConfig, QgsSettings
 
 # package
 import geoserver_manager.toolbelt.log_handler as log_hdlr
@@ -115,6 +115,7 @@ class PlgSettingsStructure:
             auth_mgr.removeAuthenticationConfig(self.geoserver_auth_cfg_id)
             self.geoserver_auth_cfg_id = ""
 
+
 class PlgOptionsManager:
     @staticmethod
     def get_plg_settings() -> PlgSettingsStructure:
@@ -156,20 +157,10 @@ class PlgOptionsManager:
 
     @staticmethod
     def get_value_from_key(key: str, default=None, exp_type=None):
-        """Load and return plugin settings as a dictionary. \
-        Useful to get user preferences across plugin logic.
+        """Load and return a single plugin QSettings value by key.
 
         :return: plugin settings value matching key
         """
-        if not hasattr(PlgSettingsStructure, key):
-            log_hdlr.PlgLogger.log(
-                message="Bad settings key. Must be one of: {}".format(
-                    ",".join(PlgSettingsStructure._fields)
-                ),
-                log_level=Qgis.MessageLevel.Warning,
-            )
-            return None
-
         settings = QgsSettings()
         settings.beginGroup(__title__)
 
@@ -198,15 +189,6 @@ class PlgOptionsManager:
         :return: operation status
         :rtype: bool
         """
-        if not hasattr(PlgSettingsStructure, key):
-            log_hdlr.PlgLogger.log(
-                message="Bad settings key. Must be one of: {}".format(
-                    ",".join(PlgSettingsStructure._fields)
-                ),
-                log_level=Qgis.MessageLevel.Critical,
-            )
-            return False
-
         settings = QgsSettings()
         settings.beginGroup(__title__)
 
@@ -227,15 +209,9 @@ class PlgOptionsManager:
 
     @classmethod
     def save_from_object(cls, plugin_settings_obj: PlgSettingsStructure):
-        """Load and return plugin settings as a dictionary. \
-        Useful to get user preferences across plugin logic.
+        """Save plugin settings from a dataclass object to QgsSettings.
 
-        :return: plugin settings value matching key
+        :param plugin_settings_obj: settings object to persist.
         """
-        settings = QgsSettings()
-        settings.beginGroup(__title__)
-
         for k, v in asdict(plugin_settings_obj).items():
             cls.set_value_from_key(k, v)
-
-        settings.endGroup()

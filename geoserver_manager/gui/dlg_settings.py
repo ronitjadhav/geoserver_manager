@@ -8,8 +8,8 @@ Plugin settings form integrated into QGIS 'Options' menu.
 import platform
 from functools import partial
 from pathlib import Path
-from urllib.parse import quote
 from typing import Callable
+from urllib.parse import quote
 
 # PyQGIS
 from qgis.core import Qgis, QgsApplication
@@ -29,7 +29,6 @@ from geoserver_manager.__about__ import (
 )
 from geoserver_manager.toolbelt import PlgLogger, PlgOptionsManager
 from geoserver_manager.toolbelt.preferences import PlgSettingsStructure
-
 
 # ############################################################################
 # ########## Classes ###############
@@ -63,17 +62,13 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         self.lbl_title.setText(f"{__title__} - Version {__version__}")
 
         # customization
-        self.btn_help.setIcon(
-            QIcon(QgsApplication.iconPath("mActionHelpContents.svg"))
-        )
+        self.btn_help.setIcon(QIcon(QgsApplication.iconPath("mActionHelpContents.svg")))
         self.btn_help.pressed.connect(
             partial(QDesktopServices.openUrl, QUrl(__uri_homepage__))
         )
 
         self.btn_report.setIcon(
-            QIcon(QgsApplication.iconPath(
-                "console/iconSyntaxErrorConsole.svg"
-            ))
+            QIcon(QgsApplication.iconPath("console/iconSyntaxErrorConsole.svg"))
         )
         self.btn_report.pressed.connect(
             partial(
@@ -86,9 +81,7 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
             )
         )
 
-        self.btn_reset.setIcon(
-            QIcon(QgsApplication.iconPath("mActionUndo.svg"))
-        )
+        self.btn_reset.setIcon(QIcon(QgsApplication.iconPath("mActionUndo.svg")))
         self.btn_reset.pressed.connect(self.on_reset_settings)
 
         # load previously saved settings
@@ -103,7 +96,15 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         settings.version = __version__
 
         # geoserver URL (not sensitive — stored in QgsSettings)
-        settings.geoserver_url = self.txt_gs_url.text()
+        url = self.txt_gs_url.text().strip()
+        if url and not url.startswith(("http://", "https://")):
+            self.log(
+                message="GeoServer URL must start with http:// or https://",
+                log_level=Qgis.MessageLevel.Warning,
+                push=True,
+            )
+            return
+        settings.geoserver_url = url
 
         # credentials (sensitive — stored encrypted in QgsAuthManager)
         username = self.txt_gs_username.text()
