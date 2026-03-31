@@ -31,7 +31,7 @@ class DatastoreTabMixin:
 
     def _load_datastores(self):
         """Fetch all datastores across all workspaces and display them."""
-        self.setCursor(Qt.WaitCursor)
+        self.setCursor(Qt.CursorShape.WaitCursor)
         try:
             self._setup_add_button(
                 self.tr("Add a New Datastore"),
@@ -245,11 +245,11 @@ class DatastoreTabMixin:
             # Apply initial visibility for the default type
             self._on_type_changed(dlg, type_combo.currentText())
 
-        if dlg.exec_() != QDialog.Accepted:
+        if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         values = dlg.get_values()
-        self.setCursor(Qt.WaitCursor)
+        self.setCursor(Qt.CursorShape.WaitCursor)
         try:
             self._create_datastore_from_values(values)
             self.show_success_message(
@@ -310,7 +310,7 @@ class DatastoreTabMixin:
         ds_type = row_data[2]
 
         # Fetch full detail for connection_params
-        self.setCursor(Qt.WaitCursor)
+        self.setCursor(Qt.CursorShape.WaitCursor)
         try:
             detail, _ = self.gs.get_datastore(ws_name, ds_name)
         except Exception as e:
@@ -383,14 +383,14 @@ class DatastoreTabMixin:
             # Disable type change in edit mode
             type_combo.setEnabled(False)
 
-        if dlg.exec_() != QDialog.Accepted:
+        if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         if is_unsupported:
             return
 
         values = dlg.get_values()
-        self.setCursor(Qt.WaitCursor)
+        self.setCursor(Qt.CursorShape.WaitCursor)
         try:
             self._create_datastore_from_values(values)
             self.show_success_message(
@@ -413,7 +413,7 @@ class DatastoreTabMixin:
         if not self._confirm_delete(self.tr("datastore"), f"{ws_name}/{ds_name}"):
             return
 
-        self.setCursor(Qt.WaitCursor)
+        self.setCursor(Qt.CursorShape.WaitCursor)
         try:
             self._do_delete_datastore(ws_name, ds_name)
             self.show_success_message(
@@ -443,13 +443,13 @@ class DatastoreTabMixin:
                 "Are you sure you want to delete {} datastore(s)?\n\n{}\n\n"
                 "This action cannot be undone."
             ).format(len(labels), "\n".join(f"  \u2022 {lbl}" for lbl in labels)),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             return
 
-        self.setCursor(Qt.WaitCursor)
+        self.setCursor(Qt.CursorShape.WaitCursor)
         errors = []
         try:
             for row in selected_rows:

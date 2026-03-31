@@ -18,7 +18,7 @@ class WorkspaceTabMixin:
 
     def _load_workspaces(self):
         """Fetch all workspaces and display them in the results table."""
-        self.setCursor(Qt.WaitCursor)
+        self.setCursor(Qt.CursorShape.WaitCursor)
         try:
             self._setup_add_button(
                 self.tr("Add a New Workspace"),
@@ -92,11 +92,11 @@ class WorkspaceTabMixin:
             fields=self._workspace_fields(),
             parent=self,
         )
-        if dlg.exec_() != QDialog.Accepted:
+        if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         values = dlg.get_values()
-        self.setCursor(Qt.WaitCursor)
+        self.setCursor(Qt.CursorShape.WaitCursor)
         try:
             self.gs.create_workspace(
                 values["name"],
@@ -133,12 +133,12 @@ class WorkspaceTabMixin:
             values=current_values,
             parent=self,
         )
-        if dlg.exec_() != QDialog.Accepted:
+        if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         values = dlg.get_values()
         new_name = values["name"]
-        self.setCursor(Qt.WaitCursor)
+        self.setCursor(Qt.CursorShape.WaitCursor)
         try:
             if new_name != old_name:
                 # TODO: Replace this workaround with a proper
@@ -190,13 +190,13 @@ class WorkspaceTabMixin:
                 "Are you sure you want to delete {} workspace(s)?\n\n{}\n\n"
                 "This action cannot be undone."
             ).format(len(names), "\n".join(f"  \u2022 {n}" for n in names)),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             return
 
-        self.setCursor(Qt.WaitCursor)
+        self.setCursor(Qt.CursorShape.WaitCursor)
         errors = []
         try:
             for name in names:
@@ -224,7 +224,7 @@ class WorkspaceTabMixin:
         if not self._confirm_delete(self.tr("workspace"), name):
             return
 
-        self.setCursor(Qt.WaitCursor)
+        self.setCursor(Qt.CursorShape.WaitCursor)
         try:
             self.gs.delete_workspace(name)
             self.show_success_message(self.tr("Workspace '{}' deleted.").format(name))

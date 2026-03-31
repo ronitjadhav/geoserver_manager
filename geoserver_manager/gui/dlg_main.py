@@ -48,7 +48,9 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
 
         # Inline message bar (sits above the splitter)
         self.message_bar = QgsMessageBar(self)
-        self.message_bar.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.message_bar.setSizePolicy(
+            QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed
+        )
         self.message_bar_layout.insertWidget(0, self.message_bar)
 
         self.splitter.setSizes([160, 740])
@@ -280,9 +282,9 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         header = self.resultsTable.horizontalHeader()
         for i in range(len(columns)):
             if columns[i] == self.tr("Actions"):
-                header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+                header.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
             else:
-                header.setSectionResizeMode(i, QHeaderView.Stretch)
+                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
 
     def _on_selection_changed(self):
         """Enable or disable the Delete Selected button based on selection."""
@@ -351,7 +353,7 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
                     # Clickable cell
                     link = QPushButton(str(val))
                     link.setFlat(True)
-                    link.setCursor(Qt.PointingHandCursor)
+                    link.setCursor(Qt.CursorShape.PointingHandCursor)
                     link.setStyleSheet(
                         "text-align: left; color: palette(link); "
                         "text-decoration: underline; padding: 0 4px;"
@@ -452,10 +454,10 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
                 "Are you sure you want to delete {type} '{name}'?\n\n"
                 "This action cannot be undone."
             ).format(type=resource_type, name=name),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        return reply == QMessageBox.Yes
+        return reply == QMessageBox.StandardButton.Yes
 
     # -- Dialog actions ----------------------------------------------------
 

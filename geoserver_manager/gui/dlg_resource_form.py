@@ -16,7 +16,7 @@ Usage:
         fields=fields,
         parent=self,
     )
-    if dlg.exec_() == QDialog.Accepted:
+    if dlg.exec() == QDialog.DialogCode.Accepted:
         values = dlg.get_values()
 
 For edit mode, pass existing values:
@@ -123,9 +123,11 @@ class ResourceFormDialog(QDialog):
 
         # Buttons
         self._button_box = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
-        self._button_box.button(QDialogButtonBox.Ok).setText(self.tr("Save"))
+        self._button_box.button(QDialogButtonBox.StandardButton.Ok).setText(
+            self.tr("Save")
+        )
         self._button_box.accepted.connect(self._on_accept)
         self._button_box.rejected.connect(self.reject)
         layout.addWidget(self._button_box)
@@ -144,8 +146,8 @@ class ResourceFormDialog(QDialog):
         """Build a QWidget containing a QFormLayout for the given fields."""
         container = QWidget()
         form = QFormLayout(container)
-        form.setLabelAlignment(Qt.AlignLeft)
-        form.setFormAlignment(Qt.AlignLeft | Qt.AlignTop)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        form.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         form.setHorizontalSpacing(12)
         form.setVerticalSpacing(8)
 
@@ -171,7 +173,9 @@ class ResourceFormDialog(QDialog):
                 help_label = QLabel(help_text)
                 help_label.setWordWrap(True)
                 help_label.setStyleSheet("color: gray; font-size: 11px;")
-                help_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+                help_label.setSizePolicy(
+                    QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+                )
                 wrapper.addWidget(help_label)
 
             form.addRow(label, wrapper_widget)
@@ -200,7 +204,7 @@ class ResourceFormDialog(QDialog):
         if ftype == "text":
             w = QLineEdit()
             if field.get("echo_password"):
-                w.setEchoMode(QLineEdit.Password)
+                w.setEchoMode(QLineEdit.EchoMode.Password)
             if value:
                 w.setText(str(value))
             placeholder = field.get("placeholder")
