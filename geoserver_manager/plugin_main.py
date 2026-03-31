@@ -20,9 +20,8 @@ from geoserver_manager.__about__ import (
     __title__,
     __uri_homepage__,
 )
-from geoserver_manager.gui.dlg_settings import PlgOptionsFactory
 from geoserver_manager.gui.dlg_main import GeoServerMainDialog
-
+from geoserver_manager.gui.dlg_settings import PlgOptionsFactory
 from geoserver_manager.toolbelt import PlgLogger, PlgOptionsManager
 
 # ############################################################################
@@ -42,7 +41,6 @@ class GeoServerManagerPlugin:
         self.log = PlgLogger().log
         self.plg_settings = PlgOptionsManager()
         self.main_dialog = None
-        
 
         # translation
         # initialize the locale
@@ -55,7 +53,10 @@ class GeoServerManagerPlugin:
             / "i18n"
             / f"{__title__.lower()}_{self.locale}.qm"
         )
-        self.log(message=f"Translation: {self.locale}, {locale_path}", log_level=Qgis.MessageLevel.NoLevel)
+        self.log(
+            message=f"Translation: {self.locale}, {locale_path}",
+            log_level=Qgis.MessageLevel.NoLevel,
+        )
         if locale_path.exists():
             self.translator = QTranslator()
             self.translator.load(str(locale_path.resolve()))
@@ -63,6 +64,7 @@ class GeoServerManagerPlugin:
 
         # Ensure dependencies are available
         from geoserver_manager.toolbelt.dependencies import ensure_dependencies
+
         self.dependencies_available = ensure_dependencies()
 
     def initGui(self) -> None:  # noqa: N802
@@ -159,47 +161,29 @@ class GeoServerManagerPlugin:
         del self.action_help
 
     def run(self):
-        """Main process.
-
-        :raises Exception: if there is no item in the feed
-        """
+        """Open the main plugin dialog."""
         if not self.dependencies_available:
             return
 
         settings = self.plg_settings.get_plg_settings()
-        
+
         if not settings.has_credentials():
             QMessageBox.information(
                 self.iface.mainWindow(),
                 "GeoServer Manager - Credentials Required",
                 "Welcome to GeoServer Manager!\n\n"
-                "Please configure your GeoServer connection URL, username, and password "
-                "before using the plugin."
+                "Please configure your GeoServer connection URL, "
+                "username, and password before using the plugin.",
             )
-            # Open settings page
-            self.iface.showOptionsDialog(currentPage="mOptionsPage{}".format(__title__))
-            
+            self.iface.showOptionsDialog(currentPage=f"mOptionsPage{__title__}")
+
             # Re-check in case they cancelled
             settings = self.plg_settings.get_plg_settings()
             if not settings.has_credentials():
                 return
-        
-        # Init dialog if not already done
+
         if not self.main_dialog:
             self.main_dialog = GeoServerMainDialog(self.iface.mainWindow(), self.iface)
-            
+
         self.main_dialog.refresh_ui()
         self.main_dialog.show()
-        
-        try:
-            self.log(
-                message=self.tr("Main dialog opened."),
-                log_level=Qgis.MessageLevel.Success,
-                push=False,
-            )
-        except Exception as err:
-            self.log(
-                message=self.tr("Houston, we've got a problem: {}".format(err)),
-                log_level=Qgis.MessageLevel.Critical,
-                push=True,
-            )
