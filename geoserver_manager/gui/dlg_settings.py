@@ -31,7 +31,6 @@ from geoserver_manager.toolbelt import PlgLogger, PlgOptionsManager
 from geoserver_manager.toolbelt.preferences import PlgSettingsStructure
 
 
-
 # ############################################################################
 # ########## Classes ###############
 # ##################################
@@ -41,11 +40,6 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
     """Settings form embedded into QGIS 'options' menu."""
 
     def __init__(self, parent: QWidget) -> None:
-        """Settings dialog constructor.
-
-        :param QgsOptionsPageWidget parent: base class for widgets for pages included
-            in the options dialog.
-        """         
         super().__init__(parent)
         self.log: Callable = PlgLogger().log
         self.plg_settings = PlgOptionsManager()
@@ -57,7 +51,6 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
 
     def initGui(self) -> None:  # noqa: N802
         """Set up UI elements."""
-        # header
         report_context_message: str = quote(
             "> Reported from plugin settings\n\n"
             f"- operating system: {platform.system()} "
@@ -70,16 +63,18 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         self.lbl_title.setText(f"{__title__} - Version {__version__}")
 
         # customization
-        self.btn_help.setIcon(QIcon(QgsApplication.iconPath("mActionHelpContents.svg")))
+        self.btn_help.setIcon(
+            QIcon(QgsApplication.iconPath("mActionHelpContents.svg"))
+        )
         self.btn_help.pressed.connect(
             partial(QDesktopServices.openUrl, QUrl(__uri_homepage__))
         )
 
-
         self.btn_report.setIcon(
-            QIcon(QgsApplication.iconPath("console/iconSyntaxErrorConsole.svg"))
+            QIcon(QgsApplication.iconPath(
+                "console/iconSyntaxErrorConsole.svg"
+            ))
         )
-        
         self.btn_report.pressed.connect(
             partial(
                 QDesktopServices.openUrl,
@@ -90,24 +85,33 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
                 ),
             )
         )
-        
-        self.btn_reset.setIcon(QIcon(QgsApplication.iconPath("mActionUndo.svg")))
+
+        self.btn_reset.setIcon(
+            QIcon(QgsApplication.iconPath("mActionUndo.svg"))
+        )
         self.btn_reset.pressed.connect(self.on_reset_settings)
 
         # load previously saved settings
         self.load_settings()
 
     def apply(self) -> None:
-        """Called to permanently apply the settings shown in the options page (e.g. \
-        save them to QgsSettings objects). This is usually called when the options \
-        dialog is accepted."""
+        """Save settings from UI to QgsSettings + QgsAuthManager."""
         settings: PlgSettingsStructure = self.plg_settings.get_plg_settings()
 
         # misc
         settings.debug_mode = self.opt_debug.isChecked()
         settings.version = __version__
 
-        # dump new settings into QgsSettings
+        # geoserver URL (not sensitive — stored in QgsSettings)
+        settings.geoserver_url = self.txt_gs_url.text()
+
+        # credentials (sensitive — stored encrypted in QgsAuthManager)
+        username = self.txt_gs_username.text()
+        password = self.txt_gs_password.text()
+        auth_cfg_id = settings.save_credentials(username, password)
+        settings.geoserver_auth_cfg_id = auth_cfg_id
+
+        # dump settings into QgsSettings
         self.plg_settings.save_from_object(settings)
 
         if __debug__:
@@ -117,21 +121,29 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
             )
 
     def load_settings(self) -> None:
-        """Load options from QgsSettings into UI form."""
+        """Load options from QgsSettings + QgsAuthManager into UI form."""
         settings: PlgSettingsStructure = self.plg_settings.get_plg_settings()
 
         # global
         self.opt_debug.setChecked(settings.debug_mode)
         self.lbl_version_saved_value.setText(settings.version)
 
+        # geoserver URL
+        self.txt_gs_url.setText(settings.geoserver_url)
+
+        # credentials from encrypted store
+        username, password = settings.get_credentials()
+        self.txt_gs_username.setText(username)
+        self.txt_gs_password.setText(password)
+
     def on_reset_settings(self) -> None:
-        """Reset settings to default values (set in preferences.py module)."""
+        """Reset settings to default values."""
+        # Remove the auth config if it exists
+        current = self.plg_settings.get_plg_settings()
+        current.remove_credentials()
+
         default_settings: PlgSettingsStructure = PlgSettingsStructure()
-
-        # dump default settings into QgsSettings
         self.plg_settings.save_from_object(default_settings)
-
-        # update the form
         self.load_settings()
 
 
@@ -139,40 +151,16 @@ class PlgOptionsFactory(QgsOptionsWidgetFactory):
     """Factory for options widget."""
 
     def __init__(self) -> None:
-        """Constructor."""
         super().__init__()
 
     def icon(self) -> QIcon:
-        """Returns plugin icon, used to as tab icon in QGIS options tab widget.
-
-        :return: plugin's icon
-        :rtype: QIcon
-        """
         return QIcon(str(__icon_path__))
 
     def createWidget(self, parent: QWidget) -> ConfigOptionsPage:  # noqa: N802
-        """Create settings widget.
-
-        :param parent: Qt parent where to include the options page.
-        :type parent: QObject
-
-        :return: options page for tab widget
-        :rtype: ConfigOptionsPage
-        """
         return ConfigOptionsPage(parent)
 
     def title(self) -> str:
-        """Returns plugin title, used to name the tab in QGIS options tab widget.
-
-        :return: plugin title from about module
-        :rtype: str
-        """
         return __title__
 
     def helpId(self) -> str:  # noqa: N802
-        """Returns plugin help URL.
-
-        :return: plugin homepage url from about module
-        :rtype: str
-        """
         return __uri_homepage__
