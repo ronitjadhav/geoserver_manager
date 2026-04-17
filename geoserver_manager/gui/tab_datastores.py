@@ -19,12 +19,6 @@ _SUPPORTED_TYPES = [
     "PMTiles",
 ]
 
-# Fields that are specific to each type.
-# Keys match field "key" values used in the form.
-_POSTGIS_KEYS = ["pg_host", "pg_port", "pg_db", "pg_user", "pg_password", "pg_schema"]
-_JNDI_KEYS = ["jndi_reference", "pg_schema"]
-_PMTILES_KEYS = ["pmtiles_url"]
-
 
 class DatastoreTabMixin:
     """Mixin that adds datastore CRUD methods to the main dialog."""
@@ -40,7 +34,9 @@ class DatastoreTabMixin:
             )
             self._setup_delete_selected_button(self._delete_selected_datastores)
             self._name_click_callback = self._show_datastore_info
-            self._extra_click_callbacks = {1: self._open_workspace_from_row}
+            self._extra_click_callbacks = {
+                self.tr("Workspace"): self._open_workspace_from_row
+            }
             self._row_actions = [
                 (
                     "mActionDeleteSelected.svg",
@@ -201,16 +197,22 @@ class DatastoreTabMixin:
 
     def _on_type_changed(self, dlg, new_type):
         """Show/hide form fields based on the selected datastore type."""
-        for key in _POSTGIS_KEYS:
-            dlg.set_field_visible(key, new_type == "PostGIS")
-        for key in _JNDI_KEYS:
-            dlg.set_field_visible(
-                key,
-                new_type == "PostGIS (JNDI)"
-                or (key == "pg_schema" and new_type == "PostGIS"),
-            )
-        for key in _PMTILES_KEYS:
-            dlg.set_field_visible(key, new_type == "PMTiles")
+        is_postgis = new_type == "PostGIS"
+        is_jndi = new_type == "PostGIS (JNDI)"
+        is_pmtiles = new_type == "PMTiles"
+
+        # PostGIS-only fields
+        for key in ["pg_host", "pg_port", "pg_db", "pg_user", "pg_password"]:
+            dlg.set_field_visible(key, is_postgis)
+
+        # pg_schema is shared by PostGIS and JNDI
+        dlg.set_field_visible("pg_schema", is_postgis or is_jndi)
+
+        # JNDI-only fields
+        dlg.set_field_visible("jndi_reference", is_jndi)
+
+        # PMTiles-only fields
+        dlg.set_field_visible("pmtiles_url", is_pmtiles)
 
     def _get_workspace_names(self):
         """Return a list of workspace names from the current connection."""
@@ -370,8 +372,8 @@ class DatastoreTabMixin:
         )
 
         if is_unsupported:
-            # Disable all fields — user cannot edit unsupported types
-            dlg.set_all_fields_enabled(False)
+            # User can only view, not save — hide the Save button
+            dlg.hide_save_button()
         else:
             # Wire type combo and apply visibility
             type_combo = dlg.get_widget("type")
@@ -384,9 +386,6 @@ class DatastoreTabMixin:
             type_combo.setEnabled(False)
 
         if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-
-        if is_unsupported:
             return
 
         values = dlg.get_values()

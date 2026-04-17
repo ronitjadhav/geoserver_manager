@@ -301,12 +301,16 @@ class ResourceFormDialog(QDialog):
         return self._widgets.get(key)
 
     def set_all_fields_enabled(self, enabled):
-        """Enable or disable all field widgets.
-
-        :param enabled: True to enable, False to disable.
-        """
+        """Enable or disable all field widgets."""
         for widget in self._widgets.values():
             widget.setEnabled(enabled)
+
+    def hide_save_button(self):
+        """Hide the Save button, leaving only Cancel (for view-only dialogs)."""
+        self._button_box.button(QDialogButtonBox.StandardButton.Ok).setVisible(False)
+        self._button_box.button(QDialogButtonBox.StandardButton.Cancel).setText(
+            self.tr("Close")
+        )
 
     def _on_accept(self):
         """Validate required fields before accepting."""
