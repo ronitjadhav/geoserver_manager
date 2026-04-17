@@ -64,7 +64,7 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         self._filtered_rows = []  # rows after search filter
         self._row_actions = []  # list of (icon, tooltip, callback) for action buttons
         self._name_click_callback = None  # callback(row_data) when name is clicked
-        self._extra_click_callbacks = {}  # extra col_index -> callback(row_data)
+        self._extra_click_callbacks = {}  # col_header -> callback(row_data)
         self._delete_selected_callback = (
             None  # callback(list[row_data]) for bulk delete
         )
@@ -93,7 +93,7 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         self._search_timer.setSingleShot(True)
         self._search_timer.setInterval(300)
         self._search_timer.timeout.connect(self._apply_filter)
-        self.searchBox.textChanged.connect(lambda _: self._search_timer.start())
+        self.searchBox.textChanged.connect(self._search_timer.start)
         self.btn_page_first.clicked.connect(self._page_first)
         self.btn_page_prev.clicked.connect(self._page_prev)
         self.btn_page_next.clicked.connect(self._page_next)
@@ -149,8 +149,12 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
     # -- Connection --------------------------------------------------------
 
     def _connect(self):
-        """Create a GeoServerCloud client from stored credentials.
-        Returns True on success."""
+        """Create a GeoServerCloud client and verify the server is reachable.
+
+        The GeoServerCloud constructor makes no network call, so we do a quick
+        test request after creating it to catch: server down, wrong credentials,
+        or any other connectivity issue before the user tries to load data.
+        """
         settings = self.plg_settings.get_plg_settings()
 
         if not settings.has_credentials():
@@ -170,24 +174,50 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             self.gs = None
             return False
 
-        try:
-            from geoservercloud import GeoServerCloud
+        from geoservercloud import GeoServerCloud
 
-            self.gs = GeoServerCloud(
-                url=settings.geoserver_url,
-                user=username,
-                password=password,
+        gs = GeoServerCloud(
+            url=settings.geoserver_url,
+            user=username,
+            password=password,
+        )
+
+        # Test the connection with a real request
+        try:
+            _, status_code = gs.get_workspaces()
+        except OSError:
+            # requests raises ConnectionError (subclass of OSError) when the
+            # server is unreachable, refused, or the URL is wrong
+            self._set_status(self.tr("Server unreachable"), "red")
+            self.show_error_message(
+                self.tr(
+                    "Cannot reach GeoServer at {url} — is the server running?"
+                ).format(url=settings.geoserver_url)
             )
-            self._set_status(
-                self.tr("Connected — {}").format(settings.geoserver_url), "green"
-            )
-            return True
+            self.gs = None
+            return False
         except Exception as e:
             self._set_status(self.tr("Connection error"), "red")
-            self.show_error_message(self.tr("Failed to connect: {}").format(e))
+            self.show_error_message(self.tr("Connection failed: {}").format(e))
             self.log(f"Connection error: {e}", log_level=Qgis.MessageLevel.Critical)
             self.gs = None
             return False
+
+        if status_code == 401:
+            self._set_status(self.tr("Authentication failed"), "red")
+            self.show_error_message(
+                self.tr(
+                    "Authentication failed — check your username and password in Settings."
+                )
+            )
+            self.gs = None
+            return False
+
+        self.gs = gs
+        self._set_status(
+            self.tr("Connected — {}").format(settings.geoserver_url), "green"
+        )
+        return True
 
     def _set_status(self, text, color="black"):
         self.lbl_status.setText(text)
@@ -344,11 +374,13 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         self.resultsTable.setRowCount(len(page_rows))
         for row_idx, values in enumerate(page_rows):
             for col, val in enumerate(values):
+                col_header = self.resultsTable.horizontalHeaderItem(col)
+                col_name = col_header.text() if col_header else ""
                 click_cb = None
                 if col == 0 and self._name_click_callback:
                     click_cb = self._name_click_callback
-                elif col in self._extra_click_callbacks:
-                    click_cb = self._extra_click_callbacks[col]
+                elif col_name in self._extra_click_callbacks:
+                    click_cb = self._extra_click_callbacks[col_name]
                 if click_cb:
                     # Clickable cell
                     link = QPushButton(str(val))
@@ -435,10 +467,6 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
                 log_level=Qgis.MessageLevel.Warning,
             )
             return []
-
-    def _filter_table(self, _text):
-        """Filter rows by search text and reset to first page."""
-        self._apply_filter()
 
     def _confirm_delete(self, resource_type, name):
         """Show a confirmation dialog before deleting a resource.
