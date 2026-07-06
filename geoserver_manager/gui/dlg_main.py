@@ -148,6 +148,18 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
 
     # -- Connection --------------------------------------------------------
 
+    @staticmethod
+    def _check(result):
+        """Unpack a geoservercloud (content, status_code) tuple.
+
+        The library returns HTTP errors instead of raising, so raise here to
+        make every caller's error handling actually fire.
+        """
+        content, status_code = result
+        if status_code >= 400:
+            raise RuntimeError(f"HTTP {status_code}: {content}")
+        return content
+
     def _connect(self):
         """Create a GeoServerCloud client and verify the server is reachable.
 
@@ -214,10 +226,30 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             return False
 
         self.gs = gs
-        self._set_status(
-            self.tr("Connected — {}").format(settings.geoserver_url), "green"
-        )
+        status = self.tr("Connected — {}").format(settings.geoserver_url)
+        version = self._fetch_version_label()
+        if version:
+            status += f" ({version})"
+        self._set_status(status, "green")
         return True
+
+    def _fetch_version_label(self):
+        """Best-effort 'GeoServer x.y.z' string for the status bar.
+
+        Not required for a successful connection — if it fails, we still
+        show "Connected" without the version suffix.
+        """
+        try:
+            info = self._check(self.gs.get_version())
+        except Exception:
+            return ""
+        if not isinstance(info, dict):
+            return ""
+        for res in info.get("about", {}).get("resource", []):
+            if res.get("@name", "").lower().startswith("geoserver"):
+                version = res.get("Version", "")
+                return f"GeoServer {version}" if version else ""
+        return ""
 
     def _set_status(self, text, color="black"):
         self.lbl_status.setText(text)
@@ -457,16 +489,10 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         self._show_page()
 
     def _fetch_list(self, api_method, *args):
-        """Call a geoservercloud list endpoint. Returns a list or []."""
-        try:
-            result, _ = api_method(*args)
-            return result if isinstance(result, list) else []
-        except Exception as e:
-            self.log(
-                f"API error ({api_method.__name__}): {e}",
-                log_level=Qgis.MessageLevel.Warning,
-            )
-            return []
+        """Call a geoservercloud list endpoint. Returns a list or [].
+        Raises on HTTP errors — callers surface them to the user."""
+        result = self._check(api_method(*args))
+        return result if isinstance(result, list) else []
 
     def _confirm_delete(self, resource_type, name):
         """Show a confirmation dialog before deleting a resource.
@@ -486,6 +512,68 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             QMessageBox.StandardButton.No,
         )
         return reply == QMessageBox.StandardButton.Yes
+
+    def _delete_many(self, kind, labeled_deletes, reload_fn):
+        """Confirm and run one or more deletions, then reload the table.
+
+        :param kind: human-readable resource type (e.g. "workspace").
+        :param labeled_deletes: list of (label, zero-arg callable) pairs.
+        :param reload_fn: called afterwards to refresh the table.
+        """
+        if not labeled_deletes:
+            return
+
+        if len(labeled_deletes) == 1:
+            if not self._confirm_delete(kind, labeled_deletes[0][0]):
+                return
+        else:
+            bullets = "\n".join(f"  • {lbl}" for lbl, _ in labeled_deletes)
+            reply = QMessageBox.warning(
+                self,
+                self.tr("Confirm Delete"),
+                self.tr(
+                    "Are you sure you want to delete {count} {kind}(s)?\n\n{items}\n\n"
+                    "This action cannot be undone."
+                ).format(count=len(labeled_deletes), kind=kind, items=bullets),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
+        self.setCursor(Qt.CursorShape.WaitCursor)
+        errors = []
+        try:
+            for label, delete_fn in labeled_deletes:
+                try:
+                    delete_fn()
+                except Exception as e:
+                    errors.append(f"{label}: {e}")
+                    self.log(
+                        f"Delete {kind} error ({label}): {e}",
+                        log_level=Qgis.MessageLevel.Critical,
+                    )
+            if errors:
+                self.show_error_message(
+                    self.tr("Failed to delete some {kind}(s):\n{errors}").format(
+                        kind=kind, errors="\n".join(errors)
+                    )
+                )
+            elif len(labeled_deletes) == 1:
+                self.show_success_message(
+                    self.tr("{kind} '{name}' deleted.").format(
+                        kind=kind.capitalize(), name=labeled_deletes[0][0]
+                    )
+                )
+            else:
+                self.show_success_message(
+                    self.tr("{count} {kind}(s) deleted.").format(
+                        count=len(labeled_deletes), kind=kind
+                    )
+                )
+            reload_fn()
+        finally:
+            self.unsetCursor()
 
     # -- Dialog actions ----------------------------------------------------
 

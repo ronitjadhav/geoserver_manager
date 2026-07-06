@@ -48,19 +48,6 @@ def _add_whls_to_path(logger=None):
                     log_level=Qgis.MessageLevel.Info,
                 )
 
-    # Also register with pkg_resources if available
-    try:
-        import pkg_resources
-
-        for whl in BUNDLED_WHLS:
-            if whl.exists():
-                dist = pkg_resources.Distribution.from_location(
-                    str(whl), whl.name
-                )
-                pkg_resources.working_set.add(dist)
-    except Exception:
-        pass  # non-fatal
-
 
 def _try_import(logger=None) -> bool:
     """Invalidate import caches and try importing geoservercloud."""
@@ -75,8 +62,7 @@ def _try_import(logger=None) -> bool:
 
             tb = traceback.format_exc()
             logger(
-                f"geoservercloud import error: {e}\n"
-                f"Traceback:\n{tb}",
+                f"geoservercloud import error: {e}\nTraceback:\n{tb}",
                 log_level=Qgis.MessageLevel.Warning,
             )
         return False
@@ -129,7 +115,5 @@ def ensure_dependencies() -> bool:
         "<code>pip install geoservercloud</code><br><br>"
         "The plugin will not work until this library is available."
     )
-    QMessageBox.critical(
-        None, "GeoServer Manager - Missing Dependency", error_msg
-    )
+    QMessageBox.critical(None, "GeoServer Manager - Missing Dependency", error_msg)
     return False

@@ -8,7 +8,7 @@ Used as a mixin for GeoServerMainDialog.
 
 from qgis.core import Qgis
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import QDialog, QMessageBox
+from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 
@@ -276,31 +276,37 @@ class DatastoreTabMixin:
         description = values.get("description") or None
 
         if ds_type == "PostGIS":
-            self.gs.create_pg_datastore(
-                workspace_name=ws,
-                datastore_name=name,
-                pg_host=values.get("pg_host", ""),
-                pg_port=int(values.get("pg_port", 5432)),
-                pg_db=values.get("pg_db", ""),
-                pg_user=values.get("pg_user", ""),
-                pg_password=values.get("pg_password", ""),
-                pg_schema=values.get("pg_schema", "public") or "public",
-                description=description,
+            self._check(
+                self.gs.create_pg_datastore(
+                    workspace_name=ws,
+                    datastore_name=name,
+                    pg_host=values.get("pg_host", ""),
+                    pg_port=int(values.get("pg_port", 5432)),
+                    pg_db=values.get("pg_db", ""),
+                    pg_user=values.get("pg_user", ""),
+                    pg_password=values.get("pg_password", ""),
+                    pg_schema=values.get("pg_schema", "public") or "public",
+                    description=description,
+                )
             )
         elif ds_type == "PostGIS (JNDI)":
-            self.gs.create_jndi_datastore(
-                workspace_name=ws,
-                datastore_name=name,
-                jndi_reference=values.get("jndi_reference", ""),
-                pg_schema=values.get("pg_schema", "public") or "public",
-                description=description,
+            self._check(
+                self.gs.create_jndi_datastore(
+                    workspace_name=ws,
+                    datastore_name=name,
+                    jndi_reference=values.get("jndi_reference", ""),
+                    pg_schema=values.get("pg_schema", "public") or "public",
+                    description=description,
+                )
             )
         elif ds_type == "PMTiles":
-            self.gs.create_pmtiles_datastore(
-                workspace_name=ws,
-                datastore_name=name,
-                pmtiles_url=values.get("pmtiles_url", ""),
-                description=description,
+            self._check(
+                self.gs.create_pmtiles_datastore(
+                    workspace_name=ws,
+                    datastore_name=name,
+                    pmtiles_url=values.get("pmtiles_url", ""),
+                    description=description,
+                )
             )
         else:
             raise ValueError(f"Unsupported datastore type: {ds_type}")
@@ -314,7 +320,7 @@ class DatastoreTabMixin:
         # Fetch full detail for connection_params
         self.setCursor(Qt.CursorShape.WaitCursor)
         try:
-            detail, _ = self.gs.get_datastore(ws_name, ds_name)
+            detail = self._check(self.gs.get_datastore(ws_name, ds_name))
         except Exception as e:
             self.show_error_message(
                 self.tr("Failed to load datastore details: {}").format(e)
@@ -382,8 +388,8 @@ class DatastoreTabMixin:
                     lambda t: self._on_type_changed(dlg, t)
                 )
                 self._on_type_changed(dlg, type_for_form)
-            # Disable type change in edit mode
-            type_combo.setEnabled(False)
+                # Disable type change in edit mode
+                type_combo.setEnabled(False)
 
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -408,68 +414,21 @@ class DatastoreTabMixin:
 
     def _delete_datastore(self, row_data):
         """Delete a single datastore after confirmation."""
-        ds_name, ws_name = row_data[0], row_data[1]
-        if not self._confirm_delete(self.tr("datastore"), f"{ws_name}/{ds_name}"):
-            return
-
-        self.setCursor(Qt.CursorShape.WaitCursor)
-        try:
-            self._do_delete_datastore(ws_name, ds_name)
-            self.show_success_message(
-                self.tr("Datastore '{}' deleted.").format(ds_name)
-            )
-            self._load_datastores()
-        except Exception as e:
-            self.show_error_message(
-                self.tr("Failed to delete datastore '{}': {}").format(ds_name, e)
-            )
-            self.log(
-                f"Delete datastore error: {e}", log_level=Qgis.MessageLevel.Critical
-            )
-        finally:
-            self.unsetCursor()
+        self._delete_selected_datastores([row_data])
 
     def _delete_selected_datastores(self, selected_rows):
-        """Delete multiple datastores after confirmation."""
-        if not selected_rows:
-            return
-
-        labels = [f"{row[1]}/{row[0]}" for row in selected_rows]
-        reply = QMessageBox.warning(
-            self,
-            self.tr("Confirm Delete"),
-            self.tr(
-                "Are you sure you want to delete {} datastore(s)?\n\n{}\n\n"
-                "This action cannot be undone."
-            ).format(len(labels), "\n".join(f"  \u2022 {lbl}" for lbl in labels)),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
+        """Delete one or more datastores after confirmation."""
+        self._delete_many(
+            self.tr("datastore"),
+            [
+                (
+                    f"{row[1]}/{row[0]}",
+                    lambda ws=row[1], ds=row[0]: self._do_delete_datastore(ws, ds),
+                )
+                for row in selected_rows
+            ],
+            self._load_datastores,
         )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-
-        self.setCursor(Qt.CursorShape.WaitCursor)
-        errors = []
-        try:
-            for row in selected_rows:
-                ds_name, ws_name = row[0], row[1]
-                try:
-                    self._do_delete_datastore(ws_name, ds_name)
-                except Exception as e:
-                    errors.append(f"{ws_name}/{ds_name}: {e}")
-            if errors:
-                self.show_error_message(
-                    self.tr("Failed to delete some datastores:\n{}").format(
-                        "\n".join(errors)
-                    )
-                )
-            else:
-                self.show_success_message(
-                    self.tr("{} datastore(s) deleted.").format(len(selected_rows))
-                )
-            self._load_datastores()
-        finally:
-            self.unsetCursor()
 
     def _do_delete_datastore(self, workspace_name, datastore_name):
         """Execute the REST DELETE for a datastore (recurse=true removes feature types too)."""
@@ -482,16 +441,8 @@ class DatastoreTabMixin:
             path, params={"recurse": "true"}
         )
         if response.status_code >= 400:
-            raise Exception(response.content.decode())
+            raise RuntimeError(response.content.decode())
 
     def _open_workspace_from_row(self, row_data):
         """Open the workspace info dialog for the workspace in a datastore row."""
-        ws_name = row_data[1]
-        try:
-            detail, _ = self.gs.get_workspace(ws_name)
-            isolated = (
-                str(detail.get("isolated", False)) if isinstance(detail, dict) else "—"
-            )
-        except Exception:
-            isolated = "—"
-        self._show_workspace_info([ws_name, isolated])
+        self._show_workspace_info([row_data[1]])
