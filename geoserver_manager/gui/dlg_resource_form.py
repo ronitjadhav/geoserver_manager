@@ -337,23 +337,3 @@ class ResourceFormDialog(QDialog):
                 return
 
         self.accept()
-
-    def set_field_value(self, key, value):
-        """Programmatically set a field value by key."""
-        if key not in self._widgets:
-            return
-        widget = self._widgets[key]
-        field = next((f for f in self._fields if f["key"] == key), None)
-        if not field:
-            return
-        ftype = field.get("type", "text")
-        if ftype == "text":
-            widget.setText(str(value) if value else "")
-        elif ftype == "checkbox":
-            widget.setChecked(bool(value))
-        elif ftype == "combo":
-            widget.setCurrentText(str(value))
-        elif ftype == "spinbox":
-            widget.setValue(int(value) if value else 0)
-        elif ftype == "textarea":
-            widget.setPlainText(str(value) if value else "")

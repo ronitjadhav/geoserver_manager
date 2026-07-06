@@ -8,7 +8,7 @@ Used as a mixin for GeoServerMainDialog.
 
 from qgis.core import Qgis
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import QDialog, QMessageBox
+from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 
@@ -38,23 +38,14 @@ class WorkspaceTabMixin:
             self._setup_table(
                 [
                     self.tr("Workspace Name"),
-                    self.tr("Isolated"),
                     self.tr("Actions"),
                 ]
             )
             workspaces = self._fetch_list(self.gs.get_workspaces)
-
-            rows = []
-            for ws in workspaces:
-                name = ws.get("name", str(ws)) if isinstance(ws, dict) else str(ws)
-                detail, _ = self.gs.get_workspace(name)
-                isolated = (
-                    str(detail.get("isolated", False))
-                    if isinstance(detail, dict)
-                    else "—"
-                )
-                rows.append([name, isolated])
-
+            rows = [
+                [ws.get("name", str(ws)) if isinstance(ws, dict) else str(ws)]
+                for ws in workspaces
+            ]
             self._populate_rows(rows)
         except Exception as e:
             self.show_error_message(self.tr("Failed to load workspaces: {}").format(e))
@@ -84,6 +75,22 @@ class WorkspaceTabMixin:
             },
         ]
 
+    def _set_default_workspace(self, name):
+        """Set the GeoServer default workspace.
+
+        TODO: move to geoservercloud — its create_workspace(set_default_workspace=True)
+        only sets a client-side attribute, it never calls the server.
+        Workaround: PUT /rest/workspaces/default.json
+        """
+        path = f"{self.gs.rest_service.rest_endpoints.base_url}/workspaces/default.json"
+        response = self.gs.rest_service.rest_client.put(
+            path, json={"workspace": {"name": name}}
+        )
+        if response.status_code >= 400:
+            raise RuntimeError(
+                f"HTTP {response.status_code}: {response.content.decode()}"
+            )
+
     def _add_workspace(self):
         """Open a form dialog to create a new workspace."""
         dlg = ResourceFormDialog(
@@ -98,11 +105,11 @@ class WorkspaceTabMixin:
         values = dlg.get_values()
         self.setCursor(Qt.CursorShape.WaitCursor)
         try:
-            self.gs.create_workspace(
-                values["name"],
-                isolated=values["isolated"],
-                set_default_workspace=values["set_default"],
+            self._check(
+                self.gs.create_workspace(values["name"], isolated=values["isolated"])
             )
+            if values["set_default"]:
+                self._set_default_workspace(values["name"])
             self.show_success_message(
                 self.tr("Workspace '{}' created.").format(values["name"])
             )
@@ -121,9 +128,25 @@ class WorkspaceTabMixin:
     def _show_workspace_info(self, row_data):
         """Open a form dialog to view/edit an existing workspace."""
         old_name = row_data[0]
+
+        self.setCursor(Qt.CursorShape.WaitCursor)
+        try:
+            detail = self._check(self.gs.get_workspace(old_name))
+        except Exception as e:
+            self.show_error_message(
+                self.tr("Failed to load workspace details: {}").format(e)
+            )
+            return
+        finally:
+            self.unsetCursor()
+
         current_values = {
             "name": old_name,
-            "isolated": row_data[1] == "True",
+            "isolated": (
+                bool(detail.get("isolated", False))
+                if isinstance(detail, dict)
+                else False
+            ),
             "set_default": False,
         }
         dlg = ResourceFormDialog(
@@ -153,15 +176,13 @@ class WorkspaceTabMixin:
                     path, json=ws.put_payload()
                 )
                 if response.status_code >= 400:
-                    raise Exception(response.content.decode())
+                    raise RuntimeError(response.content.decode())
             else:
-                self.gs.create_workspace(
-                    new_name,
-                    isolated=values["isolated"],
-                    set_default_workspace=values["set_default"],
+                self._check(
+                    self.gs.create_workspace(new_name, isolated=values["isolated"])
                 )
             if values["set_default"]:
-                self.gs.default_workspace = new_name
+                self._set_default_workspace(new_name)
             self.show_success_message(
                 self.tr("Workspace '{}' updated.").format(new_name)
             )
@@ -177,65 +198,17 @@ class WorkspaceTabMixin:
         finally:
             self.unsetCursor()
 
-    def _delete_selected_workspaces(self, selected_rows):
-        """Delete multiple workspaces after confirmation."""
-        if not selected_rows:
-            return
-
-        names = [row[0] for row in selected_rows]
-        reply = QMessageBox.warning(
-            self,
-            self.tr("Confirm Delete"),
-            self.tr(
-                "Are you sure you want to delete {} workspace(s)?\n\n{}\n\n"
-                "This action cannot be undone."
-            ).format(len(names), "\n".join(f"  \u2022 {n}" for n in names)),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-
-        self.setCursor(Qt.CursorShape.WaitCursor)
-        errors = []
-        try:
-            for name in names:
-                try:
-                    self.gs.delete_workspace(name)
-                except Exception as e:
-                    errors.append(f"{name}: {e}")
-            if errors:
-                self.show_error_message(
-                    self.tr("Failed to delete some workspaces:\n{}").format(
-                        "\n".join(errors)
-                    )
-                )
-            else:
-                self.show_success_message(
-                    self.tr("{} workspace(s) deleted.").format(len(names))
-                )
-            self._load_workspaces()
-        finally:
-            self.unsetCursor()
-
     def _delete_workspace(self, row_data):
-        """Delete the workspace after confirmation."""
-        name = row_data[0]
-        if not self._confirm_delete(self.tr("workspace"), name):
-            return
+        """Delete a single workspace after confirmation."""
+        self._delete_selected_workspaces([row_data])
 
-        self.setCursor(Qt.CursorShape.WaitCursor)
-        try:
-            self.gs.delete_workspace(name)
-            self.show_success_message(self.tr("Workspace '{}' deleted.").format(name))
-            self._load_workspaces()
-        except Exception as e:
-            self.show_error_message(
-                self.tr("Failed to delete workspace '{}': {}").format(name, e)
-            )
-            self.log(
-                f"Delete workspace error: {e}",
-                log_level=Qgis.MessageLevel.Critical,
-            )
-        finally:
-            self.unsetCursor()
+    def _delete_selected_workspaces(self, selected_rows):
+        """Delete one or more workspaces after confirmation."""
+        self._delete_many(
+            self.tr("workspace"),
+            [
+                (row[0], lambda n=row[0]: self._check(self.gs.delete_workspace(n)))
+                for row in selected_rows
+            ],
+            self._load_workspaces,
+        )
