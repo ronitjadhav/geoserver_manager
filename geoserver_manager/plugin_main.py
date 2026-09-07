@@ -140,6 +140,11 @@ class GeoServerManagerPlugin:
 
     def unload(self) -> None:
         """Cleans up when plugin is disabled/uninstalled."""
+        # -- Close and drop the main dialog
+        if self.main_dialog:
+            self.main_dialog.close()
+            self.main_dialog = None
+
         # -- Clean up menu and toolbar
         self.iface.removeToolBarIcon(self.action_main)
         self.iface.removePluginMenu(__title__, self.action_main)

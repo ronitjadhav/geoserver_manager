@@ -88,6 +88,10 @@ class ResourceFormDialog(QDialog):
         self._fields = fields
         self._widgets = {}  # key -> widget
         self._row_widgets = {}  # key -> (label_widget, wrapper_widget) for visibility
+        # Keys hidden on purpose. Tracked explicitly because Qt reports every
+        # widget on a non-active tab as invisible, which would silently skip
+        # validation of required fields the user simply hasn't scrolled to.
+        self._hidden_keys = set()
 
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
@@ -106,17 +110,22 @@ class ResourceFormDialog(QDialog):
         # Group fields by tab
         groups = self._collect_groups(fields)
 
+        self._tabs = None
+        self._field_page = {}  # key -> tab page, to reveal validation errors
+
         if len(groups) == 1:
             # Single group — no tabs needed
             form = self._build_form(list(groups.values())[0], values)
             layout.addWidget(form)
         else:
             # Multiple groups — use tabs
-            tabs = QTabWidget()
+            self._tabs = QTabWidget()
             for group_name, group_fields in groups.items():
                 page = self._build_form(group_fields, values)
-                tabs.addTab(page, group_name)
-            layout.addWidget(tabs)
+                self._tabs.addTab(page, group_name)
+                for field in group_fields:
+                    self._field_page[field["key"]] = page
+            layout.addWidget(self._tabs)
 
         # Stretch to push buttons to the bottom
         layout.addStretch()
@@ -183,8 +192,7 @@ class ResourceFormDialog(QDialog):
 
             # Initial visibility
             if field.get("visible") is False:
-                label.setVisible(False)
-                wrapper_widget.setVisible(False)
+                self.set_field_visible(field["key"], False)
 
             # on_change callback for combo widgets
             if field.get("type") == "combo" and field.get("on_change"):
@@ -291,6 +299,10 @@ class ResourceFormDialog(QDialog):
             label, wrapper = self._row_widgets[key]
             label.setVisible(visible)
             wrapper.setVisible(visible)
+        if visible:
+            self._hidden_keys.discard(key)
+        else:
+            self._hidden_keys.add(key)
 
     def get_widget(self, key):
         """Return the widget for a field by key.
@@ -320,40 +332,21 @@ class ResourceFormDialog(QDialog):
             if not field.get("read_only"):
                 widget.setStyleSheet("")
 
+        values = self.get_values()
         for field in self._fields:
             if not field.get("required"):
                 continue
-            # Skip hidden fields
             key = field["key"]
-            if key in self._row_widgets:
-                _, wrapper = self._row_widgets[key]
-                if not wrapper.isVisible():
-                    continue
-            value = self.get_values()[key]
+            if key in self._hidden_keys:  # not applicable to the current form
+                continue
+            value = values[key]
             if not value:
+                # Bring the offending field on screen — it may sit on another tab
+                if self._tabs is not None and key in self._field_page:
+                    self._tabs.setCurrentWidget(self._field_page[key])
                 widget = self._widgets[key]
                 widget.setFocus()
                 widget.setStyleSheet("border: 1px solid red;")
                 return
 
         self.accept()
-
-    def set_field_value(self, key, value):
-        """Programmatically set a field value by key."""
-        if key not in self._widgets:
-            return
-        widget = self._widgets[key]
-        field = next((f for f in self._fields if f["key"] == key), None)
-        if not field:
-            return
-        ftype = field.get("type", "text")
-        if ftype == "text":
-            widget.setText(str(value) if value else "")
-        elif ftype == "checkbox":
-            widget.setChecked(bool(value))
-        elif ftype == "combo":
-            widget.setCurrentText(str(value))
-        elif ftype == "spinbox":
-            widget.setValue(int(value) if value else 0)
-        elif ftype == "textarea":
-            widget.setPlainText(str(value) if value else "")

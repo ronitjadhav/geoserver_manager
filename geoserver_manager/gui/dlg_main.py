@@ -68,6 +68,7 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         self._delete_selected_callback = (
             None  # callback(list[row_data]) for bulk delete
         )
+        self._workspace_names = []  # cache for the datastore form combo boxes
 
         # Tooltips
         self.btn_close.setToolTip(self.tr("Close the dialog"))
@@ -148,6 +149,19 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
 
     # -- Connection --------------------------------------------------------
 
+    @staticmethod
+    def _check(result):
+        """Unpack a geoservercloud (content, status_code) tuple.
+
+        The library's REST client raises for most HTTP errors, but deliberately
+        lets three statuses through: 404 on GET/DELETE and 409 on POST. Those
+        would otherwise read as success, so raise here too.
+        """
+        content, status_code = result
+        if status_code >= 400:
+            raise RuntimeError(f"HTTP {status_code}: {content}")
+        return content
+
     def _connect(self):
         """Create a GeoServerCloud client and verify the server is reachable.
 
@@ -175,6 +189,7 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             return False
 
         from geoservercloud import GeoServerCloud
+        from requests.exceptions import HTTPError
 
         gs = GeoServerCloud(
             url=settings.geoserver_url,
@@ -182,12 +197,19 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             password=password,
         )
 
-        # Test the connection with a real request
+        # Test the connection with a real request.
+        # HTTPError must be caught before OSError: requests' exceptions all
+        # subclass OSError, so a 401 would otherwise be reported as an
+        # unreachable server.
         try:
             _, status_code = gs.get_workspaces()
+        except HTTPError as e:
+            # raise_for_status() always attaches the response; 500 is a safe
+            # stand-in that routes to the generic HTTP branch below.
+            status_code = e.response.status_code if e.response is not None else 500
         except OSError:
-            # requests raises ConnectionError (subclass of OSError) when the
-            # server is unreachable, refused, or the URL is wrong
+            # requests raises ConnectionError/Timeout (subclasses of OSError)
+            # when the server is unreachable, refused, or the host is wrong
             self._set_status(self.tr("Server unreachable"), "red")
             self.show_error_message(
                 self.tr(
@@ -203,7 +225,7 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             self.gs = None
             return False
 
-        if status_code == 401:
+        if status_code in (401, 403):
             self._set_status(self.tr("Authentication failed"), "red")
             self.show_error_message(
                 self.tr(
@@ -213,11 +235,47 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             self.gs = None
             return False
 
+        if status_code >= 400:
+            # 404 is not raised by the library: it usually means the URL points
+            # somewhere that isn't a GeoServer REST endpoint.
+            self._set_status(self.tr("HTTP error {}").format(status_code), "red")
+            self.show_error_message(
+                self.tr(
+                    "GeoServer returned HTTP {code} for {url} — check the URL in Settings."
+                ).format(code=status_code, url=settings.geoserver_url)
+            )
+            self.log(
+                f"Connection check returned HTTP {status_code}",
+                log_level=Qgis.MessageLevel.Critical,
+            )
+            self.gs = None
+            return False
+
         self.gs = gs
-        self._set_status(
-            self.tr("Connected — {}").format(settings.geoserver_url), "green"
-        )
+        status = self.tr("Connected — {}").format(settings.geoserver_url)
+        version = self._fetch_version_label()
+        if version:
+            status += f" ({version})"
+        self._set_status(status, "green")
         return True
+
+    def _fetch_version_label(self):
+        """Best-effort 'GeoServer x.y.z' string for the status bar.
+
+        Not required for a successful connection — if it fails, we still
+        show "Connected" without the version suffix.
+        """
+        try:
+            info = self._check(self.gs.get_version())
+        except Exception:
+            return ""
+        if not isinstance(info, dict):
+            return ""
+        for res in info.get("about", {}).get("resource", []):
+            if res.get("@name", "").lower().startswith("geoserver"):
+                version = res.get("Version", "")
+                return f"GeoServer {version}" if version else ""
+        return ""
 
     def _set_status(self, text, color="black"):
         self.lbl_status.setText(text)
@@ -251,6 +309,15 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             )
         if self.navList.count():
             self.navList.setCurrentRow(0)
+
+    def _reload_current_tab(self):
+        """Reload whichever tab is selected.
+
+        Use this instead of a specific loader when the caller may have been
+        reached from another tab (e.g. editing a workspace from the datastore
+        list), otherwise the table gets repainted with the wrong resource type.
+        """
+        self._on_nav_changed(self.navList.currentRow())
 
     def _on_nav_changed(self, index):
         """Load data for the selected navigation tab."""
@@ -305,6 +372,10 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
 
     def _setup_table(self, columns):
         """Reset the table with the given column headers."""
+        # Sorting must stay off: rows are paginated in Python and selections are
+        # mapped back by row index, so a header click would make the table delete
+        # a different resource than the one highlighted.
+        self.resultsTable.setSortingEnabled(False)
         self.resultsTable.clear()
         self.resultsTable.setColumnCount(len(columns))
         self.resultsTable.setHorizontalHeaderLabels(columns)
@@ -324,7 +395,10 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         )
 
     def _get_selected_rows(self):
-        """Return the row data for all currently selected table rows."""
+        """Return the row data for all currently selected table rows.
+
+        Assumes the table renders _filtered_rows in order — see _setup_table.
+        """
         selected = []
         start = self._current_page * self._page_size
         for index in self.resultsTable.selectionModel().selectedRows():
@@ -457,16 +531,10 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         self._show_page()
 
     def _fetch_list(self, api_method, *args):
-        """Call a geoservercloud list endpoint. Returns a list or []."""
-        try:
-            result, _ = api_method(*args)
-            return result if isinstance(result, list) else []
-        except Exception as e:
-            self.log(
-                f"API error ({api_method.__name__}): {e}",
-                log_level=Qgis.MessageLevel.Warning,
-            )
-            return []
+        """Call a geoservercloud list endpoint. Returns a list or [].
+        Raises on HTTP errors — callers surface them to the user."""
+        result = self._check(api_method(*args))
+        return result if isinstance(result, list) else []
 
     def _confirm_delete(self, resource_type, name):
         """Show a confirmation dialog before deleting a resource.
@@ -486,6 +554,68 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             QMessageBox.StandardButton.No,
         )
         return reply == QMessageBox.StandardButton.Yes
+
+    def _delete_many(self, kind, labeled_deletes, reload_fn):
+        """Confirm and run one or more deletions, then reload the table.
+
+        :param kind: human-readable resource type (e.g. "workspace").
+        :param labeled_deletes: list of (label, zero-arg callable) pairs.
+        :param reload_fn: called afterwards to refresh the table.
+        """
+        if not labeled_deletes:
+            return
+
+        if len(labeled_deletes) == 1:
+            if not self._confirm_delete(kind, labeled_deletes[0][0]):
+                return
+        else:
+            bullets = "\n".join(f"  • {lbl}" for lbl, _ in labeled_deletes)
+            reply = QMessageBox.warning(
+                self,
+                self.tr("Confirm Delete"),
+                self.tr(
+                    "Are you sure you want to delete {count} {kind}(s)?\n\n{items}\n\n"
+                    "This action cannot be undone."
+                ).format(count=len(labeled_deletes), kind=kind, items=bullets),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
+        self.setCursor(Qt.CursorShape.WaitCursor)
+        errors = []
+        try:
+            for label, delete_fn in labeled_deletes:
+                try:
+                    delete_fn()
+                except Exception as e:
+                    errors.append(f"{label}: {e}")
+                    self.log(
+                        f"Delete {kind} error ({label}): {e}",
+                        log_level=Qgis.MessageLevel.Critical,
+                    )
+            if errors:
+                self.show_error_message(
+                    self.tr("Failed to delete some {kind}(s):\n{errors}").format(
+                        kind=kind, errors="\n".join(errors)
+                    )
+                )
+            elif len(labeled_deletes) == 1:
+                self.show_success_message(
+                    self.tr("{kind} '{name}' deleted.").format(
+                        kind=kind.capitalize(), name=labeled_deletes[0][0]
+                    )
+                )
+            else:
+                self.show_success_message(
+                    self.tr("{count} {kind}(s) deleted.").format(
+                        count=len(labeled_deletes), kind=kind
+                    )
+                )
+            reload_fn()
+        finally:
+            self.unsetCursor()
 
     # -- Dialog actions ----------------------------------------------------
 

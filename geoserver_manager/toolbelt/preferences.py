@@ -85,7 +85,8 @@ class PlgSettingsStructure:
 
         :param username: GeoServer username.
         :param password: GeoServer password.
-        :return: the auth config ID.
+        :return: the auth config ID, or an empty string if the auth database
+            refused the write (e.g. the master password was not entered).
         """
         auth_mgr = QgsApplication.authManager()
         auth_cfg = QgsAuthMethodConfig()
@@ -97,7 +98,8 @@ class PlgSettingsStructure:
             ):
                 auth_cfg.setConfig("username", username)
                 auth_cfg.setConfig("password", password)
-                auth_mgr.updateAuthenticationConfig(auth_cfg)
+                if not auth_mgr.updateAuthenticationConfig(auth_cfg):
+                    return ""
                 return self.geoserver_auth_cfg_id
 
         # Create a new auth config
@@ -105,7 +107,8 @@ class PlgSettingsStructure:
         auth_cfg.setMethod("Basic")
         auth_cfg.setConfig("username", username)
         auth_cfg.setConfig("password", password)
-        auth_mgr.storeAuthenticationConfig(auth_cfg)
+        if not auth_mgr.storeAuthenticationConfig(auth_cfg):
+            return ""
         return auth_cfg.id()
 
     def remove_credentials(self) -> None:

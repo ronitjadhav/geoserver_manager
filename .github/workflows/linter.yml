@@ -15,7 +15,7 @@ on:
 
 env:
   PROJECT_FOLDER: "geoserver_manager"
-  PYTHON_VERSION: 3.9
+  PYTHON_VERSION: "3.12"
 
 
 jobs:
@@ -74,4 +74,3 @@ jobs:
           name: pyqt6-checker-error-report
           path: pyqt6_checker.log
           retention-days: 7
-  

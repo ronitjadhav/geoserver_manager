@@ -6,9 +6,11 @@ Datastore tab — load, create, edit, delete datastores.
 Used as a mixin for GeoServerMainDialog.
 """
 
+from concurrent.futures import ThreadPoolExecutor
+
 from qgis.core import Qgis
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import QDialog, QMessageBox
+from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 
@@ -19,9 +21,18 @@ _SUPPORTED_TYPES = [
     "PMTiles",
 ]
 
+# Listing datastores needs one GET per workspace plus one per datastore.
+# ponytail: 8 parallel GETs keep that bearable; it still runs on the GUI
+# thread, so move to QgsTask if a big server still feels frozen.
+_MAX_PARALLEL_REQUESTS = 8
+
 
 class DatastoreTabMixin:
-    """Mixin that adds datastore CRUD methods to the main dialog."""
+    """Mixin that adds datastore CRUD methods to the main dialog.
+
+    ponytail: same translation caveat as WorkspaceTabMixin — self.tr() here is
+    extracted under this class but resolved against the host dialog's context.
+    """
 
     def _load_datastores(self):
         """Fetch all datastores across all workspaces and display them."""
@@ -54,27 +65,19 @@ class DatastoreTabMixin:
                 ]
             )
 
-            workspaces = self._fetch_list(self.gs.get_workspaces)
-            rows = []
-            for ws in workspaces:
-                ws_name = ws.get("name", str(ws)) if isinstance(ws, dict) else str(ws)
-                datastores = self._fetch_list(self.gs.get_datastores, ws_name)
-                for ds in datastores:
-                    ds_name = (
-                        ds.get("name", str(ds)) if isinstance(ds, dict) else str(ds)
-                    )
-                    try:
-                        detail, _ = self.gs.get_datastore(ws_name, ds_name)
-                        if isinstance(detail, dict):
-                            ds_type = detail.get("type", "—")
-                            enabled = str(detail.get("enabled", True))
-                        else:
-                            ds_type = "—"
-                            enabled = "—"
-                    except Exception:
-                        ds_type = "—"
-                        enabled = "—"
-                    rows.append([ds_name, ws_name, ds_type, enabled])
+            ws_names = self._get_workspace_names(refresh=True)
+            with ThreadPoolExecutor(max_workers=_MAX_PARALLEL_REQUESTS) as pool:
+                names_per_ws = pool.map(self._datastore_names, ws_names)
+                pairs = [
+                    (ws_name, ds_name)
+                    for ws_name, ds_names in zip(ws_names, names_per_ws)
+                    for ds_name in ds_names
+                ]
+                summaries = pool.map(lambda pair: self._datastore_summary(*pair), pairs)
+                rows = [
+                    [ds_name, ws_name, ds_type, enabled]
+                    for (ws_name, ds_name), (ds_type, enabled) in zip(pairs, summaries)
+                ]
 
             self._populate_rows(rows)
         except Exception as e:
@@ -83,14 +86,34 @@ class DatastoreTabMixin:
         finally:
             self.unsetCursor()
 
-    def _datastore_fields(
-        self, workspace_names, on_type_changed=None, read_only_workspace=False
-    ):
+    def _datastore_names(self, workspace_name):
+        """Return the datastore names of one workspace. Raises on HTTP errors."""
+        return [
+            ds.get("name", str(ds)) if isinstance(ds, dict) else str(ds)
+            for ds in self._fetch_list(self.gs.get_datastores, workspace_name)
+        ]
+
+    def _datastore_summary(self, workspace_name, datastore_name):
+        """Best-effort (type, enabled) for the list view — "—" when unavailable.
+
+        One datastore failing to load must not blank the whole table.
+        """
+        unknown = ("—", "—")
+        try:
+            detail, _ = self.gs.get_datastore(workspace_name, datastore_name)
+        except Exception:
+            return unknown
+        if not isinstance(detail, dict):
+            return unknown
+        return (detail.get("type", "—"), str(detail.get("enabled", True)))
+
+    def _datastore_fields(self, workspace_names, on_type_changed=None, edit_mode=False):
         """Return datastore form field definitions with type-specific params.
 
         :param workspace_names: list of workspace names for the combo box.
         :param on_type_changed: callback(new_type) when the type combo changes.
-        :param read_only_workspace: disable workspace field in edit mode.
+        :param edit_mode: editing an existing datastore — the workspace is
+            fixed and the password has to be re-entered.
         """
         return [
             {
@@ -99,7 +122,7 @@ class DatastoreTabMixin:
                 "type": "combo",
                 "options": workspace_names,
                 "required": True,
-                "read_only": read_only_workspace,
+                "read_only": edit_mode,
                 "help": self.tr("The workspace this datastore belongs to"),
             },
             {
@@ -161,6 +184,11 @@ class DatastoreTabMixin:
                 "required": True,
                 "echo_password": True,
                 "group": self.tr("Connection"),
+                "help": (
+                    self.tr("Re-enter the password to save changes")
+                    if edit_mode
+                    else None
+                ),
             },
             {
                 "key": "pg_schema",
@@ -214,13 +242,20 @@ class DatastoreTabMixin:
         # PMTiles-only fields
         dlg.set_field_visible("pmtiles_url", is_pmtiles)
 
-    def _get_workspace_names(self):
-        """Return a list of workspace names from the current connection."""
-        workspaces = self._fetch_list(self.gs.get_workspaces)
-        return [
-            ws.get("name", str(ws)) if isinstance(ws, dict) else str(ws)
-            for ws in workspaces
-        ]
+    def _get_workspace_names(self, refresh=False):
+        """Return the workspace names, cached between dialog openings.
+
+        ponytail: the cache is refreshed whenever the datastore list reloads,
+        so Refresh picks up workspaces created elsewhere. That is enough to
+        stop every Add/Edit dialog from re-fetching the list.
+        """
+        if refresh or not self._workspace_names:
+            workspaces = self._fetch_list(self.gs.get_workspaces)
+            self._workspace_names = [
+                ws.get("name", str(ws)) if isinstance(ws, dict) else str(ws)
+                for ws in workspaces
+            ]
+        return self._workspace_names
 
     def _add_datastore(self):
         """Open a form dialog to create a new datastore."""
@@ -276,31 +311,37 @@ class DatastoreTabMixin:
         description = values.get("description") or None
 
         if ds_type == "PostGIS":
-            self.gs.create_pg_datastore(
-                workspace_name=ws,
-                datastore_name=name,
-                pg_host=values.get("pg_host", ""),
-                pg_port=int(values.get("pg_port", 5432)),
-                pg_db=values.get("pg_db", ""),
-                pg_user=values.get("pg_user", ""),
-                pg_password=values.get("pg_password", ""),
-                pg_schema=values.get("pg_schema", "public") or "public",
-                description=description,
+            self._check(
+                self.gs.create_pg_datastore(
+                    workspace_name=ws,
+                    datastore_name=name,
+                    pg_host=values.get("pg_host", ""),
+                    pg_port=int(values.get("pg_port", 5432)),
+                    pg_db=values.get("pg_db", ""),
+                    pg_user=values.get("pg_user", ""),
+                    pg_password=values.get("pg_password", ""),
+                    pg_schema=values.get("pg_schema", "public") or "public",
+                    description=description,
+                )
             )
         elif ds_type == "PostGIS (JNDI)":
-            self.gs.create_jndi_datastore(
-                workspace_name=ws,
-                datastore_name=name,
-                jndi_reference=values.get("jndi_reference", ""),
-                pg_schema=values.get("pg_schema", "public") or "public",
-                description=description,
+            self._check(
+                self.gs.create_jndi_datastore(
+                    workspace_name=ws,
+                    datastore_name=name,
+                    jndi_reference=values.get("jndi_reference", ""),
+                    pg_schema=values.get("pg_schema", "public") or "public",
+                    description=description,
+                )
             )
         elif ds_type == "PMTiles":
-            self.gs.create_pmtiles_datastore(
-                workspace_name=ws,
-                datastore_name=name,
-                pmtiles_url=values.get("pmtiles_url", ""),
-                description=description,
+            self._check(
+                self.gs.create_pmtiles_datastore(
+                    workspace_name=ws,
+                    datastore_name=name,
+                    pmtiles_url=values.get("pmtiles_url", ""),
+                    description=description,
+                )
             )
         else:
             raise ValueError(f"Unsupported datastore type: {ds_type}")
@@ -314,7 +355,7 @@ class DatastoreTabMixin:
         # Fetch full detail for connection_params
         self.setCursor(Qt.CursorShape.WaitCursor)
         try:
-            detail, _ = self.gs.get_datastore(ws_name, ds_name)
+            detail = self._check(self.gs.get_datastore(ws_name, ds_name))
         except Exception as e:
             self.show_error_message(
                 self.tr("Failed to load datastore details: {}").format(e)
@@ -348,7 +389,10 @@ class DatastoreTabMixin:
             "pg_port": int(conn_params.get("port", 5432) or 5432),
             "pg_db": conn_params.get("database", ""),
             "pg_user": conn_params.get("user", ""),
-            "pg_password": conn_params.get("passwd", ""),
+            # Never prefill: GeoServer returns this field encrypted
+            # ("crypt1:…") or not at all depending on its configuration, and
+            # writing that value back would replace the real password with it.
+            "pg_password": "",
             "pg_schema": conn_params.get("schema", "public"),
             # JNDI fields
             "jndi_reference": conn_params.get("jndiReferenceName", ""),
@@ -366,7 +410,7 @@ class DatastoreTabMixin:
                     "Datastore type '{}' is read-only (not supported for editing)"
                 ).format(ds_type)
             ),
-            fields=self._datastore_fields(workspace_names, read_only_workspace=True),
+            fields=self._datastore_fields(workspace_names, edit_mode=True),
             values=current_values,
             parent=self,
         )
@@ -382,8 +426,8 @@ class DatastoreTabMixin:
                     lambda t: self._on_type_changed(dlg, t)
                 )
                 self._on_type_changed(dlg, type_for_form)
-            # Disable type change in edit mode
-            type_combo.setEnabled(False)
+                # Disable type change in edit mode
+                type_combo.setEnabled(False)
 
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -408,68 +452,21 @@ class DatastoreTabMixin:
 
     def _delete_datastore(self, row_data):
         """Delete a single datastore after confirmation."""
-        ds_name, ws_name = row_data[0], row_data[1]
-        if not self._confirm_delete(self.tr("datastore"), f"{ws_name}/{ds_name}"):
-            return
-
-        self.setCursor(Qt.CursorShape.WaitCursor)
-        try:
-            self._do_delete_datastore(ws_name, ds_name)
-            self.show_success_message(
-                self.tr("Datastore '{}' deleted.").format(ds_name)
-            )
-            self._load_datastores()
-        except Exception as e:
-            self.show_error_message(
-                self.tr("Failed to delete datastore '{}': {}").format(ds_name, e)
-            )
-            self.log(
-                f"Delete datastore error: {e}", log_level=Qgis.MessageLevel.Critical
-            )
-        finally:
-            self.unsetCursor()
+        self._delete_selected_datastores([row_data])
 
     def _delete_selected_datastores(self, selected_rows):
-        """Delete multiple datastores after confirmation."""
-        if not selected_rows:
-            return
-
-        labels = [f"{row[1]}/{row[0]}" for row in selected_rows]
-        reply = QMessageBox.warning(
-            self,
-            self.tr("Confirm Delete"),
-            self.tr(
-                "Are you sure you want to delete {} datastore(s)?\n\n{}\n\n"
-                "This action cannot be undone."
-            ).format(len(labels), "\n".join(f"  \u2022 {lbl}" for lbl in labels)),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
+        """Delete one or more datastores after confirmation."""
+        self._delete_many(
+            self.tr("datastore"),
+            [
+                (
+                    f"{row[1]}/{row[0]}",
+                    lambda ws=row[1], ds=row[0]: self._do_delete_datastore(ws, ds),
+                )
+                for row in selected_rows
+            ],
+            self._load_datastores,
         )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-
-        self.setCursor(Qt.CursorShape.WaitCursor)
-        errors = []
-        try:
-            for row in selected_rows:
-                ds_name, ws_name = row[0], row[1]
-                try:
-                    self._do_delete_datastore(ws_name, ds_name)
-                except Exception as e:
-                    errors.append(f"{ws_name}/{ds_name}: {e}")
-            if errors:
-                self.show_error_message(
-                    self.tr("Failed to delete some datastores:\n{}").format(
-                        "\n".join(errors)
-                    )
-                )
-            else:
-                self.show_success_message(
-                    self.tr("{} datastore(s) deleted.").format(len(selected_rows))
-                )
-            self._load_datastores()
-        finally:
-            self.unsetCursor()
 
     def _do_delete_datastore(self, workspace_name, datastore_name):
         """Execute the REST DELETE for a datastore (recurse=true removes feature types too)."""
@@ -482,16 +479,8 @@ class DatastoreTabMixin:
             path, params={"recurse": "true"}
         )
         if response.status_code >= 400:
-            raise Exception(response.content.decode())
+            raise RuntimeError(response.content.decode())
 
     def _open_workspace_from_row(self, row_data):
         """Open the workspace info dialog for the workspace in a datastore row."""
-        ws_name = row_data[1]
-        try:
-            detail, _ = self.gs.get_workspace(ws_name)
-            isolated = (
-                str(detail.get("isolated", False)) if isinstance(detail, dict) else "—"
-            )
-        except Exception:
-            isolated = "—"
-        self._show_workspace_info([ws_name, isolated])
+        self._show_workspace_info([row_data[1]])

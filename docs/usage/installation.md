@@ -1,8 +1,17 @@
 # Installation
 
-## Stable version (recomended)
+## Released version
 
-This plugin is published on the official QGIS plugins repository: <https://plugins.qgis.org/plugins/geoserver_manager/>.### Using this plugin with QGIS Deployment Toolbelt (QDT)
+The plugin is not on the official QGIS plugins repository yet. Download the
+latest `geoserver_manager.*.zip` from the
+[releases page](https://github.com/ronitjadhav/geoserver_manager/releases) and
+install it with *Plugins → Manage and Install Plugins → Install from ZIP*.
+
+Once it is published, it will be available at
+<https://plugins.qgis.org/plugins/geoserver_manager/> and installable directly
+from the plugins manager.
+
+### Using this plugin with QGIS Deployment Toolbelt (QDT)
 
 If you want to use this plugin with [QGIS Deployment Toolbelt (QDT)](https://qgis-deployment.github.io/qgis-deployment-toolbelt-cli/), you can add the following snippet to your `profile.json` file, under the `plugins` attribute:
 
@@ -13,16 +22,17 @@ If you want to use this plugin with [QGIS Deployment Toolbelt (QDT)](https://qgi
 
 Remember to replace the `version` attribute with the version you want to install.
 
-## Beta versions released
+## Beta versions
 
-Enable experimental extensions in the QGIS plugins manager settings panel.
+The plugin is flagged as experimental, so enable experimental extensions in the
+QGIS plugins manager settings panel to see it.
 
-## Earlier development version
+## Latest development version
 
 If you define yourself as early adopter or a tester and can't wait for the release, the plugin is automatically packaged for each commit to main, so you can use this address as repository URL in your QGIS extensions manager settings:
 
 ```url
-http://github.com/ronitjadhav/geoserver_manager/pages/plugins.xml
+https://ronitjadhav.github.io/geoserver_manager/plugins.xml
 ```
 
 Be careful, this version can be unstable.
