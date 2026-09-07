@@ -68,6 +68,7 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         self._delete_selected_callback = (
             None  # callback(list[row_data]) for bulk delete
         )
+        self._workspace_names = []  # cache for the datastore form combo boxes
 
         # Tooltips
         self.btn_close.setToolTip(self.tr("Close the dialog"))
@@ -152,8 +153,9 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
     def _check(result):
         """Unpack a geoservercloud (content, status_code) tuple.
 
-        The library returns HTTP errors instead of raising, so raise here to
-        make every caller's error handling actually fire.
+        The library's REST client raises for most HTTP errors, but deliberately
+        lets three statuses through: 404 on GET/DELETE and 409 on POST. Those
+        would otherwise read as success, so raise here too.
         """
         content, status_code = result
         if status_code >= 400:
@@ -187,6 +189,7 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             return False
 
         from geoservercloud import GeoServerCloud
+        from requests.exceptions import HTTPError
 
         gs = GeoServerCloud(
             url=settings.geoserver_url,
@@ -194,12 +197,19 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             password=password,
         )
 
-        # Test the connection with a real request
+        # Test the connection with a real request.
+        # HTTPError must be caught before OSError: requests' exceptions all
+        # subclass OSError, so a 401 would otherwise be reported as an
+        # unreachable server.
         try:
             _, status_code = gs.get_workspaces()
+        except HTTPError as e:
+            # raise_for_status() always attaches the response; 500 is a safe
+            # stand-in that routes to the generic HTTP branch below.
+            status_code = e.response.status_code if e.response is not None else 500
         except OSError:
-            # requests raises ConnectionError (subclass of OSError) when the
-            # server is unreachable, refused, or the URL is wrong
+            # requests raises ConnectionError/Timeout (subclasses of OSError)
+            # when the server is unreachable, refused, or the host is wrong
             self._set_status(self.tr("Server unreachable"), "red")
             self.show_error_message(
                 self.tr(
@@ -215,12 +225,28 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             self.gs = None
             return False
 
-        if status_code == 401:
+        if status_code in (401, 403):
             self._set_status(self.tr("Authentication failed"), "red")
             self.show_error_message(
                 self.tr(
                     "Authentication failed — check your username and password in Settings."
                 )
+            )
+            self.gs = None
+            return False
+
+        if status_code >= 400:
+            # 404 is not raised by the library: it usually means the URL points
+            # somewhere that isn't a GeoServer REST endpoint.
+            self._set_status(self.tr("HTTP error {}").format(status_code), "red")
+            self.show_error_message(
+                self.tr(
+                    "GeoServer returned HTTP {code} for {url} — check the URL in Settings."
+                ).format(code=status_code, url=settings.geoserver_url)
+            )
+            self.log(
+                f"Connection check returned HTTP {status_code}",
+                log_level=Qgis.MessageLevel.Critical,
             )
             self.gs = None
             return False
@@ -284,6 +310,15 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         if self.navList.count():
             self.navList.setCurrentRow(0)
 
+    def _reload_current_tab(self):
+        """Reload whichever tab is selected.
+
+        Use this instead of a specific loader when the caller may have been
+        reached from another tab (e.g. editing a workspace from the datastore
+        list), otherwise the table gets repainted with the wrong resource type.
+        """
+        self._on_nav_changed(self.navList.currentRow())
+
     def _on_nav_changed(self, index):
         """Load data for the selected navigation tab."""
         if not self.gs or index < 0:
@@ -337,6 +372,10 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
 
     def _setup_table(self, columns):
         """Reset the table with the given column headers."""
+        # Sorting must stay off: rows are paginated in Python and selections are
+        # mapped back by row index, so a header click would make the table delete
+        # a different resource than the one highlighted.
+        self.resultsTable.setSortingEnabled(False)
         self.resultsTable.clear()
         self.resultsTable.setColumnCount(len(columns))
         self.resultsTable.setHorizontalHeaderLabels(columns)
@@ -356,7 +395,10 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         )
 
     def _get_selected_rows(self):
-        """Return the row data for all currently selected table rows."""
+        """Return the row data for all currently selected table rows.
+
+        Assumes the table renders _filtered_rows in order — see _setup_table.
+        """
         selected = []
         start = self._current_page * self._page_size
         for index in self.resultsTable.selectionModel().selectedRows():

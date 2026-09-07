@@ -14,7 +14,15 @@ from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 
 
 class WorkspaceTabMixin:
-    """Mixin that adds workspace CRUD methods to the main dialog."""
+    """Mixin that adds workspace CRUD methods to the main dialog.
+
+    ponytail: the self.tr() calls below cannot resolve translations. They are
+    extracted under this class name, but at runtime resolve to QObject.tr,
+    whose context is the host dialog (QDialog precedes the mixins in the MRO,
+    so overriding tr() here would be dead code). When the first translation
+    lands, switch these sites to an explicit
+    QCoreApplication.translate("WorkspaceTabMixin", ...).
+    """
 
     def _load_workspaces(self):
         """Fetch all workspaces and display them in the results table."""
@@ -186,7 +194,8 @@ class WorkspaceTabMixin:
             self.show_success_message(
                 self.tr("Workspace '{}' updated.").format(new_name)
             )
-            self._load_workspaces()
+            # Reachable from the datastore tab, so reload whatever is on screen
+            self._reload_current_tab()
         except Exception as e:
             self.show_error_message(
                 self.tr("Failed to update workspace '{}': {}").format(values["name"], e)

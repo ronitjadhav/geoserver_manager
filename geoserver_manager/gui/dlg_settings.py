@@ -98,19 +98,34 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         # geoserver URL (not sensitive — stored in QgsSettings)
         url = self.txt_gs_url.text().strip()
         if url and not url.startswith(("http://", "https://")):
+            # apply() cannot stop the options dialog from closing, so keep the
+            # previous URL and warn — dropping out here would also discard the
+            # credentials the user just typed.
             self.log(
-                message="GeoServer URL must start with http:// or https://",
+                message="GeoServer URL must start with http:// or https:// — "
+                "URL not saved.",
                 log_level=Qgis.MessageLevel.Warning,
                 push=True,
             )
-            return
-        settings.geoserver_url = url
+        else:
+            settings.geoserver_url = url
 
         # credentials (sensitive — stored encrypted in QgsAuthManager)
         username = self.txt_gs_username.text()
         password = self.txt_gs_password.text()
-        auth_cfg_id = settings.save_credentials(username, password)
-        settings.geoserver_auth_cfg_id = auth_cfg_id
+        if username or password:
+            auth_cfg_id = settings.save_credentials(username, password)
+            if auth_cfg_id:
+                settings.geoserver_auth_cfg_id = auth_cfg_id
+            else:
+                # Typically the user dismissed the master password prompt
+                self.log(
+                    message="Could not store the credentials in the QGIS "
+                    "authentication database. Check that the master password "
+                    "is set, then save again.",
+                    log_level=Qgis.MessageLevel.Critical,
+                    push=True,
+                )
 
         # dump settings into QgsSettings
         self.plg_settings.save_from_object(settings)
