@@ -39,12 +39,12 @@
     "python.testing.unittestEnabled": true,
     "python.testing.pytestEnabled": true,
     // Linter
-    
+
     "flake8.args": [
         "--config=setup.cfg",
         "--verbose"
     ],
-    
+
     // Extensions
     "autoDocstring.docstringFormat": "sphinx"
 }

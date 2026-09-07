@@ -1,136 +1,83 @@
-# GeoServer Manager - QGIS Plugin
+# GeoServer Manager — QGIS Plugin
 
+Browse and manage GeoServer instances from inside QGIS: list, create, edit and
+delete workspaces and datastores without switching to the GeoServer web admin.
+
+Built on [`python-geoservercloud`](https://github.com/camptocamp/python-geoservercloud).
+
+> **Status:** experimental. Workspaces and datastores are implemented; layers,
+> styles and layer upload are on the [roadmap](docs/github_issue_roadmap.md).
+
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
-[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
-
-
 [![flake8](https://img.shields.io/badge/linter-flake8-green)](https://flake8.pycqa.org/)
 
-## Generated options
+## Features
 
-### Plugin
+| Resource | Supported |
+| :------- | :-------- |
+| Workspaces | list, search, create, rename, toggle isolation, set default, delete (single + bulk) |
+| Datastores | list across all workspaces, create PostGIS / PostGIS (JNDI) / PMTiles, edit, delete (single + bulk, recursive) |
+| Connection | URL + credentials, credentials encrypted in the QGIS authentication database, live connection check with GeoServer version |
 
-> Here is a list of the options you picked when creating the plugin with the cookiecutter template.
+Results are searchable and paginated (20 per page); the datastore list links
+back to its workspace.
 
-| Cookiecutter option | Picked value |
-| :------------------ | :----------: |
-| Plugin name | GeoServer Manager |
-| Plugin name slugified | geoserver_manager |
-| Plugin name class (used in code) | GeoServerManager |
-| Plugin category | Web |
-| Plugin description short | Manage GeoServer instances directly from QGIS |
-| Plugin description long | Connect to GeoServer instances to browse, create and manage workspaces, datastores, layers and styles — all without leaving QGIS. Powered by python-geoservercloud. |
-| Plugin tags | geoserver,wms,wfs,workspace,datastore |
-| Plugin icon | default_icon.png |
-| Plugin with processing provider | False |
-| Author name | Ronit Jadhav |
-| Author organization | Camptocamp |
-| Author email | ronit.jadhav@camptocamp.com |
-| Minimum QGIS version | 3.40 |
-| Maximum QGIS version | 3.99 |
-| Support Qt6 | True |
-| Git repository URL | http://github.com/ronitjadhav/geoserver_manager |
-| Git default branch | main |
-| License | GPLv2+ |
-| Python linter | Flake8 |
-| CI/CD platform | GitHub |
-| Publish to <https://plugins.qgis.org> using CI/CD | True |
-| IDE | VSCode |
+## Requirements
 
-### Tooling
+- QGIS 3.40 or newer (Qt5 or Qt6)
+- Network access to a GeoServer REST API, with an account allowed to read and
+  write the resources you want to manage
 
-This project is configured with the following tools:
+`geoservercloud` and `xmltodict` ship with the plugin — QGIS's Python
+environment often cannot see system site-packages, so both are bundled as
+wheels in `geoserver_manager/extras/` and added to `sys.path` at startup.
+`owslib` and `requests` come with QGIS.
 
-- [Black](https://black.readthedocs.io/en/stable/) to format the code without any existential question
-- [iSort](https://pycqa.github.io/isort/) to sort the Python imports
+## Installation
 
-Code rules are enforced with [pre-commit](https://pre-commit.com/) hooks.  
-Static code analysis is based on: Flake8
+Until the plugin is published on <https://plugins.qgis.org>:
 
-See also: [contribution guidelines](CONTRIBUTING.md).
+1. Download the latest `geoserver_manager.*.zip` from the
+   [releases page](https://github.com/ronitjadhav/geoserver_manager/releases).
+2. In QGIS: *Plugins → Manage and Install Plugins → Install from ZIP*.
 
-## CI/CD
+For a development install, see
+[docs/development/environment.md](docs/development/environment.md).
 
-Plugin is linted, tested, packaged and published with GitHub.
+## Configuration
 
-If you mean to deploy it to the [official QGIS plugins repository](https://plugins.qgis.org/), remember to set your OSGeo credentials (`OSGEO_USER_NAME` and `OSGEO_USER_PASSWORD`) as environment variables in your CI/CD tool.
+*Settings → Options → GeoServer Manager*, or the plugin menu's *Settings* entry:
 
+| Field | Example |
+| :---- | :------ |
+| GeoServer URL | `https://example.com/geoserver` (must start with `http://` or `https://`) |
+| Username / Password | stored encrypted via `QgsAuthManager` — QGIS will ask for its master password |
 
-### Documentation
+Then open the plugin from the toolbar. The status line shows the connected
+server and its version; connection, authentication and HTTP errors are reported
+in the dialog's message bar and in the QGIS log panel (*GeoServer Manager* tab).
 
-The documentation is located in `docs` subfolder, written in Markdown using [myst-parser](https://myst-parser.readthedocs.io/), structured in two main parts, Usage and Contribution, generated using Sphinx (have a look to [the configuration file](./docs/conf.py)) and is automatically generated through the CI and published on Pages: <http://github.com/ronitjadhav/geoserver_manager/pages> (see [post generation steps](#2-build-the-documentation-locally) below).
+## Development
 
-----
+```sh
+# see docs/development/environment.md for the full setup
+python -m pip install -U -r requirements/development.txt
+pre-commit install
 
-## Next steps post generation
+pre-commit run -a                       # lint + format
+python -m pytest tests/unit             # no QGIS needed
+python -m pytest tests/qgis             # needs a QGIS Python environment
+```
 
-### 1. Set up development environment
+Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[contribution guide](docs/development/contribute.md).
 
-> Typical commands on Linux (Ubuntu).
+## Documentation
 
-1. If you didn't pick the `git init` option, initialize your local repository:
-
-    ```sh
-    git init
-    ```
-
-1. Follow the [embedded documentation to set up your development environment](./docs/development/environment.md) to create  virtual environment and install development dependencies.
-1. Add all files to git index to prepare initial commit:
-
-    ```sh
-    git add -A
-    ```
-
-1. Run the git hooks to ensure that everything runs OK and to start developing on quality standards:
-
-    ```sh
-    # run all pre-commit hooks on all files
-    pre-commit run -a
-    # don't be shy, run it again until it's all green
-    ```
-
-### 2. Adjust URL and build the documentation locally
-
-> [!NOTE]
-> Since it's very hard to determine which the final documentation URL will be, the templater does not set it up. You have to do it manually.
-> The final URL should be something like this: <https://{user_org}.github.io/{project_slug}>. You can find it in Pages settings of your repository: <http://github.com/ronitjadhav/geoserver_manager/pages>.
-
-1. Have a look to the [plugin's metadata.txt file](geoserver_manager/metadata.txt): review it, complete it or fix it if needed (URLs, etc.)., especially the `homepage` URL which should be to your GitLab or GitHub Pages.
-1. Update the base URL of custom repository in [installation doc page](./docs/usage/installation.md).
-1. Change the plugin's icon stored in `geoserver_manager/resources/images`
-1. Follow the [embedded documentation to build plugin documentation locally](./docs/development/documentation.md)
-
-### 3. Prepare your remote repository
-
-1. If you did not yet, create a remote repository on your Git hosting platform (GitHub, GitLab, etc.)
-1. Create labels listed in [labeler.yml file](.github/labeler.yml) to make PR auto-labelling work.
-1. Switch the source of GitHub Pages to `GitHub Actions` in your repository settings <http://github.com/ronitjadhav/geoserver_manager/pages>
-1. Add the remote repository to your local repository:
-
-    ```sh
-    git remote add origin http://github.com/ronitjadhav/geoserver_manager
-    ```
-
-1. Commit changes:
-
-    ```sh
-    git commit -m "init(plugin): adding first files of GeoServer Manager" -m "generated with QGIS Plugin Templater (https://oslandia.gitlab.io/qgis/template-qgis-plugin)"
-    ```
-
-1. Push the initial commit to the remote repository:
-
-    ```sh
-    git push -u origin main
-    ```
-
-1. Create a new release following the [packaging/release guide](./docs//development/packaging.md) with the tag `0.1.0-beta1` to trigger the CI/CD pipeline and publish the plugin on the [official QGIS plugins repository](https://plugins.qgis.org/) (if you picked up the option).
-
-
-1. After publishing the plugin for the first time on the official QGIS repository, remember to indicate the plugin ID in the [documentation configuration](./docs/conf.py).
-
-
-----
+Written in Markdown under `docs/`, built with Sphinx + myst-parser and
+published to <https://ronitjadhav.github.io/geoserver_manager/>.
 
 ## License
 

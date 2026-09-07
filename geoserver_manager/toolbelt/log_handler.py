@@ -3,7 +3,7 @@
 # standard library
 import logging
 from functools import partial
-from typing import Callable, Literal, Optional
+from typing import Callable, Optional
 
 # PyQGIS
 from qgis.core import Qgis, QgsMessageLog, QgsMessageOutput

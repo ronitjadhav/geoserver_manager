@@ -19,7 +19,7 @@ on:
 
 env:
   PROJECT_FOLDER: "geoserver_manager"
-  PYTHON_VERSION: 3.9
+  PYTHON_VERSION: "3.12"
 
 
 jobs:
@@ -58,7 +58,7 @@ jobs:
         PYTHONPATH: "/usr/share/qgis/python/plugins:/usr/share/qgis/python:."
         QT_QPA_PLATFORM: "offscreen"
         WITH_PYTHON_PEP: false
-      # be careful, things have changed since QGIS 3.40. So if you are using this setup 
+      # be careful, things have changed since QGIS 3.40. So if you are using this setup
       #  with a QGIS version older than 3.40, you may need to change the way you set up the container
       volumes:
         # Mount the X11 socket to allow GUI applications to run
