@@ -22,6 +22,12 @@ from geoserver_manager.__about__ import DIR_PLUGIN_ROOT
 from geoserver_manager.toolbelt.log_handler import PlgLogger
 
 # All bundled WHLs — order matters: deps first, then geoservercloud
+#
+# The geoservercloud wheel is the upstream one with its geoserver_acceptance_tests
+# package removed (15.3 MB of test fixtures, none of it imported): 16 MB -> 49 KB.
+# When bumping the version, strip the fresh wheel the same way, e.g.
+#   zip -d geoservercloud-<v>-py3-none-any.whl 'geoserver_acceptance_tests/*'
+# and drop the matching lines from its dist-info/RECORD.
 EXTRAS_DIR = DIR_PLUGIN_ROOT / "extras"
 BUNDLED_WHLS = [
     EXTRAS_DIR / "xmltodict-1.0.4-py3-none-any.whl",
