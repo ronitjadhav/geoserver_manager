@@ -51,7 +51,7 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 - [x] Upload style from `.sld` file
 - [x] Upload style from pasted string
 - [x] Delete style
-- [ ] Set default style for a layer
+- [x] Set default style for a layer
 
 ## Layer Groups
 

@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   definition and body, and edit the body of SLD/MBStyle styles in place;
   upload a style from pasted SLD or from an `.sld` / `.zip` / `.mbstyle` file;
   delete (single and bulk, purging the file and clearing references).
+- **Set style** on the Layers tab: pick a layer's default style among the
+  global styles and its workspace's own; nothing else on the layer is touched.
 - The form dialog gained a `file` field type (path + Browse).
 - **Add to QGIS** from the Layers tab: load any GeoServer layer into the current
   project as WMS, WFS (the actual features) or WMTS (via GeoWebCache). The layer

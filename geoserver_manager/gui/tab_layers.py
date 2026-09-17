@@ -45,7 +45,16 @@ class LayerTabMixin:
                     self.tr("Add to QGIS"),
                     self._add_layer_to_qgis,
                 ),
-                ("mActionDeleteSelected.svg", self.tr("Delete"), self._delete_layer),
+                (
+                    "mActionStyleManager.svg",
+                    self.tr("Set style"),
+                    self._set_layer_style,
+                ),
+                (
+                    "mActionDeleteSelected.svg",
+                    self.tr("Delete"),
+                    self._delete_layer,
+                ),
             ]
             self._setup_table(
                 [
@@ -435,6 +444,80 @@ class LayerTabMixin:
                 keywords=[k for k in keywords if k],
             )
         )
+
+    # -- Default style --------------------------------------------------------
+
+    def _layer_default_style(self, workspace_name, name):
+        """The layer's current default style name, or None if unreadable.
+
+        TODO(#50): upstream — the facade has set_default_layer_style() but no
+        get_layer(); rest_service.get_layer() exists and is used here directly.
+        """
+        try:
+            layer = self._check(self.gs.rest_service.get_layer(workspace_name, name))
+        except Exception:
+            return None
+        info = layer.asdict() if hasattr(layer, "asdict") else layer
+        return info.get("defaultStyle") if isinstance(info, dict) else None
+
+    def _style_choices(self, workspace_name):
+        """Styles a layer in this workspace may use: global ones and its workspace's.
+
+        A workspace style is referenced by its qualified name, "ws:style".
+        """
+        choices = [self._name_of(st) for st in self._fetch_list(self.gs.get_styles)]
+        choices += [
+            f"{workspace_name}:{self._name_of(st)}"
+            for st in self._fetch_list(self.gs.get_styles, workspace_name)
+        ]
+        return sorted(choices)
+
+    def _set_layer_style(self, row_data):
+        """Pick the default style for one layer."""
+        name, ws_name = row_data[0], row_data[1]
+        fetched = self._fetch(
+            lambda: (
+                self._style_choices(ws_name),
+                self._layer_default_style(ws_name, name),
+            ),
+            self.tr("Failed to load styles for '{}'").format(name),
+        )
+        if fetched is None:
+            return
+        choices, current = fetched
+        if current and current not in choices:
+            choices.insert(0, current)
+
+        dlg = ResourceFormDialog(
+            title=self.tr("Default style for '{}'").format(name),
+            description=self.tr(
+                "Global styles and the styles of workspace '{}'. Other styles the "
+                "layer may use stay as they are."
+            ).format(ws_name),
+            fields=[
+                {
+                    "key": "style",
+                    "label": self.tr("Default style"),
+                    "type": "combo",
+                    "options": choices,
+                    "default": current,
+                    "required": True,
+                }
+            ],
+            parent=self,
+        )
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        style = dlg.get_values()["style"]
+        if style == current:
+            return
+        if self._run_action(
+            lambda: self._check(self.gs.set_default_layer_style(name, ws_name, style)),
+            self.tr("Failed to set the style of '{}'").format(name),
+        ):
+            self.show_success_message(
+                self.tr("'{}' now uses style '{}'.").format(name, style)
+            )
 
     # -- Add to QGIS ----------------------------------------------------------
 

@@ -295,14 +295,6 @@ class TestAddToQgis(unittest.TestCase):
         with self.assertRaises(ValueError):
             GeoServerMainDialog._layer_uri("FTP", self.BASE, "x:y")
 
-    def test_add_action_is_offered_before_delete(self):
-        dlg = GeoServerMainDialog()
-        dlg.gs = FakeGS()
-        dlg.show_warning_message = lambda text: None
-        dlg._load_layers()
-        tooltips = [tooltip for _icon, tooltip, _cb in dlg._row_actions]
-        self.assertEqual(tooltips, ["Add to QGIS", "Delete"])
-
     def test_unreachable_layer_is_a_banner_not_a_project_entry(self):
         from unittest.mock import patch
 
@@ -467,6 +459,104 @@ class TestPublish(unittest.TestCase):
         ws.setCurrentText("empty")
         self.assertEqual(ds.count(), 0)
         self.assertEqual(table.count(), 0)
+
+
+class TestSetLayerStyle(unittest.TestCase):
+    """The default style is read from the layer and written through the library."""
+
+    def setUp(self):
+        self.dlg = GeoServerMainDialog()
+        outer = self
+        self.set_calls = []
+
+        class LayerModel:
+            def asdict(inner):
+                return {"name": "tasmania_roads", "defaultStyle": "simple_roads"}
+
+        class Rest:
+            def get_layer(inner, ws, name):
+                return (LayerModel(), 200)
+
+        class GS(FakeGS):
+            rest_service = Rest()
+
+            def get_styles(inner, workspace_name=None):
+                if workspace_name is None:
+                    return ([{"name": "population"}, {"name": "simple_roads"}], 200)
+                return ([{"name": "roads_ws"}], 200)
+
+            def set_default_layer_style(inner, layer_name, workspace_name, style):
+                outer.set_calls.append((layer_name, workspace_name, style))
+                return ("", 200)
+
+        self.dlg.gs = GS()
+        self.dlg.show_error_message = lambda t: self.fail(t)
+        self.dlg.show_success_message = lambda t: None
+
+    def test_choices_are_global_plus_qualified_workspace_styles(self):
+        self.assertEqual(
+            self.dlg._style_choices("topp"),
+            ["population", "simple_roads", "topp:roads_ws"],
+        )
+
+    def test_current_default_is_read_from_the_layer(self):
+        self.assertEqual(
+            self.dlg._layer_default_style("topp", "tasmania_roads"), "simple_roads"
+        )
+
+    def test_dialog_preselects_the_current_style(self):
+        from unittest.mock import patch
+
+        from qgis.PyQt.QtWidgets import QDialog
+
+        from geoserver_manager.gui import tab_layers
+        from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+
+        opened = []
+
+        class Recording(ResourceFormDialog):
+            def exec(self):
+                opened.append(self)
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_layers, "ResourceFormDialog", Recording):
+            self.dlg._set_layer_style(
+                ["tasmania_roads", "topp", "taz_shapes", "EPSG:4326", "True"]
+            )
+        combo = opened[0].get_widget("style")
+        self.assertEqual(combo.currentText(), "simple_roads")
+        self.assertEqual(
+            [combo.itemText(i) for i in range(combo.count())],
+            ["population", "simple_roads", "topp:roads_ws"],
+        )
+        self.assertEqual(self.set_calls, [])  # cancelled: nothing written
+
+    def test_choosing_another_style_writes_it(self):
+        from unittest.mock import patch
+
+        from qgis.PyQt.QtWidgets import QDialog
+
+        from geoserver_manager.gui import tab_layers
+        from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+
+        class Choosing(ResourceFormDialog):
+            def exec(self):
+                self.get_widget("style").setCurrentText("population")
+                return QDialog.DialogCode.Accepted
+
+        with patch.object(tab_layers, "ResourceFormDialog", Choosing):
+            self.dlg._set_layer_style(
+                ["tasmania_roads", "topp", "taz_shapes", "EPSG:4326", "True"]
+            )
+        self.assertEqual(self.set_calls, [("tasmania_roads", "topp", "population")])
+
+    def test_style_action_sits_between_add_and_delete(self):
+        self.dlg.show_warning_message = lambda t: None
+        self.dlg._load_layers()
+        self.assertEqual(
+            [t for _i, t, _c in self.dlg._row_actions],
+            ["Add to QGIS", "Set style", "Delete"],
+        )
 
 
 # ############################################################################
