@@ -478,6 +478,52 @@ class TestLinkCells(unittest.TestCase):
         self.assertEqual(self.opened, [["ds20", "topp", "PostGIS"]])
 
 
+class TestTlsVerification(unittest.TestCase):
+    """A certificate problem is named as such, and the setting reaches the client."""
+
+    def test_probe_names_a_certificate_problem(self):
+        import requests
+
+        class FakeGS:
+            def get_workspaces(inner):
+                raise requests.exceptions.SSLError("CERTIFICATE_VERIFY_FAILED")
+
+        status, message = GeoServerMainDialog()._probe(
+            FakeGS(), "https://gs.example.org"
+        )
+        self.assertIn("Certificate", status)
+        self.assertNotIn("is the server running", message)
+        self.assertIn("Verify the server", message)  # points at the setting
+
+    def test_build_client_passes_the_setting_through(self):
+        import sys
+        import types
+
+        seen = {}
+
+        class FakeGeoServerCloud:
+            def __init__(inner, **kwargs):
+                seen.update(kwargs)
+
+        fake = types.ModuleType("geoservercloud")
+        fake.GeoServerCloud = FakeGeoServerCloud
+
+        class Settings:
+            geoserver_url = "https://gs.example.org"
+            geoserver_verify_tls = False
+
+            def has_credentials(inner):
+                return True
+
+            def get_credentials(inner):
+                return ("admin", "secret")
+
+        with patch.dict(sys.modules, {"geoservercloud": fake}):
+            GeoServerMainDialog()._build_client(Settings())
+        self.assertIs(seen["verifytls"], False)
+        self.assertEqual(seen["url"], "https://gs.example.org")
+
+
 # ############################################################################
 # ####### Stand-alone run ########
 # ################################

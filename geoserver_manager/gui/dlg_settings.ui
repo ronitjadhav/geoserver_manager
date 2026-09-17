@@ -104,6 +104,19 @@
                                 </property>
                             </widget>
                         </item>
+                        <item row="3" column="1">
+                            <widget class="QCheckBox" name="opt_verify_tls">
+                                <property name="text">
+                                    <string>Verify the server's TLS certificate</string>
+                                </property>
+                                <property name="toolTip">
+                                    <string>Untick only for a GeoServer behind a private CA or a self-signed certificate that you trust. Leaving it on is the safe default.</string>
+                                </property>
+                                <property name="checked">
+                                    <bool>true</bool>
+                                </property>
+                            </widget>
+                        </item>
                     </layout>
                 </widget>
             </item>

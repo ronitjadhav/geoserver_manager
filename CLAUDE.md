@@ -100,7 +100,9 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
   live from the server on every load and every edit dialog — if it looks "out of sync" with the web UI,
   the web UI is the one lying.
 - The client strips trailing `/` from the URL itself. It has no timeout parameter (`TIMEOUT = 120` is a
-  module constant) and `verifytls` is not yet surfaced in settings (open issue).
+  module constant). `verifytls` is the *Verify the server's TLS certificate* setting (default on);
+  `_probe` catches `requests.exceptions.SSLError` before `OSError` so a private-CA server is reported as a
+  certificate problem, not as "is the server running?".
 - **Thread safety:** the REST methods are stateless `requests.*` calls and are safe to run through
   `_fan_out` (the datastore list does this). `self.wms` / `self.wmts` on the client are shared state —
   OWS calls must not be fanned out the same way.

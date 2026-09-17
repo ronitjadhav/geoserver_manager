@@ -219,7 +219,10 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         from geoservercloud import GeoServerCloud
 
         return GeoServerCloud(
-            url=settings.geoserver_url, user=username, password=password
+            url=settings.geoserver_url,
+            user=username,
+            password=password,
+            verifytls=settings.geoserver_verify_tls,
         )
 
     def _probe(self, gs, url):
@@ -228,7 +231,7 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         HTTPError must be caught before OSError: every requests exception
         subclasses OSError, so a 401 would otherwise read as "unreachable".
         """
-        from requests.exceptions import HTTPError
+        from requests.exceptions import HTTPError, SSLError
 
         try:
             content, status_code = gs.get_workspaces()
@@ -236,6 +239,17 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             # raise_for_status() always attaches the response; 500 is a safe
             # stand-in that lands in the generic HTTP branch below.
             status_code = e.response.status_code if e.response is not None else 500
+        except SSLError:
+            # Before OSError (it is a ConnectionError): a private-CA or
+            # self-signed certificate used to read as "is the server running?"
+            return (
+                self.tr("Certificate not trusted"),
+                self.tr(
+                    "{url} presented a TLS certificate this machine does not trust. "
+                    "If it is your own private CA or a self-signed certificate, untick "
+                    '"Verify the server\'s TLS certificate" in Settings.'
+                ).format(url=url),
+            )
         except OSError:
             # ConnectionError / Timeout: refused, unreachable, wrong host
             return (

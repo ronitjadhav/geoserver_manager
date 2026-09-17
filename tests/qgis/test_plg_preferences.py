@@ -44,6 +44,9 @@ class TestPlgPreferences(unittest.TestCase):
         self.assertIsInstance(settings.version, str)
         self.assertEqual(settings.version, __version__)
 
+        # TLS verification defaults to on: nothing is silently insecure
+        self.assertIs(settings.geoserver_verify_tls, True)
+
     def test_bool_env_variable(self):
         """Test settings with environment value."""
         manager = PlgOptionsManager()

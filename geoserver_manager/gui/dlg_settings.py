@@ -97,6 +97,7 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         # misc
         settings.debug_mode = self.opt_debug.isChecked()
         settings.version = __version__
+        settings.geoserver_verify_tls = self.opt_verify_tls.isChecked()
 
         # geoserver URL (not sensitive — stored in QgsSettings)
         url = self.txt_gs_url.text().strip()
@@ -149,6 +150,7 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
 
         # geoserver URL
         self.txt_gs_url.setText(settings.geoserver_url)
+        self.opt_verify_tls.setChecked(settings.geoserver_verify_tls)
 
         # credentials from encrypted store
         username, password = settings.get_credentials()
