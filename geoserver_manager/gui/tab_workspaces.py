@@ -6,6 +6,7 @@ Workspace tab — load, create, edit, delete workspaces.
 Used as a mixin for GeoServerMainDialog.
 """
 
+from qgis.core import Qgis
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
@@ -52,8 +53,13 @@ class WorkspaceTabMixin:
 
         self._run_action(load, self.tr("Failed to load workspaces"))
 
-    def _workspace_fields(self):
-        """Return workspace form field definitions."""
+    def _workspace_fields(self, is_default=False):
+        """Return workspace form field definitions.
+
+        :param is_default: the workspace being edited already is GeoServer's
+            default; the checkbox is then shown ticked and locked, because the
+            REST API has no "unset default", only "set another one".
+        """
         return [
             {"key": "name", "label": self.tr("Name"), "type": "text", "required": True},
             {
@@ -70,9 +76,26 @@ class WorkspaceTabMixin:
                 "label": self.tr("Default Workspace"),
                 "type": "checkbox",
                 "default": False,
-                "help": self.tr("Set this as the default workspace for GeoServer"),
+                "read_only": is_default,
+                "help": (
+                    self.tr("This is the default workspace; pick another to change it")
+                    if is_default
+                    else self.tr("Set this as the default workspace for GeoServer")
+                ),
             },
         ]
+
+    def _default_workspace_name(self):
+        """Name of GeoServer's default workspace, or None if it cannot be read.
+
+        TODO: move to geoservercloud (no getter exists; see _set_default_workspace).
+        """
+        try:
+            base = self.gs.rest_service.rest_endpoints.base_url
+            payload = self._raw_rest("get", f"{base}/workspaces/default.json").json()
+            return payload.get("workspace", {}).get("name")
+        except Exception:  # best-effort prefill: unreadable means "unknown"
+            return None
 
     def _set_default_workspace(self, name):
         """Set the GeoServer default workspace.
@@ -109,7 +132,17 @@ class WorkspaceTabMixin:
         else:
             self._check(self.gs.create_workspace(name, isolated=values["isolated"]))
         if values["set_default"]:
-            self._set_default_workspace(name)
+            # Separate from the save: a 403 here must not report the (already
+            # successful) create or rename as failed, nor skip the reload.
+            try:
+                self._set_default_workspace(name)
+            except Exception as e:
+                self.show_warning_message(
+                    self.tr(
+                        "Workspace '{}' saved, but it could not be made the default: {}"
+                    ).format(name, e)
+                )
+                self.log(f"Set default workspace error: {e}", Qgis.MessageLevel.Warning)
 
     def _add_workspace(self):
         """Open a form dialog to create a new workspace."""
@@ -142,10 +175,11 @@ class WorkspaceTabMixin:
         if detail is None:
             return
 
+        is_default = self._default_workspace_name() == old_name
         dlg = ResourceFormDialog(
             title=self.tr("Edit Workspace '{}'").format(old_name),
             description=self.tr("Modify workspace settings"),
-            fields=self._workspace_fields(),
+            fields=self._workspace_fields(is_default=is_default),
             values={
                 "name": old_name,
                 "isolated": (
@@ -153,7 +187,7 @@ class WorkspaceTabMixin:
                     if isinstance(detail, dict)
                     else False
                 ),
-                "set_default": False,
+                "set_default": is_default,
             },
             parent=self,
         )

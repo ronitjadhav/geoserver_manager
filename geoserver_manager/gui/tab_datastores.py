@@ -6,8 +6,6 @@ Datastore tab — load, create, edit, delete datastores.
 Used as a mixin for GeoServerMainDialog.
 """
 
-from concurrent.futures import ThreadPoolExecutor
-
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
@@ -18,11 +16,6 @@ _SUPPORTED_TYPES = [
     "PostGIS (JNDI)",
     "PMTiles",
 ]
-
-# Listing datastores needs one GET per workspace plus one per datastore.
-# ponytail: 8 parallel GETs keep that bearable; it still runs on the GUI
-# thread, so move to QgsTask if a big server still feels frozen.
-_MAX_PARALLEL_REQUESTS = 8
 
 
 class DatastoreTabMixin:
@@ -64,20 +57,27 @@ class DatastoreTabMixin:
             )
 
             ws_names = self._get_workspace_names(refresh=True)
-            with ThreadPoolExecutor(max_workers=_MAX_PARALLEL_REQUESTS) as pool:
-                names_per_ws = pool.map(self._datastore_names, ws_names)
-                pairs = [
-                    (ws_name, ds_name)
-                    for ws_name, ds_names in zip(ws_names, names_per_ws)
-                    for ds_name in ds_names
-                ]
-                summaries = pool.map(lambda pair: self._datastore_summary(*pair), pairs)
-                rows = [
-                    [ds_name, ws_name, ds_type, enabled]
-                    for (ws_name, ds_name), (ds_type, enabled) in zip(pairs, summaries)
-                ]
-
+            listed = self._fan_out(self._datastore_names, ws_names)
+            pairs = [
+                (ws_name, ds_name)
+                for ws_name, (ds_names, error) in zip(ws_names, listed)
+                if error is None
+                for ds_name in ds_names
+            ]
+            details = self._fan_out(lambda pair: self._datastore_summary(*pair), pairs)
+            rows = [
+                [ds_name, ws_name, *(summary or ("—", "—"))]
+                for (ws_name, ds_name), (summary, _error) in zip(pairs, details)
+            ]
             self._populate_rows(rows)
+
+            failures = [(ws, err) for ws, (_names, err) in zip(ws_names, listed) if err]
+            failures += [
+                (f"{ws}/{ds}", err)
+                for (ws, ds), (_summary, err) in zip(pairs, details)
+                if err
+            ]
+            self._report_partial_failures(failures)
 
         self._run_action(load, self.tr("Failed to load datastores"))
 
@@ -89,17 +89,10 @@ class DatastoreTabMixin:
         ]
 
     def _datastore_summary(self, workspace_name, datastore_name):
-        """Best-effort (type, enabled) for the list view — "—" when unavailable.
-
-        One datastore failing to load must not blank the whole table.
-        """
-        unknown = ("—", "—")
-        try:
-            detail, _ = self.gs.get_datastore(workspace_name, datastore_name)
-        except Exception:
-            return unknown
+        """(type, enabled) for the list view. Raises on HTTP errors."""
+        detail = self._check(self.gs.get_datastore(workspace_name, datastore_name))
         if not isinstance(detail, dict):
-            return unknown
+            return ("—", "—")
         return (detail.get("type", "—"), str(detail.get("enabled", True)))
 
     def _datastore_fields(self, workspace_names, on_type_changed=None, edit_mode=False):
@@ -243,18 +236,6 @@ class DatastoreTabMixin:
 
         # PMTiles-only fields
         dlg.set_field_visible("pmtiles_url", is_pmtiles)
-
-    def _get_workspace_names(self, refresh=False):
-        """Return the workspace names, cached between dialog openings.
-
-        ponytail: the cache is refreshed whenever the datastore list reloads,
-        so Refresh picks up workspaces created elsewhere. That is enough to
-        stop every Add/Edit dialog from re-fetching the list.
-        """
-        if refresh or not self._workspace_names:
-            workspaces = self._fetch_list(self.gs.get_workspaces)
-            self._workspace_names = [self._name_of(ws) for ws in workspaces]
-        return self._workspace_names
 
     def _add_datastore(self):
         """Open a form dialog to create a new datastore."""

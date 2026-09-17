@@ -57,6 +57,7 @@ class GeoServerManagerPlugin:
             message=f"Translation: {self.locale}, {locale_path}",
             log_level=Qgis.MessageLevel.NoLevel,
         )
+        self.translator = None
         if locale_path.exists():
             self.translator = QTranslator()
             self.translator.load(str(locale_path.resolve()))
@@ -113,7 +114,7 @@ class GeoServerManagerPlugin:
         # -- Help menu
 
         # documentation
-        self.iface.pluginHelpMenu().addSeparator()
+        self._help_separator = self.iface.pluginHelpMenu().addSeparator()
         self.action_help_plugin_menu_documentation = QAction(
             QIcon(str(__icon_path__)),
             f"{__title__} - Documentation",
@@ -140,9 +141,11 @@ class GeoServerManagerPlugin:
 
     def unload(self) -> None:
         """Cleans up when plugin is disabled/uninstalled."""
-        # -- Close and drop the main dialog
+        # -- Close and destroy the main dialog (it is a child of the QGIS main
+        # window, so dropping the reference alone would keep it alive)
         if self.main_dialog:
             self.main_dialog.close()
+            self.main_dialog.deleteLater()
             self.main_dialog = None
 
         # -- Clean up menu and toolbar
@@ -159,6 +162,10 @@ class GeoServerManagerPlugin:
             self.iface.pluginHelpMenu().removeAction(
                 self.action_help_plugin_menu_documentation
             )
+        if self._help_separator:
+            self.iface.pluginHelpMenu().removeAction(self._help_separator)
+        if self.translator:
+            QCoreApplication.removeTranslator(self.translator)
 
         # remove actions
         del self.action_main

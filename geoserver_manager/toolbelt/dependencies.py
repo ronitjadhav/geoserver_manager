@@ -33,6 +33,34 @@ BUNDLED_WHLS = [
     EXTRAS_DIR / "xmltodict-1.0.4-py3-none-any.whl",
     EXTRAS_DIR / "geoservercloud-0.8.5-py3-none-any.whl",
 ]
+# The version the plugin is written against. Its raw-REST workarounds ride on
+# library internals, so a different version in the QGIS profile is worth a
+# loud warning even when the import works.
+GSC_REQUIRED = "0.8.5"
+
+
+def _report_resolved_version(logger) -> None:
+    """Log which geoservercloud was imported, and warn if it is not the pin."""
+    import importlib.metadata
+
+    import geoservercloud
+
+    try:
+        version = importlib.metadata.version("geoservercloud")
+    except importlib.metadata.PackageNotFoundError:
+        version = "unknown"
+    origin = getattr(geoservercloud, "__file__", "?")
+    if version == GSC_REQUIRED:
+        logger(
+            f"geoservercloud {version} from {origin}", log_level=Qgis.MessageLevel.Info
+        )
+    else:
+        logger(
+            f"geoservercloud {version} from {origin} — the plugin is tested with "
+            f"{GSC_REQUIRED}; workspace/datastore workarounds may misbehave.",
+            log_level=Qgis.MessageLevel.Warning,
+            push=True,
+        )
 
 
 def _add_whls_to_path(logger=None):
@@ -86,12 +114,10 @@ def ensure_dependencies() -> bool:
     """
     logger = PlgLogger().log
 
-    # 1. Already importable?
+    # 1. Already importable? (an install in the QGIS profile wins over the
+    #    bundled wheel — say so, and which version it is)
     if _try_import():
-        logger(
-            "'geoservercloud' already available.",
-            log_level=Qgis.MessageLevel.Info,
-        )
+        _report_resolved_version(logger)
         return True
 
     logger(
@@ -103,10 +129,7 @@ def ensure_dependencies() -> bool:
     _add_whls_to_path(logger)
 
     if _try_import(logger):
-        logger(
-            "Successfully loaded geoservercloud from bundled WHLs.",
-            log_level=Qgis.MessageLevel.Success,
-        )
+        _report_resolved_version(logger)
         return True
 
     # 3. All methods failed

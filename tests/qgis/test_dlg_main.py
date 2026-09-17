@@ -203,6 +203,133 @@ class TestDatastoreUpdate(unittest.TestCase):
             )
 
 
+class TestListingTolerance(unittest.TestCase):
+    """One broken workspace must cost one warning, not the whole table."""
+
+    def setUp(self):
+        self.dlg = GeoServerMainDialog()
+        self.warnings = []
+        self.dlg.show_warning_message = self.warnings.append
+        self.dlg.show_error_message = lambda t: self.fail(f"unexpected error: {t}")
+
+        class FakeGS:
+            def get_workspaces(inner):
+                return ([{"name": "ok1"}, {"name": "broken"}, {"name": "ok2"}], 200)
+
+            def get_datastores(inner, ws):
+                if ws == "broken":
+                    raise RuntimeError("HTTP 500: boom")
+                return ([{"name": f"{ws}_ds"}], 200)
+
+            def get_datastore(inner, ws, ds):
+                return ({"type": "PostGIS", "enabled": True}, 200)
+
+        self.dlg.gs = FakeGS()
+
+    def test_fan_out_keeps_order_and_captures_errors(self):
+        def fn(x):
+            if x == 2:
+                raise ValueError("two")
+            return x * 10
+
+        results = self.dlg._fan_out(fn, [1, 2, 3])
+        self.assertEqual([r for r, _ in results], [10, None, 30])
+        self.assertIsInstance(results[1][1], ValueError)
+
+    def test_one_failing_workspace_leaves_the_others_and_warns_once(self):
+        self.dlg._load_datastores()
+
+        names = sorted(row[0] for row in self.dlg._all_rows)
+        self.assertEqual(names, ["ok1_ds", "ok2_ds"])
+        self.assertEqual(len(self.warnings), 1)
+        self.assertIn("broken", self.warnings[0])
+
+    def test_report_partial_failures_is_silent_when_nothing_failed(self):
+        self.dlg._report_partial_failures([])
+        self.assertEqual(self.warnings, [])
+
+
+class TestNonJsonResponses(unittest.TestCase):
+    """A proxy login page answers 200 with HTML; that is not 'Connected'."""
+
+    def setUp(self):
+        self.dlg = GeoServerMainDialog()
+
+    def test_fetch_list_refuses_a_non_list_payload(self):
+        with self.assertRaises(RuntimeError):
+            self.dlg._fetch_list(lambda: ("<html>login</html>", 200))
+
+    def test_probe_rejects_html_with_status_200(self):
+        class FakeGS:
+            def get_workspaces(inner):
+                return ("<html>login</html>", 200)
+
+        problem = self.dlg._probe(FakeGS(), "http://proxy.example.org/geoserver")
+        self.assertIsNotNone(problem)
+        status, message = problem
+        self.assertIn("Not a GeoServer", status)
+
+    def test_probe_accepts_a_real_list(self):
+        class FakeGS:
+            def get_workspaces(inner):
+                return ([{"name": "ws"}], 200)
+
+        self.assertIsNone(self.dlg._probe(FakeGS(), "http://gs"))
+
+
+class TestDefaultWorkspaceHandling(unittest.TestCase):
+    def setUp(self):
+        self.dlg = GeoServerMainDialog()
+        self.warnings, self.calls = [], []
+        self.dlg.show_warning_message = self.warnings.append
+
+        outer = self
+
+        class FakeGS:
+            def get_workspace(inner, name):
+                return ({"name": name}, 404)
+
+            def create_workspace(inner, name, isolated=False):
+                outer.calls.append(("create", name))
+                return ("", 201)
+
+        self.dlg.gs = FakeGS()
+
+    def test_set_default_failure_does_not_fail_the_save(self):
+        def boom(name):
+            raise RuntimeError("HTTP 403: forbidden")
+
+        self.dlg._set_default_workspace = boom
+        ok = self.dlg._run_action(
+            lambda: self.dlg._save_workspace(
+                {"name": "ws", "isolated": False, "set_default": True}
+            ),
+            "Failed to create workspace 'ws'",
+        )
+
+        self.assertTrue(ok)  # the create itself succeeded and is reported so
+        self.assertEqual(self.calls, [("create", "ws")])
+        self.assertEqual(len(self.warnings), 1)
+        self.assertIn("could not be made the default", self.warnings[0])
+
+    def test_default_workspace_name_is_none_when_unreadable(self):
+        self.assertIsNone(
+            self.dlg._default_workspace_name()
+        )  # FakeGS has no REST client
+
+    def test_default_flag_locks_the_checkbox_field(self):
+        field = [
+            f
+            for f in self.dlg._workspace_fields(is_default=True)
+            if f["key"] == "set_default"
+        ][0]
+        self.assertTrue(field["read_only"])
+        field = [f for f in self.dlg._workspace_fields() if f["key"] == "set_default"][
+            0
+        ]
+        self.assertFalse(field["read_only"])
+
+
 # ############################################################################
 # ####### Stand-alone run ########
 # ################################

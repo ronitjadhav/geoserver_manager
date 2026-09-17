@@ -7,6 +7,7 @@ Left panel: navigation tabs (Workspaces, Datastores, Layers, Styles).
 Right panel: search bar + results table for the selected tab.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from pathlib import Path
 
@@ -32,6 +33,11 @@ from geoserver_manager.gui.tab_datastores import DatastoreTabMixin
 from geoserver_manager.gui.tab_workspaces import WorkspaceTabMixin
 from geoserver_manager.toolbelt.log_handler import PlgLogger
 from geoserver_manager.toolbelt.preferences import PlgOptionsManager
+
+# Listing a nested resource needs one GET per parent plus one per item. Eight
+# parallel requests keep that bearable; the calls still block the GUI thread
+# (issue #31 tracks the QgsTask move).
+_MAX_PARALLEL_REQUESTS = 8
 
 
 class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
@@ -225,7 +231,7 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         from requests.exceptions import HTTPError
 
         try:
-            _, status_code = gs.get_workspaces()
+            content, status_code = gs.get_workspaces()
         except HTTPError as e:
             # raise_for_status() always attaches the response; 500 is a safe
             # stand-in that lands in the generic HTTP branch below.
@@ -259,6 +265,16 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
                 self.tr(
                     "GeoServer returned HTTP {code} for {url} — check the URL in Settings."
                 ).format(code=status_code, url=url),
+            )
+        if not isinstance(content, list):
+            # An SSO / reverse-proxy login page answers 200 with HTML. Without
+            # this check it showed a green "Connected" and empty tables.
+            return (
+                self.tr("Not a GeoServer REST endpoint"),
+                self.tr(
+                    "{url} answered, but not with the GeoServer REST API (a login "
+                    "page?) — check the URL, or the proxy in front of it."
+                ).format(url=url),
             )
         return None
 
@@ -611,10 +627,68 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         return status_code == 200
 
     def _fetch_list(self, api_method, *args):
-        """Call a geoservercloud list endpoint. Returns a list or [].
-        Raises on HTTP errors — callers surface them to the user."""
+        """Call a geoservercloud list endpoint and return the list.
+
+        Raises on HTTP errors and on a payload that is not a list — a proxy
+        login page or an error document must surface, not render as an empty
+        table.
+        """
         result = self._check(api_method(*args))
-        return result if isinstance(result, list) else []
+        if not isinstance(result, list):
+            raise RuntimeError(
+                f"Unexpected response (not a JSON list): {str(result)[:200]}"
+            )
+        return result
+
+    def _get_workspace_names(self, refresh=False):
+        """Workspace names for combo boxes, cached until the next list reload.
+
+        Every tab with a workspace column or a workspace picker needs this;
+        Refresh (via the loaders) repopulates it, which is enough of a TTL.
+        """
+        if refresh or not self._workspace_names:
+            workspaces = self._fetch_list(self.gs.get_workspaces)
+            self._workspace_names = [self._name_of(ws) for ws in workspaces]
+        return self._workspace_names
+
+    @staticmethod
+    def _fan_out(fn, items):
+        """Run fn(item) for every item on a small thread pool.
+
+        Returns [(result, error)] in input order. A worker that raises yields
+        (None, exception) instead of aborting the whole listing, so one broken
+        workspace cannot blank the table. Only stateless REST reads belong
+        here: GeoServerCloud.wms / .wmts are shared state.
+        """
+
+        def guarded(item):
+            try:
+                return (fn(item), None)
+            except Exception as e:  # reported by the caller, per item
+                return (None, e)
+
+        with ThreadPoolExecutor(max_workers=_MAX_PARALLEL_REQUESTS) as pool:
+            return list(pool.map(guarded, items))
+
+    def _report_partial_failures(self, failures):
+        """One warning banner for the items a listing could not fetch.
+
+        :param failures: list of (label, exception); details go to the QGIS log.
+        """
+        if not failures:
+            return
+        for label, error in failures:
+            self.log(
+                f"Could not list {label}: {error}", log_level=Qgis.MessageLevel.Warning
+            )
+        shown = ", ".join(label for label, _ in failures[:5])
+        if len(failures) > 5:
+            shown += ", …"
+        self.show_warning_message(
+            self.tr("{count} item(s) could not be listed: {names}").format(
+                count=len(failures), names=shown
+            )
+        )
 
     def _confirm_delete(self, kind, labels, cascade=""):
         """Ask before deleting one or more resources of one kind.
