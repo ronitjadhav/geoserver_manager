@@ -4,6 +4,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## Unreleased
 
+### Added
+
+- `docker-compose.yml`: a throwaway GeoServer 2.28.5 plus PostGIS for local
+  development and for testing the library contract against a real server.
+
 ### Fixed
 
 - A tab load that failed mid-fetch left the previous resource type's rows in the

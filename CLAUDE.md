@@ -21,6 +21,7 @@ Skills in `.claude/skills/` hold the step-by-step procedures:
 | `geoserver_manager/extras/*.whl` | Bundled `geoservercloud` (stripped, see below) and `xmltodict`, added to `sys.path` at startup |
 | `tests/unit/` | Runs without QGIS. `tests/qgis/` needs the QGIS Python (headless via `qgis.testing.start_app()`) |
 | `docs/github_issue_roadmap.md` | Feature backlog; GitHub milestones mirror it |
+| `docker-compose.yml` | Throwaway GeoServer 2.28.5 (`:8080`, admin/geoserver) + PostGIS, for testing against a real server |
 
 The `Inspiration/` folder is untracked reference code from another plugin. Never import from it.
 
@@ -141,6 +142,12 @@ QT_QPA_PLATFORM=offscreen python -m pytest tests/qgis
 # build the zip qgis-plugin-ci would release (~125 KB, 23 files)
 qgis-plugin-ci package 0.1.0 --allow-uncommitted-changes && rm geoserver_manager.0.1.0.zip
 ```
+
+A real server to test against: `docker compose up -d` — GeoServer on :8080
+(admin/geoserver) plus PostGIS, reachable *from GeoServer* as host `postgis`,
+database / user / password `geoserver`. Use it for anything touching the library
+contract: the `crypt1:` password encoding, the datastore edit merge and `enabled`
+handling were all confirmed against it, and a fake server cannot show you those.
 
 Load the plugin in QGIS by symlinking `geoserver_manager/` into a profile's `python/plugins/`
 (`docs/development/environment.md`). Check which profile QGIS actually launches

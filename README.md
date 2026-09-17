@@ -92,6 +92,23 @@ from your everyday QGIS. See
 [docs/development/environment.md](docs/development/environment.md) for the
 virtualenv setup and the `QGIS_PLUGINPATH` alternative.
 
+### Local GeoServer (Docker)
+
+A throwaway server to develop against, including the PostGIS database the
+plugin's main datastore type needs:
+
+```sh
+docker compose up -d      # GeoServer on :8080 (admin/geoserver) + PostGIS
+docker compose ps         # wait until gsm-geoserver is "healthy"
+docker compose down -v    # stop and discard the data
+```
+
+Configure the plugin with `http://localhost:8080/geoserver` and
+`admin` / `geoserver`. In the datastore form, reach the database the way
+GeoServer sees it: host `postgis`, port `5432`, database / user / password
+`geoserver`. Details in
+[docs/development/environment.md](docs/development/environment.md).
+
 ### Checks
 
 ```sh

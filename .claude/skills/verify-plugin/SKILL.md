@@ -100,6 +100,27 @@ Check, at minimum:
 | delete of N rows | N server calls, one success banner |
 | Add with an existing name | no create call, "already exists" banner |
 
+## 3b. Against a real GeoServer (for anything touching the library contract)
+
+A fake cannot show you what GeoServer actually stores. `docker compose up -d`
+starts GeoServer 2.28.5 on :8080 (admin/geoserver) with PostGIS; wait for
+`docker compose ps` to report gsm-geoserver "healthy" (~40 s), then drive the
+real dialog with `dlg.plg_settings` pointed at it, exactly as in §3 but with the
+genuine `geoservercloud` (call `ensure_dependencies()` first, do not stub the
+module).
+
+Use it whenever you change a write path, the `_check` contract, `_raw_rest`, or
+the datastore merge. What it proves that a fake cannot:
+
+| Check | Expected on a real server |
+|---|---|
+| create a PostGIS store (host `postgis`, db/user/password `geoserver`), then GET it | `passwd` comes back as `crypt1:…`, never the plaintext — this is why the form never prefills it |
+| add a parameter the form does not model (`max connections`), then edit only the description through `_update_datastore_from_values` | the parameter is still there afterwards |
+| set `enabled: false`, then edit through the plugin | still disabled |
+| `_do_delete_datastore`, then `delete_workspace` | both succeed, no error banner |
+
+Clean up with `docker compose down -v`.
+
 ## 4. Release zip
 
 ```sh
