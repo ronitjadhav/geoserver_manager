@@ -61,3 +61,24 @@ It's recommended to create a dedicated QGIS profile for the development of the p
 1. Finally, enable the plugin in the plugin manager (ignore invalid folders like documentation, tests, etc.):
 
     ![QGIS - Enable the plugin in the plugin manager](../static/dev_qgis_enable_plugin.png)
+
+### 4. Load the plugin: symlink (alternative to `QGIS_PLUGINPATH`)
+
+Instead of the environment variable, symlink the `geoserver_manager` package
+into the profile's plugin folder — QGIS then loads the working tree directly and
+only sees the plugin package, not the repo's `docs/`, `tests/` and friends:
+
+```sh
+# Linux, dedicated profile
+ln -s "${PWD}/geoserver_manager" \
+  "$HOME/.local/share/QGIS/QGIS3/profiles/plg_geoserver_manager/python/plugins/"
+```
+
+On macOS the profiles live in `$HOME/Library/Application Support/QGIS/QGIS3`, on
+Windows in `%APPDATA%\QGIS\QGIS3` (use `New-Item -ItemType SymbolicLink` from an
+administrator PowerShell).
+
+There is no build step: the `geoservercloud` and `xmltodict` wheels in
+`geoserver_manager/extras/` are committed. Restart QGIS or use
+[Plugin Reloader](https://plugins.qgis.org/plugins/plugin_reloader/) to pick up
+code changes.

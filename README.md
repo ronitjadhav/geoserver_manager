@@ -43,8 +43,7 @@ Until the plugin is published on <https://plugins.qgis.org>:
    [releases page](https://github.com/ronitjadhav/geoserver_manager/releases).
 2. In QGIS: *Plugins → Manage and Install Plugins → Install from ZIP*.
 
-For a development install, see
-[docs/development/environment.md](docs/development/environment.md).
+For a development install, see [Development](#development) below.
 
 ## Configuration
 
@@ -61,8 +60,41 @@ in the dialog's message bar and in the QGIS log panel (*GeoServer Manager* tab).
 
 ## Development
 
+### Local install (symlink)
+
+Symlink the plugin package into a QGIS profile so QGIS loads the working tree
+directly — there is no build step, the bundled wheels are committed.
+
 ```sh
-# see docs/development/environment.md for the full setup
+git clone https://github.com/ronitjadhav/geoserver_manager.git
+cd geoserver_manager
+
+# Linux
+ln -s "${PWD}/geoserver_manager" "$HOME/.local/share/QGIS/QGIS3/profiles/default/python/plugins/"
+
+# macOS
+ln -s "${PWD}/geoserver_manager" "$HOME/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/"
+
+# Windows (PowerShell, as administrator)
+New-Item -ItemType SymbolicLink `
+  -Path "$env:APPDATA\QGIS\QGIS3\profiles\default\python\plugins\geoserver_manager" `
+  -Target "$PWD\geoserver_manager"
+```
+
+Start QGIS, then enable *GeoServer Manager* in *Plugins → Manage and Install
+Plugins → Installed*. Code changes are picked up by the
+[Plugin Reloader](https://plugins.qgis.org/plugins/plugin_reloader/) plugin or a
+QGIS restart.
+
+Replace `default` with another profile name (e.g. `plg_geoserver_manager`,
+started with `qgis --profile plg_geoserver_manager`) to keep development apart
+from your everyday QGIS. See
+[docs/development/environment.md](docs/development/environment.md) for the
+virtualenv setup and the `QGIS_PLUGINPATH` alternative.
+
+### Checks
+
+```sh
 python -m pip install -U -r requirements/development.txt
 pre-commit install
 
