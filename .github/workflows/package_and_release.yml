@@ -15,9 +15,27 @@ on:
       - .github/workflows/package_and_release.yml
       - 'docs/**/*'
       - "geoserver_manager/**/*.py"
+      - "geoserver_manager/**/*.ui"
+      - "geoserver_manager/extras/**"
       - "geoserver_manager/metadata.txt"
+      - requirements/packaging.txt
+      - setup.cfg
     tags:
       - "*"
+  # The packaging job must run on PRs too: a dependency bump once broke it and
+  # only surfaced after merge because this workflow never saw the PR (#30).
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/package_and_release.yml
+      - 'docs/**/*'
+      - "geoserver_manager/**/*.py"
+      - "geoserver_manager/**/*.ui"
+      - "geoserver_manager/extras/**"
+      - "geoserver_manager/metadata.txt"
+      - requirements/packaging.txt
+      - setup.cfg
 
 # Allow one concurrent deployment per branch/pr
 concurrency:
@@ -104,6 +122,14 @@ jobs:
           qgis-plugin-ci package latest \
             --allow-uncommitted-changes \
             --plugin-repo-url $(gh api "repos/$GITHUB_REPOSITORY/pages" --jq '.html_url')
+
+      - name: Refuse a bloated archive
+        # The bundled geoservercloud wheel is stripped to ~50 KB; an unstripped
+        # re-download is 16 MB and would ship to every user.
+        run: |
+          size=$(stat -c%s ${{ env.PROJECT_FOLDER }}.*.zip)
+          echo "plugin zip: ${size} bytes"
+          test "$size" -lt 1000000
 
       - uses: actions/upload-artifact@v7
         with:
