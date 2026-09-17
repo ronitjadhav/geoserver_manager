@@ -5,6 +5,12 @@ QGIS plugin that manages a GeoServer through the REST API, using the
 library. Python 3.12 (QGIS ≥ 3.40), PyQt5 **and** PyQt6 via `qgis.PyQt`.
 Read this file before touching code; it records what the code cannot tell you.
 
+**The one rule above all others: python-geoservercloud first.** This plugin exists
+partly to drive that library's maturity. Every GeoServer call goes through the
+library; when the library lacks something, the gap is recorded in
+[issue #50](https://github.com/ronitjadhav/geoserver_manager/issues/50) so it can be
+implemented *there*, and only then worked around here. See Conventions.
+
 Skills in `.claude/skills/` hold the step-by-step procedures:
 `add-resource-tab`, `verify-plugin`, `release-plugin`.
 
@@ -83,11 +89,9 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
   `OSError`, so catch `HTTPError` *before* `OSError` (see `_probe`).
 - `create_workspace` and `create_datastore` **upsert**. There is no `update_*`, no `delete_datastore`, no
   workspace rename, no "set default workspace" call (the `set_default_workspace=True` kwarg only sets a
-  client-side attribute). Those are `_raw_rest` workarounds carrying `TODO(#50)`. **Issue #50 is the
-  upstream tracking list**: every `_raw_rest` call, and every piece of client-side logic that exists only
-  because the library lacks a method (`_check`, `_resource_exists`, the datastore merge), has a row there
-  with the endpoint and the proposed library API. When you add one, add the row and the `TODO(#50)`; when
-  the library gains it and the wheel is bumped, replace the workaround and tick the row.
+  client-side attribute). Those are `_raw_rest` workarounds carrying `TODO(#50)`, each with a row in
+  [issue #50](https://github.com/ronitjadhav/geoserver_manager/issues/50) — the library-first rule in
+  Conventions says how new ones are handled.
 - **GeoServer always has exactly one default workspace and it cannot be unset.** `GET
   /rest/workspaces/default.json` never 404s (with `default.xml` deleted it answers the first workspace),
   and the web UI's "Default Workspace" checkbox only *sets*: `WorkspaceEditPage` has
@@ -112,6 +116,19 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
 
 ## Conventions
 
+- **python-geoservercloud first — always.** Before writing any GeoServer call, look for the library
+  method (`geoservercloud/geoservercloud.py` in the bundled wheel) and use it, even when a raw request
+  would be shorter. If the method does not exist, or exists but cannot do what is needed:
+  1. **Update [issue #50](https://github.com/ronitjadhav/geoserver_manager/issues/50) first** — add a row
+     with the call site, the REST verb + path, and the library API you would want. That issue is the
+     work list for maturing the library; a gap that is not in it will never be fixed upstream.
+  2. Then, and only then, work around it here through `self._raw_rest(...)` (never a bare
+     `rest_client` call) with a `TODO(#50)` comment at the call site.
+  3. When the library gains the method and the bundled wheel is bumped, replace the workaround, drop the
+     `TODO(#50)`, and tick the row.
+  The same applies to behaviour the plugin has to paper over (`_check`, `_resource_exists`, the datastore
+  merge): those are library gaps too, and they are listed in #50. We depend on this library; the fastest
+  way to make the plugin better is to make the library better.
 - **Nothing the dialog shows comes from a cache.** Lists are fetched on every tab switch and Refresh,
   edit dialogs fetch the object when they open, pickers fetch their options when the form opens. A
   workspace-name cache once survived a Refresh and left the datastore form's combo stale; it was removed
@@ -119,9 +136,8 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
 - **Smallest change that removes demonstrated friction.** No abstraction with one implementation, no
   config for a value that never changes. A service layer between GUI and library was proposed twice and
   rejected as premature — don't build it until a non-GUI caller needs the API.
-- Deliberate shortcuts carry a `ponytail:` comment naming the ceiling and the upgrade path. Library gaps
-  carry `TODO(#50)` and a row in issue #50 naming the upstream method that should replace the workaround.
-  Leave both in place until the condition they name is met.
+- Deliberate shortcuts carry a `ponytail:` comment naming the ceiling and the upgrade path; library gaps
+  carry `TODO(#50)` (see the first convention). Leave both in place until the condition they name is met.
 - `self.tr()` inside the mixins **cannot** resolve translations: strings are extracted under the mixin's
   class name but looked up under `GeoServerMainDialog` (QDialog precedes the mixins in the MRO, so an
   override of `tr()` there is dead code). When the first real translation lands, switch those sites to
