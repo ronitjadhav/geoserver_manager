@@ -382,9 +382,9 @@ class TestServerSync(unittest.TestCase):
 
 
 class TestUnsupportedTypeDialog(unittest.TestCase):
-    """A datastore type the form cannot edit gets an honest read-only view."""
+    """A type without dedicated fields gets the generic key = value editor."""
 
-    def test_dialog_is_locked_and_shows_the_real_type(self):
+    def test_dialog_locks_the_type_and_offers_the_parameter_editor(self):
         from qgis.PyQt.QtWidgets import QDialog, QDialogButtonBox
 
         from geoserver_manager.gui import tab_datastores
@@ -424,9 +424,11 @@ class TestUnsupportedTypeDialog(unittest.TestCase):
         for key in ("pg_host", "pg_password", "jndi_reference", "pmtiles_url"):
             self.assertIn(key, form._hidden_keys)
         self.assertNotIn("raw_params", form._hidden_keys)
-        self.assertIn("url = file:x.shp", form.get_widget("raw_params").toPlainText())
+        editor = form.get_widget("raw_params")
+        self.assertIn("url = file:x.shp", editor.toPlainText())
+        self.assertFalse(editor.isReadOnly())  # it is an editor, not a view
         save = form._button_box.button(QDialogButtonBox.StandardButton.Ok)
-        self.assertTrue(save.isHidden())
+        self.assertFalse(save.isHidden())  # any type can be saved now
 
 
 class TestLinkCells(unittest.TestCase):
@@ -522,6 +524,69 @@ class TestTlsVerification(unittest.TestCase):
             GeoServerMainDialog()._build_client(Settings())
         self.assertIs(seen["verifytls"], False)
         self.assertEqual(seen["url"], "https://gs.example.org")
+
+
+class TestGenericParameterEditor(unittest.TestCase):
+    """Any datastore type is editable through 'key = value' lines."""
+
+    def setUp(self):
+        self.dlg = GeoServerMainDialog()
+        self.sent = {}
+        outer = self
+
+        class FakeGS:
+            def create_datastore(inner, **kwargs):
+                outer.sent.update(kwargs)
+                return ("ok", 200)
+
+        self.dlg.gs = FakeGS()
+
+    def test_parse_round_trips_and_ignores_noise(self):
+        text = "url = file:data/shapes\n\n# a comment\ncharset = UTF-8\nkey with = sign = a=b\n"
+        self.assertEqual(
+            self.dlg._parse_params(text),
+            {"url": "file:data/shapes", "charset": "UTF-8", "key with": "sign = a=b"},
+        )
+
+    def test_parse_rejects_a_line_without_equals(self):
+        with self.assertRaises(ValueError) as ctx:
+            self.dlg._parse_params("url = ok\njust words\n")
+        self.assertIn("Line 2", str(ctx.exception))
+
+    def test_editor_is_authoritative_but_keeps_masked_secrets(self):
+        stored = {
+            "url": "file:old",
+            "charset": "ISO-8859-1",
+            "passwd": "crypt1:SECRET",
+            "obsolete": "x",
+        }
+        detail = {"type": "Shapefile", "enabled": False}
+        values = {
+            "workspace": "topp",
+            "name": "shp",
+            "description": "",
+            "raw_params": "url = file:new\ncharset = UTF-8\npasswd = ••••\n",  # 'obsolete' removed
+        }
+
+        self.dlg._update_datastore_from_values(values, detail, stored)
+
+        self.assertEqual(
+            self.sent["connection_parameters"],
+            {"url": "file:new", "charset": "UTF-8", "passwd": "crypt1:SECRET"},
+        )
+        self.assertEqual(
+            self.sent["datastore_type"], "Shapefile"
+        )  # server's type, not the combo
+        self.assertIs(self.sent["enabled"], False)  # still disabled
+
+    def test_bad_line_never_reaches_the_server(self):
+        with self.assertRaises(ValueError):
+            self.dlg._update_datastore_from_values(
+                {"workspace": "w", "name": "n", "raw_params": "no equals here"},
+                {"type": "GeoPackage"},
+                {"database": "x.gpkg"},
+            )
+        self.assertEqual(self.sent, {})
 
 
 # ############################################################################

@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- Any datastore type can be edited. Types without a dedicated form (Shapefile,
+  GeoPackage, …) get a `key = value` editor for their connection parameters;
+  the save merges onto the server's stored map exactly as the typed forms do.
+- *Verify the server's TLS certificate* setting (default on); a private-CA or
+  self-signed server is now reported as a certificate problem, not as
+  "is the server running?".
+- The Workspaces list shows GeoServer's default workspace; rows are selectable
+  on every tab, so *Delete Selected* works everywhere.
 - `docker-compose.yml`: a throwaway GeoServer 2.28.5 plus PostGIS for local
   development and for testing the library contract against a real server.
 

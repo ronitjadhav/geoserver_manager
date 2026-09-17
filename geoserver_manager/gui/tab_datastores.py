@@ -17,6 +17,9 @@ _SUPPORTED_TYPES = [
     "PMTiles",
 ]
 
+# Stands in for password-like values in the generic editor; never sent back as-is
+_MASKED = "••••"
+
 # Every field that belongs to one of those types (shown/hidden by _on_type_changed)
 _TYPE_SPECIFIC_FIELDS = (
     "pg_host",
@@ -220,12 +223,12 @@ class DatastoreTabMixin:
                 "key": "raw_params",
                 "label": self.tr("Connection parameters"),
                 "type": "textarea",
-                "read_only": True,
                 "visible": False,
                 "group": self.tr("Connection"),
                 "help": self.tr(
-                    "As stored on the server. This datastore type can be viewed here "
-                    "but not edited — use the GeoServer web UI to change it."
+                    "One 'key = value' per line, exactly as GeoServer stores them. "
+                    "Lines you remove are removed on the server; a masked password "
+                    "(••••) is kept as it is unless you replace it."
                 ),
             },
             # --- PMTiles fields ---
@@ -291,23 +294,36 @@ class DatastoreTabMixin:
             )
             self._load_datastores()
 
-    def _show_as_read_only(self, dlg, ds_type):
-        """Turn the edit dialog into a plain view for a type the form cannot edit.
+    def _show_generic_editor(self, dlg, ds_type):
+        """Edit a datastore type the form has no dedicated fields for.
 
-        Used to show "PostGIS" in a live combo with every type's fields visible,
-        which looked editable and wrong (4 of 5 GeoServer demo stores are
-        Shapefile). Now: the real type, locked; the type-specific fields gone;
-        the stored connection parameters shown as they are; no Save.
+        Shapefile, GeoPackage, Directory, WFS, …: the real type, locked; the
+        type-specific field groups hidden; the stored connection parameters
+        editable as 'key = value' lines. The save path is the same merge as
+        for typed stores, so GeoServer still validates the result.
         """
         combo = dlg.get_widget("type")
         if combo is not None:
             combo.addItem(ds_type)
             combo.setCurrentText(ds_type)
+            combo.setEnabled(False)
         for key in _TYPE_SPECIFIC_FIELDS:
             dlg.set_field_visible(key, False)
         dlg.set_field_visible("raw_params", True)
-        dlg.set_all_fields_enabled(False)
-        dlg.hide_save_button()
+
+    @staticmethod
+    def _parse_params(text):
+        """Parse 'key = value' lines back into a dict. Raises ValueError on a bad line."""
+        params = {}
+        for number, raw in enumerate(text.splitlines(), start=1):
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                raise ValueError(f"Line {number} is not 'key = value': {raw!r}")
+            key, value = line.split("=", 1)
+            params[key.strip()] = value.strip()
+        return params
 
     def _wire_type_combo(self, dlg, initial_type=None, locked=False):
         """Show only the connection fields that belong to the selected type.
@@ -416,7 +432,13 @@ class DatastoreTabMixin:
         elif ds_type == "PMTiles":
             merged["pmtiles"] = values.get("pmtiles_url", "")
         else:
-            raise ValueError(f"Unsupported datastore type: {ds_type}")
+            # Generic editor: what the user left in the textarea is the whole
+            # map (removed lines remove keys); a masked value keeps the original.
+            edited = self._parse_params(values.get("raw_params", ""))
+            merged = {
+                key: (conn_params.get(key, "") if value == _MASKED else value)
+                for key, value in edited.items()
+            }
 
         enabled = detail.get("enabled", True)
         if isinstance(enabled, str):  # .json gives a bool, but do not assume
@@ -445,8 +467,8 @@ class DatastoreTabMixin:
     def _datastore_form_values(ws_name, ds_name, ds_type, detail, conn_params):
         """Prefill for the edit form, from what GeoServer returned.
 
-        The type is passed through as-is; for a type the form cannot edit the
-        caller (_show_as_read_only) adds it to the combo and locks the dialog.
+        The type is passed through as-is; for a type without dedicated fields
+        the caller (_show_generic_editor) adds it to the combo and locks it.
         """
         return {
             "workspace": ws_name,
@@ -468,9 +490,9 @@ class DatastoreTabMixin:
             "jndi_reference": conn_params.get("jndiReferenceName", ""),
             # PMTiles
             "pmtiles_url": conn_params.get("pmtiles", ""),
-            # Read-only view for unsupported types; secrets masked
+            # Generic editor for types without dedicated fields; secrets masked
             "raw_params": "\n".join(
-                f"{key} = {'••••' if key.lower() in ('passwd', 'password') else value}"
+                f"{key} = {_MASKED if key.lower() in ('passwd', 'password') else value}"
                 for key, value in sorted(conn_params.items())
             ),
         }
@@ -501,7 +523,8 @@ class DatastoreTabMixin:
                 self.tr("Modify datastore settings")
                 if editable
                 else self.tr(
-                    "Datastore type '{}' is read-only (not supported for editing)"
+                    "Datastore type '{}' has no dedicated form — edit its connection "
+                    "parameters directly."
                 ).format(ds_type)
             ),
             fields=self._datastore_fields(self._get_workspace_names(), edit_mode=True),
@@ -511,7 +534,7 @@ class DatastoreTabMixin:
         if editable:
             self._wire_type_combo(dlg, initial_type=values["type"], locked=True)
         else:
-            self._show_as_read_only(dlg, ds_type)
+            self._show_generic_editor(dlg, ds_type)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 

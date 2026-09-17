@@ -73,6 +73,7 @@ fake.GeoServerCloud = FakeGS; sys.modules["geoservercloud"] = fake
 
 class Settings:
     geoserver_url = "http://localhost:8080/geoserver"
+    geoserver_verify_tls = True          # every field _build_client reads
     def has_credentials(self): return True
     def get_credentials(self): return ("admin", "geoserver")
 class Prefs:
