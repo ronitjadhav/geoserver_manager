@@ -46,11 +46,11 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 
 ## Styles
 
-- [ ] List styles (global + per-workspace)
-- [ ] View SLD/CSS style definition
-- [ ] Upload style from `.sld` file
-- [ ] Upload style from pasted string
-- [ ] Delete style
+- [x] List styles (global + per-workspace)
+- [x] View SLD/CSS style definition
+- [x] Upload style from `.sld` file
+- [x] Upload style from pasted string
+- [x] Delete style
 - [ ] Set default style for a layer
 
 ## Layer Groups

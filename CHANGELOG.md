@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Styles tab**: global and per-workspace styles; open one to see its
+  definition and body, and edit the body of SLD/MBStyle styles in place;
+  upload a style from pasted SLD or from an `.sld` / `.zip` / `.mbstyle` file;
+  delete (single and bulk, purging the file and clearing references).
+- The form dialog gained a `file` field type (path + Browse).
 - **Add to QGIS** from the Layers tab: load any GeoServer layer into the current
   project as WMS, WFS (the actual features) or WMTS (via GeoWebCache). The layer
   source carries the plugin's QGIS authentication config id, never a password.

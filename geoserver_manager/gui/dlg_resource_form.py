@@ -33,6 +33,7 @@ Supported field types:
     - "combo"     -> QComboBox (provide "options": ["a", "b", ...])
     - "spinbox"   -> QSpinBox (optional "min", "max", "default")
     - "textarea"  -> QPlainTextEdit
+    - "file"      -> QLineEdit + Browse button (optional "filter", e.g. "Styles (*.sld)")
 
 Field options:
     - key (str): identifier used in get_values()
@@ -58,10 +59,13 @@ from qgis.PyQt.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPlainTextEdit,
+    QPushButton,
     QSizePolicy,
     QSpinBox,
     QTabWidget,
@@ -261,6 +265,32 @@ class ResourceFormDialog(QDialog):
                 w.setReadOnly(True)
             return w
 
+        if ftype == "file":
+            container = QWidget()
+            row = QHBoxLayout(container)
+            row.setContentsMargins(0, 0, 0, 0)
+            edit = QLineEdit()
+            if value:
+                edit.setText(str(value))
+            if field.get("placeholder"):
+                edit.setPlaceholderText(field["placeholder"])
+            browse = QPushButton(self.tr("Browse…"))
+
+            def pick(_checked=False, edit=edit, field=field):
+                path, _selected = QFileDialog.getOpenFileName(
+                    self, field["label"], edit.text(), field.get("filter", "")
+                )
+                if path:
+                    edit.setText(path)
+
+            browse.clicked.connect(pick)
+            row.addWidget(edit)
+            row.addWidget(browse)
+            container.path_edit = edit  # read back by get_values()
+            if read_only:
+                container.setEnabled(False)
+            return container
+
         # Fallback to text
         w = QLineEdit()
         if value:
@@ -285,6 +315,8 @@ class ResourceFormDialog(QDialog):
                 result[key] = widget.value()
             elif ftype == "textarea":
                 result[key] = widget.toPlainText().strip()
+            elif ftype == "file":
+                result[key] = widget.path_edit.text().strip()
             else:
                 result[key] = widget.text().strip()
         return result

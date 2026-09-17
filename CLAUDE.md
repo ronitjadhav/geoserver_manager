@@ -19,8 +19,8 @@ Skills in `.claude/skills/` hold the step-by-step procedures:
 | Path | What lives there |
 |---|---|
 | `geoserver_manager/plugin_main.py` | QGIS entry point: `initGui` / `unload` / `run`. Shows the dialog, then connects. |
-| `geoserver_manager/gui/dlg_main.py` | `GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin)` — nav list, results table, search, pagination, and every helper the tabs share |
-| `geoserver_manager/gui/tab_workspaces.py`, `tab_datastores.py` | One mixin per resource type: load / add / edit / delete |
+| `geoserver_manager/gui/dlg_main.py` | `GeoServerMainDialog(QDialog, <one mixin per tab>)` — nav list, results table, search, pagination, and every helper the tabs share |
+| `geoserver_manager/gui/tab_workspaces.py`, `tab_datastores.py`, `tab_layers.py`, `tab_styles.py` | One mixin per resource type: load / add / edit / delete (layers also: publish, add to QGIS) |
 | `geoserver_manager/gui/dlg_resource_form.py` | `ResourceFormDialog` — a modal form built from a list of field dicts (see its module docstring for the field spec) |
 | `geoserver_manager/gui/dlg_settings.py` | Options page: URL + credentials (credentials go to `QgsAuthManager`, encrypted) |
 | `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser` |
