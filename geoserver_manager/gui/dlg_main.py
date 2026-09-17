@@ -30,6 +30,7 @@ from qgis.PyQt.QtWidgets import (
 
 from geoserver_manager.__about__ import __title__
 from geoserver_manager.gui.tab_datastores import DatastoreTabMixin
+from geoserver_manager.gui.tab_layergroups import LayerGroupTabMixin
 from geoserver_manager.gui.tab_layers import LayerTabMixin
 from geoserver_manager.gui.tab_styles import StyleTabMixin
 from geoserver_manager.gui.tab_workspaces import WorkspaceTabMixin
@@ -43,7 +44,12 @@ _MAX_PARALLEL_REQUESTS = 8
 
 
 class GeoServerMainDialog(
-    QDialog, WorkspaceTabMixin, DatastoreTabMixin, LayerTabMixin, StyleTabMixin
+    QDialog,
+    WorkspaceTabMixin,
+    DatastoreTabMixin,
+    LayerTabMixin,
+    LayerGroupTabMixin,
+    StyleTabMixin,
 ):
     """Main dialog — GeoServer resource browser."""
 
@@ -342,6 +348,7 @@ class GeoServerMainDialog(
         ("Workspaces", "mIconFolder.svg", "_load_workspaces"),
         ("Datastores", "mIconDbSchema.svg", "_load_datastores"),
         ("Layers", "mIconVector.svg", "_load_layers"),
+        ("Layer Groups", "mActionAddGroup.svg", "_load_layer_groups"),
         ("Styles", "mActionStyleManager.svg", "_load_styles"),
     )
 

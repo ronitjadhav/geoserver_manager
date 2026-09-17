@@ -55,9 +55,9 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 
 ## Layer Groups
 
-- [ ] List layer groups per workspace
-- [ ] Create layer group (select layers, styles, mode)
-- [ ] Delete layer group
+- [x] List layer groups per workspace
+- [x] Create layer group (select layers, styles, mode)
+- [x] Delete layer group
 
 ## WMS / WMTS Stores (Cascaded Layers)
 

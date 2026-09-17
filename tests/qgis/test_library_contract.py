@@ -27,6 +27,7 @@ for _whl in BUNDLED_WHLS:  # conftest does this under pytest; unittest needs it 
 
 from geoservercloud import GeoServerCloud  # noqa: E402
 from geoservercloud.models.datastore import DataStore  # noqa: E402
+from geoservercloud.models.layergroup import LayerGroup  # noqa: E402
 from geoservercloud.models.workspace import Workspace  # noqa: E402
 
 # ############################################################################
@@ -93,6 +94,14 @@ class TestRestClientPolicy(unittest.TestCase):
         self.assertIn("if response.status_code != 409:", src)  # POST
         self.assertTrue(hasattr(restclient, "TIMEOUT"))
         self.assertNotIn("timeout", inspect.signature(restclient.RestClient).parameters)
+
+
+class TestLayerGroupModes(unittest.TestCase):
+    def test_the_tab_offers_exactly_the_librarys_modes(self):
+        """tab_layergroups.MODES spells out the enum, so it must not drift."""
+        from geoserver_manager.gui.tab_layergroups import MODES
+
+        self.assertEqual(list(MODES), LayerGroup.modes)
 
 
 # ############################################################################

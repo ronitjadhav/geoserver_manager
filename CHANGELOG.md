@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Layer Groups tab**: the global layer groups and every workspace's, with
+  mode and size; open one to see its layers in drawing order (with their
+  styles and any nested group), title, abstract and bounds; create a group
+  from an ordered list of layers — pick them from every published layer on
+  the server, rasters included, and mix workspaces in a global group;
+  **Add to QGIS** loads a group as a single WMS layer; delete (single and
+  bulk). GeoServer computes the group's bounds from its layers.
 - **Styles tab**: global and per-workspace styles; open one to see its
   definition and body, and edit the body of SLD/MBStyle styles in place;
   upload a style from pasted SLD or from an `.sld` / `.zip` / `.mbstyle` file;

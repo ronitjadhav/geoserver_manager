@@ -20,7 +20,7 @@ Skills in `.claude/skills/` hold the step-by-step procedures:
 |---|---|
 | `geoserver_manager/plugin_main.py` | QGIS entry point: `initGui` / `unload` / `run`. Shows the dialog, then connects. |
 | `geoserver_manager/gui/dlg_main.py` | `GeoServerMainDialog(QDialog, <one mixin per tab>)` — nav list, results table, search, pagination, and every helper the tabs share |
-| `geoserver_manager/gui/tab_workspaces.py`, `tab_datastores.py`, `tab_layers.py`, `tab_styles.py` | One mixin per resource type: load / add / edit / delete (layers also: publish, add to QGIS) |
+| `geoserver_manager/gui/tab_workspaces.py`, `tab_datastores.py`, `tab_layers.py`, `tab_layergroups.py`, `tab_styles.py` | One mixin per resource type: load / add / edit / delete (layers also: publish, add to QGIS; layer groups also: add to QGIS) |
 | `geoserver_manager/gui/dlg_resource_form.py` | `ResourceFormDialog` — a modal form built from a list of field dicts (see its module docstring for the field spec) |
 | `geoserver_manager/gui/dlg_settings.py` | Options page: URL + credentials (credentials go to `QgsAuthManager`, encrypted) |
 | `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser` |
@@ -113,6 +113,13 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
 - **Thread safety:** the REST methods are stateless `requests.*` calls and are safe to run through
   `_fan_out` (the datastore list does this). `self.wms` / `self.wmts` on the client are shared state —
   OWS calls must not be fanned out the same way.
+- **Layer groups** are the biggest library gap so far (rows 16–19 of #50): every layer-group call requires a
+  `workspace_name`, so the *global* groups are unreachable; `create_layer_group` re-qualifies every layer with
+  the group's own workspace (no cross-workspace and no nested group), always sends a world bbox from a
+  three-entry `EPSG_BBOX` table — GeoServer computes the real union when `bounds` is omitted — and writes the
+  abstract as `abstract`, which GeoServer drops (its key is `abstractTxt`, which the model also fails to read).
+  Hence `tab_layergroups.py` builds its own payload and GETs the group itself; it still uses the facade for the
+  per-workspace listing and delete.
 - The bundled wheel is the upstream 0.8.5 with `geoserver_acceptance_tests/` removed (15 MB of fixtures):
   16 MB → 49 KB. On a version bump, strip the new wheel the same way — the procedure is in
   `toolbelt/dependencies.py` and the `release-plugin` skill. `GSC_REQUIRED` pins the version;
@@ -138,6 +145,9 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
   The same applies to behaviour the plugin has to paper over (`_check`, `_resource_exists`, the datastore
   merge): those are library gaps too, and they are listed in #50. We depend on this library; the fastest
   way to make the plugin better is to make the library better.
+- The global-or-workspace scope (`GLOBAL` label + `_scope()`) lives in `tab_styles.py` and is reused by
+  `tab_layergroups.py` through the shared dialog class, like `_layer_uri()` from `tab_layers.py`. A third tab
+  needing it is the point to lift it out of `tab_styles` — not before.
 - **Nothing the dialog shows comes from a cache.** Lists are fetched on every tab switch and Refresh,
   edit dialogs fetch the object when they open, pickers fetch their options when the form opens. A
   workspace-name cache once survived a Refresh and left the datastore form's combo stale; it was removed
