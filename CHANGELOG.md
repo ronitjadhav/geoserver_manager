@@ -11,6 +11,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- The workspace-name list used by the datastore forms was cached and survived a
+  Refresh on the Workspaces tab, so a workspace created elsewhere showed in the
+  list but not in the combo. Nothing the dialog shows is cached any more.
+- The Workspaces list shows which workspace is GeoServer's default, read from the
+  server on every load, and the edit form explains that GeoServer always has
+  exactly one default that cannot be unset (unchecking it in the GeoServer web
+  UI is a no-op there).
 - A tab load that failed mid-fetch left the previous resource type's rows in the
   table cache, reachable through search and pagination and wired to the new
   tab's delete handler — Delete could act on the wrong resource.

@@ -56,7 +56,7 @@ class DatastoreTabMixin:
                 ]
             )
 
-            ws_names = self._get_workspace_names(refresh=True)
+            ws_names = self._get_workspace_names()
             listed = self._fan_out(self._datastore_names, ws_names)
             pairs = [
                 (ws_name, ds_name)

@@ -74,7 +74,6 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         self._delete_selected_callback = (
             None  # callback(list[row_data]) for bulk delete
         )
-        self._workspace_names = []  # cache for the datastore form combo boxes
 
         # Tooltips
         self.btn_close.setToolTip(self.tr("Close the dialog"))
@@ -642,16 +641,15 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             )
         return result
 
-    def _get_workspace_names(self, refresh=False):
-        """Workspace names for combo boxes, cached until the next list reload.
+    def _get_workspace_names(self):
+        """Workspace names for combo boxes — fetched from the server every time.
 
-        Every tab with a workspace column or a workspace picker needs this;
-        Refresh (via the loaders) repopulates it, which is enough of a TTL.
+        Deliberately not cached: a cache here survived a Refresh on the
+        Workspaces tab, so a workspace created in the web UI showed in the list
+        but not in the datastore form's combo. One GET per dialog open is
+        cheaper than a stale picker.
         """
-        if refresh or not self._workspace_names:
-            workspaces = self._fetch_list(self.gs.get_workspaces)
-            self._workspace_names = [self._name_of(ws) for ws in workspaces]
-        return self._workspace_names
+        return [self._name_of(ws) for ws in self._fetch_list(self.gs.get_workspaces)]
 
     @staticmethod
     def _fan_out(fn, items):

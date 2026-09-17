@@ -330,6 +330,54 @@ class TestDefaultWorkspaceHandling(unittest.TestCase):
         self.assertFalse(field["read_only"])
 
 
+class TestServerSync(unittest.TestCase):
+    """What the dialog shows must come from the server, not from a cache."""
+
+    def setUp(self):
+        self.dlg = GeoServerMainDialog()
+        outer = self
+        self.calls = 0
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(inner):
+                return {"workspace": {"name": "topp"}}
+
+        class FakeClient:
+            def get(inner, path, **kwargs):
+                return FakeResponse()
+
+        class FakeEndpoints:
+            base_url = "/rest"
+
+        class FakeRest:
+            rest_endpoints = FakeEndpoints()
+            rest_client = FakeClient()
+
+        class FakeGS:
+            rest_service = FakeRest()
+
+            def get_workspaces(inner):
+                outer.calls += 1
+                return ([{"name": "cite"}, {"name": "topp"}], 200)
+
+        self.dlg.gs = FakeGS()
+
+    def test_workspace_names_are_fetched_on_every_call(self):
+        self.dlg._get_workspace_names()
+        self.dlg._get_workspace_names()
+        self.assertEqual(self.calls, 2)  # no cache to go stale
+
+    def test_workspace_list_marks_the_servers_default(self):
+        self.dlg._load_workspaces()
+        rows = {row[0]: row[1] for row in self.dlg._all_rows}
+        self.assertEqual(rows["topp"], "default")
+        self.assertEqual(rows["cite"], "")
+        # column 0 is still the name: delete / edit callbacks rely on it
+        self.assertEqual([row[0] for row in self.dlg._all_rows], ["cite", "topp"])
+
+
 # ############################################################################
 # ####### Stand-alone run ########
 # ################################

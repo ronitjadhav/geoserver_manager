@@ -46,7 +46,7 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
   | `_resource_exists(getter, *args)` | pre-check before *Add* (the library upserts) |
   | `_raw_rest(method, path, **kw)` | endpoints the library lacks; raises with GeoServer's response body |
   | `_name_of(item)` | the name of a list entry (dict or str) |
-  | `_get_workspace_names(refresh=False)` | workspace names for combos; cached until a loader refreshes it |
+  | `_get_workspace_names()` | workspace names for combos — a fresh GET every call, deliberately uncached |
   | `_fan_out(fn, items) -> [(result, error)]` | parallel per-item GETs; a failing item yields `(None, exc)` instead of aborting |
   | `_report_partial_failures([(label, exc)])` | one warning banner + log lines for what a listing could not fetch |
   | `_delete_many(kind, [(label, fn)], reload_fn, cascade=…)` | confirm + run + report one or many deletions |
@@ -88,6 +88,13 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
   because the library lacks a method (`_check`, `_resource_exists`, the datastore merge), has a row there
   with the endpoint and the proposed library API. When you add one, add the row and the `TODO(#50)`; when
   the library gains it and the wheel is bumped, replace the workaround and tick the row.
+- **GeoServer always has exactly one default workspace and it cannot be unset.** `GET
+  /rest/workspaces/default.json` never 404s (with `default.xml` deleted it answers the first workspace),
+  and the web UI's "Default Workspace" checkbox only *sets*: `WorkspaceEditPage` has
+  `if (defaultWs) setDefaultWorkspace(ws)` with no else, so unchecking it and saving is a no-op. The
+  plugin therefore shows the default read-only-and-checked, marks it in the Workspaces list, and reads it
+  live from the server on every load and every edit dialog — if it looks "out of sync" with the web UI,
+  the web UI is the one lying.
 - The client strips trailing `/` from the URL itself. It has no timeout parameter (`TIMEOUT = 120` is a
   module constant) and `verifytls` is not yet surfaced in settings (open issue).
 - **Thread safety:** the REST methods are stateless `requests.*` calls and are safe to run through
@@ -105,6 +112,10 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
 
 ## Conventions
 
+- **Nothing the dialog shows comes from a cache.** Lists are fetched on every tab switch and Refresh,
+  edit dialogs fetch the object when they open, pickers fetch their options when the form opens. A
+  workspace-name cache once survived a Refresh and left the datastore form's combo stale; it was removed
+  rather than given a TTL. One extra GET is always cheaper than a stale view.
 - **Smallest change that removes demonstrated friction.** No abstraction with one implementation, no
   config for a value that never changes. A service layer between GUI and library was proposed twice and
   rejected as premature — don't build it until a non-GUI caller needs the API.

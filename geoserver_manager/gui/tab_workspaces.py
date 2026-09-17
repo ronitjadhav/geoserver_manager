@@ -45,11 +45,20 @@ class WorkspaceTabMixin:
             self._setup_table(
                 [
                     self.tr("Workspace Name"),
+                    self.tr("Default"),
                     self.tr("Actions"),
                 ]
             )
             workspaces = self._fetch_list(self.gs.get_workspaces)
-            self._populate_rows([[self._name_of(ws)] for ws in workspaces])
+            # Shown in the list so the server's truth is visible at a glance:
+            # GeoServer always has exactly one default and it cannot be unset.
+            default = self._default_workspace_name()
+            self._populate_rows(
+                [
+                    [name, self.tr("default") if name == default else ""]
+                    for name in (self._name_of(ws) for ws in workspaces)
+                ]
+            )
 
         self._run_action(load, self.tr("Failed to load workspaces"))
 
@@ -78,9 +87,15 @@ class WorkspaceTabMixin:
                 "default": False,
                 "read_only": is_default,
                 "help": (
-                    self.tr("This is the default workspace; pick another to change it")
+                    self.tr(
+                        "This is GeoServer's default workspace. There is always "
+                        "exactly one and it cannot be unset — to change it, tick "
+                        "Default on another workspace."
+                    )
                     if is_default
-                    else self.tr("Set this as the default workspace for GeoServer")
+                    else self.tr(
+                        "Make this GeoServer's default workspace (replaces the current one)"
+                    )
                 ),
             },
         ]
