@@ -76,9 +76,9 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 
 ## Load GeoServer Layer into QGIS
 
-- [ ] Add layer as WMS to QGIS project
-- [ ] Add layer as WFS to QGIS project
-- [ ] Add layer as WMTS to QGIS project
+- [x] Add layer as WMS to QGIS project
+- [x] Add layer as WFS to QGIS project
+- [x] Add layer as WMTS to QGIS project
 
 ## GeoWebCache
 

@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Add to QGIS** from the Layers tab: load any GeoServer layer into the current
+  project as WMS, WFS (the actual features) or WMTS (via GeoWebCache). The layer
+  source carries the plugin's QGIS authentication config id, never a password.
 - **Layers tab**: every feature type on the server, with its workspace,
   datastore, SRS and enabled flag; search and pagination; a detail view with
   native name, projection policy, title, abstract, keywords, bounding box and

@@ -58,6 +58,13 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
   | `_delete_many(kind, [(label, fn)], reload_fn, cascade=…)` | confirm + run + report one or many deletions |
   | `_reload_current_tab()` | after an action reachable from another tab |
 
+- **Adding a layer to QGIS** (`LayerTabMixin._add_layer_to_qgis`): build the URI with `_layer_uri`
+  (pure, tested), construct `QgsRasterLayer`/`QgsVectorLayer`, check `isValid()`, then
+  `QgsProject.instance().addMapLayer()` — never `iface.addRasterLayer()`, which pops QGIS's own modal on
+  failure instead of our banner. Credentials travel as `authcfg=<geoserver_auth_cfg_id>`, resolved by the
+  providers from `QgsAuthManager`, so a saved project never contains a password. Note the plugin's TLS
+  setting does not reach QGIS's providers; they use QGIS's own certificate handling.
+
 ## Invariants — do not break these
 
 1. **Row cache and tab callbacks are reset together.** `_setup_table` clears `_all_rows`/`_filtered_rows`;

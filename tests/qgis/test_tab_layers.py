@@ -253,6 +253,90 @@ class TestLibraryPayloadShape(unittest.TestCase):
         self.assertEqual(values["attributes"], "plain : ")
 
 
+class TestAddToQgis(unittest.TestCase):
+    """URIs carry the auth config id, never a password; the right provider is used."""
+
+    BASE = "http://gs.example.org/geoserver/"  # trailing slash must not matter
+
+    def test_wms_uri(self):
+        uri, provider = GeoServerMainDialog._layer_uri(
+            "WMS", self.BASE, "topp:roads", "abc123"
+        )
+        self.assertEqual(provider, "wms")
+        self.assertIn("layers=topp:roads", uri)
+        self.assertIn("url=http://gs.example.org/geoserver/ows", uri)
+        self.assertIn("authcfg=abc123", uri)
+        self.assertNotIn("//geoserver//", uri)
+
+    def test_wmts_goes_through_geowebcache(self):
+        uri, provider = GeoServerMainDialog._layer_uri(
+            "WMTS", self.BASE, "topp:roads", "abc123"
+        )
+        self.assertEqual(provider, "wms")
+        self.assertIn("gwc/service/wmts", uri)
+        self.assertIn("tileMatrixSet=EPSG:900913", uri)
+        self.assertIn("authcfg=abc123", uri)
+
+    def test_wfs_uri_uses_the_datasource_uri_and_no_password(self):
+        uri, provider = GeoServerMainDialog._layer_uri(
+            "WFS", self.BASE, "topp:roads", "abc123"
+        )
+        self.assertEqual(provider, "WFS")
+        self.assertIn("typename='topp:roads'", uri)
+        self.assertIn("authcfg=abc123", uri)
+        self.assertIn("pagingEnabled='true'", uri)
+        self.assertNotIn("password", uri.lower())
+
+    def test_no_auth_config_means_anonymous(self):
+        uri, _ = GeoServerMainDialog._layer_uri("WMS", self.BASE, "topp:roads", "")
+        self.assertNotIn("authcfg", uri)
+
+    def test_unknown_protocol_is_refused(self):
+        with self.assertRaises(ValueError):
+            GeoServerMainDialog._layer_uri("FTP", self.BASE, "x:y")
+
+    def test_add_action_is_offered_before_delete(self):
+        dlg = GeoServerMainDialog()
+        dlg.gs = FakeGS()
+        dlg.show_warning_message = lambda text: None
+        dlg._load_layers()
+        tooltips = [tooltip for _icon, tooltip, _cb in dlg._row_actions]
+        self.assertEqual(tooltips, ["Add to QGIS", "Delete"])
+
+    def test_unreachable_layer_is_a_banner_not_a_project_entry(self):
+        from unittest.mock import patch
+
+        from qgis.core import QgsProject
+        from qgis.PyQt.QtWidgets import QDialog
+
+        from geoserver_manager.gui import tab_layers
+        from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+
+        class Accepting(ResourceFormDialog):
+            def exec(self):
+                return QDialog.DialogCode.Accepted
+
+        class Settings:
+            geoserver_url = "http://127.0.0.1:1/geoserver"  # nothing listens here
+            geoserver_auth_cfg_id = ""
+
+        class Prefs:
+            def get_plg_settings(self):
+                return Settings()
+
+        dlg = GeoServerMainDialog()
+        dlg.plg_settings = Prefs()
+        errors = []
+        dlg.show_error_message = errors.append
+        before = len(QgsProject.instance().mapLayers())
+        with patch.object(tab_layers, "ResourceFormDialog", Accepting):
+            dlg._add_layer_to_qgis(["roads", "topp", "ds", "EPSG:4326", "True"])
+
+        self.assertEqual(len(errors), 1)
+        self.assertIn("Could not add 'roads'", errors[0])
+        self.assertEqual(len(QgsProject.instance().mapLayers()), before)
+
+
 # ############################################################################
 # ####### Stand-alone run ########
 # ################################

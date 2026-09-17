@@ -6,7 +6,16 @@ Layers tab — list, view and delete feature types.
 Used as a mixin for GeoServerMainDialog.
 """
 
+from qgis.core import QgsDataSourceUri, QgsProject, QgsRasterLayer, QgsVectorLayer
+from qgis.PyQt.QtWidgets import QDialog
+
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+
+# How a GeoServer layer can be brought into QGIS. WFS gives the actual features
+# (editable, stylable in QGIS); WMS/WMTS give rendered images. WMTS goes through
+# GeoWebCache, which caches EPSG:900913 and EPSG:4326 for every layer by default.
+PROTOCOLS = ("WMS", "WFS", "WMTS")
+_WMTS_TILE_MATRIX_SET = "EPSG:900913"
 
 
 class LayerTabMixin:
@@ -26,6 +35,11 @@ class LayerTabMixin:
                 self.tr("Workspace"): self._open_workspace_from_row
             }
             self._row_actions = [
+                (
+                    "mActionAddLayer.svg",
+                    self.tr("Add to QGIS"),
+                    self._add_layer_to_qgis,
+                ),
                 ("mActionDeleteSelected.svg", self.tr("Delete"), self._delete_layer),
             ]
             self._setup_table(
@@ -239,6 +253,92 @@ class LayerTabMixin:
         )
         dlg.hide_save_button()
         dlg.exec()
+
+    # -- Add to QGIS ----------------------------------------------------------
+
+    @staticmethod
+    def _layer_uri(protocol, base_url, qualified_name, authcfg=""):
+        """Provider URI for one GeoServer layer. Returns (uri, provider_key).
+
+        Credentials never go in the URI: `authcfg` is the id of the QGIS
+        authentication config the plugin already stores, and the providers
+        resolve it themselves — so a saved project holds no password.
+        """
+        base = base_url.rstrip("/")
+        auth = f"&authcfg={authcfg}" if authcfg else ""
+        if protocol == "WMS":
+            return (
+                f"crs=EPSG:4326&format=image/png&layers={qualified_name}&styles="
+                f"&url={base}/ows{auth}",
+                "wms",
+            )
+        if protocol == "WMTS":
+            return (
+                f"crs=EPSG:4326&format=image/png&layers={qualified_name}&styles="
+                f"&tileMatrixSet={_WMTS_TILE_MATRIX_SET}"
+                f"&url={base}/gwc/service/wmts?REQUEST=GetCapabilities{auth}",
+                "wms",
+            )
+        if protocol == "WFS":
+            uri = QgsDataSourceUri()
+            uri.setParam("url", f"{base}/ows")
+            uri.setParam("typename", qualified_name)
+            uri.setParam("version", "auto")
+            uri.setParam("srsname", "EPSG:4326")
+            uri.setParam("pagingEnabled", "true")
+            if authcfg:
+                uri.setAuthConfigId(authcfg)
+            return (uri.uri(False), "WFS")
+        raise ValueError(f"Unknown protocol: {protocol}")
+
+    def _add_layer_to_qgis(self, row_data):
+        """Ask which protocol, then add the layer to the current QGIS project."""
+        name, ws_name = row_data[0], row_data[1]
+        dlg = ResourceFormDialog(
+            title=self.tr("Add '{}' to QGIS").format(name),
+            description=self.tr(
+                "WFS loads the features themselves (editable, styled in QGIS); WMS "
+                "and WMTS load rendered images. Credentials come from the plugin's "
+                "saved connection, not from the layer."
+            ),
+            fields=[
+                {
+                    "key": "protocol",
+                    "label": self.tr("Load as"),
+                    "type": "combo",
+                    "options": list(PROTOCOLS),
+                    "default": "WMS",
+                    "required": True,
+                }
+            ],
+            parent=self,
+        )
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        protocol = dlg.get_values()["protocol"]
+
+        def add():
+            settings = self.plg_settings.get_plg_settings()
+            uri, provider = self._layer_uri(
+                protocol,
+                settings.geoserver_url,
+                f"{ws_name}:{name}",
+                settings.geoserver_auth_cfg_id,
+            )
+            layer_class = QgsVectorLayer if provider == "WFS" else QgsRasterLayer
+            layer = layer_class(uri, name, provider)
+            if not layer.isValid():
+                # Build first and check, instead of iface.addRasterLayer(), so an
+                # unreachable layer becomes our banner rather than QGIS's modal.
+                raise RuntimeError(
+                    layer.error().message() or self.tr("layer is not valid")
+                )
+            QgsProject.instance().addMapLayer(layer)
+
+        if self._run_action(add, self.tr("Could not add '{}' to QGIS").format(name)):
+            self.show_success_message(
+                self.tr("'{}' added to the project as {}.").format(name, protocol)
+            )
 
     def _delete_layer(self, row_data):
         """Delete a single feature type after confirmation."""
