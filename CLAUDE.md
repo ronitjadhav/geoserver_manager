@@ -45,6 +45,9 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
   | `_resource_exists(getter, *args)` | pre-check before *Add* (the library upserts) |
   | `_raw_rest(method, path, **kw)` | endpoints the library lacks; raises with GeoServer's response body |
   | `_name_of(item)` | the name of a list entry (dict or str) |
+  | `_get_workspace_names(refresh=False)` | workspace names for combos; cached until a loader refreshes it |
+  | `_fan_out(fn, items) -> [(result, error)]` | parallel per-item GETs; a failing item yields `(None, exc)` instead of aborting |
+  | `_report_partial_failures([(label, exc)])` | one warning banner + log lines for what a listing could not fetch |
   | `_delete_many(kind, [(label, fn)], reload_fn, cascade=…)` | confirm + run + report one or many deletions |
   | `_reload_current_tab()` | after an action reachable from another tab |
 
@@ -83,13 +86,15 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
   library when possible, keep the local workaround until then.
 - The client strips trailing `/` from the URL itself. It has no timeout parameter (`TIMEOUT = 120` is a
   module constant) and `verifytls` is not yet surfaced in settings (open issue).
-- **Thread safety:** the REST methods are stateless `requests.*` calls and are safe from a
-  `ThreadPoolExecutor` (the datastore list does this). `self.wms` / `self.wmts` on the client are shared
-  state — OWS calls must not be fanned out the same way.
+- **Thread safety:** the REST methods are stateless `requests.*` calls and are safe to run through
+  `_fan_out` (the datastore list does this). `self.wms` / `self.wmts` on the client are shared state —
+  OWS calls must not be fanned out the same way.
 - The bundled wheel is the upstream 0.8.5 with `geoserver_acceptance_tests/` removed (15 MB of fixtures):
   16 MB → 49 KB. On a version bump, strip the new wheel the same way — the procedure is in
-  `toolbelt/dependencies.py` and the `release-plugin` skill. Nothing pins the version yet (open issue): an
-  ambient install in the QGIS profile wins over the bundled wheel.
+  `toolbelt/dependencies.py` and the `release-plugin` skill. `GSC_REQUIRED` pins the version;
+  `ensure_dependencies()` logs which copy was imported and from where, and pushes a warning when it is not
+  the pin — an install in the QGIS profile still wins over the bundled wheel, the warning is how you notice.
+  `tests/qgis/test_library_contract.py` asserts the pin equals the shipped wheel.
 - Extracted library source, when you need to read it: unzip the wheel into a scratch dir; the plugin
   only uses `geoservercloud/geoservercloud.py`, `services/restclient.py`, `services/restservice.py`,
   `models/datastore.py`, `models/workspace.py`.
@@ -113,6 +118,8 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
 - Every fix ships with a test that **fails without it** — run the test against the old code once to prove
   it. Headless GUI tests: `from qgis.testing import start_app, unittest; start_app()` then instantiate
   `GeoServerMainDialog()` directly and drive its methods. Fake the server by assigning `dlg.gs = FakeGS()`.
+  `tests/qgis/conftest.py` puts the bundled wheels on `sys.path`, so tests may also import the real
+  `geoservercloud` models to lock payload shapes (see `test_library_contract.py`).
 - Commit messages: conventional prefix (`fix:`, `feat:`, `refactor:`, `chore:`, `ci:`, `docs:`), a body
   that says *why*. Pre-commit runs ruff, ruff-format, black, isort, flake8(+flake8-qgis) and the
   hygiene hooks on every commit; if black rewrites a file the commit aborts — re-add and commit again.

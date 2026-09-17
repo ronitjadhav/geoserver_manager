@@ -66,9 +66,11 @@ Rules for the mixin:
 - Forms: build the field list with `ResourceFormDialog` field dicts; put
   type-specific fields in a `group`, toggle them with `dlg.set_field_visible`,
   and if a type combo drives visibility, reuse the `_wire_type_combo` pattern.
-- Fan out per-item GETs with `ThreadPoolExecutor` **only** for stateless REST
-  reads; never OWS calls (`self.wms`/`self.wmts` are shared state). Make each
-  worker tolerant (return a placeholder) so one failure does not blank the table.
+- Fan out per-item GETs with `self._fan_out(fn, items)` — **only** stateless REST
+  reads, never OWS calls (`self.wms`/`self.wmts` are shared state). It returns
+  `[(result, error)]` in order; render what loaded and hand the failures to
+  `self._report_partial_failures([(label, error), …])` so one broken parent
+  costs one warning, not the whole table (see `_load_datastores`).
 
 ## 3. Register it — two lines in `dlg_main.py`
 

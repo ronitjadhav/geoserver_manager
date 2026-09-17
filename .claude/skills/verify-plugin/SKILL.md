@@ -40,6 +40,12 @@ QT_QPA_PLATFORM=offscreen PYTHONPATH=. python3 -m unittest discover -s tests/qgi
 Expect every test green. A new fix must come with a test that fails without it —
 verify that claim by temporarily reverting the fix once, not by reading the test.
 
+**Run `tests/unit` in an interpreter that has no `qgis`** (a plain venv), because
+that is what the CI unit job is. Your system Python probably has QGIS installed, so
+it will happily pass a test whose import chain pulls in `qgis.core` — CI won't. The
+`toolbelt` package init is kept empty for exactly this reason; do not add re-exports
+to it.
+
 ## 3. End-to-end smoke against a fake GeoServer
 
 The library is imported lazily inside `_build_client`, so inject a fake module
@@ -87,6 +93,8 @@ Check, at minimum:
 | 401 | status *Authentication failed* — not "unreachable" |
 | connection refused | *Server unreachable* |
 | 404 | *HTTP error 404* — never "Connected" |
+| 200 with HTML body | *Not a GeoServer REST endpoint* — a proxy login page is not "Connected" |
+| one workspace's `get_datastores` raises | rows for the others still render, exactly one warning names it |
 | healthy | *Connected — <url>* |
 | loader raises after `_setup_table` | `dlg._all_rows == []`, table empty, cursor restored |
 | delete of N rows | N server calls, one success banner |
