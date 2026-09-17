@@ -454,6 +454,10 @@ class DatastoreTabMixin:
         if detail is None:
             return
 
+        # The row's Type cell can be "—" after a transient GET failure at list
+        # time; the detail we just fetched is authoritative.
+        if isinstance(detail, dict) and detail.get("type"):
+            ds_type = detail["type"]
         conn_params = self._connection_params(detail)
         values = self._datastore_form_values(
             ws_name, ds_name, ds_type, detail, conn_params

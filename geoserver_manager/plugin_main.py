@@ -51,7 +51,7 @@ class GeoServerManagerPlugin:
             DIR_PLUGIN_ROOT
             / "resources"
             / "i18n"
-            / f"{__title__.lower()}_{self.locale}.qm"
+            / f"{DIR_PLUGIN_ROOT.name}_{self.locale}.qm"  # geoserver_manager_<loc>.qm
         )
         self.log(
             message=f"Translation: {self.locale}, {locale_path}",

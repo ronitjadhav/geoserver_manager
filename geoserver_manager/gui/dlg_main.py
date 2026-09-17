@@ -363,6 +363,7 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         if not self.gs or index < 0:
             return
         self.searchBox.clear()
+        self._search_timer.stop()  # clear() may have armed it
         self._reset_table_state()
         getattr(self, self.TABS[index][2])()
 
