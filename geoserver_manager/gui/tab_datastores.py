@@ -17,6 +17,18 @@ _SUPPORTED_TYPES = [
     "PMTiles",
 ]
 
+# Every field that belongs to one of those types (shown/hidden by _on_type_changed)
+_TYPE_SPECIFIC_FIELDS = (
+    "pg_host",
+    "pg_port",
+    "pg_db",
+    "pg_user",
+    "pg_password",
+    "pg_schema",
+    "jndi_reference",
+    "pmtiles_url",
+)
+
 
 class DatastoreTabMixin:
     """Mixin that adds datastore CRUD methods to the main dialog.
@@ -203,6 +215,19 @@ class DatastoreTabMixin:
                 "group": self.tr("Connection"),
                 "help": self.tr("JNDI name of the database connection pool"),
             },
+            # --- any other type: shown read-only, since the form cannot edit it ---
+            {
+                "key": "raw_params",
+                "label": self.tr("Connection parameters"),
+                "type": "textarea",
+                "read_only": True,
+                "visible": False,
+                "group": self.tr("Connection"),
+                "help": self.tr(
+                    "As stored on the server. This datastore type can be viewed here "
+                    "but not edited — use the GeoServer web UI to change it."
+                ),
+            },
             # --- PMTiles fields ---
             {
                 "key": "pmtiles_url",
@@ -265,6 +290,24 @@ class DatastoreTabMixin:
                 self.tr("Datastore '{}' created.").format(values["name"])
             )
             self._load_datastores()
+
+    def _show_as_read_only(self, dlg, ds_type):
+        """Turn the edit dialog into a plain view for a type the form cannot edit.
+
+        Used to show "PostGIS" in a live combo with every type's fields visible,
+        which looked editable and wrong (4 of 5 GeoServer demo stores are
+        Shapefile). Now: the real type, locked; the type-specific fields gone;
+        the stored connection parameters shown as they are; no Save.
+        """
+        combo = dlg.get_widget("type")
+        if combo is not None:
+            combo.addItem(ds_type)
+            combo.setCurrentText(ds_type)
+        for key in _TYPE_SPECIFIC_FIELDS:
+            dlg.set_field_visible(key, False)
+        dlg.set_field_visible("raw_params", True)
+        dlg.set_all_fields_enabled(False)
+        dlg.hide_save_button()
 
     def _wire_type_combo(self, dlg, initial_type=None, locked=False):
         """Show only the connection fields that belong to the selected type.
@@ -402,13 +445,13 @@ class DatastoreTabMixin:
     def _datastore_form_values(ws_name, ds_name, ds_type, detail, conn_params):
         """Prefill for the edit form, from what GeoServer returned.
 
-        A type the form cannot edit is shown against the first supported type
-        purely so the combo has something to display; the caller hides Save.
+        The type is passed through as-is; for a type the form cannot edit the
+        caller (_show_as_read_only) adds it to the combo and locks the dialog.
         """
         return {
             "workspace": ws_name,
             "name": ds_name,
-            "type": ds_type if ds_type in _SUPPORTED_TYPES else _SUPPORTED_TYPES[0],
+            "type": ds_type,
             "description": (
                 detail.get("description", "") if isinstance(detail, dict) else ""
             ),
@@ -425,6 +468,11 @@ class DatastoreTabMixin:
             "jndi_reference": conn_params.get("jndiReferenceName", ""),
             # PMTiles
             "pmtiles_url": conn_params.get("pmtiles", ""),
+            # Read-only view for unsupported types; secrets masked
+            "raw_params": "\n".join(
+                f"{key} = {'••••' if key.lower() in ('passwd', 'password') else value}"
+                for key, value in sorted(conn_params.items())
+            ),
         }
 
     def _show_datastore_info(self, row_data):
@@ -463,7 +511,7 @@ class DatastoreTabMixin:
         if editable:
             self._wire_type_combo(dlg, initial_type=values["type"], locked=True)
         else:
-            dlg.hide_save_button()
+            self._show_as_read_only(dlg, ds_type)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 

@@ -12,6 +12,8 @@ Usage from the repo root folder:
 """
 
 # standard library
+from unittest.mock import patch
+
 from qgis.testing import start_app, unittest
 
 # project
@@ -179,12 +181,13 @@ class TestDatastoreUpdate(unittest.TestCase):
         self.assertEqual(values["pg_password"], "")  # crypt1:SECRET must not leak in
         self.assertEqual(values["type"], "PostGIS")
 
-    def test_prefill_for_an_unsupported_type_still_builds(self):
-        values = self.dlg._datastore_form_values("ws", "shp", "Shapefile", {}, {})
-        # shown against the first supported type only so the combo has a value;
-        # the caller hides Save for these
-        self.assertEqual(values["type"], "PostGIS")
+    def test_prefill_keeps_the_real_type_and_dumps_the_parameters(self):
+        stored = {"url": "file:data/shapes", "passwd": "crypt1:SECRET"}
+        values = self.dlg._datastore_form_values("ws", "shp", "Shapefile", {}, stored)
+        self.assertEqual(values["type"], "Shapefile")  # never shown as PostGIS
         self.assertEqual(values["pg_port"], 5432)
+        self.assertIn("url = file:data/shapes", values["raw_params"])
+        self.assertNotIn("SECRET", values["raw_params"])  # secrets masked
 
     def test_connection_params_tolerates_odd_payloads(self):
         self.assertEqual(self.dlg._connection_params("not a dict"), {})
@@ -376,6 +379,54 @@ class TestServerSync(unittest.TestCase):
         self.assertEqual(rows["cite"], "")
         # column 0 is still the name: delete / edit callbacks rely on it
         self.assertEqual([row[0] for row in self.dlg._all_rows], ["cite", "topp"])
+
+
+class TestUnsupportedTypeDialog(unittest.TestCase):
+    """A datastore type the form cannot edit gets an honest read-only view."""
+
+    def test_dialog_is_locked_and_shows_the_real_type(self):
+        from qgis.PyQt.QtWidgets import QDialog, QDialogButtonBox
+
+        from geoserver_manager.gui import tab_datastores
+        from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+
+        opened = []
+
+        class Recording(ResourceFormDialog):
+            def exec(self):
+                opened.append(self)
+                return QDialog.DialogCode.Rejected
+
+        class FakeGS:
+            def get_workspaces(inner):
+                return ([{"name": "topp"}], 200)
+
+            def get_datastore(inner, ws, ds):
+                return (
+                    {
+                        "type": "Shapefile",
+                        "enabled": True,
+                        "connectionParameters": {"entry": {"url": "file:x.shp"}},
+                    },
+                    200,
+                )
+
+        dlg = GeoServerMainDialog()
+        dlg.gs = FakeGS()
+        with patch.object(tab_datastores, "ResourceFormDialog", Recording):
+            dlg._show_datastore_info(["taz_shapes", "topp", "Shapefile", "True"])
+
+        self.assertEqual(len(opened), 1)
+        form = opened[0]
+        combo = form.get_widget("type")
+        self.assertEqual(combo.currentText(), "Shapefile")
+        self.assertFalse(combo.isEnabled())
+        for key in ("pg_host", "pg_password", "jndi_reference", "pmtiles_url"):
+            self.assertIn(key, form._hidden_keys)
+        self.assertNotIn("raw_params", form._hidden_keys)
+        self.assertIn("url = file:x.shp", form.get_widget("raw_params").toPlainText())
+        save = form._button_box.button(QDialogButtonBox.StandardButton.Ok)
+        self.assertTrue(save.isHidden())
 
 
 # ############################################################################
