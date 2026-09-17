@@ -55,7 +55,7 @@ jobs:
 
     steps:
     - name: Get source code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Set up Python
       uses: actions/setup-python@v6
@@ -82,7 +82,7 @@ jobs:
 
     - name: Download artifact from build workflow
       if: ${{ env.CONDITION_IS_PUSH || env.CONDITION_IS_WORKFLOW_RUN }}
-      uses: dawidd6/action-download-artifact@v9
+      uses: dawidd6/action-download-artifact@v19
       with:
         allow_forks: false
         branch: main
@@ -95,7 +95,7 @@ jobs:
         workflow: package_and_release.yml
 
     - name: Save build doc as artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         if-no-files-found: error
         name: documentation
@@ -103,7 +103,7 @@ jobs:
         retention-days: 30
 
     - name: Setup Pages
-      uses: actions/configure-pages@v5
+      uses: actions/configure-pages@v6
       if: ${{ env.CONDITION_IS_PUSH || env.CONDITION_IS_WORKFLOW_RUN }}
 
     - name: Upload artifact
@@ -116,4 +116,4 @@ jobs:
     - name: Deploy to GitHub Pages
       id: deployment
       if: ${{ env.CONDITION_IS_PUSH || env.CONDITION_IS_WORKFLOW_RUN }}
-      uses: actions/deploy-pages@v4
+      uses: actions/deploy-pages@v5

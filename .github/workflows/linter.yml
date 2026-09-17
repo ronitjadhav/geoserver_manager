@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Get source code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -60,7 +60,7 @@ jobs:
       options: --user root
     steps:
       - name: Get source code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Check PyQt5 to PyQt6 compatibility.
         run: |
@@ -68,7 +68,7 @@ jobs:
           pyqt5_to_pyqt6.py --logfile pyqt6_checker.log ${{ env.PROJECT_FOLDER }}/
 
       - name: Upload script report if script fails
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ failure() }}
         with:
           name: pyqt6-checker-error-report
