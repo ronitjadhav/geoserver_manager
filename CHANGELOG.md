@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- A tab load that failed mid-fetch left the previous resource type's rows in the
+  table cache, reachable through search and pagination and wired to the new
+  tab's delete handler — Delete could act on the wrong resource.
+- Editing a datastore replaced its whole connection-parameter map, discarding
+  pool settings, `Loose bbox`, `preparedStatements` and the real namespace,
+  resetting a PMTiles store's range-reader provider to `file`, and re-enabling
+  disabled stores. Edits now merge onto what the server holds.
+- "Add a New Workspace/Datastore" silently overwrote an existing resource of the
+  same name and reported it as created; both now refuse a taken name.
+- A datastore cannot be renamed from the edit form any more: it would either
+  duplicate the store or overwrite whatever already held the new name.
+- Delete confirmations now state what the cascade takes with it (both delete
+  paths send `recurse=true`).
+- The first, blocking connection attempt no longer runs before the window is on
+  screen, which made an unreachable host look like a hung QGIS.
+
 - Bulk delete acted on the wrong rows once a column was sorted; table sorting is
   now disabled, since rows are paginated client-side.
 - A wrong password or an HTTP error was reported as "server unreachable", and a
