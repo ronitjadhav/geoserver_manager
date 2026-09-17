@@ -105,6 +105,7 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         self.btn_page_next.clicked.connect(self._page_next)
         self.btn_page_last.clicked.connect(self._page_last)
         self.resultsTable.itemSelectionChanged.connect(self._on_selection_changed)
+        self.resultsTable.cellClicked.connect(self._on_cell_clicked)
 
         self._restore_settings()
 
@@ -492,30 +493,17 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         self.resultsTable.setRowCount(len(page_rows))
         for row_idx, values in enumerate(page_rows):
             for col, val in enumerate(values):
-                col_header = self.resultsTable.horizontalHeaderItem(col)
-                col_name = col_header.text() if col_header else ""
-                click_cb = None
-                if col == 0 and self._name_click_callback:
-                    click_cb = self._name_click_callback
-                elif col_name in self._extra_click_callbacks:
-                    click_cb = self._extra_click_callbacks[col_name]
-                if click_cb:
-                    # Clickable cell
-                    link = QPushButton(str(val))
-                    link.setFlat(True)
-                    link.setCursor(Qt.CursorShape.PointingHandCursor)
-                    link.setStyleSheet(
-                        "text-align: left; color: palette(link); "
-                        "text-decoration: underline; padding: 0 4px;"
-                    )
-                    link.clicked.connect(partial(click_cb, values))
-                    self.resultsTable.setCellWidget(row_idx, col, link)
-                else:
-                    self.resultsTable.setItem(
-                        row_idx,
-                        col,
-                        QTableWidgetItem("—" if val is None else str(val)),
-                    )
+                item = QTableWidgetItem("—" if val is None else str(val))
+                if self._cell_click_callback(col) is not None:
+                    # Styled as a link; the click itself is handled by
+                    # _on_cell_clicked. A real item (not a QPushButton) keeps
+                    # the row selectable, so "Delete Selected" works here too.
+                    item.setForeground(self.palette().link())
+                    font = item.font()
+                    font.setUnderline(True)
+                    item.setFont(font)
+                    item.setToolTip(self.tr("Click to open"))
+                self.resultsTable.setItem(row_idx, col, item)
             if self._row_actions:
                 self.resultsTable.setCellWidget(
                     row_idx, data_col_count, self._make_action_widget(values)
@@ -537,6 +525,22 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         self.btn_page_prev.setEnabled(self._current_page > 0)
         self.btn_page_next.setEnabled(self._current_page + 1 < self._total_pages)
         self.btn_page_last.setEnabled(self._current_page + 1 < self._total_pages)
+
+    def _cell_click_callback(self, col):
+        """The callback a click in this column triggers, or None."""
+        if col == 0:
+            return self._name_click_callback
+        header = self.resultsTable.horizontalHeaderItem(col)
+        return self._extra_click_callbacks.get(header.text() if header else "")
+
+    def _on_cell_clicked(self, row, col):
+        """Open the resource behind a link cell; other cells just select."""
+        callback = self._cell_click_callback(col)
+        if callback is None:
+            return
+        index = self._current_page * self._page_size + row
+        if index < len(self._filtered_rows):
+            callback(self._filtered_rows[index])
 
     def _make_action_widget(self, row_data):
         """Create a widget with icon action buttons for a table row."""

@@ -429,6 +429,55 @@ class TestUnsupportedTypeDialog(unittest.TestCase):
         self.assertTrue(save.isHidden())
 
 
+class TestLinkCells(unittest.TestCase):
+    """Name cells open the resource but must stay real, selectable items."""
+
+    def setUp(self):
+        self.dlg = GeoServerMainDialog()
+        self.opened = []
+        self.dlg._name_click_callback = self.opened.append
+        self.dlg._extra_click_callbacks = {
+            "Workspace": lambda row: self.opened.append(("ws", row))
+        }
+        self.dlg._setup_table(["Name", "Workspace", "Type", "Actions"])
+        self.dlg._row_actions = [
+            ("mActionDeleteSelected.svg", "Delete", lambda r: None)
+        ]
+        self.dlg._populate_rows([[f"ds{i:02d}", "topp", "PostGIS"] for i in range(25)])
+
+    def test_link_cells_are_items_not_widgets(self):
+        table = self.dlg.resultsTable
+        self.assertIsNone(table.cellWidget(0, 0))
+        self.assertEqual(table.item(0, 0).text(), "ds00")
+        self.assertTrue(table.item(0, 0).font().underline())  # styled as a link
+        self.assertFalse(table.item(0, 2).font().underline())  # plain data cell
+
+    def test_rows_are_selectable_by_clicking_any_cell(self):
+        self.dlg.resultsTable.setCurrentCell(
+            3, 0
+        )  # what a mouse press on the name does
+        self.assertEqual(self.dlg._get_selected_rows(), [["ds03", "topp", "PostGIS"]])
+        self.assertTrue(
+            self.dlg.btn_delete_selected.isEnabled()
+            or self.dlg._delete_selected_callback is None
+        )
+
+    def test_click_on_a_link_cell_opens_the_row_resource(self):
+        self.dlg._on_cell_clicked(1, 0)
+        self.assertEqual(self.opened, [["ds01", "topp", "PostGIS"]])
+        self.dlg._on_cell_clicked(1, 1)  # extra link column
+        self.assertEqual(self.opened[-1], ("ws", ["ds01", "topp", "PostGIS"]))
+
+    def test_click_on_a_plain_cell_does_nothing(self):
+        self.dlg._on_cell_clicked(1, 2)
+        self.assertEqual(self.opened, [])
+
+    def test_click_respects_the_current_page(self):
+        self.dlg._page_next()
+        self.dlg._on_cell_clicked(0, 0)
+        self.assertEqual(self.opened, [["ds20", "topp", "PostGIS"]])
+
+
 # ############################################################################
 # ####### Stand-alone run ########
 # ################################
