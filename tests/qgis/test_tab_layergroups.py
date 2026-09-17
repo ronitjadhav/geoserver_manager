@@ -152,6 +152,12 @@ class FakeGS:
             return ([{"name": "roads_group"}], 200)
         return ([], 200)
 
+    def get_style_definition(self, name, workspace_name=None):
+        self.calls.append(("get_style_definition", name, workspace_name))
+        if name in ("simple_roads", "disputed"):
+            return ({"name": name, "format": "sld"}, 200)
+        return ("<html>Not Found</html>", 404)
+
     def delete_layer_group(self, workspace_name, name):
         self.calls.append(("delete_layer_group", workspace_name, name))
         return ("", 200)
@@ -307,6 +313,52 @@ class TestCreateLayerGroup(unittest.TestCase):
             [item["name"] for item in group["publishables"]["published"]],
             ["topp:tasmania_roads", "ne:coastlines"],
         )
+
+    def test_a_style_per_layer_is_sent_parallel_to_the_layers(self):
+        self.dlg._create_layer_group_from_values(
+            {
+                "name": "styled",
+                "workspace": GLOBAL,
+                "mode": "SINGLE",
+                "layers": (
+                    "topp:tasmania_state_boundaries\n"
+                    "topp:tasmania_roads = simple_roads\n"
+                    "ne:coastlines = ne:disputed"
+                ),
+            }
+        )
+        group = self.posted()[0][2]["json"]["layerGroup"]
+        self.assertEqual(
+            [item["name"] for item in group["publishables"]["published"]],
+            ["topp:tasmania_state_boundaries", "topp:tasmania_roads", "ne:coastlines"],
+        )
+        # "" is what GeoServer itself stores for "the layer's own default style"
+        self.assertEqual(
+            group["styles"]["style"],
+            ["", {"name": "simple_roads"}, {"name": "ne:disputed"}],
+        )
+        # a workspace-qualified style is looked up in its own workspace
+        self.assertIn(("get_style_definition", "disputed", "ne"), self.dlg.gs.calls)
+
+    def test_a_style_that_does_not_exist_is_refused_not_dropped(self):
+        # GeoServer answers 201 and silently drops an unknown style, which would
+        # leave the group rendering with default styles and look like a success.
+        with self.assertRaises(ValueError) as caught:
+            self.dlg._create_layer_group_from_values(
+                {
+                    "name": "styled",
+                    "workspace": GLOBAL,
+                    "mode": "SINGLE",
+                    "layers": "topp:tasmania_roads = no_such_style",
+                }
+            )
+        self.assertIn("no_such_style", str(caught.exception))
+        self.assertEqual(self.posted(), [])
+
+    def test_parsing_keeps_the_order_and_qualifies_bare_names(self):
+        layers, styles = self.dlg._parse_group_layers(" b:two = s2 \n\none\n", "topp")
+        self.assertEqual(layers, ["b:two", "topp:one"])
+        self.assertEqual(styles, ["s2", ""])
 
     def test_refuses_an_existing_name(self):
         self.dlg.gs = FakeGS(exists=True)

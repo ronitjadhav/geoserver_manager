@@ -10,7 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   mode and size; open one to see its layers in drawing order (with their
   styles and any nested group), title, abstract and bounds; create a group
   from an ordered list of layers — pick them from every published layer on
-  the server, rasters included, and mix workspaces in a global group;
+  the server, rasters included, mix workspaces in a global group, and give a
+  layer a style other than its default with `layer = style`;
   **Add to QGIS** loads a group as a single WMS layer; delete (single and
   bulk). GeoServer computes the group's bounds from its layers.
 - **Styles tab**: global and per-workspace styles; open one to see its

@@ -337,10 +337,14 @@ class LayerGroupTabMixin:
                 "type": "textarea",
                 "required": True,
                 "group": self.tr("Layers"),
-                "placeholder": "topp:tasmania_state_boundaries\ntopp:tasmania_roads",
+                "placeholder": (
+                    "topp:tasmania_state_boundaries\ntopp:tasmania_roads = simple_roads"
+                ),
                 "help": self.tr(
                     "One layer per line, in drawing order — the first line is "
-                    "drawn first, at the bottom. Reorder by editing the text."
+                    "drawn first, at the bottom. Reorder by editing the text. "
+                    'Add "= style" to a line to publish that layer with a '
+                    "style other than its own default."
                 ),
             },
         ]
@@ -389,16 +393,40 @@ class LayerGroupTabMixin:
 
     @staticmethod
     def _parse_group_layers(text, workspace_name):
-        """One "workspace:layer" per line; a bare name takes the group's workspace."""
-        layers = []
+        """Parse the ordered layer list into (layers, styles).
+
+        One layer per line, `workspace:layer` or `workspace:layer = style` —
+        the same `key = value` shape the datastore parameter editor uses. The
+        styles are parallel to the layers, "" where the layer keeps its own
+        default style, and a bare layer name takes the group's workspace.
+        """
+        layers, styles = [], []
         for line in text.splitlines():
-            line = line.strip()
-            if not line:
+            if not line.strip():
                 continue
-            if ":" not in line and workspace_name:
-                line = f"{workspace_name}:{line}"
-            layers.append(line)
-        return layers
+            name, _, style = line.partition("=")
+            name = name.strip()
+            if ":" not in name and workspace_name:
+                name = f"{workspace_name}:{name}"
+            layers.append(name)
+            styles.append(style.strip())
+        return layers, styles
+
+    def _check_styles_exist(self, styles):
+        """Refuse a style GeoServer would silently ignore.
+
+        A layer group POST naming a style that does not exist answers 201 with
+        the style simply dropped, so the group would quietly render with the
+        layers' default styles and the plugin would report success.
+        """
+        for reference in sorted({style for style in styles if style}):
+            workspace_name, _, name = reference.rpartition(":")
+            if not self._resource_exists(
+                self.gs.get_style_definition, name, workspace_name or None
+            ):
+                raise ValueError(
+                    self.tr("No style '{}' on the server.").format(reference)
+                )
 
     def _create_layer_group_from_values(self, values):
         """POST a new layer group, refusing to overwrite an existing one.
@@ -412,9 +440,10 @@ class LayerGroupTabMixin:
         """
         name = values["name"]
         workspace_name = self._scope(values["workspace"])
-        layers = self._parse_group_layers(values["layers"], workspace_name)
+        layers, styles = self._parse_group_layers(values["layers"], workspace_name)
         if not layers:
             raise ValueError(self.tr("List at least one layer."))
+        self._check_styles_exist(styles)
         if self.gs.rest_service.resource_exists(self._group_path(name, workspace_name)):
             raise ValueError(
                 self.tr("Layer group '{}' already exists in {}.").format(
@@ -435,8 +464,12 @@ class LayerGroupTabMixin:
             group["title"] = values["title"]
         if values.get("abstract"):
             group["abstractTxt"] = values["abstract"]
+        if any(styles):
+            # "" is how GeoServer itself spells "this layer's own default style".
+            group["styles"] = {
+                "style": [{"name": style} if style else "" for style in styles]
+            }
         # No "bounds": GeoServer then computes the union of the layers' extents.
-        # No "styles": every layer keeps its own default style.
         self._raw_rest(
             "post", self._groups_path(workspace_name), json={"layerGroup": group}
         )
