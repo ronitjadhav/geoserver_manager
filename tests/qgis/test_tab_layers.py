@@ -337,6 +337,138 @@ class TestAddToQgis(unittest.TestCase):
         self.assertEqual(len(QgsProject.instance().mapLayers()), before)
 
 
+class PublishFakeGS(FakeGS):
+    """Adds the pieces the publish flow touches: raw REST for ?list=available,
+    an existence check, and a create that records what it was asked."""
+
+    def __init__(self):
+        super().__init__()
+        self.created = []
+        outer = self
+
+        class Response:
+            status_code = 200
+
+            def json(inner):
+                return {"list": {"string": ["plugin_demo", "another"]}}
+
+        class Client:
+            def get(inner, path, **kwargs):
+                outer.last_query = (path, kwargs.get("params"))
+                return Response()
+
+        class Endpoints:
+            def featuretypes(inner, ws, ds):
+                return f"/rest/workspaces/{ws}/datastores/{ds}/featuretypes.json"
+
+        class Rest:
+            rest_client = Client()
+            rest_endpoints = Endpoints()
+
+        self.rest_service = Rest()
+
+    def get_feature_type(self, ws, ds, name):
+        if name == "plugin_demo":
+            return ("<html>Not Found</html>", 404)  # free
+        return ({"name": name}, 200)  # taken
+
+    def create_feature_type(self, **kwargs):
+        self.created.append(kwargs)
+        return ("", 201)
+
+
+class TestPublish(unittest.TestCase):
+    def setUp(self):
+        self.dlg = GeoServerMainDialog()
+        self.dlg.gs = PublishFakeGS()
+        self.dlg.show_warning_message = lambda t: None
+
+    def test_available_tables_uses_the_list_available_query(self):
+        tables = self.dlg._available_tables("topp", "pg")
+        self.assertEqual(tables, ["another", "plugin_demo"])
+        path, params = self.dlg.gs.last_query
+        self.assertTrue(path.endswith("/topp/datastores/pg/featuretypes.json"))
+        self.assertEqual(params, {"list": "available"})
+
+    def test_available_tables_tolerates_odd_payloads(self):
+        for payload, expected in (
+            ({"list": {"string": "solo"}}, ["solo"]),  # one table is unwrapped
+            ({"list": ""}, []),  # none available
+            ("not json at all", []),
+        ):
+
+            class R:
+                status_code = 200
+
+                def json(inner, p=payload):
+                    return p
+
+            self.dlg.gs.rest_service.rest_client.get = lambda *a, **k: R()
+            self.assertEqual(self.dlg._available_tables("w", "d"), expected)
+
+    def test_publish_sends_what_the_form_collected(self):
+        self.dlg._publish_layer_from_values(
+            {
+                "workspace": "topp",
+                "datastore": "pg",
+                "table": "plugin_demo",
+                "epsg": 2056,
+                "title": "Demo",
+                "abstract": "",
+                "keywords": "a, b,, c ",
+            }
+        )
+        sent = self.dlg.gs.created[0]
+        self.assertEqual(sent["layer_name"], "plugin_demo")
+        self.assertEqual(sent["workspace_name"], "topp")
+        self.assertEqual(sent["datastore_name"], "pg")
+        self.assertEqual(sent["epsg"], 2056)
+        self.assertEqual(sent["title"], "Demo")
+        self.assertIsNone(sent["abstract"])  # empty stays None, not ""
+        self.assertEqual(sent["keywords"], ["a", "b", "c"])
+
+    def test_publish_refuses_an_existing_layer(self):
+        with self.assertRaises(ValueError) as ctx:
+            self.dlg._publish_layer_from_values(
+                {"workspace": "topp", "datastore": "pg", "table": "tasmania_roads"}
+            )
+        self.assertIn("already exists", str(ctx.exception))
+        self.assertEqual(self.dlg.gs.created, [])  # upsert never reached
+
+    def test_dialog_combos_cascade_from_the_workspace(self):
+        from unittest.mock import patch
+
+        from qgis.PyQt.QtWidgets import QDialog
+
+        from geoserver_manager.gui import tab_layers
+        from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+
+        opened = []
+
+        class Recording(ResourceFormDialog):
+            def exec(self):
+                opened.append(self)
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_layers, "ResourceFormDialog", Recording):
+            self.dlg._publish_layer()
+
+        form = opened[0]
+        ws, ds, table = (
+            form.get_widget(k) for k in ("workspace", "datastore", "table")
+        )
+        self.assertEqual([ws.itemText(i) for i in range(ws.count())], ["topp", "empty"])
+        self.assertEqual([ds.itemText(i) for i in range(ds.count())], ["taz_shapes"])
+        self.assertEqual(
+            [table.itemText(i) for i in range(table.count())],
+            ["another", "plugin_demo"],
+        )
+        # switching to a workspace with no datastores empties both dependants
+        ws.setCurrentText("empty")
+        self.assertEqual(ds.count(), 0)
+        self.assertEqual(table.count(), 0)
+
+
 # ############################################################################
 # ####### Stand-alone run ########
 # ################################

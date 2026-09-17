@@ -29,6 +29,11 @@ class LayerTabMixin:
         """List every feature type on the server, with its SRS and enabled flag."""
 
         def load():
+            self._setup_add_button(
+                self.tr("Publish a Table"),
+                self.tr("Publish a table of a datastore as a new layer"),
+                self._publish_layer,
+            )
             self._setup_delete_selected_button(self._delete_selected_layers)
             self._name_click_callback = self._show_layer_info
             self._extra_click_callbacks = {
@@ -253,6 +258,183 @@ class LayerTabMixin:
         )
         dlg.hide_save_button()
         dlg.exec()
+
+    # -- Publish --------------------------------------------------------------
+
+    def _available_tables(self, workspace_name, datastore_name):
+        """Tables of a datastore that are not published as layers yet.
+
+        TODO(#50): upstream as get_available_feature_types(ws, ds) — the
+        library has no call for GeoServer's ?list=available. Workaround: GET
+        the featuretypes path with that query.
+        """
+        path = self.gs.rest_service.rest_endpoints.featuretypes(
+            workspace_name, datastore_name
+        )
+        payload = self._raw_rest("get", path, params={"list": "available"}).json()
+        listing = payload.get("list") if isinstance(payload, dict) else None
+        names = listing.get("string") if isinstance(listing, dict) else []
+        if isinstance(names, str):  # a single table comes back unwrapped
+            names = [names]
+        return sorted(names or [])
+
+    def _publish_fields(self, workspace_names):
+        """Field definitions for the publish form; combos cascade at runtime."""
+        return [
+            {
+                "key": "workspace",
+                "label": self.tr("Workspace"),
+                "type": "combo",
+                "options": workspace_names,
+                "required": True,
+            },
+            {
+                "key": "datastore",
+                "label": self.tr("Datastore"),
+                "type": "combo",
+                "options": [],
+                "required": True,
+                "help": self.tr("Datastores of the selected workspace"),
+            },
+            {
+                "key": "table",
+                "label": self.tr("Table"),
+                "type": "combo",
+                "options": [],
+                "required": True,
+                "help": self.tr(
+                    "Tables in the datastore that are not published yet. The layer "
+                    "takes the table's name."
+                ),
+            },
+            {
+                "key": "epsg",
+                "label": self.tr("Declared SRS (EPSG)"),
+                "type": "spinbox",
+                "default": 4326,
+                "min": 1,
+                "max": 999999,
+                "group": self.tr("Metadata"),
+                "help": self.tr(
+                    "The SRS GeoServer declares for the layer. Use the table's own "
+                    "SRS — a wrong value misplaces the data."
+                ),
+            },
+            {
+                "key": "title",
+                "label": self.tr("Title"),
+                "type": "text",
+                "group": self.tr("Metadata"),
+                "placeholder": self.tr("Optional"),
+            },
+            {
+                "key": "abstract",
+                "label": self.tr("Abstract"),
+                "type": "textarea",
+                "group": self.tr("Metadata"),
+                "placeholder": self.tr("Optional"),
+            },
+            {
+                "key": "keywords",
+                "label": self.tr("Keywords"),
+                "type": "text",
+                "group": self.tr("Metadata"),
+                "placeholder": self.tr("Optional, comma-separated"),
+            },
+        ]
+
+    def _refill_publish_combos(self, dlg, workspace=None, datastore=None):
+        """Cascade: workspace -> its datastores -> the store's unpublished tables.
+
+        A fetch that fails leaves its combo empty (and logs why); the required
+        check then stops Save with the empty combo highlighted.
+        """
+        ws_combo = dlg.get_widget("workspace")
+        ds_combo = dlg.get_widget("datastore")
+        table_combo = dlg.get_widget("table")
+        workspace = workspace or ws_combo.currentText()
+
+        if datastore is None:
+            ds_combo.blockSignals(True)  # the table refill below is explicit
+            ds_combo.clear()
+            try:
+                ds_combo.addItems(self._datastore_names(workspace))
+            except Exception as e:
+                self.log(f"Could not list datastores of {workspace}: {e}")
+            ds_combo.blockSignals(False)
+            datastore = ds_combo.currentText()
+
+        table_combo.clear()
+        if workspace and datastore:
+            try:
+                table_combo.addItems(self._available_tables(workspace, datastore))
+            except Exception as e:
+                self.log(f"Could not list tables of {workspace}/{datastore}: {e}")
+
+    def _publish_layer(self):
+        """Open the publish form: pick workspace, datastore and table."""
+        workspace_names = self._get_workspace_names()
+        if not workspace_names:
+            self.show_warning_message(
+                self.tr("No workspaces available. Create a workspace first.")
+            )
+            return
+
+        dlg = ResourceFormDialog(
+            title=self.tr("Publish a Table"),
+            description=self.tr(
+                "Publish a database table as a new layer. Only tables not "
+                "published yet are offered."
+            ),
+            fields=self._publish_fields(workspace_names),
+            parent=self,
+        )
+        dlg.get_widget("workspace").currentTextChanged.connect(
+            lambda ws: self._refill_publish_combos(dlg, workspace=ws)
+        )
+        dlg.get_widget("datastore").currentTextChanged.connect(
+            lambda ds: self._refill_publish_combos(dlg, datastore=ds)
+        )
+        self._refill_publish_combos(dlg)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        values = dlg.get_values()
+        if self._run_action(
+            lambda: self._publish_layer_from_values(values),
+            self.tr("Failed to publish '{}'").format(values["table"]),
+        ):
+            self.show_success_message(
+                self.tr("Layer '{}' published.").format(values["table"])
+            )
+            self._load_layers()
+
+    def _publish_layer_from_values(self, values):
+        """Publish one table as a feature type through the library."""
+        ws_name, ds_name, table = (
+            values["workspace"],
+            values["datastore"],
+            values["table"],
+        )
+        # create_feature_type upserts, so an existing layer would be overwritten
+        if self._resource_exists(self.gs.get_feature_type, ws_name, ds_name, table):
+            raise ValueError(
+                self.tr("Layer '{}' already exists in {}/{}.").format(
+                    table, ws_name, ds_name
+                )
+            )
+        keywords = [k.strip() for k in (values.get("keywords") or "").split(",")]
+        self._check(
+            self.gs.create_feature_type(
+                layer_name=table,
+                workspace_name=ws_name,
+                datastore_name=ds_name,
+                title=values.get("title") or None,
+                abstract=values.get("abstract") or None,
+                epsg=int(values.get("epsg") or 4326),
+                keywords=[k for k in keywords if k],
+            )
+        )
 
     # -- Add to QGIS ----------------------------------------------------------
 

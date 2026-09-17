@@ -12,7 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Layers tab**: every feature type on the server, with its workspace,
   datastore, SRS and enabled flag; search and pagination; a detail view with
   native name, projection policy, title, abstract, keywords, bounding box and
-  attributes; delete (single and bulk).
+  attributes; **publish a table** (workspace → datastore → not-yet-published
+  tables, with declared SRS, title, abstract, keywords); delete (single and
+  bulk).
 - Error banners now include GeoServer's own explanation. A failed delete used
   to read "500 Server Error: for url: …"; it now says, for example, "Unable to
   delete layer referenced by layer group 'tasmania'".

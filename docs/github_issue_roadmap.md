@@ -34,7 +34,7 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 
 - [x] List all feature types across workspaces/datastores
 - [x] View feature type details (SRS, bounding box, title, keywords)
-- [ ] Publish a DB table as a new feature type
+- [x] Publish a DB table as a new feature type
 - [x] Delete feature type (single + bulk)
 
 ## Coverage Stores & Coverages
