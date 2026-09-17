@@ -167,6 +167,35 @@ class TestDatastoreUpdate(unittest.TestCase):
         # "file" here would make the store unable to open its own data
         self.assertEqual(params["io.tileverse.rangereader.provider"], "s3")
 
+    def test_prefill_comes_from_the_server_and_never_includes_the_password(self):
+        detail = {"type": "PostGIS", "description": "prod"}
+        values = self.dlg._datastore_form_values(
+            "ws", "store", "PostGIS", detail, self.STORED
+        )
+
+        self.assertEqual(values["pg_host"], "db.example.org")
+        self.assertEqual(values["pg_port"], 5432)
+        self.assertEqual(values["description"], "prod")
+        self.assertEqual(values["pg_password"], "")  # crypt1:SECRET must not leak in
+        self.assertEqual(values["type"], "PostGIS")
+
+    def test_prefill_for_an_unsupported_type_still_builds(self):
+        values = self.dlg._datastore_form_values("ws", "shp", "Shapefile", {}, {})
+        # shown against the first supported type only so the combo has a value;
+        # the caller hides Save for these
+        self.assertEqual(values["type"], "PostGIS")
+        self.assertEqual(values["pg_port"], 5432)
+
+    def test_connection_params_tolerates_odd_payloads(self):
+        self.assertEqual(self.dlg._connection_params("not a dict"), {})
+        self.assertEqual(self.dlg._connection_params({}), {})
+        self.assertEqual(
+            self.dlg._connection_params(
+                {"connectionParameters": {"entry": {"host": "h"}}}
+            ),
+            {"host": "h"},
+        )
+
     def test_refuses_to_update_when_the_server_reports_no_type(self):
         with self.assertRaises(RuntimeError):
             self.dlg._update_datastore_from_values(

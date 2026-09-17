@@ -163,92 +163,23 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         return content
 
     def _connect(self):
-        """Create a GeoServerCloud client and verify the server is reachable.
+        """Create the GeoServerCloud client and verify the server answers.
 
-        The GeoServerCloud constructor makes no network call, so we do a quick
-        test request after creating it to catch: server down, wrong credentials,
-        or any other connectivity issue before the user tries to load data.
+        Sets self.gs on success. Every failure leaves self.gs = None, paints
+        the status label red and explains itself in the message bar.
         """
+        self.gs = None
         settings = self.plg_settings.get_plg_settings()
-
-        if not settings.has_credentials():
-            self._set_status(self.tr("Not configured"), "red")
-            self.show_warning_message(
-                self.tr("GeoServer not configured — open Settings to add credentials.")
-            )
-            self.gs = None
+        gs = self._build_client(settings)
+        if gs is None:
             return False
 
-        username, password = settings.get_credentials()
-        if not username or not password:
-            self._set_status(self.tr("Auth error"), "red")
-            self.show_error_message(
-                self.tr("Could not read credentials from the auth store.")
-            )
-            self.gs = None
-            return False
-
-        from geoservercloud import GeoServerCloud
-        from requests.exceptions import HTTPError
-
-        gs = GeoServerCloud(
-            url=settings.geoserver_url,
-            user=username,
-            password=password,
-        )
-
-        # Test the connection with a real request.
-        # HTTPError must be caught before OSError: requests' exceptions all
-        # subclass OSError, so a 401 would otherwise be reported as an
-        # unreachable server.
-        try:
-            _, status_code = gs.get_workspaces()
-        except HTTPError as e:
-            # raise_for_status() always attaches the response; 500 is a safe
-            # stand-in that routes to the generic HTTP branch below.
-            status_code = e.response.status_code if e.response is not None else 500
-        except OSError:
-            # requests raises ConnectionError/Timeout (subclasses of OSError)
-            # when the server is unreachable, refused, or the host is wrong
-            self._set_status(self.tr("Server unreachable"), "red")
-            self.show_error_message(
-                self.tr(
-                    "Cannot reach GeoServer at {url} — is the server running?"
-                ).format(url=settings.geoserver_url)
-            )
-            self.gs = None
-            return False
-        except Exception as e:
-            self._set_status(self.tr("Connection error"), "red")
-            self.show_error_message(self.tr("Connection failed: {}").format(e))
-            self.log(f"Connection error: {e}", log_level=Qgis.MessageLevel.Critical)
-            self.gs = None
-            return False
-
-        if status_code in (401, 403):
-            self._set_status(self.tr("Authentication failed"), "red")
-            self.show_error_message(
-                self.tr(
-                    "Authentication failed — check your username and password in Settings."
-                )
-            )
-            self.gs = None
-            return False
-
-        if status_code >= 400:
-            # 404 is not raised by the library: it usually means the URL points
-            # somewhere that isn't a GeoServer REST endpoint.
-            self._set_status(self.tr("HTTP error {}").format(status_code), "red")
-            self.show_error_message(
-                self.tr(
-                    "GeoServer returned HTTP {code} for {url} — check the URL in Settings."
-                ).format(code=status_code, url=settings.geoserver_url)
-            )
-            self.log(
-                f"Connection check returned HTTP {status_code}",
-                log_level=Qgis.MessageLevel.Critical,
-            )
-            self.gs = None
+        problem = self._probe(gs, settings.geoserver_url)
+        if problem is not None:
+            status, message = problem
+            self._set_status(status, "red")
+            self.show_error_message(message)
+            self.log(f"Connection check failed: {status}", Qgis.MessageLevel.Critical)
             return False
 
         self.gs = gs
@@ -258,6 +189,78 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             status += f" ({version})"
         self._set_status(status, "green")
         return True
+
+    def _build_client(self, settings):
+        """Return a GeoServerCloud client from the saved settings, or None.
+
+        The constructor makes no network call; _probe does the real check.
+        """
+        if not settings.has_credentials():
+            self._set_status(self.tr("Not configured"), "red")
+            self.show_warning_message(
+                self.tr("GeoServer not configured — open Settings to add credentials.")
+            )
+            return None
+
+        username, password = settings.get_credentials()
+        if not username or not password:
+            self._set_status(self.tr("Auth error"), "red")
+            self.show_error_message(
+                self.tr("Could not read credentials from the auth store.")
+            )
+            return None
+
+        from geoservercloud import GeoServerCloud
+
+        return GeoServerCloud(
+            url=settings.geoserver_url, user=username, password=password
+        )
+
+    def _probe(self, gs, url):
+        """Make one real request. Return None if it worked, else (status, message).
+
+        HTTPError must be caught before OSError: every requests exception
+        subclasses OSError, so a 401 would otherwise read as "unreachable".
+        """
+        from requests.exceptions import HTTPError
+
+        try:
+            _, status_code = gs.get_workspaces()
+        except HTTPError as e:
+            # raise_for_status() always attaches the response; 500 is a safe
+            # stand-in that lands in the generic HTTP branch below.
+            status_code = e.response.status_code if e.response is not None else 500
+        except OSError:
+            # ConnectionError / Timeout: refused, unreachable, wrong host
+            return (
+                self.tr("Server unreachable"),
+                self.tr(
+                    "Cannot reach GeoServer at {url} — is the server running?"
+                ).format(url=url),
+            )
+        except Exception as e:
+            return (
+                self.tr("Connection error"),
+                self.tr("Connection failed: {}").format(e),
+            )
+
+        if status_code in (401, 403):
+            return (
+                self.tr("Authentication failed"),
+                self.tr(
+                    "Authentication failed — check your username and password in Settings."
+                ),
+            )
+        if status_code >= 400:
+            # 404 is the one status the library does not raise on: the URL
+            # usually points at something that is not a GeoServer REST endpoint.
+            return (
+                self.tr("HTTP error {}").format(status_code),
+                self.tr(
+                    "GeoServer returned HTTP {code} for {url} — check the URL in Settings."
+                ).format(code=status_code, url=url),
+            )
+        return None
 
     def _fetch_version_label(self):
         """Best-effort 'GeoServer x.y.z' string for the status bar.
@@ -299,16 +302,17 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
 
     # -- Left navigation ---------------------------------------------------
 
+    # One entry per tab: (label, QGIS icon, loader method name). Adding a
+    # resource type means adding a line here and a mixin with that loader.
+    TABS = (
+        ("Workspaces", "mIconFolder.svg", "_load_workspaces"),
+        ("Datastores", "mIconDbSchema.svg", "_load_datastores"),
+    )
+
     def _setup_nav(self):
-        """Build the navigation tabs on the left."""
+        """Build the navigation list on the left from TABS."""
         self.navList.clear()
-        tabs = [
-            ("Workspaces", "mIconFolder.svg"),
-            ("Datastores", "mIconDbSchema.svg"),
-            # ("Layers",     "mIconVector.svg"),
-            # ("Styles",     "mIconRendererCategory.svg"),
-        ]
-        for label, icon in tabs:
+        for label, icon, _loader in self.TABS:
             self.navList.addItem(
                 QListWidgetItem(QIcon(QgsApplication.iconPath(icon)), label)
             )
@@ -360,18 +364,7 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             return
         self.searchBox.clear()
         self._reset_table_state()
-
-        label = self.navList.item(index).text()
-
-        # Route to the appropriate loader
-        if label == "Workspaces":
-            self._load_workspaces()
-        elif label == "Datastores":
-            self._load_datastores()
-        # elif label == "Layers":
-        #     self._load_layers()
-        # elif label == "Styles":
-        #     self._load_styles()
+        getattr(self, self.TABS[index][2])()
 
     # -- Reusable table helpers --------------------------------------------
 
@@ -565,6 +558,47 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         self._current_page = self._total_pages - 1
         self._show_page()
 
+    @staticmethod
+    def _name_of(item):
+        """Name of a list entry: geoservercloud returns dicts, tolerate strings."""
+        return item.get("name", str(item)) if isinstance(item, dict) else str(item)
+
+    def _run_action(self, action, failure_message):
+        """Run a server action under a wait cursor and report if it fails.
+
+        Every add / edit / delete / load used to spell this out by hand. On an
+        exception the message bar gets "<failure_message>: <error>", the QGIS
+        log gets the same, and False comes back so the caller can stop.
+        """
+        self.setCursor(Qt.CursorShape.WaitCursor)
+        try:
+            action()
+            return True
+        except Exception as e:
+            self.show_error_message(f"{failure_message}: {e}")
+            self.log(f"{failure_message}: {e}", log_level=Qgis.MessageLevel.Critical)
+            return False
+        finally:
+            self.unsetCursor()
+
+    def _fetch(self, action, failure_message):
+        """_run_action for reads: return the value, or None after reporting."""
+        result = []
+        if self._run_action(lambda: result.append(action()), failure_message):
+            return result[0]
+        return None
+
+    def _raw_rest(self, method, path, **kwargs):
+        """Call the REST client directly for what geoservercloud has no method for.
+
+        Raises with GeoServer's own response body on any HTTP error, so the
+        message the user sees is the same shape as _check's.
+        """
+        response = getattr(self.gs.rest_service.rest_client, method)(path, **kwargs)
+        if response.status_code >= 400:
+            raise RuntimeError(f"HTTP {response.status_code}: {response.text}")
+        return response
+
     def _resource_exists(self, getter, *args):
         """True when a GET for the resource returns 200, False on 404.
 
@@ -581,22 +615,30 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         result = self._check(api_method(*args))
         return result if isinstance(result, list) else []
 
-    def _confirm_delete(self, resource_type, name, cascade=""):
-        """Show a confirmation dialog before deleting a resource.
+    def _confirm_delete(self, kind, labels, cascade=""):
+        """Ask before deleting one or more resources of one kind.
 
-        :param resource_type: human-readable type (e.g. "workspace").
-        :param name: name of the resource to delete.
-        :param cascade: what else the deletion takes with it. Both delete paths
-            send recurse=true, so the user has to be told.
-        :return: True if the user confirmed deletion.
+        :param kind: human-readable type (e.g. "workspace").
+        :param labels: names of the resources about to be deleted.
+        :param cascade: what else the deletion takes with it — both delete
+            paths send recurse=true, so the user has to be told.
         """
+        if len(labels) == 1:
+            question = self.tr(
+                "Are you sure you want to delete {kind} '{name}'?"
+            ).format(kind=kind, name=labels[0])
+        else:
+            question = self.tr(
+                "Are you sure you want to delete {count} {kind}(s)?\n\n{items}"
+            ).format(
+                count=len(labels),
+                kind=kind,
+                items="\n".join(f"  • {label}" for label in labels),
+            )
         reply = QMessageBox.warning(
             self,
             self.tr("Confirm Delete"),
-            self.tr(
-                "Are you sure you want to delete {type} '{name}'?\n\n"
-                "{cascade}This action cannot be undone."
-            ).format(type=resource_type, name=name, cascade=cascade),
+            f"{question}\n\n{cascade}" + self.tr("This action cannot be undone."),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -612,33 +654,13 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         """
         if not labeled_deletes:
             return
+        labels = [label for label, _ in labeled_deletes]
+        if not self._confirm_delete(kind, labels, cascade):
+            return
 
-        if len(labeled_deletes) == 1:
-            if not self._confirm_delete(kind, labeled_deletes[0][0], cascade):
-                return
-        else:
-            bullets = "\n".join(f"  • {lbl}" for lbl, _ in labeled_deletes)
-            reply = QMessageBox.warning(
-                self,
-                self.tr("Confirm Delete"),
-                self.tr(
-                    "Are you sure you want to delete {count} {kind}(s)?\n\n{items}\n\n"
-                    "{cascade}This action cannot be undone."
-                ).format(
-                    count=len(labeled_deletes),
-                    kind=kind,
-                    items=bullets,
-                    cascade=cascade,
-                ),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if reply != QMessageBox.StandardButton.Yes:
-                return
-
-        self.setCursor(Qt.CursorShape.WaitCursor)
         errors = []
-        try:
+
+        def delete_all():
             for label, delete_fn in labeled_deletes:
                 try:
                     delete_fn()
@@ -648,27 +670,27 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
                         f"Delete {kind} error ({label}): {e}",
                         log_level=Qgis.MessageLevel.Critical,
                     )
-            if errors:
-                self.show_error_message(
-                    self.tr("Failed to delete some {kind}(s):\n{errors}").format(
-                        kind=kind, errors="\n".join(errors)
-                    )
+
+        self._run_action(delete_all, self.tr("Delete failed"))
+        if errors:
+            self.show_error_message(
+                self.tr("Failed to delete some {kind}(s):\n{errors}").format(
+                    kind=kind, errors="\n".join(errors)
                 )
-            elif len(labeled_deletes) == 1:
-                self.show_success_message(
-                    self.tr("{kind} '{name}' deleted.").format(
-                        kind=kind.capitalize(), name=labeled_deletes[0][0]
-                    )
+            )
+        elif len(labels) == 1:
+            self.show_success_message(
+                self.tr("{kind} '{name}' deleted.").format(
+                    kind=kind.capitalize(), name=labels[0]
                 )
-            else:
-                self.show_success_message(
-                    self.tr("{count} {kind}(s) deleted.").format(
-                        count=len(labeled_deletes), kind=kind
-                    )
+            )
+        else:
+            self.show_success_message(
+                self.tr("{count} {kind}(s) deleted.").format(
+                    count=len(labels), kind=kind
                 )
-            reload_fn()
-        finally:
-            self.unsetCursor()
+            )
+        reload_fn()
 
     # -- Dialog actions ----------------------------------------------------
 

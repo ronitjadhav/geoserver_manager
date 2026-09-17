@@ -8,8 +8,6 @@ Used as a mixin for GeoServerMainDialog.
 
 from concurrent.futures import ThreadPoolExecutor
 
-from qgis.core import Qgis
-from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
@@ -36,8 +34,8 @@ class DatastoreTabMixin:
 
     def _load_datastores(self):
         """Fetch all datastores across all workspaces and display them."""
-        self.setCursor(Qt.CursorShape.WaitCursor)
-        try:
+
+        def load():
             self._setup_add_button(
                 self.tr("Add a New Datastore"),
                 self.tr("Create a new datastore"),
@@ -80,16 +78,13 @@ class DatastoreTabMixin:
                 ]
 
             self._populate_rows(rows)
-        except Exception as e:
-            self.show_error_message(self.tr("Failed to load datastores: {}").format(e))
-            self.log(f"Datastore load error: {e}", log_level=Qgis.MessageLevel.Critical)
-        finally:
-            self.unsetCursor()
+
+        self._run_action(load, self.tr("Failed to load datastores"))
 
     def _datastore_names(self, workspace_name):
         """Return the datastore names of one workspace. Raises on HTTP errors."""
         return [
-            ds.get("name", str(ds)) if isinstance(ds, dict) else str(ds)
+            self._name_of(ds)
             for ds in self._fetch_list(self.gs.get_datastores, workspace_name)
         ]
 
@@ -258,10 +253,7 @@ class DatastoreTabMixin:
         """
         if refresh or not self._workspace_names:
             workspaces = self._fetch_list(self.gs.get_workspaces)
-            self._workspace_names = [
-                ws.get("name", str(ws)) if isinstance(ws, dict) else str(ws)
-                for ws in workspaces
-            ]
+            self._workspace_names = [self._name_of(ws) for ws in workspaces]
         return self._workspace_names
 
     def _add_datastore(self):
@@ -273,52 +265,40 @@ class DatastoreTabMixin:
             )
             return
 
-        # Build dialog with a deferred on_change so we get a reference to dlg
         dlg = ResourceFormDialog(
             title=self.tr("New Datastore"),
             description=self.tr("Configure a new datastore"),
             fields=self._datastore_fields(workspace_names),
             parent=self,
         )
-        # Wire type combo after dialog is constructed
-        type_combo = dlg.get_widget("type")
-        if type_combo:
-            type_combo.currentTextChanged.connect(
-                lambda t: self._on_type_changed(dlg, t)
-            )
-            # Apply initial visibility for the default type
-            self._on_type_changed(dlg, type_combo.currentText())
-
+        self._wire_type_combo(dlg)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         values = dlg.get_values()
-        self.setCursor(Qt.CursorShape.WaitCursor)
-        try:
-            # create_* upserts, so an existing name would overwrite a live store
-            if self._resource_exists(
-                self.gs.get_datastore, values["workspace"], values["name"]
-            ):
-                self.show_error_message(
-                    self.tr("Datastore '{}' already exists in workspace '{}'.").format(
-                        values["name"], values["workspace"]
-                    )
-                )
-                return
-            self._create_datastore_from_values(values)
+        if self._run_action(
+            lambda: self._create_datastore_from_values(values),
+            self.tr("Failed to create datastore '{}'").format(values["name"]),
+        ):
             self.show_success_message(
                 self.tr("Datastore '{}' created.").format(values["name"])
             )
             self._load_datastores()
-        except Exception as e:
-            self.show_error_message(
-                self.tr("Failed to create datastore '{}': {}").format(values["name"], e)
-            )
-            self.log(
-                f"Create datastore error: {e}", log_level=Qgis.MessageLevel.Critical
-            )
-        finally:
-            self.unsetCursor()
+
+    def _wire_type_combo(self, dlg, initial_type=None, locked=False):
+        """Show only the connection fields that belong to the selected type.
+
+        The combo is wired after the dialog exists because the handler needs
+        the dialog itself. `locked` is for edit mode: the type is displayed
+        but cannot be changed.
+        """
+        type_combo = dlg.get_widget("type")
+        if type_combo is None:
+            return
+        type_combo.currentTextChanged.connect(lambda t: self._on_type_changed(dlg, t))
+        self._on_type_changed(dlg, initial_type or type_combo.currentText())
+        if locked:
+            type_combo.setEnabled(False)
 
     def _create_datastore_from_values(self, values):
         """Call the appropriate library method based on the datastore type."""
@@ -326,6 +306,14 @@ class DatastoreTabMixin:
         name = values["name"]
         ds_type = values["type"]
         description = values.get("description") or None
+
+        # create_* upserts, so an existing name would overwrite a live store
+        if self._resource_exists(self.gs.get_datastore, ws, name):
+            raise ValueError(
+                self.tr("Datastore '{}' already exists in workspace '{}'.").format(
+                    name, ws
+                )
+            )
 
         if ds_type == "PostGIS":
             self._check(
@@ -419,109 +407,88 @@ class DatastoreTabMixin:
             )
         )
 
-    def _show_datastore_info(self, row_data):
-        """Open a form dialog to view/edit an existing datastore."""
-        ds_name = row_data[0]
-        ws_name = row_data[1]
-        ds_type = row_data[2]
+    @staticmethod
+    def _connection_params(detail):
+        """The datastore's connectionParameters as a plain dict."""
+        if not isinstance(detail, dict):
+            return {}
+        entry = detail.get("connectionParameters", {}).get("entry", {})
+        return entry if isinstance(entry, dict) else {}
 
-        # Fetch full detail for connection_params
-        self.setCursor(Qt.CursorShape.WaitCursor)
-        try:
-            detail = self._check(self.gs.get_datastore(ws_name, ds_name))
-        except Exception as e:
-            self.show_error_message(
-                self.tr("Failed to load datastore details: {}").format(e)
-            )
-            return
-        finally:
-            self.unsetCursor()
+    @staticmethod
+    def _datastore_form_values(ws_name, ds_name, ds_type, detail, conn_params):
+        """Prefill for the edit form, from what GeoServer returned.
 
-        conn_params = {}
-        if isinstance(detail, dict):
-            conn_entry = detail.get("connectionParameters", {}).get("entry", {})
-            conn_params = conn_entry if isinstance(conn_entry, dict) else {}
-
-        # Map library type to our supported combo values; unsupported types are read-only
-        type_for_form = ds_type
-        if ds_type not in _SUPPORTED_TYPES:
-            type_for_form = _SUPPORTED_TYPES[0]  # fallback display
-            is_unsupported = True
-        else:
-            is_unsupported = False
-
-        current_values = {
+        A type the form cannot edit is shown against the first supported type
+        purely so the combo has something to display; the caller hides Save.
+        """
+        return {
             "workspace": ws_name,
             "name": ds_name,
-            "type": type_for_form,
+            "type": ds_type if ds_type in _SUPPORTED_TYPES else _SUPPORTED_TYPES[0],
             "description": (
                 detail.get("description", "") if isinstance(detail, dict) else ""
             ),
-            # PostGIS fields
+            # PostGIS
             "pg_host": conn_params.get("host", ""),
             "pg_port": int(conn_params.get("port", 5432) or 5432),
             "pg_db": conn_params.get("database", ""),
             "pg_user": conn_params.get("user", ""),
-            # Never prefill: GeoServer returns this field encrypted
-            # ("crypt1:…") or not at all depending on its configuration, and
-            # writing that value back would replace the real password with it.
+            # Never prefilled: GeoServer returns it encrypted ("crypt1:…") or
+            # not at all, and writing that back would replace the real password.
             "pg_password": "",
             "pg_schema": conn_params.get("schema", "public"),
-            # JNDI fields
+            # JNDI
             "jndi_reference": conn_params.get("jndiReferenceName", ""),
-            # PMTiles fields
+            # PMTiles
             "pmtiles_url": conn_params.get("pmtiles", ""),
         }
 
-        workspace_names = self._get_workspace_names()
+    def _show_datastore_info(self, row_data):
+        """Open a form dialog to view/edit an existing datastore."""
+        ds_name, ws_name, ds_type = row_data[0], row_data[1], row_data[2]
+        detail = self._fetch(
+            lambda: self._check(self.gs.get_datastore(ws_name, ds_name)),
+            self.tr("Failed to load datastore details"),
+        )
+        if detail is None:
+            return
+
+        conn_params = self._connection_params(detail)
+        values = self._datastore_form_values(
+            ws_name, ds_name, ds_type, detail, conn_params
+        )
+        editable = ds_type in _SUPPORTED_TYPES
+
         dlg = ResourceFormDialog(
             title=self.tr("Edit Datastore '{}'").format(ds_name),
             description=(
                 self.tr("Modify datastore settings")
-                if not is_unsupported
+                if editable
                 else self.tr(
                     "Datastore type '{}' is read-only (not supported for editing)"
                 ).format(ds_type)
             ),
-            fields=self._datastore_fields(workspace_names, edit_mode=True),
-            values=current_values,
+            fields=self._datastore_fields(self._get_workspace_names(), edit_mode=True),
+            values=values,
             parent=self,
         )
-
-        if is_unsupported:
-            # User can only view, not save — hide the Save button
-            dlg.hide_save_button()
+        if editable:
+            self._wire_type_combo(dlg, initial_type=values["type"], locked=True)
         else:
-            # Wire type combo and apply visibility
-            type_combo = dlg.get_widget("type")
-            if type_combo:
-                type_combo.currentTextChanged.connect(
-                    lambda t: self._on_type_changed(dlg, t)
-                )
-                self._on_type_changed(dlg, type_for_form)
-                # Disable type change in edit mode
-                type_combo.setEnabled(False)
-
+            dlg.hide_save_button()
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         values = dlg.get_values()
-        self.setCursor(Qt.CursorShape.WaitCursor)
-        try:
-            self._update_datastore_from_values(values, detail, conn_params)
+        if self._run_action(
+            lambda: self._update_datastore_from_values(values, detail, conn_params),
+            self.tr("Failed to update datastore '{}'").format(values["name"]),
+        ):
             self.show_success_message(
                 self.tr("Datastore '{}' updated.").format(values["name"])
             )
             self._load_datastores()
-        except Exception as e:
-            self.show_error_message(
-                self.tr("Failed to update datastore '{}': {}").format(values["name"], e)
-            )
-            self.log(
-                f"Update datastore error: {e}", log_level=Qgis.MessageLevel.Critical
-            )
-        finally:
-            self.unsetCursor()
 
     def _delete_datastore(self, row_data):
         """Delete a single datastore after confirmation."""
@@ -550,11 +517,7 @@ class DatastoreTabMixin:
         path = self.gs.rest_service.rest_endpoints.datastore(
             workspace_name, datastore_name
         )
-        response = self.gs.rest_service.rest_client.delete(
-            path, params={"recurse": "true"}
-        )
-        if response.status_code >= 400:
-            raise RuntimeError(response.content.decode())
+        self._raw_rest("delete", path, params={"recurse": "true"})
 
     def _open_workspace_from_row(self, row_data):
         """Open the workspace info dialog for the workspace in a datastore row."""
