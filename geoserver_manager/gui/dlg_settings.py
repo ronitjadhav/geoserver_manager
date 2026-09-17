@@ -27,8 +27,11 @@ from geoserver_manager.__about__ import (
     __uri_tracker__,
     __version__,
 )
-from geoserver_manager.toolbelt import PlgLogger, PlgOptionsManager
-from geoserver_manager.toolbelt.preferences import PlgSettingsStructure
+from geoserver_manager.toolbelt.log_handler import PlgLogger
+from geoserver_manager.toolbelt.preferences import (
+    PlgOptionsManager,
+    PlgSettingsStructure,
+)
 
 # ############################################################################
 # ########## Classes ###############

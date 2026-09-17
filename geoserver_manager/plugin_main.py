@@ -22,7 +22,8 @@ from geoserver_manager.__about__ import (
 )
 from geoserver_manager.gui.dlg_main import GeoServerMainDialog
 from geoserver_manager.gui.dlg_settings import PlgOptionsFactory
-from geoserver_manager.toolbelt import PlgLogger, PlgOptionsManager
+from geoserver_manager.toolbelt.log_handler import PlgLogger
+from geoserver_manager.toolbelt.preferences import PlgOptionsManager
 
 # ############################################################################
 # ########## Classes ###############

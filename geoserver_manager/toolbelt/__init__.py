@@ -1,4 +1,8 @@
 #! python3  # noqa: E265
-from .dependencies import ensure_dependencies  # noqa: F401
-from .log_handler import PlgLogger  # noqa: F401
-from .preferences import PlgOptionsManager  # noqa: F401
+
+"""Plugin utilities.
+
+Deliberately empty: importing a submodule must not pull in QGIS. That keeps
+the pure ones (env_var_parser) importable — and unit-testable — on a plain
+Python, which the CI unit job is.
+"""
