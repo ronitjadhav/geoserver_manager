@@ -2,7 +2,10 @@ name: "📦 Package & 🚀 Release"
 
 env:
   PROJECT_FOLDER: geoserver_manager
+  # translation job: pyqt5-tools is only proven on 3.9
   PYTHON_VERSION: 3.9
+  # packaging/release jobs: qgis-plugin-ci >= 2.10 requires Python >= 3.10
+  PYTHON_VERSION_PACKAGING: "3.12"
 
 on:
   push:
@@ -73,7 +76,7 @@ jobs:
         with:
           cache: "pip"
           cache-dependency-path: "requirements/packaging.txt"
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION_PACKAGING }}
 
       - name: Install dependencies
         run: |
@@ -130,7 +133,7 @@ jobs:
         with:
           cache: "pip"
           cache-dependency-path: "requirements/packaging.txt"
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION_PACKAGING }}
 
       - name: Install project requirements
         run: |

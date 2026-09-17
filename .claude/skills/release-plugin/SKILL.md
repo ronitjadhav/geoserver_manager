@@ -95,5 +95,7 @@ plugins.qgis.org. Then close the `0.1.0 — first release` milestone.
 - **Zip is huge**: unstripped wheel, see step 0.
 - **`qgis-plugin-ci` complains about the slug**: `setup.cfg` `[qgis-plugin-ci]` — `project_slug` /
   `github_organization_slug` must match the repo.
-- **Translations job fails**: it uses `pyqt5-tools` on the runner's Python; check the `PYTHON_VERSION`
-  in `package_and_release.yml` (deliberately left at 3.9 for that reason).
+- **Translations job fails**: it uses `pyqt5-tools`, proven only on Python 3.9 (`PYTHON_VERSION`).
+- **Packaging job fails on `pip install`**: `qgis-plugin-ci >= 2.10` needs Python ≥ 3.10 — the packaging
+  and release jobs use `PYTHON_VERSION_PACKAGING` (3.12) for that reason. A requirements bump merged by
+  dependabot broke this once because the workflow does not run on PRs (issue #30).
