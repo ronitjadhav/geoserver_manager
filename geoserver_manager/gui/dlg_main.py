@@ -30,6 +30,7 @@ from qgis.PyQt.QtWidgets import (
 
 from geoserver_manager.__about__ import __title__
 from geoserver_manager.gui.tab_datastores import DatastoreTabMixin
+from geoserver_manager.gui.tab_layers import LayerTabMixin
 from geoserver_manager.gui.tab_workspaces import WorkspaceTabMixin
 from geoserver_manager.toolbelt.log_handler import PlgLogger
 from geoserver_manager.toolbelt.preferences import PlgOptionsManager
@@ -40,7 +41,7 @@ from geoserver_manager.toolbelt.preferences import PlgOptionsManager
 _MAX_PARALLEL_REQUESTS = 8
 
 
-class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
+class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin, LayerTabMixin):
     """Main dialog — GeoServer resource browser."""
 
     def __init__(self, parent=None, iface=None):
@@ -337,6 +338,7 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
     TABS = (
         ("Workspaces", "mIconFolder.svg", "_load_workspaces"),
         ("Datastores", "mIconDbSchema.svg", "_load_datastores"),
+        ("Layers", "mIconVector.svg", "_load_layers"),
     )
 
     def _setup_nav(self):
@@ -597,6 +599,23 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         """Name of a list entry: geoservercloud returns dicts, tolerate strings."""
         return item.get("name", str(item)) if isinstance(item, dict) else str(item)
 
+    @staticmethod
+    def _error_text(error):
+        """One line for the user, including GeoServer's own explanation.
+
+        The library calls raise_for_status(), and HTTPError stringifies to
+        "500 Server Error:  for url: …" — dropping the body, which is exactly
+        where GeoServer puts the reason ("Unable to delete layer referenced by
+        layer group 'tasmania'"). TODO(#50): a library that raised with the
+        body would make this unnecessary.
+        """
+        response = getattr(error, "response", None)
+        body = (getattr(response, "text", "") or "").strip()
+        # Skip HTML error pages: a Tomcat stack trace is not an explanation
+        if body and not body.startswith("<") and body not in str(error):
+            return f"{error}: {body.splitlines()[0][:300]}"
+        return str(error)
+
     def _run_action(self, action, failure_message):
         """Run a server action under a wait cursor and report if it fails.
 
@@ -609,8 +628,11 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             action()
             return True
         except Exception as e:
-            self.show_error_message(f"{failure_message}: {e}")
-            self.log(f"{failure_message}: {e}", log_level=Qgis.MessageLevel.Critical)
+            detail = self._error_text(e)
+            self.show_error_message(f"{failure_message}: {detail}")
+            self.log(
+                f"{failure_message}: {detail}", log_level=Qgis.MessageLevel.Critical
+            )
             return False
         finally:
             self.unsetCursor()
@@ -758,9 +780,10 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
                 try:
                     delete_fn()
                 except Exception as e:
-                    errors.append(f"{label}: {e}")
+                    detail = self._error_text(e)
+                    errors.append(f"{label}: {detail}")
                     self.log(
-                        f"Delete {kind} error ({label}): {e}",
+                        f"Delete {kind} error ({label}): {detail}",
                         log_level=Qgis.MessageLevel.Critical,
                     )
 

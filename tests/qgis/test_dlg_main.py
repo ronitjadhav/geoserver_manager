@@ -589,6 +589,50 @@ class TestGenericParameterEditor(unittest.TestCase):
         self.assertEqual(self.sent, {})
 
 
+class TestErrorText(unittest.TestCase):
+    """GeoServer's explanation must reach the user, not just the status line."""
+
+    def _http_error(self, status, body):
+        import requests
+
+        response = requests.Response()
+        response.status_code = status
+        response._content = body.encode()
+        return requests.exceptions.HTTPError(
+            f"{status} Server Error:  for url: http://gs/rest/x", response=response
+        )
+
+    def test_body_is_appended(self):
+        error = self._http_error(
+            500, "Unable to delete layer referenced by layer group 'tasmania'"
+        )
+        text = GeoServerMainDialog._error_text(error)
+        self.assertIn("layer group 'tasmania'", text)
+        self.assertIn("500 Server Error", text)
+
+    def test_html_error_pages_are_skipped(self):
+        error = self._http_error(401, "<!doctype html><html><title>401</title></html>")
+        self.assertNotIn("doctype", GeoServerMainDialog._error_text(error))
+
+    def test_plain_exceptions_pass_through(self):
+        self.assertEqual(GeoServerMainDialog._error_text(ValueError("nope")), "nope")
+
+    def test_delete_failure_shows_the_reason(self):
+        dlg = GeoServerMainDialog()
+        errors = []
+        dlg.show_error_message = errors.append
+        dlg._confirm_delete = lambda kind, labels, cascade="": True
+
+        def boom():
+            raise self._http_error(
+                500, "Unable to delete layer referenced by layer group 'x'"
+            )
+
+        dlg._delete_many("layer", [("ws/ds/l", boom)], lambda: None)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("layer group 'x'", errors[0])
+
+
 # ############################################################################
 # ####### Stand-alone run ########
 # ################################
