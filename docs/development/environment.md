@@ -78,8 +78,24 @@ docker compose ps          # wait until gsm-geoserver is "healthy"
 | Database, as seen *from GeoServer* | host `postgis`, port `5432`, database / user / password `geoserver` |
 
 Configure the plugin with that URL and those credentials in *Settings → Options →
-GeoServer Manager*. The server starts empty (`SKIP_DEMO_DATA`), which is the
-state worth testing: no workspaces yet.
+GeoServer Manager*.
+
+The server comes up with GeoServer's demo data: 8 workspaces, 5 datastores, 24
+layers, 21 styles and 3 layer groups — enough for the list views, search and
+pagination to show something real, and for the upcoming Layers/Styles tabs to
+have resources to list. Note that 4 of the 5 demo datastores are Shapefile or
+GeoPackage, types the plugin cannot edit, so clicking one opens the read-only
+dialog (see issue #28).
+
+For the empty first-run state — "no workspaces yet", which the Add flows and the
+"create a workspace first" warning are about:
+
+```sh
+docker compose down -v && SKIP_DEMO_DATA=true docker compose up -d
+```
+
+The `-v` matters: the demo data is unpacked only when the data-dir volume is
+created, so flipping the variable on an existing volume changes nothing.
 
 PostGIS is part of the stack on purpose — "PostGIS" is the plugin's main
 datastore type, and without a reachable database a created store looks fine but

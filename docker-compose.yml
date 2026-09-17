@@ -5,8 +5,17 @@
 #   docker compose down -v     # stop and discard the data
 #
 # Point the plugin at http://localhost:8080/geoserver with admin / geoserver
-# (Settings → Options → GeoServer Manager). SKIP_DEMO_DATA leaves the server
-# empty, so you start from "no workspaces yet" — the state worth testing.
+# (Settings → Options → GeoServer Manager).
+#
+# The server comes up with GeoServer's demo data — five workspaces and their
+# layers, styles, coverage stores and layer groups — so the list views, search
+# and pagination have something real to show, and the upcoming tabs have
+# resources to list. For the empty first-run state instead:
+#
+#     docker compose down -v && SKIP_DEMO_DATA=true docker compose up -d
+#
+# The -v matters: the demo data is unpacked only when the data-dir volume is
+# created, so flipping the flag on an existing volume changes nothing.
 #
 # PostGIS is here because "PostGIS" is the plugin's main datastore type:
 # without a reachable database a created store looks fine but serves nothing,
@@ -32,7 +41,7 @@ services:
       # (/opt/handle_geoserver_admin_credentials.sh applies these at startup).
       GEOSERVER_ADMIN_USER: admin
       GEOSERVER_ADMIN_PASSWORD: geoserver
-      SKIP_DEMO_DATA: "true"
+      SKIP_DEMO_DATA: "${SKIP_DEMO_DATA:-false}"
       # A PMTiles *datastore config* can be created on vanilla GeoServer, but
       # serving from it needs the community module. Uncomment to install it —
       # it downloads at every container start, so leave it off unless needed.

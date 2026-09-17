@@ -104,9 +104,11 @@ docker compose down -v    # stop and discard the data
 ```
 
 Configure the plugin with `http://localhost:8080/geoserver` and
-`admin` / `geoserver`. In the datastore form, reach the database the way
-GeoServer sees it: host `postgis`, port `5432`, database / user / password
-`geoserver`. Details in
+`admin` / `geoserver`. It starts with GeoServer's demo data (8 workspaces, 24
+layers); `SKIP_DEMO_DATA=true docker compose up -d` on a fresh volume gives an
+empty server instead. In the datastore form, reach the database the way GeoServer
+sees it: host `postgis`, port `5432`, database / user / password `geoserver`.
+Details in
 [docs/development/environment.md](docs/development/environment.md).
 
 ### Checks
