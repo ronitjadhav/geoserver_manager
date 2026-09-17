@@ -285,12 +285,17 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
 
     def refresh_ui(self, show_message=False):
         """Connect and reload the current tab."""
+        # Say what is happening: _connect blocks, so this label is the only
+        # feedback the user gets while it does.
+        self._set_status(self.tr("Connecting…"), "gray")
         if self._connect():
             self._on_nav_changed(self.navList.currentRow())
             if show_message:
                 self.show_success_message(self.tr("Resources loaded."))
         else:
-            self.resultsTable.setRowCount(0)
+            # Clearing only the visible rows would leave the dead server's data
+            # in the row cache, still reachable through search and pagination.
+            self._reset_table_state()
 
     # -- Left navigation ---------------------------------------------------
 
@@ -319,18 +324,42 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         """
         self._on_nav_changed(self.navList.currentRow())
 
-    def _on_nav_changed(self, index):
-        """Load data for the selected navigation tab."""
-        if not self.gs or index < 0:
-            return
-        self.searchBox.clear()
+    def _reset_table_state(self):
+        """Clear the table, its row cache and every per-tab callback.
 
-        # Reset per-tab state
+        Loaders arm the callbacks and headers before they fetch, so a fetch that
+        raises would otherwise leave the previous resource type's rows in the
+        cache, reachable through the search box and the pagination buttons and
+        wired to the new tab's row actions — i.e. Delete aimed at the wrong
+        resource. Resetting both halves together is what keeps that impossible.
+        """
         self.btn_add.setVisible(False)
         self.btn_delete_selected.setVisible(False)
         self._name_click_callback = None
         self._delete_selected_callback = None
         self._row_actions = []
+        self._extra_click_callbacks = {}
+        self._all_rows = []
+        self._filtered_rows = []
+        self._current_page = 0
+        self.resultsTable.clearContents()
+        self.resultsTable.setRowCount(0)
+        self.lbl_page_number.setText("1")
+        self.lbl_page_info.setText(self.tr("No results"))
+        for button in (
+            self.btn_page_first,
+            self.btn_page_prev,
+            self.btn_page_next,
+            self.btn_page_last,
+        ):
+            button.setEnabled(False)
+
+    def _on_nav_changed(self, index):
+        """Load data for the selected navigation tab."""
+        if not self.gs or index < 0:
+            return
+        self.searchBox.clear()
+        self._reset_table_state()
 
         label = self.navList.item(index).text()
 
@@ -376,6 +405,12 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         # mapped back by row index, so a header click would make the table delete
         # a different resource than the one highlighted.
         self.resultsTable.setSortingEnabled(False)
+        # Loaders call this before fetching, so drop the previous rows here too:
+        # a fetch that raises must not leave them to be repainted under the new
+        # headers (see _reset_table_state).
+        self._all_rows = []
+        self._filtered_rows = []
+        self._current_page = 0
         self.resultsTable.clear()
         self.resultsTable.setColumnCount(len(columns))
         self.resultsTable.setHorizontalHeaderLabels(columns)
@@ -530,17 +565,29 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         self._current_page = self._total_pages - 1
         self._show_page()
 
+    def _resource_exists(self, getter, *args):
+        """True when a GET for the resource returns 200, False on 404.
+
+        The library's create_* calls are upserts (POST, then PUT on conflict),
+        so an "Add" form has to refuse a name that is already taken — otherwise
+        it silently overwrites a live resource and reports success.
+        """
+        _, status_code = getter(*args)
+        return status_code == 200
+
     def _fetch_list(self, api_method, *args):
         """Call a geoservercloud list endpoint. Returns a list or [].
         Raises on HTTP errors — callers surface them to the user."""
         result = self._check(api_method(*args))
         return result if isinstance(result, list) else []
 
-    def _confirm_delete(self, resource_type, name):
+    def _confirm_delete(self, resource_type, name, cascade=""):
         """Show a confirmation dialog before deleting a resource.
 
         :param resource_type: human-readable type (e.g. "workspace").
         :param name: name of the resource to delete.
+        :param cascade: what else the deletion takes with it. Both delete paths
+            send recurse=true, so the user has to be told.
         :return: True if the user confirmed deletion.
         """
         reply = QMessageBox.warning(
@@ -548,25 +595,26 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
             self.tr("Confirm Delete"),
             self.tr(
                 "Are you sure you want to delete {type} '{name}'?\n\n"
-                "This action cannot be undone."
-            ).format(type=resource_type, name=name),
+                "{cascade}This action cannot be undone."
+            ).format(type=resource_type, name=name, cascade=cascade),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
         return reply == QMessageBox.StandardButton.Yes
 
-    def _delete_many(self, kind, labeled_deletes, reload_fn):
+    def _delete_many(self, kind, labeled_deletes, reload_fn, cascade=""):
         """Confirm and run one or more deletions, then reload the table.
 
         :param kind: human-readable resource type (e.g. "workspace").
         :param labeled_deletes: list of (label, zero-arg callable) pairs.
         :param reload_fn: called afterwards to refresh the table.
+        :param cascade: sentence naming what else goes, for the confirmation.
         """
         if not labeled_deletes:
             return
 
         if len(labeled_deletes) == 1:
-            if not self._confirm_delete(kind, labeled_deletes[0][0]):
+            if not self._confirm_delete(kind, labeled_deletes[0][0], cascade):
                 return
         else:
             bullets = "\n".join(f"  • {lbl}" for lbl, _ in labeled_deletes)
@@ -575,8 +623,13 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
                 self.tr("Confirm Delete"),
                 self.tr(
                     "Are you sure you want to delete {count} {kind}(s)?\n\n{items}\n\n"
-                    "This action cannot be undone."
-                ).format(count=len(labeled_deletes), kind=kind, items=bullets),
+                    "{cascade}This action cannot be undone."
+                ).format(
+                    count=len(labeled_deletes),
+                    kind=kind,
+                    items=bullets,
+                    cascade=cascade,
+                ),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )

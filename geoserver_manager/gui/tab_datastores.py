@@ -130,6 +130,13 @@ class DatastoreTabMixin:
                 "label": self.tr("Name"),
                 "type": "text",
                 "required": True,
+                # Renaming would upsert: a free name creates a second store and
+                # a taken one overwrites it. Locked until the library grows a
+                # real rename (workspaces do it with a TODO-tagged PUT).
+                "read_only": edit_mode,
+                "help": (
+                    self.tr("A datastore cannot be renamed") if edit_mode else None
+                ),
             },
             {
                 "key": "type",
@@ -288,6 +295,16 @@ class DatastoreTabMixin:
         values = dlg.get_values()
         self.setCursor(Qt.CursorShape.WaitCursor)
         try:
+            # create_* upserts, so an existing name would overwrite a live store
+            if self._resource_exists(
+                self.gs.get_datastore, values["workspace"], values["name"]
+            ):
+                self.show_error_message(
+                    self.tr("Datastore '{}' already exists in workspace '{}'.").format(
+                        values["name"], values["workspace"]
+                    )
+                )
+                return
             self._create_datastore_from_values(values)
             self.show_success_message(
                 self.tr("Datastore '{}' created.").format(values["name"])
@@ -345,6 +362,62 @@ class DatastoreTabMixin:
             )
         else:
             raise ValueError(f"Unsupported datastore type: {ds_type}")
+
+    def _update_datastore_from_values(self, values, detail, conn_params):
+        """Save an edit without discarding server-side configuration.
+
+        The typed create_* helpers post a fixed connection-parameter template
+        and GeoServer applies it by REPLACING the stored map, so editing just a
+        description used to drop pool settings, Loose bbox, the real namespace
+        and the PMTiles range-reader config, and force enabled=true on a
+        disabled store. Merge the fields the form owns onto what the server
+        actually has, and keep its own type and enabled flag.
+        """
+        ds_type = detail.get("type") if isinstance(detail, dict) else None
+        if not ds_type:
+            raise RuntimeError(
+                "GeoServer did not report this datastore's type, so it cannot "
+                "be updated safely."
+            )
+
+        merged = dict(conn_params)
+        if ds_type == "PostGIS":
+            merged.update(
+                {
+                    "host": values.get("pg_host", ""),
+                    "port": int(values.get("pg_port", 5432)),
+                    "database": values.get("pg_db", ""),
+                    "user": values.get("pg_user", ""),
+                    "passwd": values.get("pg_password", ""),
+                    "schema": values.get("pg_schema", "public") or "public",
+                }
+            )
+        elif ds_type == "PostGIS (JNDI)":
+            merged.update(
+                {
+                    "jndiReferenceName": values.get("jndi_reference", ""),
+                    "schema": values.get("pg_schema", "public") or "public",
+                }
+            )
+        elif ds_type == "PMTiles":
+            merged["pmtiles"] = values.get("pmtiles_url", "")
+        else:
+            raise ValueError(f"Unsupported datastore type: {ds_type}")
+
+        enabled = detail.get("enabled", True)
+        if isinstance(enabled, str):  # .json gives a bool, but do not assume
+            enabled = enabled.strip().lower() == "true"
+
+        self._check(
+            self.gs.create_datastore(
+                workspace_name=values["workspace"],
+                datastore_name=values["name"],
+                datastore_type=ds_type,
+                connection_parameters=merged,
+                description=values.get("description") or None,
+                enabled=bool(enabled),
+            )
+        )
 
     def _show_datastore_info(self, row_data):
         """Open a form dialog to view/edit an existing datastore."""
@@ -435,7 +508,7 @@ class DatastoreTabMixin:
         values = dlg.get_values()
         self.setCursor(Qt.CursorShape.WaitCursor)
         try:
-            self._create_datastore_from_values(values)
+            self._update_datastore_from_values(values, detail, conn_params)
             self.show_success_message(
                 self.tr("Datastore '{}' updated.").format(values["name"])
             )
@@ -466,6 +539,8 @@ class DatastoreTabMixin:
                 for row in selected_rows
             ],
             self._load_datastores,
+            # _do_delete_datastore sends recurse=true
+            cascade=self.tr("Every layer published from it is deleted too.\n\n"),
         )
 
     def _do_delete_datastore(self, workspace_name, datastore_name):

@@ -113,6 +113,13 @@ class WorkspaceTabMixin:
         values = dlg.get_values()
         self.setCursor(Qt.CursorShape.WaitCursor)
         try:
+            # create_workspace upserts, so an existing name would silently
+            # reconfigure the live workspace and report it as created
+            if self._resource_exists(self.gs.get_workspace, values["name"]):
+                self.show_error_message(
+                    self.tr("Workspace '{}' already exists.").format(values["name"])
+                )
+                return
             self._check(
                 self.gs.create_workspace(values["name"], isolated=values["isolated"])
             )
@@ -220,4 +227,9 @@ class WorkspaceTabMixin:
                 for row in selected_rows
             ],
             self._load_workspaces,
+            # delete_workspace() sends recurse=true
+            cascade=self.tr(
+                "Everything it contains is deleted too: datastores, layers, "
+                "styles and layer groups.\n\n"
+            ),
         )
