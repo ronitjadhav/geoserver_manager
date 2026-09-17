@@ -82,8 +82,11 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
   `OSError`, so catch `HTTPError` *before* `OSError` (see `_probe`).
 - `create_workspace` and `create_datastore` **upsert**. There is no `update_*`, no `delete_datastore`, no
   workspace rename, no "set default workspace" call (the `set_default_workspace=True` kwarg only sets a
-  client-side attribute). Those are `_raw_rest` workarounds carrying a `TODO:` — upstream them to the
-  library when possible, keep the local workaround until then.
+  client-side attribute). Those are `_raw_rest` workarounds carrying `TODO(#50)`. **Issue #50 is the
+  upstream tracking list**: every `_raw_rest` call, and every piece of client-side logic that exists only
+  because the library lacks a method (`_check`, `_resource_exists`, the datastore merge), has a row there
+  with the endpoint and the proposed library API. When you add one, add the row and the `TODO(#50)`; when
+  the library gains it and the wheel is bumped, replace the workaround and tick the row.
 - The client strips trailing `/` from the URL itself. It has no timeout parameter (`TIMEOUT = 120` is a
   module constant) and `verifytls` is not yet surfaced in settings (open issue).
 - **Thread safety:** the REST methods are stateless `requests.*` calls and are safe to run through
@@ -105,8 +108,8 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
   config for a value that never changes. A service layer between GUI and library was proposed twice and
   rejected as premature — don't build it until a non-GUI caller needs the API.
 - Deliberate shortcuts carry a `ponytail:` comment naming the ceiling and the upgrade path. Library gaps
-  carry a `TODO:` naming the upstream method that should replace the workaround. Leave both in place until
-  the condition they name is met.
+  carry `TODO(#50)` and a row in issue #50 naming the upstream method that should replace the workaround.
+  Leave both in place until the condition they name is met.
 - `self.tr()` inside the mixins **cannot** resolve translations: strings are extracted under the mixin's
   class name but looked up under `GeoServerMainDialog` (QDialog precedes the mixins in the MRO, so an
   override of `tr()` there is dead code). When the first real translation lands, switch those sites to

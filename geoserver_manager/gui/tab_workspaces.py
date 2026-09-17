@@ -88,7 +88,7 @@ class WorkspaceTabMixin:
     def _default_workspace_name(self):
         """Name of GeoServer's default workspace, or None if it cannot be read.
 
-        TODO: move to geoservercloud (no getter exists; see _set_default_workspace).
+        TODO(#50): upstream as get_default_workspace() — no getter exists.
         """
         try:
             base = self.gs.rest_service.rest_endpoints.base_url
@@ -100,9 +100,10 @@ class WorkspaceTabMixin:
     def _set_default_workspace(self, name):
         """Set the GeoServer default workspace.
 
-        TODO: move to geoservercloud — its create_workspace(set_default_workspace=True)
-        only sets a client-side attribute, it never calls the server.
-        Workaround: PUT /rest/workspaces/default.json
+        TODO(#50): upstream as set_default_workspace(). The library's
+        create_workspace(set_default_workspace=True) only sets a client-side
+        attribute and never calls the server. Workaround: PUT
+        /rest/workspaces/default.json
         """
         path = f"{self.gs.rest_service.rest_endpoints.base_url}/workspaces/default.json"
         self._raw_rest("put", path, json={"workspace": {"name": name}})
@@ -110,8 +111,8 @@ class WorkspaceTabMixin:
     def _rename_workspace(self, old_name, new_name, isolated):
         """Rename a workspace in place.
 
-        TODO: replace with gs.update_workspace() once geoservercloud has
-        rename support. Workaround: PUT the new name to /workspaces/{old_name}.
+        TODO(#50): upstream as update_workspace(name, new_name=...) — the library
+        has no rename. Workaround: PUT the new name to /rest/workspaces/{old_name}.
         """
         from geoservercloud.models.workspace import Workspace
 

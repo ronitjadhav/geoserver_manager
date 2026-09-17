@@ -120,7 +120,7 @@ class DatastoreTabMixin:
                 "required": True,
                 # Renaming would upsert: a free name creates a second store and
                 # a taken one overwrites it. Locked until the library grows a
-                # real rename (workspaces do it with a TODO-tagged PUT).
+                # real rename (#50; workspaces do it with a raw PUT).
                 "read_only": edit_mode,
                 "help": (
                     self.tr("A datastore cannot be renamed") if edit_mode else None
@@ -341,6 +341,8 @@ class DatastoreTabMixin:
         and the PMTiles range-reader config, and force enabled=true on a
         disabled store. Merge the fields the form owns onto what the server
         actually has, and keep its own type and enabled flag.
+
+        TODO(#50): upstream as update_datastore(...) that merges server-side.
         """
         ds_type = detail.get("type") if isinstance(detail, dict) else None
         if not ds_type:
@@ -497,8 +499,8 @@ class DatastoreTabMixin:
 
     def _do_delete_datastore(self, workspace_name, datastore_name):
         """Execute the REST DELETE for a datastore (recurse=true removes feature types too)."""
-        # TODO: Replace with gs.delete_datastore() once the library adds this method.
-        # Workaround: direct DELETE to /workspaces/{ws}/datastores/{ds}.json?recurse=true
+        # TODO(#50): upstream as delete_datastore(ws, ds, recurse=True) — the library
+        # has none. Workaround: DELETE /workspaces/{ws}/datastores/{ds}.json?recurse=true
         path = self.gs.rest_service.rest_endpoints.datastore(
             workspace_name, datastore_name
         )

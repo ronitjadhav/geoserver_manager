@@ -161,7 +161,7 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
 
         The library's REST client raises for most HTTP errors, but deliberately
         lets three statuses through: 404 on GET/DELETE and 409 on POST. Those
-        would otherwise read as success, so raise here too.
+        would otherwise read as success, so raise here too. TODO(#50).
         """
         content, status_code = result
         if status_code >= 400:
@@ -609,7 +609,8 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
         """Call the REST client directly for what geoservercloud has no method for.
 
         Raises with GeoServer's own response body on any HTTP error, so the
-        message the user sees is the same shape as _check's.
+        message the user sees is the same shape as _check's. Every caller is a
+        library gap: list it in issue #50 and mark the call site TODO(#50).
         """
         response = getattr(self.gs.rest_service.rest_client, method)(path, **kwargs)
         if response.status_code >= 400:
@@ -621,7 +622,8 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin):
 
         The library's create_* calls are upserts (POST, then PUT on conflict),
         so an "Add" form has to refuse a name that is already taken — otherwise
-        it silently overwrites a live resource and reports success.
+        it silently overwrites a live resource and reports success. TODO(#50):
+        an exist_ok=False option upstream would make this unnecessary.
         """
         _, status_code = getter(*args)
         return status_code == 200

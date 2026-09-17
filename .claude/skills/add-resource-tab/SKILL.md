@@ -20,7 +20,10 @@ Unzip `geoserver_manager/extras/geoservercloud-*.whl` into a scratch dir and rea
 - Which calls return `(content, status)` — wrap them in `self._check(...)`.
 - Whether `create_*` upserts (it usually does) — then *Add* needs `_resource_exists`.
 - What is **missing**. A missing call becomes a `self._raw_rest(...)` workaround
-  with a `TODO:` naming the upstream method, using `rest_endpoints.*` for the path.
+  with a `TODO(#50)` comment, using `rest_endpoints.*` for the path — **and a new
+  row in issue #50** (call site, REST verb + path, proposed library API) so it can
+  be implemented upstream in python-geoservercloud. Check the "anticipated" list
+  in #50 first; your resource may already be there.
 
 ## 2. Write the mixin: `geoserver_manager/gui/tab_<resource>.py`
 
