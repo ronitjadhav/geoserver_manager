@@ -557,8 +557,14 @@ class TestSetLayerStyle(unittest.TestCase):
         self.dlg.show_warning_message = lambda t: None
         self.dlg._load_layers()
         self.assertEqual(
-            [t for _i, t, _c in self.dlg._row_actions],
-            ["Add to QGIS", "Set style", "Style from QGIS", "Delete"],
+            [action[1] for action in self.dlg._row_actions],
+            [
+                "Add to QGIS",
+                "Preview in a browser",
+                "Set style",
+                "Style from QGIS",
+                "Delete",
+            ],
         )
 
 
@@ -1009,3 +1015,147 @@ class TestPublishForm(unittest.TestCase):
 # ################################
 if __name__ == "__main__":
     unittest.main()
+
+
+# ############################################################################
+# ###### Preview in a browser ####
+# ################################
+
+
+class TestPreviewInBrowser(unittest.TestCase):
+    """GeoServer's own OpenLayers page, on the layer's extent, in the browser."""
+
+    def url(self, **kwargs):
+        from geoserver_manager.gui.tab_layers import LayerTabMixin
+
+        return LayerTabMixin._preview_url("http://gs/geoserver/", **kwargs)
+
+    def test_a_workspace_layer_goes_through_its_virtual_service(self):
+        url = self.url(
+            qualified_name="topp:states",
+            bbox=(0.0, 0.0, 4.0, 2.0),
+            srs="EPSG:4326",
+            workspace="topp",
+        )
+        self.assertTrue(url.startswith("http://gs/geoserver/topp/wms?"), url)
+        for part in (
+            "service=WMS",
+            "version=1.1.0",
+            "request=GetMap",
+            "layers=topp:states",
+            "bbox=0.0,0.0,4.0,2.0",
+            "width=768",
+            "height=384",
+            "srs=EPSG:4326",
+            "styles=",
+            "format=application/openlayers",
+        ):
+            self.assertIn(part, url)
+
+    def test_a_tall_extent_caps_the_height_instead(self):
+        url = self.url(
+            qualified_name="topp:states",
+            bbox=(0.0, 0.0, 2.0, 4.0),
+            srs="EPSG:4326",
+            workspace="topp",
+        )
+        self.assertIn("width=384", url)
+        self.assertIn("height=768", url)
+
+    def test_a_global_group_has_no_workspace_anywhere(self):
+        url = self.url(
+            qualified_name="tasmania",
+            bbox=(143.0, -44.0, 149.0, -40.0),
+            srs="EPSG:4326",
+        )
+        self.assertTrue(url.startswith("http://gs/geoserver/wms?"), url)
+        self.assertIn("layers=tasmania&", url)
+
+    def test_without_an_extent_the_world(self):
+        for bbox in (None, (1.0, 1.0, 1.0, 1.0)):
+            url = self.url(
+                qualified_name="x:y", bbox=bbox, srs="EPSG:2154", workspace="x"
+            )
+            self.assertIn("bbox=-180.0,-90.0,180.0,90.0", url)
+            self.assertIn("srs=EPSG:4326", url)
+            self.assertIn("width=768&height=384", url)
+
+    def test_bbox_from_geoservers_shapes(self):
+        from geoserver_manager.gui.tab_layers import LayerTabMixin
+
+        box = {
+            "minx": -124.731422,
+            "maxx": -66.969849,
+            "miny": 24.955967,
+            "maxy": 49.371735,
+            "crs": "EPSG:4326",
+        }
+        self.assertEqual(
+            LayerTabMixin._bbox_from(box),
+            ((-124.731422, 24.955967, -66.969849, 49.371735), "EPSG:4326"),
+        )
+        box["crs"] = {"@class": "projected", "$": "EPSG:2154"}
+        self.assertEqual(LayerTabMixin._bbox_from(box)[1], "EPSG:2154")
+        self.assertEqual(LayerTabMixin._bbox_from({"minx": 1}), (None, None))
+        self.assertEqual(LayerTabMixin._bbox_from(None), (None, None))
+
+    def test_the_row_action_opens_the_layers_own_extent(self):
+        from geoserver_manager.gui import tab_layers
+
+        class BboxGS(FakeGS):
+            def get_feature_type(self, workspace_name, datastore_name, name):
+                detail, status = super().get_feature_type(
+                    workspace_name, datastore_name, name
+                )
+                detail["latLonBoundingBox"] = {
+                    "minx": -124.731422,
+                    "maxx": -66.969849,
+                    "miny": 24.955967,
+                    "maxy": 49.371735,
+                    "crs": "EPSG:4326",
+                }
+                return detail, status
+
+        class Settings:
+            geoserver_url = "http://gs/geoserver"
+
+        class Prefs:
+            def get_plg_settings(self):
+                return Settings()
+
+        dlg = SyncDialog()
+        dlg.gs = BboxGS()
+        dlg.plg_settings = Prefs()
+        opened = []
+        with patch.object(
+            tab_layers.QDesktopServices,
+            "openUrl",
+            lambda url: opened.append(url.toString()) or True,
+        ):
+            dlg._preview_layer_in_browser(
+                ["states", "topp", "states_shapefile", "EPSG:4326", "True"]
+            )
+        self.assertEqual(len(opened), 1, opened)
+        self.assertTrue(opened[0].startswith("http://gs/geoserver/topp/wms?"), opened)
+        self.assertIn("layers=topp:states", opened[0])
+        self.assertIn("bbox=-124.731422,24.955967,-66.969849,49.371735", opened[0])
+
+    def test_a_browser_that_does_not_open_is_a_warning(self):
+        from geoserver_manager.gui import tab_layers
+
+        dlg = SyncDialog()
+        warnings = []
+        dlg.show_warning_message = warnings.append
+        with patch.object(tab_layers.QDesktopServices, "openUrl", lambda url: False):
+            dlg._open_in_browser("http://gs/geoserver/wms")
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("http://gs/geoserver/wms", warnings[0])
+
+    def test_the_action_sits_next_to_add_to_qgis_and_warns_about_the_login(self):
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        dlg.show_warning_message = lambda t: None
+        dlg._load_layers()
+        labels = [action[1] for action in dlg._row_actions]
+        self.assertEqual(labels[:2], ["Add to QGIS", "Preview in a browser"])
+        self.assertIn("log in", dlg._row_actions[1][3])

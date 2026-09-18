@@ -6,9 +6,12 @@ Styles tab — list, view/edit, upload and delete styles.
 Used as a mixin for GeoServerMainDialog.
 """
 
+import re
 from pathlib import Path
 
+from qgis.PyQt import sip
 from qgis.PyQt.QtCore import QCoreApplication
+from qgis.PyQt.QtGui import QPixmap
 from qgis.PyQt.QtWidgets import QDialog, QFileDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
@@ -227,6 +230,17 @@ class StyleTabMixin:
                 "read_only": True,
             },
             {
+                "key": "legend",
+                "label": translate("StyleTabMixin", "Legend"),
+                "type": "image",
+                "placeholder": translate(
+                    "StyleTabMixin", "Asking GeoServer for the legend…"
+                ),
+                "help": translate(
+                    "StyleTabMixin", "As GeoServer renders it (GetLegendGraphic)."
+                ),
+            },
+            {
                 "key": "body",
                 "label": translate("StyleTabMixin", "Definition"),
                 "type": "textarea",
@@ -287,6 +301,7 @@ class StyleTabMixin:
             parent=self,
         )
         dlg.get_widget("body").setMaximumHeight(400)
+        self._load_legend(dlg, name, workspace_name)
         if not editable:
             dlg.hide_save_button()
         if dlg.exec() != QDialog.DialogCode.Accepted:
@@ -302,6 +317,99 @@ class StyleTabMixin:
             self.show_success_message(
                 translate("StyleTabMixin", "Style '{}' saved.").format(name)
             )
+
+    # -- Legend ----------------------------------------------------------------
+
+    def _legend_layer(self, workspace_name):
+        """A published layer to draw the legend with, or None when there is none.
+
+        GetLegendGraphic needs a LAYER even for a stored style; the layer only
+        supplies the rendering context, so any published layer does. One from
+        the style's own workspace is preferred. TODO(#50): the facade has no
+        get_layers() and RestEndpoints has no path for GeoServer's layer list
+        (its layers() / layer() are GeoWebCache's), so this GETs
+        /rest/layers.json — the global list, qualified names included.
+        """
+        base = self.gs.rest_service.rest_endpoints.base_url
+        payload = self._raw_rest("get", f"{base}/layers.json").json()
+        names = [
+            self._name_of(entry) for entry in self._unwrap(payload, "layers", "layer")
+        ]
+        if workspace_name:
+            for name in names:
+                if name.startswith(f"{workspace_name}:"):
+                    return name
+        return names[0] if names else None
+
+    def _legend_png(self, layer, name, workspace_name):
+        """The legend GeoServer renders for the style, as PNG bytes.
+
+        TODO(#50): get_legend_graphic() is a plain GET through the REST client —
+        stateless, so fine in a worker — but it hands back the raw Response, an
+        OGC exception is HTTP 200 with an XML body, and it runs with the
+        client's 120 s timeout.
+        """
+        style = f"{workspace_name}:{name}" if workspace_name else name
+        response = self.gs.get_legend_graphic(layer, style=style)
+        if not response.headers.get("Content-Type", "").startswith("image/"):
+            raise RuntimeError(self._ogc_exception_text(response.text))
+        return response.content
+
+    @staticmethod
+    def _ogc_exception_text(text):
+        """The sentence inside an OGC exception report, else its first line."""
+        match = re.search(
+            r"<(?:\w+:)?(?:ServiceException|ExceptionText)\b[^>]*>\s*([^<]+?)\s*<",
+            text or "",
+        )
+        if match:
+            return match.group(1)
+        lines = (text or "").strip().splitlines()
+        return lines[0][:200] if lines else "GeoServer returned no image"
+
+    def _load_legend(self, dlg, name, workspace_name):
+        """Fetch the legend into the dialog's image field, off the GUI thread.
+
+        The dialog is modal and may be closed — even gone — before the picture
+        lands, so the landing looks before it paints. Failures land in the
+        field too: a banner would sit behind the modal.
+        """
+        closed = []
+        dlg.finished.connect(lambda _result: closed.append(True))
+
+        def work(task):
+            try:
+                layer = self._legend_layer(workspace_name)
+                if layer is None:
+                    return None, translate(
+                        "StyleTabMixin",
+                        "No published layer to draw the legend with — "
+                        "GetLegendGraphic needs one.",
+                    )
+                return self._legend_png(layer, name, workspace_name), None
+            except Exception as e:
+                return None, translate("StyleTabMixin", "No legend: {}").format(
+                    self._error_text(e)
+                )
+
+        def landed(result):
+            if closed or sip.isdeleted(dlg):
+                return
+            png, problem = result
+            pixmap = QPixmap()
+            if png and pixmap.loadFromData(png):
+                dlg.set_image("legend", pixmap)
+            else:
+                dlg.set_image(
+                    "legend",
+                    None,
+                    problem
+                    or translate("StyleTabMixin", "GeoServer did not return an image."),
+                )
+
+        self._run_in_task(
+            translate("StyleTabMixin", "Failed to load the legend"), work, landed
+        )
 
     # -- Upload ----------------------------------------------------------------
 

@@ -34,6 +34,10 @@ Supported field types:
     - "spinbox"   -> QSpinBox (optional "min", "max", "default")
     - "textarea"  -> QPlainTextEdit
     - "file"      -> QLineEdit + Browse button (optional "filter", e.g. "Styles (*.sld)")
+    - "image"     -> QLabel showing a picture set later with
+                     set_image(key, pixmap, text); "placeholder" is shown until
+                     then and "max_height" caps the picture (default 240). It is
+                     never a value: get_values() skips it.
 
 Field options:
     - key (str): identifier used in get_values()
@@ -54,6 +58,7 @@ Field options:
 """
 
 from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtGui import QPixmap
 from qgis.PyQt.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -308,6 +313,16 @@ class ResourceFormDialog(QDialog):
                 container.setEnabled(False)
             return container
 
+        if ftype == "image":
+            w = QLabel(field.get("placeholder", ""))
+            w.setWordWrap(True)
+            w.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+            w.setMaximumHeight(field.get("max_height", 240))
+            # The text states (placeholder, explanation) read as hints; a
+            # pixmap ignores the colour.
+            w.setStyleSheet(f"color: {hint_colour(self.palette())};")
+            return w
+
         # Fallback to text
         w = QLineEdit()
         if value:
@@ -322,6 +337,8 @@ class ResourceFormDialog(QDialog):
             widget = self._widgets[key]
             ftype = field.get("type", "text")
 
+            if ftype == "image":
+                continue  # a picture, not a value
             if ftype == "text":
                 result[key] = widget.text().strip()
             elif ftype == "checkbox":
@@ -352,6 +369,21 @@ class ResourceFormDialog(QDialog):
             self._hidden_keys.discard(key)
         else:
             self._hidden_keys.add(key)
+
+    def set_image(self, key, pixmap, text=""):
+        """Show a picture in an "image" field — or, without one, the text that
+        says why there is none. Painting a label, it is safe after close."""
+        label = self._widgets[key]
+        if pixmap is None or pixmap.isNull():
+            label.setPixmap(QPixmap())
+            label.setText(text)
+            return
+        if pixmap.height() > label.maximumHeight():
+            pixmap = pixmap.scaledToHeight(
+                label.maximumHeight(), Qt.TransformationMode.SmoothTransformation
+            )
+        label.setPixmap(pixmap)
+        label.setToolTip(text)
 
     def get_widget(self, key):
         """Return the widget for a field by key.

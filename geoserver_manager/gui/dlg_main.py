@@ -818,7 +818,11 @@ class GeoServerMainDialog(
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(2, 0, 2, 0)
         layout.setSpacing(4)
-        for icon_name, tooltip, callback in self._row_actions:
+        for action in self._row_actions:
+            icon_name, label, callback = action[:3]
+            # An optional fourth element says more than the label can — the
+            # button is icon-only, so the tooltip is all the user reads.
+            tooltip = action[3] if len(action) > 3 else label
             btn = QPushButton()
             btn.setIcon(QIcon(QgsApplication.iconPath(icon_name)))
             btn.setToolTip(tooltip)

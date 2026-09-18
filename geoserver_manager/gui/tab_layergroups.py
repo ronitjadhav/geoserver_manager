@@ -58,6 +58,16 @@ class LayerGroupTabMixin:
                 self._add_group_to_qgis,
             ),
             (
+                "mIconWms.svg",
+                translate("LayerGroupTabMixin", "Preview in a browser"),
+                self._preview_group_in_browser,
+                translate(
+                    "LayerGroupTabMixin",
+                    "Preview in a browser — GeoServer's own OpenLayers page. A "
+                    "secured server will ask the browser to log in.",
+                ),
+            ),
+            (
                 "mActionDeleteSelected.svg",
                 translate("LayerGroupTabMixin", "Delete"),
                 self._delete_layer_group,
@@ -541,6 +551,34 @@ class LayerGroupTabMixin:
                     "LayerGroupTabMixin", "'{}' added to the project as WMS."
                 ).format(name)
             )
+
+    def _preview_group_in_browser(self, row_data):
+        """Open GeoServer's own preview of the group, on its bounds.
+
+        The URL builder is LayerTabMixin._preview_url, reached through the
+        dialog class like _layer_uri; a global group has no workspace in the
+        path and no prefix on its name.
+        """
+        name, workspace_name = row_data[0], scope(row_data[1])
+        detail = self._fetch(
+            lambda: self._group_detail(name, workspace_name),
+            translate("LayerGroupTabMixin", "Failed to load layer group '{}'").format(
+                name
+            ),
+        )
+        if detail is None:
+            return
+        bbox, srs = self._bbox_from(detail.get("bounds"))
+        qualified = f"{workspace_name}:{name}" if workspace_name else name
+        self._open_in_browser(
+            self._preview_url(
+                self.plg_settings.get_plg_settings().geoserver_url,
+                qualified,
+                bbox,
+                srs,
+                workspace=workspace_name,
+            )
+        )
 
     # -- Delete ----------------------------------------------------------------
 

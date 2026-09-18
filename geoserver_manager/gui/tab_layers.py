@@ -6,8 +6,11 @@ Layers tab — list, view and delete feature types.
 Used as a mixin for GeoServerMainDialog.
 """
 
+from urllib.parse import urlencode
+
 from qgis.core import Qgis, QgsDataSourceUri, QgsProject, QgsRasterLayer, QgsVectorLayer
-from qgis.PyQt.QtCore import QCoreApplication
+from qgis.PyQt.QtCore import QCoreApplication, QUrl
+from qgis.PyQt.QtGui import QDesktopServices
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
@@ -29,6 +32,8 @@ _SOURCE_FIELDS = {
     _SOURCE_QGIS: ("qgis_layer", "name", "replace", "with_style"),
 }
 _WMTS_TILE_MATRIX_SET = "EPSG:900913"
+# GeoServer's own Layer Preview page renders at 768 px on the long side.
+_PREVIEW_SIZE = 768
 
 
 # Every user-visible string in this file goes through translate() with this
@@ -63,6 +68,16 @@ class LayerTabMixin:
                 "mActionAddLayer.svg",
                 translate("LayerTabMixin", "Add to QGIS"),
                 self._add_layer_to_qgis,
+            ),
+            (
+                "mIconWms.svg",
+                translate("LayerTabMixin", "Preview in a browser"),
+                self._preview_layer_in_browser,
+                translate(
+                    "LayerTabMixin",
+                    "Preview in a browser — GeoServer's own OpenLayers page. A "
+                    "secured server will ask the browser to log in.",
+                ),
             ),
             (
                 "mActionStyleManager.svg",
@@ -944,6 +959,92 @@ class LayerTabMixin:
                 uri.setAuthConfigId(authcfg)
             return (uri.uri(False), "WFS")
         raise ValueError(f"Unknown protocol: {protocol}")
+
+    # -- Preview in a browser --------------------------------------------------
+
+    @staticmethod
+    def _bbox_from(box):
+        """((minx, miny, maxx, maxy), crs) from a GeoServer bounding box, else
+        (None, None) when it is missing or incomplete."""
+        box = box or {}
+        if not {"minx", "miny", "maxx", "maxy"} <= set(box):
+            return None, None
+        try:
+            bbox = tuple(float(box[key]) for key in ("minx", "miny", "maxx", "maxy"))
+        except (TypeError, ValueError):
+            return None, None
+        crs = box.get("crs")
+        if isinstance(crs, dict):
+            # A projected CRS comes as {"@class": "projected", "$": "EPSG:…"}.
+            crs = crs.get("$")
+        return bbox, str(crs or "EPSG:4326")
+
+    @staticmethod
+    def _preview_url(base_url, qualified_name, bbox=None, srs=None, workspace=None):
+        """GeoServer's own OpenLayers preview page for a layer or a layer group.
+
+        A URL for the browser, not a request from the plugin — the browser's
+        session is not the plugin's, so a secured server asks it to log in.
+        Without a usable bbox the map opens on the world. 768 px on the long
+        side and the other from the bbox's aspect, as GeoServer's own Layer
+        Preview page computes them.
+        """
+        base = base_url.rstrip("/")
+        service = f"{base}/{workspace}/wms" if workspace else f"{base}/wms"
+        if not bbox or bbox[2] <= bbox[0] or bbox[3] <= bbox[1]:
+            bbox, srs = (-180.0, -90.0, 180.0, 90.0), "EPSG:4326"
+        width = height = _PREVIEW_SIZE
+        ratio = (bbox[3] - bbox[1]) / (bbox[2] - bbox[0])
+        if ratio <= 1:
+            height = max(1, round(_PREVIEW_SIZE * ratio))
+        else:
+            width = max(1, round(_PREVIEW_SIZE / ratio))
+        query = urlencode(
+            {
+                "service": "WMS",
+                "version": "1.1.0",
+                "request": "GetMap",
+                "layers": qualified_name,
+                "bbox": ",".join(str(value) for value in bbox),
+                "width": width,
+                "height": height,
+                "srs": srs or "EPSG:4326",
+                "styles": "",
+                "format": "application/openlayers",
+            },
+            safe=":/,",
+        )
+        return f"{service}?{query}"
+
+    def _open_in_browser(self, url):
+        """Hand a URL to the system browser; say so when nothing opens."""
+        if not QDesktopServices.openUrl(QUrl(url)):
+            self.show_warning_message(
+                translate("LayerTabMixin", "Could not open a browser for {}").format(
+                    url
+                )
+            )
+
+    def _preview_layer_in_browser(self, row_data):
+        """Open GeoServer's own preview of the layer, on its extent."""
+        name, ws_name, ds_name = row_data[0], row_data[1], row_data[2]
+        detail = self._fetch(
+            lambda: self._check(self.gs.get_feature_type(ws_name, ds_name, name)),
+            translate("LayerTabMixin", "Failed to load layer details"),
+        )
+        if detail is None:
+            return
+        detail = detail if isinstance(detail, dict) else {}
+        bbox, srs = self._bbox_from(detail.get("latLonBoundingBox"))
+        self._open_in_browser(
+            self._preview_url(
+                self.plg_settings.get_plg_settings().geoserver_url,
+                f"{ws_name}:{name}",
+                bbox,
+                srs,
+                workspace=ws_name,
+            )
+        )
 
     def _add_layer_to_qgis(self, row_data):
         """Ask which protocol, then add the layer to the current QGIS project."""

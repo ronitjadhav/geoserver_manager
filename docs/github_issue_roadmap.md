@@ -56,6 +56,7 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
       from the Layers tab: upload and assign)
 - [x] Apply a server style to a QGIS project layer
 - [x] Save a style to disk as `.sld`
+- [x] Legend preview for a style (GetLegendGraphic, rendered by GeoServer)
 
 ## Layer Groups
 
@@ -110,6 +111,7 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 
 ## Layer Preview
 
+- [x] Preview a layer in a browser (GeoServer's OpenLayers page)
 - [ ] Embedded OpenLayers map preview of WMS layers
 - [ ] GetFeatureInfo on click
 

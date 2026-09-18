@@ -563,3 +563,22 @@ class TestSortableColumns(unittest.TestCase):
         self.assertEqual(self.dlg._current_page, 1)
         self.click(0)
         self.assertEqual(self.dlg._current_page, 0)
+
+
+class TestRowActionTooltips(unittest.TestCase):
+    """A fourth element in a row action is its tooltip; without one, the label."""
+
+    def test_tooltip_defaults_to_the_label_and_can_say_more(self):
+        from qgis.PyQt.QtWidgets import QPushButton
+
+        dlg = SyncDialog()
+        dlg._row_actions = [
+            ("a.svg", "Delete", lambda row: None),
+            ("b.svg", "Preview", lambda row: None, "Preview — the browser may ask"),
+        ]
+        widget = dlg._make_action_widget(["row"])
+        buttons = widget.findChildren(QPushButton)
+        self.assertEqual(
+            [button.toolTip() for button in buttons],
+            ["Delete", "Preview — the browser may ask"],
+        )

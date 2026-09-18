@@ -33,6 +33,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   same request. Title and abstract go on the coverage, *Replace* overwrites an
   existing store. The coverage viewer now shows a coverage's abstract rather
   than GeoServer's "Generated from …" note when both exist.
+- **Preview in a browser** on the Layers and Layer Groups tabs: opens
+  GeoServer's own OpenLayers page for the layer, framed on its extent. It is
+  the browser's session, not the plugin's, so a secured server asks it to log
+  in — the tooltip says so.
+- **Legend in the style dialog**: the picture GeoServer renders for the style
+  (GetLegendGraphic), fetched in the background while the dialog is open; a
+  problem is explained in its place instead of a broken image.
 - **Test connection** in Settings: tries the URL and credentials as typed,
   without saving them, and reports the outcome in the same words the main
   dialog uses. The URL placeholder is a plain `http://localhost:8080/geoserver`.

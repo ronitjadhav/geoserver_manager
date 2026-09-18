@@ -39,7 +39,9 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
 - **A loader** sets up the header buttons, `_name_click_callback`, `_extra_click_callbacks`,
   `_row_actions`, calls `_setup_table(columns)` — and then hands a fetch function to
   `_start_load(failure_message, fetch)` and returns. Rows are plain lists of display strings;
-  column 0 is the resource name.
+  column 0 is the resource name. A `_row_actions` entry is `(icon, label, callback)`, plus an
+  optional fourth element when the icon-only button's tooltip must say more than the label
+  (the browser preview's login note).
 - **Loads run off the GUI thread.** `_start_load` wraps the fetch in a `_FetchTask` (a
   `QgsTask`), so `_load_x()` returns before a single row exists: QGIS's task bar shows the
   progress, *Refresh* turns into *Cancel*, and `finished()` comes back on the GUI thread to
@@ -136,6 +138,18 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   minutes (row 20 of #50). `verifytls` is the *Verify the server's TLS certificate* setting (default on);
   it catches `requests.exceptions.SSLError` before `OSError` so a private-CA server is reported as a
   certificate problem, not as "is the server running?".
+- **Legend and browser preview** (#50): `get_legend_graphic()` is a plain GET through the REST client —
+  stateless, so worker-safe — but it returns the raw `Response`: an OGC exception is **HTTP 200 with an
+  XML body**, so the content type decides, and it runs with the client's 120 s timeout. GetLegendGraphic
+  needs a `LAYER` even for a stored style; the layer only supplies the rendering context, so
+  `tab_styles.py` takes one from the global `/rest/layers.json` (the facade has no `get_layers()` and
+  `RestEndpoints` no path for it — its `layers()` / `layer()` are GeoWebCache's), preferring the
+  style's own workspace, and explains
+  in the `image` field when there is none. The legend lands through `_run_in_task` into a modal dialog
+  that may already be closed — the landing checks `finished` and `sip.isdeleted` first. *Preview in a
+  browser* is GeoServer's own OpenLayers GetMap page, built by the pure `_preview_url` from
+  `latLonBoundingBox` (a group: its `bounds`) with a world fallback; the browser's session is not the
+  plugin's, so a secured server asks it to log in, which the tooltip says.
 - **Thread safety:** the REST methods are stateless `requests.*` calls and are safe to run through
   `_fan_out` (the datastore list does this). `self.wms` / `self.wmts` on the client are shared state —
   OWS calls must not be fanned out the same way.

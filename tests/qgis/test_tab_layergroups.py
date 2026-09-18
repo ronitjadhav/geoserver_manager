@@ -456,3 +456,63 @@ class TestDeleteAndAddToQgis(unittest.TestCase):
 # ################################
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPreviewInBrowser(unittest.TestCase):
+    """The group's own bounds, global groups without a prefix."""
+
+    def setUp(self):
+        class Settings:
+            geoserver_url = "http://gs/geoserver"
+
+        class PlgSettings:
+            def get_plg_settings(inner):
+                return Settings()
+
+        self.dlg = SyncDialog()
+        self.dlg.gs = FakeGS()
+        self.dlg.plg_settings = PlgSettings()
+        self.dlg.show_error_message = lambda text: self.fail(f"unexpected: {text}")
+
+    def opened(self, row):
+        from geoserver_manager.gui import tab_layers
+
+        urls = []
+        with patch.object(
+            tab_layers.QDesktopServices,
+            "openUrl",
+            lambda url: urls.append(url.toString()) or True,
+        ):
+            self.dlg._preview_group_in_browser(row)
+        return urls
+
+    def test_a_global_group_previews_without_a_prefix(self):
+        (url,) = self.opened(["tasmania", GLOBAL, "SINGLE", "2"])
+        self.assertTrue(url.startswith("http://gs/geoserver/wms?"), url)
+        self.assertIn("layers=tasmania&", url)
+
+    def test_a_workspace_group_goes_through_its_virtual_service(self):
+        (url,) = self.opened(["roads_group", "topp", "CONTAINER", "1"])
+        self.assertTrue(url.startswith("http://gs/geoserver/topp/wms?"), url)
+        self.assertIn("layers=topp:roads_group", url)
+
+    def test_the_groups_own_bounds_frame_the_map(self):
+        self.dlg._group_detail = lambda name, ws: {
+            "bounds": {
+                "minx": 143.0,
+                "miny": -44.0,
+                "maxx": 149.0,
+                "maxy": -40.0,
+                "crs": "EPSG:4326",
+            }
+        }
+        (url,) = self.opened(["tasmania", GLOBAL, "SINGLE", "2"])
+        self.assertIn("bbox=143.0,-44.0,149.0,-40.0", url)
+        self.assertIn("width=768&height=512", url)
+
+    def test_the_action_is_offered_and_explains_the_login(self):
+        self.dlg.show_warning_message = lambda t: None
+        self.dlg._load_layer_groups()
+        labels = [action[1] for action in self.dlg._row_actions]
+        self.assertEqual(labels, ["Add to QGIS", "Preview in a browser", "Delete"])
+        self.assertIn("log in", self.dlg._row_actions[1][3])

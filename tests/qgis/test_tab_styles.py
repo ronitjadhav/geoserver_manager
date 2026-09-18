@@ -559,3 +559,198 @@ class TestSaveStyleToDisk(unittest.TestCase):
 # ################################
 if __name__ == "__main__":
     unittest.main()
+
+
+# ############################################################################
+# ###### Legend preview ##########
+# ################################
+
+EXCEPTION_XML = (
+    '<?xml version="1.0" encoding="UTF-8"?>'
+    '<ServiceExceptionReport version="1.1.1"><ServiceException code="StyleNotDefined">'
+    "\n      No such style: nope\n</ServiceException></ServiceExceptionReport>"
+)
+
+
+def png_bytes():
+    """A real PNG, made by Qt itself."""
+    from qgis.PyQt.QtCore import QBuffer, QIODevice
+    from qgis.PyQt.QtGui import QPixmap
+
+    pixmap = QPixmap(3, 2)
+    pixmap.fill()
+    buffer = QBuffer()
+    buffer.open(QIODevice.OpenModeFlag.WriteOnly)
+    pixmap.save(buffer, "PNG")
+    return bytes(buffer.data())
+
+
+class LegendFakeGS(FakeGS):
+    """Published layers to draw with, and a GetLegendGraphic that answers a PNG
+    or an OGC exception (HTTP 200 with XML, as GeoServer does)."""
+
+    def __init__(self, layers=("tiger:poi", "topp:states"), exception=None):
+        super().__init__()
+        self.layers = list(layers)
+        self.exception = exception
+        self.legend_calls = []
+        outer = self
+
+        class Response:
+            status_code = 200
+            content = SLD.encode()
+
+            def __init__(inner, payload=None):
+                inner._payload = payload or {}
+
+            def json(inner):
+                return inner._payload
+
+        class Client:
+            def get(inner, path, **kwargs):
+                outer.calls.append(("GET", path, kwargs))
+                if path == "/rest/layers.json":
+                    layer = [{"name": name} for name in outer.layers]
+                    return Response({"layers": {"layer": layer} if layer else ""})
+                return Response()
+
+        class Endpoints(type(self.rest_service.rest_endpoints)):
+            base_url = "/rest"  # the real one has no layers path, only base_url
+
+        self.rest_service.rest_client = Client()
+        self.rest_service.rest_endpoints = Endpoints()
+
+    def get_legend_graphic(
+        self, layer, format="image/png", language=None, style=None, workspace_name=None
+    ):
+        self.legend_calls.append((layer, style, workspace_name))
+
+        class Legend:
+            pass
+
+        response = Legend()
+        if self.exception:
+            response.headers = {
+                "Content-Type": "application/vnd.ogc.se_xml;charset=UTF-8"
+            }
+            response.text = self.exception
+            response.content = self.exception.encode()
+        else:
+            response.headers = {"Content-Type": "image/png"}
+            response.text = ""
+            response.content = png_bytes()
+        return response
+
+
+class TestImageField(unittest.TestCase):
+    """The form dialog's 'image' type: a picture set later, never a value."""
+
+    def dialog(self):
+        return ResourceFormDialog(
+            title="t",
+            fields=[
+                {
+                    "key": "legend",
+                    "label": "Legend",
+                    "type": "image",
+                    "placeholder": "Loading…",
+                    "max_height": 100,
+                },
+                {"key": "name", "label": "Name", "type": "text"},
+            ],
+        )
+
+    def test_placeholder_then_a_picture_scaled_to_the_cap(self):
+        from qgis.PyQt.QtGui import QPixmap
+
+        dlg = self.dialog()
+        label = dlg.get_widget("legend")
+        self.assertEqual(label.text(), "Loading…")
+        tall = QPixmap(20, 300)
+        tall.fill()
+        dlg.set_image("legend", tall)
+        self.assertEqual(label.text(), "")
+        self.assertEqual(label.pixmap().height(), 100)
+
+    def test_no_picture_means_an_explanation(self):
+        dlg = self.dialog()
+        dlg.set_image("legend", None, "No such style")
+        self.assertEqual(dlg.get_widget("legend").text(), "No such style")
+
+    def test_it_is_not_a_value(self):
+        dlg = self.dialog()
+        dlg.get_widget("name").setText("x")
+        self.assertEqual(dlg.get_values(), {"name": "x"})
+
+
+class TestLegendPreview(unittest.TestCase):
+    """The style dialog shows the legend GeoServer renders, a layer as context."""
+
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.dlg.gs = LegendFakeGS()
+        self.dlg.show_error_message = lambda t: self.fail(f"unexpected error: {t}")
+        self.dlg.show_warning_message = lambda t: None
+        Recording.opened.clear()
+
+    def test_a_layer_of_the_styles_workspace_first_then_any(self):
+        self.assertEqual(self.dlg._legend_layer("topp"), "topp:states")
+        self.assertEqual(self.dlg._legend_layer("nurc"), "tiger:poi")
+        self.assertEqual(self.dlg._legend_layer(None), "tiger:poi")
+        self.dlg.gs = LegendFakeGS(layers=())
+        self.assertIsNone(self.dlg._legend_layer("topp"))
+
+    def test_the_legend_lands_in_the_open_dialog(self):
+        with patch.object(tab_styles, "ResourceFormDialog", Recording):
+            self.dlg._show_style_info(["roads_style", "topp"])
+        label = Recording.opened[0].get_widget("legend")
+        self.assertIsNotNone(label.pixmap())
+        self.assertFalse(label.pixmap().isNull())
+        self.assertEqual(
+            self.dlg.gs.legend_calls, [("topp:states", "topp:roads_style", None)]
+        )
+
+    def test_a_global_style_is_asked_for_by_its_bare_name(self):
+        with patch.object(tab_styles, "ResourceFormDialog", Recording):
+            self.dlg._show_style_info(["population", GLOBAL])
+        self.assertEqual(self.dlg.gs.legend_calls, [("tiger:poi", "population", None)])
+
+    def test_an_ogc_exception_becomes_a_sentence_not_a_broken_picture(self):
+        self.dlg.gs = LegendFakeGS(exception=EXCEPTION_XML)
+        with patch.object(tab_styles, "ResourceFormDialog", Recording):
+            self.dlg._show_style_info(["population", GLOBAL])
+        label = Recording.opened[0].get_widget("legend")
+        self.assertIn("No such style: nope", label.text())
+
+    def test_no_layer_at_all_is_explained_without_asking(self):
+        self.dlg.gs = LegendFakeGS(layers=())
+        with patch.object(tab_styles, "ResourceFormDialog", Recording):
+            self.dlg._show_style_info(["population", GLOBAL])
+        label = Recording.opened[0].get_widget("legend")
+        self.assertIn("No published layer", label.text())
+        self.assertEqual(self.dlg.gs.legend_calls, [])
+
+    def test_a_dialog_closed_or_gone_before_the_legend_lands_is_left_alone(self):
+        from qgis.PyQt import sip
+
+        captured = {}
+
+        class Capturing(SyncDialog):
+            def _run_in_task(self, failure_message, work, on_success):
+                captured["work"], captured["landed"] = work, on_success
+
+        dlg = Capturing()
+        dlg.gs = LegendFakeGS()
+        form = ResourceFormDialog(title="t", fields=dlg._style_fields(False))
+        dlg._load_legend(form, "population", None)
+        form.reject()  # closed before the picture arrives
+        captured["landed"](captured["work"](None))
+        self.assertEqual(
+            form.get_widget("legend").text(), "Asking GeoServer for the legend…"
+        )
+
+        form = ResourceFormDialog(title="t", fields=dlg._style_fields(False))
+        dlg._load_legend(form, "population", None)
+        result = captured["work"](None)
+        sip.delete(form)  # the C++ dialog is gone
+        captured["landed"](result)  # must not raise
