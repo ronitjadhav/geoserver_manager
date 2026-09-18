@@ -138,7 +138,7 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   minutes (row 20 of #50). `verifytls` is the *Verify the server's TLS certificate* setting (default on);
   it catches `requests.exceptions.SSLError` before `OSError` so a private-CA server is reported as a
   certificate problem, not as "is the server running?".
-- **Legend and browser preview** (#50): `get_legend_graphic()` is a plain GET through the REST client —
+- **Legend and browser preview** (rows 39–40 of #50): `get_legend_graphic()` is a plain GET through the REST client —
   stateless, so worker-safe — but it returns the raw `Response`: an OGC exception is **HTTP 200 with an
   XML body**, so the content type decides, and it runs with the client's 120 s timeout. GetLegendGraphic
   needs a `LAYER` even for a stored style; the layer only supplies the rendering context, so
@@ -204,7 +204,7 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   Two GeoServer facts the tab depends on: a grid range's `high` is the **exclusive** bound (size = high − low,
   checked against gdalinfo), and store metadata GeoServer does not understand — `CogSettings.Key` without the
   COG extension — is dropped silently, so the create warns when it comes back missing.
-- **Cascaded WMS / WMTS stores** (the cascaded-store rows of #50): the library creates, gets and deletes a
+- **Cascaded WMS / WMTS stores** (rows 33–38 of #50): the library creates, gets and deletes a
   WMS store and its layers, and creates and deletes a WMTS store, but **lists nothing** — no store
   listing per workspace, no cascaded-layer listing (`get_wms_layers()` is this GeoServer's own
   capabilities), no WMTS getter or layer delete — so `tab_cascaded.py` GETs the collections itself.

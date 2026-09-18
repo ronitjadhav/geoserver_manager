@@ -79,6 +79,24 @@ or an ImageMosaic (a server directory, or a properties ZIP to upload). The
 pixels, bounds, bands — and *Publish a coverage* makes one of them a layer,
 with a title, an abstract, keywords and the layer name.
 
+The fifth source, **A raster layer from this QGIS project**, publishes a raster
+of the open project: it is written to a tiled, compressed GeoTIFF (or sent as
+it is when the layer already is a plain local GeoTIFF) and uploaded, and
+GeoServer creates the store, the coverage and the layer in that one request.
+Tick *Replace it if it already exists* to overwrite a previous upload. Large
+rasters block the dialog for the duration of the upload.
+
+## Cascaded stores
+
+The WMS and WMTS stores that proxy another server, listed across every
+workspace with their type and capabilities URL. *Add a Cascaded Store*: type,
+workspace, name and the remote GetCapabilities URL. Row actions: **Cascaded
+layers** (the layers already published from this store, with their details
+and a delete), **Publish a layer** (pick one of the layers the remote
+advertises, under its own name or one of yours — GeoServer reads title, SRS
+and bounds from the remote capabilities), **Delete**. The remote server is
+never touched.
+
 ## Layers
 
 Every published layer, with its workspace, datastore, SRS and default style.
@@ -100,14 +118,17 @@ Row actions: **Add to QGIS** (*Load as* WMS, WFS or WMTS — the credentials
 travel as a QGIS authentication configuration, so a saved project never
 contains a password), **Set style** (pick the default style among the server's
 styles), **Style from QGIS** (upload the matching project layer's symbology
-and make it the default), **Delete**.
+and make it the default), **Preview in a browser** (GeoServer's own OpenLayers
+page, framed on the layer's extent — the browser's session is not the
+plugin's, so a secured server asks it to log in), **Delete**.
 
 ## Layer groups
 
 Global groups and per-workspace groups; the *Workspace* column shows
 `(global)` for the former. *Create a Layer Group*: name, title, abstract,
 mode, then the layers in order (*Add a layer* appends one, with its style);
-GeoServer computes the bounds. **Add to QGIS** loads the group as a WMS layer.
+GeoServer computes the bounds. **Add to QGIS** loads the group as a WMS layer; **Preview in a browser** opens
+it on GeoServer's OpenLayers page.
 The detail dialog is read-only: to change a group, create it again or delete
 it.
 
@@ -118,7 +139,9 @@ Global and per-workspace styles, with their format and SLD version.
 **From file** (`.sld`, a `.zip` with an SLD and its resources, `.mbstyle`), or
 **From a QGIS layer** — the project layer's symbology exported as SLD 1.1.
 Click a name to view and modify the definition (GeoServer shows a stored
-SLD 1.1 document in its 1.0 rendition; the editor says so).
+SLD 1.1 document in its 1.0 rendition; the editor says so), next to the legend
+GeoServer renders for the style — fetched while the dialog is open, with a
+problem explained in its place rather than a broken image.
 
 Row actions: **Apply to a QGIS layer** (pick a project layer and get the
 server's style on it), **Save as SLD** (to disk), **Delete** — GeoServer refuses

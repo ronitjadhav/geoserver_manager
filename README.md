@@ -1,9 +1,10 @@
 # GeoServer Manager — QGIS Plugin
 
 Manage a GeoServer from inside QGIS. Browse, create, edit and delete
-workspaces, datastores, coverage stores, layers, layer groups and styles;
-publish a table or a layer of the open project; bring what the server has back
-into QGIS as WMS, WFS or WMTS — without switching to the GeoServer web admin.
+workspaces, datastores, coverage stores, cascaded WMS/WMTS stores, layers, layer
+groups and styles; publish a table, or a vector or raster layer of the open
+project; bring what the server has back into QGIS as WMS, WFS or WMTS — without
+switching to the GeoServer web admin.
 
 Built on [`python-geoservercloud`](https://github.com/camptocamp/python-geoservercloud):
 every request goes through the library, and what the library cannot do yet is
@@ -24,10 +25,11 @@ so that it gets added there rather than worked around here.
 | :-- | :-------------- |
 | Workspaces | list (the default workspace is marked), create, rename, toggle isolation, set as default, edit the workspace's WMS service settings (title, abstract, keywords, SRS list, …), delete |
 | Datastores | list across every workspace; create PostGIS, PostGIS (JNDI), Shapefile, directory of shapefiles, GeoPackage or PMTiles stores — or any other type through a `key = value` parameter editor; edit (only the fields you change are sent), delete |
-| Coverage stores | list, create from a GeoTIFF, a COG or an ImageMosaic, browse the coverages of a store, publish a coverage as a layer, delete |
-| Layers | list with type, store, SRS and default style; publish a table of a datastore, or a layer of the open QGIS project — uploaded as a GeoPackage together with its symbology; change the default style, including one made from a QGIS layer's symbology; add to QGIS as WMS, WFS or WMTS; delete |
-| Layer groups | list global and workspace groups, create (ordered layers with their styles), inspect, add to QGIS, delete |
-| Styles | list global and workspace styles; create by pasting an SLD, from a file (`.sld`, a `.zip` with its resources, `.mbstyle`) or from a QGIS layer's symbology; view and edit the SLD; apply a server style to a QGIS layer; save it to disk; delete |
+| Coverage stores | list, create from a GeoTIFF, a COG or an ImageMosaic — or from a raster layer of the open QGIS project, uploaded as a compressed GeoTIFF and published in the same request; browse the coverages of a store, publish a coverage as a layer, delete |
+| Cascaded stores | the WMS and WMTS stores that proxy another server, listed across every workspace; create one from a GetCapabilities URL, publish the layers the remote advertises, inspect and delete them, delete the store |
+| Layers | list with type, store, SRS and default style; publish a table of a datastore, or a layer of the open QGIS project — uploaded as a GeoPackage together with its symbology; change the default style, including one made from a QGIS layer's symbology; add to QGIS as WMS, WFS or WMTS; preview in a browser on GeoServer's own OpenLayers page; delete |
+| Layer groups | list global and workspace groups, create (ordered layers with their styles), inspect, add to QGIS, preview in a browser, delete |
+| Styles | list global and workspace styles; create by pasting an SLD, from a file (`.sld`, a `.zip` with its resources, `.mbstyle`) or from a QGIS layer's symbology; view and edit the SLD next to the legend GeoServer renders for it; apply a server style to a QGIS layer; save it to disk; delete |
 
 Every list is searchable, sortable by column and paginated (20 per page), and
 loads in the background — QGIS stays usable, and *Cancel* stops a slow one.

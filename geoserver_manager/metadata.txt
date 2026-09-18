@@ -1,6 +1,6 @@
 [general]
 name=GeoServer Manager
-about=Browse, create, edit and delete workspaces, datastores, coverage stores, layers, layer groups and styles on a GeoServer; publish a table or a layer of the open project; bring layers and styles back into QGIS as WMS, WFS or WMTS. Lists load in the background and are searchable, sortable and paginated. Credentials are kept in the QGIS authentication database. Built on python-geoservercloud.
+about=Browse, create, edit and delete workspaces, datastores, coverage stores, cascaded WMS/WMTS stores, layers, layer groups and styles on a GeoServer; publish a table, or a vector or raster layer of the open project; bring layers and styles back into QGIS as WMS, WFS or WMTS. Lists load in the background and are searchable, sortable and paginated. Credentials are kept in the QGIS authentication database. Built on python-geoservercloud.
 category=Web
 hasProcessingProvider=False
 description=Manage a GeoServer from QGIS: workspaces, stores, layers, layer groups and styles — browse, create, edit, delete and publish
