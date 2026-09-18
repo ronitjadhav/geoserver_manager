@@ -481,20 +481,18 @@ class TestUnsupportedTypeDialog(unittest.TestCase):
         dlg = SyncDialog()
         dlg.gs = FakeGS()
         with patch.object(tab_datastores, "ResourceFormDialog", Recording):
-            dlg._show_datastore_info(
-                ["cascaded", "topp", "Web Feature Server (NG)", "True"]
-            )
+            dlg._show_datastore_info(["legacy", "topp", "Oracle NG", "True"])
 
         self.assertEqual(len(opened), 1)
         form = opened[0]
         combo = form.get_widget("type")
-        self.assertEqual(combo.currentText(), "Web Feature Server (NG)")
+        self.assertEqual(combo.currentText(), "Oracle NG")
         self.assertFalse(combo.isEnabled())
         for key in ("pg_host", "pg_password", "jndi_reference", "pmtiles_url"):
             self.assertIn(key, form._hidden_keys)
         self.assertNotIn("raw_params", form._hidden_keys)
         editor = form.get_widget("raw_params")
-        self.assertIn("WFSDataStoreFactory:GET_CAPABILITIES_URL", editor.toPlainText())
+        self.assertIn("host = oracle.example.org", editor.toPlainText())
         self.assertFalse(editor.isReadOnly())  # it is an editor, not a view
         save = form._button_box.button(QDialogButtonBox.StandardButton.Ok)
         self.assertFalse(save.isHidden())  # any type can be saved now
