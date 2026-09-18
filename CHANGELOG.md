@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Shapefile, directory-of-shapefiles and GeoPackage datastores have their own
+  form**, next to PostGIS: a path on the server, the attribute charset, the
+  spatial-index flag, and for a GeoPackage its read-only and expose-primary-keys
+  switches. Creating and editing them was possible before only through the
+  `key = value` editor. An edit still merges onto the parameters GeoServer
+  holds, so a namespace, fetch size or memory-mapping setting the form does not
+  show survives it.
 - Saving credentials for a plain-HTTP server now says that the password
   travels unencrypted, and suggests `https://`. It saves them anyway — a
   server on a trusted network is a legitimate setup — and stays quiet for

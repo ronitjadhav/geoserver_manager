@@ -20,6 +20,8 @@ from qgis.testing import start_app, unittest
 
 # project
 from geoserver_manager.gui.dlg_main import GeoServerMainDialog
+from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.gui.tab_datastores import DatastoreTabMixin
 from tests.qgis.sync_dialog import SyncDialog
 
 start_app()
@@ -464,9 +466,17 @@ class TestUnsupportedTypeDialog(unittest.TestCase):
             def get_datastore(inner, ws, ds):
                 return (
                     {
-                        "type": "Shapefile",
+                        # A type the form has no dedicated fields for: those
+                        # are what the generic editor is for.
+                        "type": "Web Feature Server (NG)",
                         "enabled": True,
-                        "connectionParameters": {"entry": {"url": "file:x.shp"}},
+                        "connectionParameters": {
+                            "entry": {
+                                "WFSDataStoreFactory:GET_CAPABILITIES_URL": (
+                                    "http://other/geoserver/wfs?request=GetCapabilities"
+                                )
+                            }
+                        },
                     },
                     200,
                 )
@@ -474,18 +484,20 @@ class TestUnsupportedTypeDialog(unittest.TestCase):
         dlg = SyncDialog()
         dlg.gs = FakeGS()
         with patch.object(tab_datastores, "ResourceFormDialog", Recording):
-            dlg._show_datastore_info(["taz_shapes", "topp", "Shapefile", "True"])
+            dlg._show_datastore_info(
+                ["cascaded", "topp", "Web Feature Server (NG)", "True"]
+            )
 
         self.assertEqual(len(opened), 1)
         form = opened[0]
         combo = form.get_widget("type")
-        self.assertEqual(combo.currentText(), "Shapefile")
+        self.assertEqual(combo.currentText(), "Web Feature Server (NG)")
         self.assertFalse(combo.isEnabled())
         for key in ("pg_host", "pg_password", "jndi_reference", "pmtiles_url"):
             self.assertIn(key, form._hidden_keys)
         self.assertNotIn("raw_params", form._hidden_keys)
         editor = form.get_widget("raw_params")
-        self.assertIn("url = file:x.shp", editor.toPlainText())
+        self.assertIn("WFSDataStoreFactory:GET_CAPABILITIES_URL", editor.toPlainText())
         self.assertFalse(editor.isReadOnly())  # it is an editor, not a view
         save = form._button_box.button(QDialogButtonBox.StandardButton.Ok)
         self.assertFalse(save.isHidden())  # any type can be saved now
@@ -611,27 +623,35 @@ class TestGenericParameterEditor(unittest.TestCase):
 
     def test_editor_is_authoritative_but_keeps_masked_secrets(self):
         stored = {
-            "url": "file:old",
-            "charset": "ISO-8859-1",
-            "passwd": "crypt1:SECRET",
+            "WFSDataStoreFactory:GET_CAPABILITIES_URL": "http://old/wfs",
+            "WFSDataStoreFactory:TIMEOUT": "3000",
+            "WFSDataStoreFactory:PASSWORD": "crypt1:SECRET",
             "obsolete": "x",
         }
-        detail = {"type": "Shapefile", "enabled": False}
+        detail = {"type": "Web Feature Server (NG)", "enabled": False}
         values = {
             "workspace": "topp",
-            "name": "shp",
+            "name": "cascaded",
             "description": "",
-            "raw_params": "url = file:new\ncharset = UTF-8\npasswd = ••••\n",  # 'obsolete' removed
+            "raw_params": (
+                "WFSDataStoreFactory:GET_CAPABILITIES_URL = http://new/wfs\n"
+                "WFSDataStoreFactory:TIMEOUT = 5000\n"
+                "WFSDataStoreFactory:PASSWORD = ••••\n"  # 'obsolete' removed
+            ),
         }
 
         self.dlg._update_datastore_from_values(values, detail, stored)
 
         self.assertEqual(
             self.sent["connection_parameters"],
-            {"url": "file:new", "charset": "UTF-8", "passwd": "crypt1:SECRET"},
+            {
+                "WFSDataStoreFactory:GET_CAPABILITIES_URL": "http://new/wfs",
+                "WFSDataStoreFactory:TIMEOUT": "5000",
+                "WFSDataStoreFactory:PASSWORD": "crypt1:SECRET",
+            },
         )
         self.assertEqual(
-            self.sent["datastore_type"], "Shapefile"
+            self.sent["datastore_type"], "Web Feature Server (NG)"
         )  # server's type, not the combo
         self.assertIs(self.sent["enabled"], False)  # still disabled
 
@@ -639,8 +659,8 @@ class TestGenericParameterEditor(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.dlg._update_datastore_from_values(
                 {"workspace": "w", "name": "n", "raw_params": "no equals here"},
-                {"type": "GeoPackage"},
-                {"database": "x.gpkg"},
+                {"type": "Web Feature Server (NG)"},
+                {"WFSDataStoreFactory:GET_CAPABILITIES_URL": "http://old/wfs"},
             )
         self.assertEqual(self.sent, {})
 
@@ -912,6 +932,298 @@ class TestFanOutProgress(unittest.TestCase):
     def test_without_a_task_nothing_changes(self):
         results = GeoServerMainDialog._fan_out(lambda n: n * 2, [1, 2])
         self.assertEqual(results, [(2, None), (4, None)])
+
+
+# ############################################################################
+# ##### File-based datastores ####
+# ################################
+
+
+class TestFileStoreParams(unittest.TestCase):
+    """The typed fields of a file-based store, as connection parameters."""
+
+    def shapefile(self, **overrides):
+        values = {
+            "file_url": "file:data/shapefiles/states.shp",
+            "charset": "UTF-8",
+            "spatial_index": True,
+        }
+        values.update(overrides)
+        return DatastoreTabMixin._file_store_params("Shapefile", values)
+
+    def test_a_shapefile_carries_its_path_charset_and_index_flag(self):
+        self.assertEqual(
+            self.shapefile(),
+            {
+                "url": "file:data/shapefiles/states.shp",
+                "charset": "UTF-8",
+                "create spatial index": "true",
+            },
+        )
+
+    def test_an_empty_charset_is_left_to_geoserver_rather_than_sent_blank(self):
+        # A blank charset is not the same as "use your default".
+        self.assertNotIn("charset", self.shapefile(charset=""))
+        self.assertNotIn("charset", self.shapefile(charset="   "))
+
+    def test_the_index_flag_is_a_geoserver_style_string_not_a_python_bool(self):
+        self.assertEqual(
+            self.shapefile(spatial_index=False)["create spatial index"], "false"
+        )
+
+    def test_a_directory_store_has_no_index_flag_of_its_own(self):
+        params = DatastoreTabMixin._file_store_params(
+            "Directory of spatial files (shapefiles)",
+            {"file_url": "file:data/taz_shapes", "charset": "", "spatial_index": True},
+        )
+        self.assertEqual(params, {"url": "file:data/taz_shapes"})
+
+    def test_a_geopackage_always_declares_its_dbtype(self):
+        # That parameter is how GeoServer picks the GeoPackage factory.
+        params = DatastoreTabMixin._file_store_params(
+            "GeoPackage",
+            {
+                "gpkg_database": "file:data/ne/natural_earth.gpkg",
+                "gpkg_read_only": True,
+                "gpkg_expose_pk": False,
+            },
+        )
+        self.assertEqual(
+            params,
+            {
+                "database": "file:data/ne/natural_earth.gpkg",
+                "dbtype": "geopkg",
+                "read_only": "true",
+                "Expose primary keys": "false",
+            },
+        )
+
+
+class TestFileStoreCreate(unittest.TestCase):
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.sent = {}
+        outer = self
+
+        class FakeGS:
+            def get_datastore(inner, ws, name):
+                return ("not found", 404)
+
+            def create_datastore(inner, **kwargs):
+                outer.sent.update(kwargs)
+                return ("", 201)
+
+        self.dlg.gs = FakeGS()
+
+    def test_a_shapefile_goes_through_the_librarys_generic_creator(self):
+        self.dlg._create_datastore_from_values(
+            {
+                "workspace": "topp",
+                "name": "states",
+                "type": "Shapefile",
+                "description": "US states",
+                "file_url": "file:data/shapefiles/states.shp",
+                "charset": "ISO-8859-1",
+                "spatial_index": True,
+            }
+        )
+        self.assertEqual(self.sent["datastore_type"], "Shapefile")
+        self.assertEqual(self.sent["workspace_name"], "topp")
+        self.assertEqual(self.sent["description"], "US states")
+        self.assertEqual(
+            self.sent["connection_parameters"]["url"],
+            "file:data/shapefiles/states.shp",
+        )
+
+    def test_a_geopackage_too(self):
+        self.dlg._create_datastore_from_values(
+            {
+                "workspace": "ne",
+                "name": "natural_earth",
+                "type": "GeoPackage",
+                "description": "",
+                "gpkg_database": "file:data/ne/natural_earth.gpkg",
+                "gpkg_read_only": True,
+                "gpkg_expose_pk": False,
+            }
+        )
+        self.assertEqual(self.sent["datastore_type"], "GeoPackage")
+        self.assertEqual(self.sent["connection_parameters"]["dbtype"], "geopkg")
+        self.assertIsNone(self.sent["description"])
+
+    def test_an_existing_name_is_still_refused_first(self):
+        class Taken:
+            def get_datastore(inner, ws, name):
+                return ({"name": name}, 200)
+
+        self.dlg.gs = Taken()
+        with self.assertRaises(ValueError):
+            self.dlg._create_datastore_from_values(
+                {
+                    "workspace": "topp",
+                    "name": "taz_shapes",
+                    "type": "Shapefile",
+                    "file_url": "file:x.shp",
+                    "charset": "",
+                    "spatial_index": False,
+                }
+            )
+
+
+class TestFileStoreEdit(unittest.TestCase):
+    """An edit merges onto the server's map, like every other type."""
+
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.sent = {}
+        outer = self
+
+        class FakeGS:
+            def create_datastore(inner, **kwargs):
+                outer.sent.update(kwargs)
+                return ("", 200)
+
+        self.dlg.gs = FakeGS()
+
+    def test_editing_a_shapefile_keeps_what_the_form_does_not_model(self):
+        stored = {
+            "url": "file:data/old",
+            "charset": "ISO-8859-1",
+            "namespace": "http://www.openplans.org/topp",
+            "memory mapped buffer": "false",
+            "cache and reuse memory maps": "false",
+        }
+        self.dlg._update_datastore_from_values(
+            {
+                "workspace": "topp",
+                "name": "taz_shapes",
+                "description": "",
+                "file_url": "file:data/new",
+                "charset": "UTF-8",
+                "spatial_index": True,
+            },
+            {"type": "Shapefile", "enabled": True},
+            stored,
+        )
+        params = self.sent["connection_parameters"]
+        self.assertEqual(params["url"], "file:data/new")
+        self.assertEqual(params["charset"], "UTF-8")
+        self.assertEqual(params["create spatial index"], "true")
+        # untouched by the form, kept by the merge
+        self.assertEqual(params["namespace"], "http://www.openplans.org/topp")
+        self.assertEqual(params["memory mapped buffer"], "false")
+
+    def test_editing_a_geopackage_keeps_its_tuning_parameters(self):
+        stored = {
+            "database": "file:data/ne/natural_earth.gpkg",
+            "dbtype": "geopkg",
+            "namespace": "https://www.naturalearthdata.com",
+            "fetch size": "1000",
+            "Batch insert size": "1",
+            "read_only": "true",
+        }
+        self.dlg._update_datastore_from_values(
+            {
+                "workspace": "ne",
+                "name": "NaturalEarth",
+                "description": "",
+                "gpkg_database": "file:data/ne/natural_earth.gpkg",
+                "gpkg_read_only": False,
+                "gpkg_expose_pk": True,
+            },
+            {"type": "GeoPackage", "enabled": True},
+            stored,
+        )
+        params = self.sent["connection_parameters"]
+        self.assertEqual(params["read_only"], "false")  # the form owns this one
+        self.assertEqual(params["Expose primary keys"], "true")
+        self.assertEqual(params["fetch size"], "1000")  # it does not own these
+        self.assertEqual(params["Batch insert size"], "1")
+        self.assertEqual(params["namespace"], "https://www.naturalearthdata.com")
+
+
+class TestFileStoreFormBehaviour(unittest.TestCase):
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.form = ResourceFormDialog(
+            title="t", fields=self.dlg._datastore_fields(["topp"])
+        )
+
+    def visible_connection_fields(self, store_type):
+        self.dlg._on_type_changed(self.form, store_type)
+        return {
+            field["key"]
+            for field in self.dlg._datastore_fields(["topp"])
+            if field.get("group") and field["key"] not in self.form._hidden_keys
+        }
+
+    def test_each_type_shows_only_its_own_fields(self):
+        self.assertEqual(
+            self.visible_connection_fields("Shapefile"),
+            {"file_url", "charset", "spatial_index"},
+        )
+        self.assertEqual(
+            self.visible_connection_fields("Directory of spatial files (shapefiles)"),
+            {"file_url", "charset"},
+        )
+        self.assertEqual(
+            self.visible_connection_fields("GeoPackage"),
+            {"gpkg_database", "gpkg_read_only", "gpkg_expose_pk"},
+        )
+        self.assertEqual(
+            self.visible_connection_fields("PostGIS"),
+            {"pg_host", "pg_port", "pg_db", "pg_user", "pg_password", "pg_schema"},
+        )
+
+    def test_the_new_types_are_offered_in_the_type_combo(self):
+        options = [
+            field["options"]
+            for field in self.dlg._datastore_fields(["topp"])
+            if field["key"] == "type"
+        ][0]
+        for store_type in (
+            "Shapefile",
+            "Directory of spatial files (shapefiles)",
+            "GeoPackage",
+        ):
+            self.assertIn(store_type, options)
+
+    def test_the_prefill_reads_the_servers_parameters(self):
+        values = self.dlg._datastore_form_values(
+            "topp",
+            "taz_shapes",
+            "Shapefile",
+            {"description": "Tasmania"},
+            {
+                "url": "file:data/taz_shapes",
+                "charset": "UTF-8",
+                "create spatial index": "false",
+            },
+        )
+        self.assertEqual(values["file_url"], "file:data/taz_shapes")
+        self.assertEqual(values["charset"], "UTF-8")
+        self.assertIs(values["spatial_index"], False)
+
+    def test_a_geopackage_prefill_reads_its_flags(self):
+        values = self.dlg._datastore_form_values(
+            "ne",
+            "NaturalEarth",
+            "GeoPackage",
+            {},
+            {
+                "database": "file:data/ne/natural_earth.gpkg",
+                "read_only": "true",
+                "Expose primary keys": "false",
+            },
+        )
+        self.assertEqual(values["gpkg_database"], "file:data/ne/natural_earth.gpkg")
+        self.assertIs(values["gpkg_read_only"], True)
+        self.assertIs(values["gpkg_expose_pk"], False)
+
+    def test_a_missing_index_parameter_prefills_as_geoservers_own_default(self):
+        # GeoServer creates the index unless told otherwise.
+        values = self.dlg._datastore_form_values("topp", "s", "Shapefile", {}, {})
+        self.assertIs(values["spatial_index"], True)
 
 
 # ############################################################################

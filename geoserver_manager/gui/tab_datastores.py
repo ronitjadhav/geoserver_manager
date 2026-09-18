@@ -10,12 +10,23 @@ from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 
-# Datastore types supported by the library with dedicated or generic methods
+# Datastore types this form has dedicated fields for. Every other type still
+# opens in the generic "key = value" editor.
+_SHAPEFILE = "Shapefile"
+_SHAPEFILE_DIRECTORY = "Directory of spatial files (shapefiles)"
+_GEOPACKAGE = "GeoPackage"
 _SUPPORTED_TYPES = [
     "PostGIS",
     "PostGIS (JNDI)",
     "PMTiles",
+    _SHAPEFILE,
+    _SHAPEFILE_DIRECTORY,
+    _GEOPACKAGE,
 ]
+
+# GeoServer picks the GeoPackage factory by this connection parameter, so it
+# travels with every GeoPackage store the form saves.
+_GEOPACKAGE_DBTYPE = "geopkg"
 
 # Stands in for password-like values in the generic editor; never sent back as-is
 _MASKED = "••••"
@@ -30,6 +41,12 @@ _TYPE_SPECIFIC_FIELDS = (
     "pg_schema",
     "jndi_reference",
     "pmtiles_url",
+    "file_url",
+    "charset",
+    "spatial_index",
+    "gpkg_database",
+    "gpkg_read_only",
+    "gpkg_expose_pk",
 )
 
 
@@ -245,7 +262,112 @@ class DatastoreTabMixin:
                     "Path or URL to the PMTiles file (file://, s3://, gs://, http(s)://)"
                 ),
             },
+            # --- Shapefile / directory of shapefiles ---
+            {
+                "key": "file_url",
+                "label": self.tr("File or folder"),
+                "type": "text",
+                "required": True,
+                "visible": False,
+                "placeholder": "file:data/shapefiles/states.shp",
+                "group": self.tr("Connection"),
+                "help": self.tr(
+                    "A path on the GeoServer machine: relative to its data "
+                    "directory (file:data/…) or absolute (file:///…). A single "
+                    ".shp, or the folder holding them for a directory store."
+                ),
+            },
+            {
+                "key": "charset",
+                "label": self.tr("Attribute charset"),
+                "type": "text",
+                "visible": False,
+                "placeholder": self.tr("Leave empty for GeoServer's default"),
+                "group": self.tr("Connection"),
+                "help": self.tr(
+                    "How the .dbf attribute text is encoded — UTF-8, or "
+                    "ISO-8859-1, which is what GeoServer assumes"
+                ),
+            },
+            {
+                "key": "spatial_index",
+                "label": self.tr("Create a spatial index"),
+                "type": "checkbox",
+                "default": True,
+                "visible": False,
+                "group": self.tr("Connection"),
+                "help": self.tr("Writes a .qix file next to the data, once"),
+            },
+            # --- GeoPackage ---
+            {
+                "key": "gpkg_database",
+                "label": self.tr("GeoPackage file"),
+                "type": "text",
+                "required": True,
+                "visible": False,
+                "placeholder": "file:data/ne/natural_earth.gpkg",
+                "group": self.tr("Connection"),
+                "help": self.tr(
+                    "A path on the GeoServer machine. To publish a .gpkg from "
+                    "this computer instead, use Publish a Layer on the Layers "
+                    "tab, which uploads it."
+                ),
+            },
+            {
+                "key": "gpkg_read_only",
+                "label": self.tr("Read-only"),
+                "type": "checkbox",
+                "default": False,
+                "visible": False,
+                "group": self.tr("Connection"),
+                "help": self.tr(
+                    "Recommended when nothing writes to the file: GeoServer "
+                    "then serves it without taking write locks"
+                ),
+            },
+            {
+                "key": "gpkg_expose_pk",
+                "label": self.tr("Expose primary keys"),
+                "type": "checkbox",
+                "default": False,
+                "visible": False,
+                "group": self.tr("Connection"),
+                "help": self.tr("Publish the tables' primary key as an attribute"),
+            },
         ]
+
+    @staticmethod
+    def _file_store_params(ds_type, values):
+        """Connection parameters for a file-based store, from the typed fields.
+
+        Only the keys the form owns: the caller merges them onto whatever
+        GeoServer already has (invariant 3), so an unmentioned parameter like
+        `namespace` or `fetch size` survives an edit.
+
+        TODO(#50): upstream as create_shapefile_datastore() /
+        create_geopackage_datastore(), next to create_pg_datastore() — the
+        library has typed creators for PostGIS, JNDI and PMTiles only, so
+        these go through the generic create_datastore().
+        """
+        if ds_type == _GEOPACKAGE:
+            return {
+                "database": values.get("gpkg_database", ""),
+                # How GeoServer picks the GeoPackage factory.
+                "dbtype": _GEOPACKAGE_DBTYPE,
+                "read_only": str(bool(values.get("gpkg_read_only"))).lower(),
+                "Expose primary keys": str(bool(values.get("gpkg_expose_pk"))).lower(),
+            }
+        params = {"url": values.get("file_url", "")}
+        charset = (values.get("charset") or "").strip()
+        if charset:
+            # Left empty, GeoServer applies its own default rather than a
+            # blank charset the shapefile reader would choke on.
+            params["charset"] = charset
+        if ds_type == _SHAPEFILE:
+            params["create spatial index"] = str(
+                bool(values.get("spatial_index"))
+            ).lower()
+        return params
 
     def _on_type_changed(self, dlg, new_type):
         """Show/hide form fields based on the selected datastore type."""
@@ -265,6 +387,19 @@ class DatastoreTabMixin:
 
         # PMTiles-only fields
         dlg.set_field_visible("pmtiles_url", is_pmtiles)
+
+        # Shapefile and directory-of-shapefiles share the path and the charset;
+        # only a single-file store offers the spatial index.
+        is_shapefile = new_type == _SHAPEFILE
+        is_directory = new_type == _SHAPEFILE_DIRECTORY
+        dlg.set_field_visible("file_url", is_shapefile or is_directory)
+        dlg.set_field_visible("charset", is_shapefile or is_directory)
+        dlg.set_field_visible("spatial_index", is_shapefile)
+
+        # GeoPackage-only fields
+        is_geopackage = new_type == _GEOPACKAGE
+        for key in ("gpkg_database", "gpkg_read_only", "gpkg_expose_pk"):
+            dlg.set_field_visible(key, is_geopackage)
 
     def _add_datastore(self):
         """Open a form dialog to create a new datastore."""
@@ -389,6 +524,16 @@ class DatastoreTabMixin:
                     description=description,
                 )
             )
+        elif ds_type in (_SHAPEFILE, _SHAPEFILE_DIRECTORY, _GEOPACKAGE):
+            self._check(
+                self.gs.create_datastore(
+                    workspace_name=ws,
+                    datastore_name=name,
+                    datastore_type=ds_type,
+                    connection_parameters=self._file_store_params(ds_type, values),
+                    description=description,
+                )
+            )
         else:
             raise ValueError(f"Unsupported datastore type: {ds_type}")
 
@@ -432,6 +577,8 @@ class DatastoreTabMixin:
             )
         elif ds_type == "PMTiles":
             merged["pmtiles"] = values.get("pmtiles_url", "")
+        elif ds_type in (_SHAPEFILE, _SHAPEFILE_DIRECTORY, _GEOPACKAGE):
+            merged.update(self._file_store_params(ds_type, values))
         else:
             # Generic editor: what the user left in the textarea is the whole
             # map (removed lines remove keys); a masked value keeps the original.
@@ -491,6 +638,21 @@ class DatastoreTabMixin:
             "jndi_reference": conn_params.get("jndiReferenceName", ""),
             # PMTiles
             "pmtiles_url": conn_params.get("pmtiles", ""),
+            # Shapefile and directory of shapefiles
+            "file_url": conn_params.get("url", ""),
+            "charset": conn_params.get("charset", ""),
+            "spatial_index": str(
+                conn_params.get("create spatial index", "true")
+            ).lower()
+            == "true",
+            # GeoPackage
+            "gpkg_database": conn_params.get("database", ""),
+            "gpkg_read_only": str(conn_params.get("read_only", "false")).lower()
+            == "true",
+            "gpkg_expose_pk": str(
+                conn_params.get("Expose primary keys", "false")
+            ).lower()
+            == "true",
             # Generic editor for types without dedicated fields; secrets masked
             "raw_params": "\n".join(
                 f"{key} = {_MASKED if key.lower() in ('passwd', 'password') else value}"

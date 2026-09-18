@@ -130,6 +130,12 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
 - **Thread safety:** the REST methods are stateless `requests.*` calls and are safe to run through
   `_fan_out` (the datastore list does this). `self.wms` / `self.wmts` on the client are shared state —
   OWS calls must not be fanned out the same way.
+- **File-based datastores** (row 30 of #50): the library's typed creators stop at PostGIS, JNDI and PMTiles,
+  so Shapefile, *Directory of spatial files (shapefiles)* and GeoPackage forms build their parameter map and
+  go through the generic `create_datastore`. Two things that map has to get right: a GeoPackage store must
+  carry **`dbtype: geopkg`** — that is how GeoServer picks the factory — and an empty `charset` is omitted
+  rather than sent blank, because blank is not "use your default". GeoServer fills in `namespace` itself, and
+  the edit merge keeps it along with everything else the form does not show.
 - **Publishing a QGIS layer** (rows 28–29 of #50) uploads a GeoPackage: `PUT
   .../datastores/{name}/file.gpkg?update=overwrite`. GeoServer then creates the store *and* configures one
   feature type per table in the file, with the SRS, bounding box and attributes read from the data — so the
