@@ -5,11 +5,12 @@ Plugin settings form integrated into QGIS 'Options' menu.
 """
 
 # standard
+import ipaddress
 import platform
 from functools import partial
 from pathlib import Path
 from typing import Callable
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 # PyQGIS
 from qgis.core import Qgis, QgsApplication
@@ -90,6 +91,29 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         # load previously saved settings
         self.load_settings()
 
+    @staticmethod
+    def _password_travels_in_clear(url: str, username: str, password: str) -> bool:
+        """True when saving these would put a password on the wire unencrypted.
+
+        The plugin authenticates with HTTP Basic, so over `http://` the
+        password is readable by anything on the path. Loopback is exempt:
+        those requests never leave the machine — and a warning on every local
+        sandbox (this repo ships one) is a warning nobody reads.
+        """
+        if not (username or password):
+            return False
+        parsed = urlparse((url or "").strip())
+        if parsed.scheme != "http":
+            return False
+        host = (parsed.hostname or "").casefold()
+        if host == "localhost" or host.endswith(".localhost"):
+            return False
+        try:
+            return not ipaddress.ip_address(host).is_loopback
+        except ValueError:
+            # A host name the plugin cannot resolve to a loopback address.
+            return True
+
     def apply(self) -> None:
         """Save settings from UI to QgsSettings + QgsAuthManager."""
         settings: PlgSettingsStructure = self.plg_settings.get_plg_settings()
@@ -131,6 +155,8 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
                     push=True,
                 )
 
+        self._warn_if_password_travels_in_clear(url, username, password)
+
         # dump settings into QgsSettings
         self.plg_settings.save_from_object(settings)
 
@@ -139,6 +165,24 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
                 message="DEBUG - Settings successfully saved.",
                 log_level=Qgis.MessageLevel.NoLevel,
             )
+
+    def _warn_if_password_travels_in_clear(
+        self, url: str, username: str, password: str
+    ) -> None:
+        """Say once, while saving, that HTTP Basic over http:// is readable.
+
+        Informs rather than refuses: apply() cannot stop the options dialog
+        from closing, and a plain-HTTP server on a trusted network is a
+        legitimate setup — the settings are saved either way.
+        """
+        if not self._password_travels_in_clear(url, username, password):
+            return
+        self.log(
+            message=f"{url} is plain HTTP, so the password is sent unencrypted "
+            "with every request. Use https:// where the server offers it.",
+            log_level=Qgis.MessageLevel.Warning,
+            push=True,
+        )
 
     def load_settings(self) -> None:
         """Load options from QgsSettings + QgsAuthManager into UI form."""

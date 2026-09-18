@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- Saving credentials for a plain-HTTP server now says that the password
+  travels unencrypted, and suggests `https://`. It saves them anyway — a
+  server on a trusted network is a legitimate setup — and stays quiet for
+  loopback addresses, because a warning on every local sandbox is a warning
+  nobody reads.
 - **Publish a QGIS layer to GeoServer.** The publish dialog on the Layers tab
   gained a source: a layer of the current project is written to a GeoPackage
   and uploaded, which makes GeoServer create the datastore and configure the
