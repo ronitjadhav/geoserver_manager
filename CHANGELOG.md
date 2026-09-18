@@ -21,6 +21,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Cascaded Stores tab**: the WMS and WMTS stores that proxy another
+  server, listed across every workspace. Create one from a GetCapabilities
+  URL, publish the layers the remote advertises (under the remote name or
+  one of your own), inspect and delete the cascaded layers, delete the
+  store — the remote server is never touched.
 - **Test connection** in Settings: tries the URL and credentials as typed,
   without saving them, and reports the outcome in the same words the main
   dialog uses. The URL placeholder is a plain `http://localhost:8080/geoserver`.

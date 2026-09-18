@@ -33,6 +33,7 @@ from qgis.PyQt.QtWidgets import (
 
 from geoserver_manager.__about__ import __title__
 from geoserver_manager.gui.scope import scope
+from geoserver_manager.gui.tab_cascaded import CascadedStoreTabMixin
 from geoserver_manager.gui.tab_coveragestores import CoverageStoreTabMixin
 from geoserver_manager.gui.tab_datastores import DatastoreTabMixin
 from geoserver_manager.gui.tab_layergroups import LayerGroupTabMixin
@@ -91,6 +92,7 @@ class GeoServerMainDialog(
     WorkspaceTabMixin,
     DatastoreTabMixin,
     CoverageStoreTabMixin,
+    CascadedStoreTabMixin,
     LayerTabMixin,
     LayerGroupTabMixin,
     StyleTabMixin,
@@ -500,6 +502,7 @@ class GeoServerMainDialog(
         ("Workspaces", "mIconFolder.svg", "_load_workspaces"),
         ("Datastores", "mIconDbSchema.svg", "_load_datastores"),
         ("Coverage Stores", "mIconRasterLayer.svg", "_load_coverage_stores"),
+        ("Cascaded Stores", "mIconWms.svg", "_load_cascaded_stores"),
         ("Layers", "mIconVector.svg", "_load_layers"),
         ("Layer Groups", "mActionAddGroup.svg", "_load_layer_groups"),
         ("Styles", "mActionStyleManager.svg", "_load_styles"),

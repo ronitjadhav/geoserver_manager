@@ -32,6 +32,7 @@ CONTEXTS = {
     "tab_workspaces.py": "WorkspaceTabMixin",
     "tab_datastores.py": "DatastoreTabMixin",
     "tab_coveragestores.py": "CoverageStoreTabMixin",
+    "tab_cascaded.py": "CascadedStoreTabMixin",
     "tab_layers.py": "LayerTabMixin",
     "tab_layergroups.py": "LayerGroupTabMixin",
     "tab_styles.py": "StyleTabMixin",

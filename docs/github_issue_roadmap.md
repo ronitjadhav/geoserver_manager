@@ -65,9 +65,11 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 
 ## WMS / WMTS Stores (Cascaded Layers)
 
-- [ ] Create WMS store from external capabilities URL
-- [ ] Create/delete cascaded WMS layers
-- [ ] Create/delete WMTS stores
+- [x] Create WMS store from external capabilities URL (Cascaded Stores tab,
+      listed across workspaces)
+- [x] Create/delete cascaded WMS layers (publish what the remote
+      advertises, view one, delete one)
+- [x] Create/delete WMTS stores — and their layers
 
 ## Layer Upload (QGIS → GeoServer)
 

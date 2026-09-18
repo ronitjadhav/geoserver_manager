@@ -20,7 +20,7 @@ Skills in `.claude/skills/` hold the step-by-step procedures:
 |---|---|
 | `geoserver_manager/plugin_main.py` | QGIS entry point: `initGui` / `unload` / `run`. Shows the dialog, then connects. |
 | `geoserver_manager/gui/dlg_main.py` | `GeoServerMainDialog(QDialog, <one mixin per tab>)` — nav list, results table, search, pagination, and every helper the tabs share |
-| `geoserver_manager/gui/tab_workspaces.py`, `tab_datastores.py`, `tab_coveragestores.py`, `tab_layers.py`, `tab_layergroups.py`, `tab_styles.py` | One mixin per resource type: load / add / edit / delete (layers also: publish, add to QGIS; layer groups also: add to QGIS; coverage stores also: publish a coverage) |
+| `geoserver_manager/gui/tab_workspaces.py`, `tab_datastores.py`, `tab_coveragestores.py`, `tab_cascaded.py`, `tab_layers.py`, `tab_layergroups.py`, `tab_styles.py` | One mixin per resource type: load / add / edit / delete (layers also: publish, add to QGIS; layer groups also: add to QGIS; coverage stores also: publish a coverage; cascaded stores also: publish / view / delete a remote layer) |
 | `geoserver_manager/gui/dlg_resource_form.py` | `ResourceFormDialog` — a modal form built from a list of field dicts (see its module docstring for the field spec) |
 | `geoserver_manager/gui/dlg_settings.py` | Options page: URL + credentials (credentials go to `QgsAuthManager`, encrypted) and *Test connection*, which probes the fields as typed |
 | `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser`, `probe` (the bounded connection check the dialog and Settings share), `sld` and `qgis_export` (QGIS ↔ GeoServer conversions, pure) |
@@ -178,6 +178,20 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   Two GeoServer facts the tab depends on: a grid range's `high` is the **exclusive** bound (size = high − low,
   checked against gdalinfo), and store metadata GeoServer does not understand — `CogSettings.Key` without the
   COG extension — is dropped silently, so the create warns when it comes back missing.
+- **Cascaded WMS / WMTS stores** (the cascaded-store rows of #50): the library creates, gets and deletes a
+  WMS store and its layers, and creates and deletes a WMTS store, but **lists nothing** — no store
+  listing per workspace, no cascaded-layer listing (`get_wms_layers()` is this GeoServer's own
+  capabilities), no WMTS getter or layer delete — so `tab_cascaded.py` GETs the collections itself.
+  GeoServer facts behind it, measured on 2.28.5: the collections are `wmsStores.wmsStore` and
+  `wmtsStores.wmtsStore` (WMTS layers live under `.../wmtsstores/{s}/layers`, not `wmtslayers`);
+  `?list=available` on a layer collection answers `{"list": {"string": [...]}}` with the remote's own
+  layer names, a single entry written as a bare string; a POST of just `name` + `nativeName` publishes
+  a cascaded layer, GeoServer filling title, abstract, SRS and bounds from the capabilities — which
+  is why the WMTS publish does not use `create_wmts_layer()` (it fetches the remote capabilities from
+  the *plugin's* machine, forces EPSG:4326 and deletes an existing layer first); a cascaded layer
+  DELETE needs `recurse=true` or GeoServer answers 403 "wms layer referenced by layer(s)"; a store
+  DELETE with `recurse=true` takes its layers along. Cascaded layers are *not* in the Layers tab, which
+  walks feature types and coverages — the Cascaded Stores tab is where they live.
 - **Layer groups** are the biggest library gap so far (rows 16–19 of #50): every layer-group call requires a
   `workspace_name`, so the *global* groups are unreachable; `create_layer_group` re-qualifies every layer with
   the group's own workspace (no cross-workspace and no nested group), always sends a world bbox from a

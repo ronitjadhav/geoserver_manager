@@ -2,6 +2,289 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="en" sourcelanguage="en">
 <context>
+    <name>CascadedStoreTabMixin</name>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="510" />
+        <location filename="../../gui/tab_cascaded.py" line="43" />
+        <source>Add a Cascaded Store</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="44" />
+        <source>Proxy another server's WMS or WMTS through this GeoServer</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="574" />
+        <location filename="../../gui/tab_cascaded.py" line="471" />
+        <location filename="../../gui/tab_cascaded.py" line="75" />
+        <location filename="../../gui/tab_cascaded.py" line="53" />
+        <source>Workspace</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="583" />
+        <location filename="../../gui/tab_cascaded.py" line="58" />
+        <source>Cascaded layers</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="63" />
+        <source>Publish a layer</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="68" />
+        <source>Delete</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="573" />
+        <location filename="../../gui/tab_cascaded.py" line="74" />
+        <source>Store Name</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="575" />
+        <location filename="../../gui/tab_cascaded.py" line="478" />
+        <location filename="../../gui/tab_cascaded.py" line="76" />
+        <source>Type</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="577" />
+        <location filename="../../gui/tab_cascaded.py" line="296" />
+        <location filename="../../gui/tab_cascaded.py" line="77" />
+        <source>Enabled</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="576" />
+        <location filename="../../gui/tab_cascaded.py" line="78" />
+        <source>Capabilities URL</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="83" />
+        <source>Failed to load cascaded stores</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="214" />
+        <source>Layer '{}' already exists in store '{}'.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="285" />
+        <source>Layer</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="424" />
+        <location filename="../../gui/tab_cascaded.py" line="293" />
+        <source>Remote layer</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="294" />
+        <source>Title</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="295" />
+        <source>SRS</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="297" />
+        <source>Bounds</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="298" />
+        <source>Keywords</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="304" />
+        <source>Abstract</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="317" />
+        <source>Failed to load layer '{}'</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="331" />
+        <source>Failed to load the layers of '{}'</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="339" />
+        <source>'{}' publishes no layer yet — use Publish a layer.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="347" />
+        <source>Cascaded layers of '{}'</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="350" />
+        <source>What this store publishes from the remote server. Delete layer removes the selected one from this GeoServer; the remote is not touched.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="358" />
+        <source>Delete layer</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="371" />
+        <source>cascaded layer</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="381" />
+        <source>The layer disappears from this GeoServer; the remote server is not touched.
+
+</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="395" />
+        <source>Failed to list the remote layers of '{}'</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="403" />
+        <source>The remote server behind '{}' advertises no layer — check its capabilities URL.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="412" />
+        <source>Publish a layer of '{}'</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="415" />
+        <source>The remote layer becomes a layer of this GeoServer, fetched from the remote server on every request. Leave the name empty to reuse the remote name without its prefix.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="431" />
+        <source>Layer name</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="433" />
+        <source>As published here, in workspace '{}'.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="439" />
+        <source>Publish</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="449" />
+        <source>Failed to publish '{}'</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="452" />
+        <source>'{}' published as layer '{}'.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="465" />
+        <source>Name</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="485" />
+        <source>GetCapabilities URL</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="490" />
+        <source>As GeoServer reaches it — from its own machine, not from yours.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="502" />
+        <source>No workspaces available. Create a workspace first.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="511" />
+        <source>A cascaded store proxies another server's WMS or WMTS: its layers can then be published here, and are fetched from the remote server on every request.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="519" />
+        <source>Create</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="527" />
+        <source>Failed to create cascaded store '{}'</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="532" />
+        <source>Cascaded store '{}' created.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="548" />
+        <source>The GetCapabilities URL must start with http:// or https://.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="556" />
+        <source>Cascaded store '{}' already exists in workspace '{}'.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="586" />
+        <source>Layers</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="587" />
+        <source>Open the Cascaded layers action for one layer's details.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="615" />
+        <source>Failed to load cascaded store '{}'</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="624" />
+        <source>Cascaded Store '{}'</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="625" />
+        <source>Read-only: to point the store at another server, create it again.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="645" />
+        <source>cascaded store</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_cascaded.py" line="657" />
+        <source>Every cascaded layer published from it is deleted too; the remote server is not touched.
+
+</source>
+        <translation type="unfinished" />
+    </message>
+</context><context>
     <name>ConfigOptionsPage</name>
     <message>
         <location filename="../../gui/dlg_settings.py" line="141" />
@@ -619,218 +902,218 @@
 </context><context>
     <name>GeoServerMainDialog</name>
     <message>
-        <location filename="../../gui/dlg_main.py" line="140" />
+        <location filename="../../gui/dlg_main.py" line="142" />
         <source>Close the dialog</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="481" />
-        <location filename="../../gui/dlg_main.py" line="142" />
+        <location filename="../../gui/dlg_main.py" line="483" />
+        <location filename="../../gui/dlg_main.py" line="144" />
         <source>Refresh resources from the GeoServer (F5)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="145" />
+        <location filename="../../gui/dlg_main.py" line="147" />
         <source>Open settings to edit GeoServer credentials</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="148" />
+        <location filename="../../gui/dlg_main.py" line="150" />
         <source>Search resources by name or other attributes (Ctrl+F to jump here, Esc to clear)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="153" />
+        <location filename="../../gui/dlg_main.py" line="155" />
         <source>Filter this list…  (Ctrl+F)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="154" />
+        <location filename="../../gui/dlg_main.py" line="156" />
         <source>First page</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="155" />
+        <location filename="../../gui/dlg_main.py" line="157" />
         <source>Previous page</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="156" />
+        <location filename="../../gui/dlg_main.py" line="158" />
         <source>Next page</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="157" />
+        <location filename="../../gui/dlg_main.py" line="159" />
         <source>Last page</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="159" />
+        <location filename="../../gui/dlg_main.py" line="161" />
         <source>Delete the selected resources (Del)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="261" />
+        <location filename="../../gui/dlg_main.py" line="263" />
         <source>Success</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="266" />
+        <location filename="../../gui/dlg_main.py" line="268" />
         <source>Error</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="271" />
+        <location filename="../../gui/dlg_main.py" line="273" />
         <source>Warning</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="295" />
+        <location filename="../../gui/dlg_main.py" line="297" />
         <source>Not configured</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="297" />
+        <location filename="../../gui/dlg_main.py" line="299" />
         <source>GeoServer not configured — open Settings to add credentials.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="303" />
+        <location filename="../../gui/dlg_main.py" line="305" />
         <source>Auth error</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="305" />
+        <location filename="../../gui/dlg_main.py" line="307" />
         <source>Could not read credentials from the auth store.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="363" />
+        <location filename="../../gui/dlg_main.py" line="365" />
         <source>Connecting…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="398" />
+        <location filename="../../gui/dlg_main.py" line="400" />
         <source>Connected — {}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="405" />
+        <location filename="../../gui/dlg_main.py" line="407" />
         <source>Resources loaded.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="408" />
+        <location filename="../../gui/dlg_main.py" line="410" />
         <source>Connection failed</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="440" />
+        <location filename="../../gui/dlg_main.py" line="442" />
         <source>Loading cancelled.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="477" />
+        <location filename="../../gui/dlg_main.py" line="479" />
         <source>Cancel</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="477" />
+        <location filename="../../gui/dlg_main.py" line="479" />
         <source>Refresh</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="479" />
+        <location filename="../../gui/dlg_main.py" line="481" />
         <source>Stop loading</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="484" />
+        <location filename="../../gui/dlg_main.py" line="486" />
         <source>Loading…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="794" />
-        <location filename="../../gui/dlg_main.py" line="557" />
-        <location filename="../../gui/dlg_main.py" line="486" />
+        <location filename="../../gui/dlg_main.py" line="797" />
+        <location filename="../../gui/dlg_main.py" line="560" />
+        <location filename="../../gui/dlg_main.py" line="488" />
         <source>No results</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="642" />
+        <location filename="../../gui/dlg_main.py" line="645" />
         <source>Actions</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="747" />
+        <location filename="../../gui/dlg_main.py" line="750" />
         <source>Click to open (or select and press Enter)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="762" />
+        <location filename="../../gui/dlg_main.py" line="765" />
         <source>Results {} to {} (out of {} items)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="785" />
+        <location filename="../../gui/dlg_main.py" line="788" />
         <source>Nothing matches '{}' — Esc clears the filter.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="791" />
+        <location filename="../../gui/dlg_main.py" line="794" />
         <source>Nothing here yet — start with '{}' above.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="888" />
+        <location filename="../../gui/dlg_main.py" line="891" />
         <source>Not connected to GeoServer — press Refresh (F5) to connect.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1015" />
+        <location filename="../../gui/dlg_main.py" line="1018" />
         <source>{count} item(s) could not be listed: {names}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1029" />
+        <location filename="../../gui/dlg_main.py" line="1032" />
         <source>Are you sure you want to delete {kind} '{name}'?</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1033" />
+        <location filename="../../gui/dlg_main.py" line="1036" />
         <source>Are you sure you want to delete {count} {kind}(s)?
 
 {items}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1042" />
+        <location filename="../../gui/dlg_main.py" line="1045" />
         <source>Confirm Delete</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1043" />
+        <location filename="../../gui/dlg_main.py" line="1046" />
         <source>This action cannot be undone.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1077" />
+        <location filename="../../gui/dlg_main.py" line="1080" />
         <source>Delete failed</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1080" />
+        <location filename="../../gui/dlg_main.py" line="1083" />
         <source>Failed to delete some {kind}(s):
 {errors}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1086" />
+        <location filename="../../gui/dlg_main.py" line="1089" />
         <source>{kind} '{name}' deleted.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1092" />
+        <location filename="../../gui/dlg_main.py" line="1095" />
         <source>{count} {kind}(s) deleted.</source>
         <translation type="unfinished" />
     </message>
