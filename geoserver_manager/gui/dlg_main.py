@@ -12,6 +12,7 @@ to _start_load, which returns immediately and renders the rows when they land.
 
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from urllib.parse import urlparse
 
 from qgis.core import Qgis, QgsApplication, QgsTask
 from qgis.gui import QgsMessageBar
@@ -31,6 +32,7 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from geoserver_manager.__about__ import __title__
+from geoserver_manager.gui.scope import scope
 from geoserver_manager.gui.tab_coveragestores import CoverageStoreTabMixin
 from geoserver_manager.gui.tab_datastores import DatastoreTabMixin
 from geoserver_manager.gui.tab_layergroups import LayerGroupTabMixin
@@ -146,6 +148,7 @@ class GeoServerMainDialog(
                 "(Ctrl+F to jump here, Esc to clear)"
             )
         )
+        self.searchBox.setPlaceholderText(self.tr("Filter this list…  (Ctrl+F)"))
         self.btn_page_first.setToolTip(self.tr("First page"))
         self.btn_page_prev.setToolTip(self.tr("Previous page"))
         self.btn_page_next.setToolTip(self.tr("Next page"))
@@ -176,7 +179,7 @@ class GeoServerMainDialog(
     # -- Keyboard -----------------------------------------------------------
 
     def keyPressEvent(self, event):  # noqa: N802 — Qt's own spelling
-        """F5 refresh, Ctrl+F search, Esc clear, Del delete the selection.
+        """F5 refresh, Ctrl+F search, Esc clear, Enter open, Del delete.
 
         Handled here rather than with QShortcut so each key can look at where
         the focus is: Del must delete resources only when the *table* has it,
@@ -195,6 +198,15 @@ class GeoServerMainDialog(
             return
         if key == Qt.Key.Key_Escape and self.searchBox.text():
             self.searchBox.clear()
+            return
+        if (
+            key in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
+            and self.resultsTable.hasFocus()
+            and self._name_click_callback is not None
+        ):
+            selected = self._get_selected_rows()
+            if len(selected) == 1 and self._require_connection():
+                self._name_click_callback(selected[0])
             return
         if (
             key == Qt.Key.Key_Delete
@@ -414,6 +426,7 @@ class GeoServerMainDialog(
         server, so QGIS stays usable even when the host swallows the SYN.
         """
         self._set_status(self.tr("Connecting…"), "busy")
+        self.setWindowTitle(__title__)
         self.gs = None
         # The rows on screen belong to the connection just dropped; the loader
         # re-arms these once the probe lands.
@@ -446,6 +459,7 @@ class GeoServerMainDialog(
                 self._reset_table_state()
                 return
             self.gs = gs
+            self.setWindowTitle(f"{__title__} — {urlparse(url).netloc or url}")
             status = self.tr("Connected — {}").format(url)
             if version:
                 status += f" ({version})"
@@ -756,7 +770,9 @@ class GeoServerMainDialog(
                     font = item.font()
                     font.setUnderline(True)
                     item.setFont(font)
-                    item.setToolTip(self.tr("Click to open"))
+                    item.setToolTip(
+                        self.tr("Click to open (or select and press Enter)")
+                    )
                 self.resultsTable.setItem(row_idx, col, item)
             if self._row_actions:
                 self.resultsTable.setCellWidget(
@@ -767,7 +783,7 @@ class GeoServerMainDialog(
         self.lbl_page_number.setText(str(self._current_page + 1))
 
         if total == 0:
-            self.lbl_page_info.setText(self.tr("No results"))
+            self.lbl_page_info.setText(self._empty_state_text())
         else:
             self.lbl_page_info.setText(
                 self.tr("Results {} to {} (out of {} items)").format(
@@ -779,6 +795,30 @@ class GeoServerMainDialog(
         self.btn_page_prev.setEnabled(self._current_page > 0)
         self.btn_page_next.setEnabled(self._current_page + 1 < self._total_pages)
         self.btn_page_last.setEnabled(self._current_page + 1 < self._total_pages)
+
+    def _open_workspace_from_row(self, row_data):
+        """The Workspace column links to the workspace — column 1 on every tab.
+
+        Styles and layer groups can live in the global scope, whose label is
+        not a workspace, so that one is a dead link rather than an error.
+        """
+        if scope(row_data[1]) is not None:
+            self._show_workspace_info([row_data[1]])
+
+    def _empty_state_text(self):
+        """What an empty table should say: why it is empty, and what helps."""
+        search = self.searchBox.text().strip()
+        if search and self._all_rows:
+            return self.tr("Nothing matches '{}' — Esc clears the filter.").format(
+                search
+            )
+        # isHidden(), not isVisible(): the latter is false for every widget of
+        # a window that is not showing yet (invariant 8).
+        if not self.btn_add.isHidden() and self.btn_add.text():
+            return self.tr("Nothing here yet — start with '{}' above.").format(
+                self.btn_add.text()
+            )
+        return self.tr("No results")
 
     def _cell_click_callback(self, col):
         """The callback a click in this column triggers, or None."""

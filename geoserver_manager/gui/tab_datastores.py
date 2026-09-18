@@ -66,8 +66,10 @@ class DatastoreTabMixin:
     def _load_datastores(self):
         """Arm the Datastores tab, then fetch its rows in the background."""
         self._setup_add_button(
-            translate("DatastoreTabMixin", "Add a New Datastore"),
-            translate("DatastoreTabMixin", "Create a new datastore"),
+            translate("DatastoreTabMixin", "Add a Datastore"),
+            translate(
+                "DatastoreTabMixin", "Connect a database or a file on the server"
+            ),
             self._add_datastore,
         )
         self._setup_delete_selected_button(self._delete_selected_datastores)
@@ -442,10 +444,15 @@ class DatastoreTabMixin:
             return
 
         dlg = ResourceFormDialog(
-            title=translate("DatastoreTabMixin", "New Datastore"),
-            description=translate("DatastoreTabMixin", "Configure a new datastore"),
+            title=translate("DatastoreTabMixin", "Add a Datastore"),
+            description=translate(
+                "DatastoreTabMixin",
+                "A datastore is where GeoServer reads a layer's data from: a "
+                "database, or a file on its own machine.",
+            ),
             fields=self._datastore_fields(workspace_names),
             parent=self,
+            ok_label=translate("DatastoreTabMixin", "Create"),
         )
         self._wire_type_combo(dlg)
         if dlg.exec() != QDialog.DialogCode.Accepted:
@@ -782,7 +789,3 @@ class DatastoreTabMixin:
             workspace_name, datastore_name
         )
         self._raw_rest("delete", path, params={"recurse": "true"})
-
-    def _open_workspace_from_row(self, row_data):
-        """Open the workspace info dialog for the workspace in a datastore row."""
-        self._show_workspace_info([row_data[1]])

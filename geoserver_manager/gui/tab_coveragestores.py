@@ -501,6 +501,7 @@ class CoverageStoreTabMixin:
                 },
             ],
             parent=self,
+            ok_label=translate("CoverageStoreTabMixin", "Publish"),
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -625,6 +626,7 @@ class CoverageStoreTabMixin:
             ),
             fields=self._coverage_store_fields(workspace_names),
             parent=self,
+            ok_label=translate("CoverageStoreTabMixin", "Create"),
         )
         dlg.get_widget("type").currentTextChanged.connect(
             lambda store_type: self._on_store_type_changed(dlg, store_type)

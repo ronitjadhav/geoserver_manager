@@ -18,7 +18,8 @@ from qgis.testing import start_app, unittest
 # project
 from geoserver_manager.gui import tab_styles
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.gui.tab_styles import GLOBAL, StyleTabMixin
+from geoserver_manager.gui.scope import GLOBAL
+from geoserver_manager.gui.tab_styles import StyleTabMixin
 from geoserver_manager.toolbelt.sld import SLD_1_1, layer_to_sld
 from tests.qgis.sync_dialog import SyncDialog
 from tests.qgis.test_sld import point_layer

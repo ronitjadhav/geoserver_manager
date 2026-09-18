@@ -18,8 +18,8 @@ from qgis.testing import start_app, unittest
 # project
 from geoserver_manager.gui import tab_layergroups
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.gui.scope import GLOBAL
 from geoserver_manager.gui.tab_layergroups import LayerGroupTabMixin
-from geoserver_manager.gui.tab_styles import GLOBAL
 from tests.qgis.sync_dialog import SyncDialog
 
 start_app()

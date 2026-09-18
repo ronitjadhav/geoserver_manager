@@ -32,8 +32,11 @@ class WorkspaceTabMixin:
     def _load_workspaces(self):
         """Arm the Workspaces tab, then fetch its rows in the background."""
         self._setup_add_button(
-            translate("WorkspaceTabMixin", "Add a New Workspace"),
-            translate("WorkspaceTabMixin", "Create a new workspace"),
+            translate("WorkspaceTabMixin", "Add a Workspace"),
+            translate(
+                "WorkspaceTabMixin",
+                "Create a workspace to hold stores, layers and styles",
+            ),
             self._add_workspace,
         )
         self._setup_delete_selected_button(self._delete_selected_workspaces)
@@ -362,10 +365,15 @@ class WorkspaceTabMixin:
     def _add_workspace(self):
         """Open a form dialog to create a new workspace."""
         dlg = ResourceFormDialog(
-            title=translate("WorkspaceTabMixin", "New Workspace"),
-            description=translate("WorkspaceTabMixin", "Configure a new workspace"),
+            title=translate("WorkspaceTabMixin", "Add a Workspace"),
+            description=translate(
+                "WorkspaceTabMixin",
+                "A workspace groups stores, layers and styles under one name, "
+                "which also prefixes its layers (workspace:layer).",
+            ),
             fields=self._workspace_fields(),
             parent=self,
+            ok_label=translate("WorkspaceTabMixin", "Create"),
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return

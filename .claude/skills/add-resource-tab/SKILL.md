@@ -44,8 +44,8 @@ class StyleTabMixin:
     def _load_styles(self):
         """Arm the tab, then fetch its rows in the background."""
         self._setup_add_button(
-            translate("StyleTabMixin", "Add a New Style"),
-            translate("StyleTabMixin", "Create a style"),
+            translate("StyleTabMixin", "Add a Style"),
+            translate("StyleTabMixin", "Create a style from an SLD"),
             self._add_style,
         )
         self._setup_delete_selected_button(self._delete_selected_styles)
@@ -86,6 +86,12 @@ Rules for the mixin:
 - **All server calls through the dialog helpers** (`_run_action`, `_fetch`,
   `_check`, `_fetch_list`, `_resource_exists`, `_raw_rest`). Never write a
   `try/except … setCursor` block yourself.
+- **Name the primary button.** Pass `ok_label=translate("<YourMixin>", "Create")` (or
+  "Publish" / "Upload" / "Apply") to every `ResourceFormDialog` that is not an edit; an edit
+  keeps the default "Save". Title the dialog with the Add button's own words, and start that
+  label with a verb, never "New" — `test_ux.py` sweeps every tab for both.
+- **The Workspace column** links through `self._open_workspace_from_row` (on the dialog); do
+  not write your own. Global-scope rows use `GLOBAL` / `scope()` from `gui/scope.py`.
 - **Add** pre-checks existence and raises `ValueError(translate("StyleTabMixin", "… already exists"))`
   inside the action; `_run_action` turns that into the banner.
 - **Edit** fetches the current object with `_fetch`, prefills from *that* (a pure

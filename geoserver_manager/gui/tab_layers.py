@@ -506,6 +506,7 @@ class LayerTabMixin:
             ),
             fields=self._publish_fields(workspace_names),
             parent=self,
+            ok_label=translate("LayerTabMixin", "Publish"),
         )
         dlg.get_widget("workspace").currentTextChanged.connect(
             lambda ws: self._refill_publish_combos(dlg, workspace=ws)
@@ -759,6 +760,7 @@ class LayerTabMixin:
                 }
             ],
             parent=self,
+            ok_label=translate("LayerTabMixin", "Set style"),
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -846,6 +848,7 @@ class LayerTabMixin:
                 },
             ],
             parent=self,
+            ok_label=translate("LayerTabMixin", "Upload"),
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -964,6 +967,7 @@ class LayerTabMixin:
                 }
             ],
             parent=self,
+            ok_label=translate("LayerTabMixin", "Add"),
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return

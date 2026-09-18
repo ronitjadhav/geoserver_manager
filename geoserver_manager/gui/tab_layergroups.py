@@ -3,9 +3,8 @@
 """
 Layer Groups tab — list, view, create, delete layer groups.
 
-Used as a mixin for GeoServerMainDialog. Two things come from its siblings on
-that class: `_scope()` and the `GLOBAL` label (StyleTabMixin — layer groups have
-the same global-or-workspace scope as styles) and `_layer_uri()` (LayerTabMixin).
+Used as a mixin for GeoServerMainDialog. `_layer_uri()` comes from LayerTabMixin
+through the shared dialog class; the global-or-workspace scope is `gui.scope`.
 """
 
 from qgis.core import QgsProject, QgsRasterLayer
@@ -13,7 +12,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.gui.tab_styles import GLOBAL
+from geoserver_manager.gui.scope import GLOBAL, scope
 
 # GeoServer's LayerGroupInfo.Mode enum. Spelled out rather than imported from
 # geoservercloud.models: the bundled wheels only reach sys.path once the plugin
@@ -50,9 +49,7 @@ class LayerGroupTabMixin:
         self._setup_delete_selected_button(self._delete_selected_layer_groups)
         self._name_click_callback = self._show_layer_group_info
         self._extra_click_callbacks = {
-            translate(
-                "LayerGroupTabMixin", "Workspace"
-            ): self._open_workspace_from_group_row
+            translate("LayerGroupTabMixin", "Workspace"): self._open_workspace_from_row
         }
         self._row_actions = [
             (
@@ -111,11 +108,6 @@ class LayerGroupTabMixin:
             rows.append([name, ws_label, mode, str(layer_count)])
         return rows, failures
 
-    def _open_workspace_from_group_row(self, row_data):
-        """The Workspace column links to the workspace — not for global groups."""
-        if self._scope(row_data[1]) is not None:
-            self._show_workspace_info([row_data[1]])
-
     def _global_group_names(self):
         """Names of the layer groups that live outside any workspace.
 
@@ -131,7 +123,7 @@ class LayerGroupTabMixin:
 
     def _group_summary(self, name, workspace_label):
         """(mode, number of layers) for the list view. Raises on HTTP errors."""
-        detail = self._group_detail(name, self._scope(workspace_label))
+        detail = self._group_detail(name, scope(workspace_label))
         return detail.get("mode", ""), len(self._group_layers(detail))
 
     # -- One group -------------------------------------------------------------
@@ -272,7 +264,7 @@ class LayerGroupTabMixin:
         """Open a layer group, read-only."""
         name, workspace_label = row_data[0], row_data[1]
         detail = self._fetch(
-            lambda: self._group_detail(name, self._scope(workspace_label)),
+            lambda: self._group_detail(name, scope(workspace_label)),
             translate("LayerGroupTabMixin", "Failed to load layer group '{}'").format(
                 name
             ),
@@ -404,6 +396,7 @@ class LayerGroupTabMixin:
             ),
             fields=self._group_fields(workspace_names, layer_names),
             parent=self,
+            ok_label=translate("LayerGroupTabMixin", "Create"),
         )
         dlg.get_widget("pick").currentTextChanged.connect(
             lambda choice: self._append_group_layer(dlg, choice)
@@ -475,7 +468,7 @@ class LayerGroupTabMixin:
         "abstract", which GeoServer silently drops.
         """
         name = values["name"]
-        workspace_name = self._scope(values["workspace"])
+        workspace_name = scope(values["workspace"])
         layers, styles = self._parse_group_layers(values["layers"], workspace_name)
         if not layers:
             raise ValueError(
@@ -520,7 +513,7 @@ class LayerGroupTabMixin:
         WMS only: a group has no feature type to fetch over WFS, and it reaches
         GeoWebCache only once someone caches it there.
         """
-        name, workspace_name = row_data[0], self._scope(row_data[1])
+        name, workspace_name = row_data[0], scope(row_data[1])
         qualified = f"{workspace_name}:{name}" if workspace_name else name
 
         def add():
@@ -562,7 +555,7 @@ class LayerGroupTabMixin:
             [
                 (
                     f"{row[1]}/{row[0]}",
-                    lambda name=row[0], ws=self._scope(row[1]): self._do_delete_group(
+                    lambda name=row[0], ws=scope(row[1]): self._do_delete_group(
                         name, ws
                     ),
                 )

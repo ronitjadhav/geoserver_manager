@@ -12,6 +12,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog, QFileDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.gui.scope import GLOBAL, scope
 from geoserver_manager.toolbelt.sld import (
     SLD_1_0,
     apply_sld_to_layer,
@@ -22,9 +23,8 @@ from geoserver_manager.toolbelt.sld import (
     styleable_project_layers,
 )
 
-# Styles live either globally or inside a workspace. Rows are display strings,
-# so the global scope needs a label; _scope() maps it back to None for the API.
-GLOBAL = "(global)"
+# Styles live either globally or inside a workspace; the label for the global
+# scope and the mapping back to None are shared with layer groups (gui.scope).
 
 # Formats whose body the library can PUT back (rest_service.create_style).
 # Anything else (css, …) is shown read-only.
@@ -50,7 +50,7 @@ class StyleTabMixin:
     @staticmethod
     def _scope(workspace_label):
         """Workspace name for the API, or None for the global scope."""
-        return None if workspace_label in ("", GLOBAL) else workspace_label
+        return scope(workspace_label)
 
     def _load_styles(self):
         """Arm the Styles tab, then fetch its rows in the background."""
@@ -62,7 +62,7 @@ class StyleTabMixin:
         self._setup_delete_selected_button(self._delete_selected_styles)
         self._name_click_callback = self._show_style_info
         self._extra_click_callbacks = {
-            translate("StyleTabMixin", "Workspace"): self._open_workspace_from_style_row
+            translate("StyleTabMixin", "Workspace"): self._open_workspace_from_row
         }
         self._row_actions = [
             (
@@ -111,11 +111,6 @@ class StyleTabMixin:
                 continue
             rows.extend([self._name_of(style), ws_name] for style in styles)
         return rows, failures
-
-    def _open_workspace_from_style_row(self, row_data):
-        """The Workspace column links to the workspace — unless it is the global scope."""
-        if self._scope(row_data[1]) is not None:
-            self._show_workspace_info([row_data[1]])
 
     # -- Body ------------------------------------------------------------------
 
@@ -389,6 +384,7 @@ class StyleTabMixin:
             ),
             fields=self._upload_fields(self._get_workspace_names()),
             parent=self,
+            ok_label=translate("StyleTabMixin", "Upload"),
         )
         dlg.get_widget("source").currentTextChanged.connect(
             lambda source: self._on_style_source_changed(dlg, source)
@@ -515,6 +511,7 @@ class StyleTabMixin:
                 }
             ],
             parent=self,
+            ok_label=translate("StyleTabMixin", "Apply"),
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return

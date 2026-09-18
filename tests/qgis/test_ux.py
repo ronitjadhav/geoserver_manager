@@ -258,3 +258,233 @@ class TestRememberedTab(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ############################################################################
+# ##### Labels and empty states ##
+# ################################
+
+
+class TestPrimaryButtons(unittest.TestCase):
+    """A form's primary button says what it does; only edits say Save."""
+
+    def test_the_default_is_save_and_it_can_be_named(self):
+        from qgis.PyQt.QtWidgets import QDialogButtonBox
+
+        from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+
+        plain = ResourceFormDialog(title="t", fields=[])
+        named = ResourceFormDialog(title="t", fields=[], ok_label="Publish")
+        ok = QDialogButtonBox.StandardButton.Ok
+        self.assertEqual(plain._button_box.button(ok).text(), "Save")
+        self.assertEqual(named._button_box.button(ok).text(), "Publish")
+
+    def test_every_add_dialog_names_its_action_and_no_add_button_says_new(self):
+        from unittest.mock import patch
+
+        from qgis.PyQt.QtWidgets import QDialog, QDialogButtonBox
+
+        from geoserver_manager.gui import (
+            tab_coveragestores,
+            tab_datastores,
+            tab_layergroups,
+            tab_layers,
+            tab_styles,
+            tab_workspaces,
+        )
+        from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+
+        opened = []
+
+        class Recording(ResourceFormDialog):
+            def exec(inner):
+                opened.append(inner)
+                return QDialog.DialogCode.Rejected
+
+        class FakeGS:
+            def get_workspaces(inner):
+                return ([{"name": "topp"}], 200)
+
+            def get_datastores(inner, workspace_name):
+                return ([], 200)
+
+            def __getattr__(inner, name):
+                raise AttributeError(name)
+
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        dlg.show_warning_message = dlg.show_error_message = lambda text: None
+        dlg._all_layer_names = lambda: []
+        modules = (
+            tab_workspaces,
+            tab_datastores,
+            tab_coveragestores,
+            tab_layers,
+            tab_layergroups,
+            tab_styles,
+        )
+        loaders = (
+            "_load_workspaces",
+            "_load_datastores",
+            "_load_coverage_stores",
+            "_load_layers",
+            "_load_layer_groups",
+            "_load_styles",
+        )
+        ok = QDialogButtonBox.StandardButton.Ok
+        seen = {}
+        for module, loader in zip(modules, loaders):
+            getattr(dlg, loader)()
+            label = dlg.btn_add.text()
+            self.assertNotIn(
+                "New", label, label
+            )  # "Add a Workspace", not "Add a New …"
+            self.assertRegex(label, r"^(Add|Publish|Create|Upload) ", label)
+            with patch.object(module, "ResourceFormDialog", Recording):
+                dlg.btn_add.click()
+            form = opened[-1]
+            seen[label] = form._button_box.button(ok).text()
+            self.assertEqual(
+                form.windowTitle(), label
+            )  # the dialog is named as the button
+        self.assertEqual(
+            set(seen.values()), {"Create", "Publish", "Upload"}, seen
+        )  # never the generic Save on a create
+
+
+class TestEmptyStates(unittest.TestCase):
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.dlg._setup_table(["Name", self.dlg.actions_column_label()])
+
+    def test_an_empty_tab_points_at_its_add_button(self):
+        self.dlg._setup_add_button("Add a Workspace", "tip", lambda: None)
+        self.dlg._populate_rows([])
+        self.assertEqual(
+            self.dlg.lbl_page_info.text(),
+            "Nothing here yet — start with 'Add a Workspace' above.",
+        )
+
+    def test_a_fruitless_filter_blames_the_filter(self):
+        self.dlg._setup_add_button("Add a Workspace", "tip", lambda: None)
+        self.dlg._populate_rows([["topp"], ["sf"]])
+        self.dlg.searchBox.setText("zzz")
+        self.dlg._apply_filter()
+        self.assertEqual(
+            self.dlg.lbl_page_info.text(),
+            "Nothing matches 'zzz' — Esc clears the filter.",
+        )
+
+    def test_without_an_add_button_it_stays_plain(self):
+        self.dlg.btn_add.setVisible(False)
+        self.dlg._populate_rows([])
+        self.assertEqual(self.dlg.lbl_page_info.text(), "No results")
+
+    def test_rows_show_the_range_as_before(self):
+        self.dlg._populate_rows([["a"], ["b"], ["c"]])
+        self.assertEqual(
+            self.dlg.lbl_page_info.text(), "Results 1 to 3 (out of 3 items)"
+        )
+
+
+class TestWindowTitleAndEnter(unittest.TestCase):
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.dlg.show_success_message = lambda text: None
+        self.dlg.show_error_message = lambda text: None
+        self.dlg.show_warning_message = lambda text: None
+
+    def test_the_title_names_the_server_while_connected(self):
+        class Settings:
+            geoserver_url = "https://maps.example.org:8443/geoserver"
+            geoserver_verify_tls = True
+            geoserver_auth_cfg_id = ""
+
+            def has_credentials(inner):
+                return True
+
+            def get_credentials(inner):
+                return ("admin", "geoserver")
+
+        class PlgSettings:
+            def get_plg_settings(inner):
+                return Settings()
+
+            def get_value_from_key(inner, *args, **kwargs):
+                return None
+
+            def set_value_from_key(inner, *args, **kwargs):
+                return True
+
+        class FakeGS:
+            def get_workspaces(inner):
+                return ([], 200)
+
+        self.dlg.plg_settings = PlgSettings()
+        self.dlg._build_client = lambda settings: FakeGS()
+        self.dlg._probe = lambda gs, url: None
+        self.dlg._fetch_version_label = lambda gs: ""
+        self.dlg.refresh_ui()  # SyncDialog runs the probe inline
+        self.assertEqual(
+            self.dlg.windowTitle(), "GeoServer Manager — maps.example.org:8443"
+        )
+
+        self.dlg._probe = lambda gs, url: ("Server unreachable", "gone")
+        self.dlg.refresh_ui()
+        self.assertEqual(self.dlg.windowTitle(), "GeoServer Manager")
+
+    def test_enter_opens_the_selected_row(self):
+        opened = []
+        self.dlg.gs = object()
+        self.dlg._setup_table(["Name", self.dlg.actions_column_label()])
+        self.dlg._name_click_callback = opened.append
+        self.dlg._populate_rows([["topp"], ["sf"]])
+        self.dlg.show()
+        QApplication.setActiveWindow(self.dlg)
+        self.dlg.resultsTable.selectRow(1)
+        self.dlg.resultsTable.setFocus()
+        QApplication.processEvents()
+
+        QTest.keyClick(self.dlg.resultsTable, Qt.Key.Key_Return)
+        self.assertEqual(opened, [["sf"]])
+        self.dlg.close()
+
+    def test_enter_with_nothing_or_several_selected_does_nothing(self):
+        opened = []
+        self.dlg.gs = object()
+        self.dlg._setup_table(["Name", self.dlg.actions_column_label()])
+        self.dlg._name_click_callback = opened.append
+        self.dlg._populate_rows([["topp"], ["sf"]])
+        self.dlg.show()
+        QApplication.setActiveWindow(self.dlg)
+        self.dlg.resultsTable.clearSelection()
+        self.dlg.resultsTable.setFocus()
+        QApplication.processEvents()
+        QTest.keyClick(self.dlg.resultsTable, Qt.Key.Key_Return)
+        self.assertEqual(opened, [])
+        self.dlg.close()
+
+
+class TestSharedWorkspaceLink(unittest.TestCase):
+    """One helper on the dialog serves every tab's Workspace column."""
+
+    def test_a_workspace_opens_and_the_global_label_does_not(self):
+        from geoserver_manager.gui.scope import GLOBAL, scope
+
+        dlg = SyncDialog()
+        opened = []
+        dlg._show_workspace_info = opened.append
+        dlg._open_workspace_from_row(["a_style", "topp"])
+        dlg._open_workspace_from_row(["a_style", GLOBAL])
+        dlg._open_workspace_from_row(["a_style", ""])
+        self.assertEqual(opened, [["topp"]])
+        self.assertIsNone(scope(GLOBAL))
+        self.assertIsNone(scope(""))
+        self.assertEqual(scope("topp"), "topp")
+
+    def test_no_tab_keeps_a_private_copy(self):
+        from pathlib import Path
+
+        gui = Path(__file__).parents[2] / "geoserver_manager" / "gui"
+        for path in gui.glob("tab_*.py"):
+            self.assertNotIn("def _open_workspace_from", path.read_text(), path.name)

@@ -11,7 +11,7 @@ Usage:
         {"key": "isolated", "label": "Isolated Workspace", "type": "checkbox"},
     ]
     dlg = ResourceFormDialog(
-        title="New Workspace",
+        title="Add a Workspace",
         description="Configure a new workspace",
         fields=fields,
         parent=self,
@@ -79,13 +79,24 @@ from geoserver_manager.gui.theme import hint_colour, invalid_field_colour
 class ResourceFormDialog(QDialog):
     """Generic modal form dialog built from a field definition list."""
 
-    def __init__(self, title, fields, values=None, description=None, parent=None):
+    def __init__(
+        self,
+        title,
+        fields,
+        values=None,
+        description=None,
+        parent=None,
+        ok_label=None,
+    ):
         """
         :param title: dialog window title.
         :param fields: list of field dicts (see module docstring).
         :param values: dict of existing values to pre-fill (edit mode).
         :param description: optional subtitle shown below the title.
         :param parent: parent widget.
+        :param ok_label: what the primary button does — "Create", "Publish",
+            "Upload", "Apply"… Defaults to "Save", which is right for an edit
+            and wrong for everything else.
         """
         super().__init__(parent)
         self.setWindowTitle(title)
@@ -143,7 +154,7 @@ class ResourceFormDialog(QDialog):
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         self._button_box.button(QDialogButtonBox.StandardButton.Ok).setText(
-            self.tr("Save")
+            ok_label or self.tr("Save")
         )
         self._button_box.accepted.connect(self._on_accept)
         self._button_box.rejected.connect(self.reject)

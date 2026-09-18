@@ -7,6 +7,7 @@ FORMS =	../../gui/dlg_main.ui \
 SOURCES =	../../gui/dlg_main.py \
 	../../gui/dlg_resource_form.py \
 	../../gui/dlg_settings.py \
+	../../gui/scope.py \
 	../../gui/tab_coveragestores.py \
 	../../gui/tab_datastores.py \
 	../../gui/tab_layergroups.py \

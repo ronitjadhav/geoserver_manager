@@ -208,9 +208,18 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   The same applies to behaviour the plugin has to paper over (`_check`, `_resource_exists`, the datastore
   merge): those are library gaps too, and they are listed in #50. We depend on this library; the fastest
   way to make the plugin better is to make the library better.
-- The global-or-workspace scope (`GLOBAL` label + `_scope()`) lives in `tab_styles.py` and is reused by
-  `tab_layergroups.py` through the shared dialog class, like `_layer_uri()` from `tab_layers.py`. A third tab
-  needing it is the point to lift it out of `tab_styles` — not before.
+- The global-or-workspace scope (`GLOBAL` label + `scope()`) lives in `gui/scope.py`, now that styles, layer
+  groups and the dialog's own workspace-link helper all need it. `_layer_uri()` is still reached from
+  `tab_layers.py` through the shared dialog class; lift it the same way when a third caller appears.
+- **One `_open_workspace_from_row()` on the dialog** serves every tab's Workspace column (column 1) and skips
+  the global label. Tabs point their `_extra_click_callbacks` at it rather than writing their own.
+- **A form's primary button says what it does.** `ResourceFormDialog(..., ok_label="Create" | "Publish" |
+  "Upload" | "Apply" | "Set style")`; only an *edit* keeps the default "Save". Add-button labels start with a
+  verb and never say "New" (`Add a Workspace`, `Publish a Layer`, `Upload a Style`), and the dialog they open is
+  titled with the same words — `tests/qgis/test_ux.py` sweeps every tab for both rules.
+- **An empty table says why.** `_empty_state_text()` distinguishes a fruitless filter ("Nothing matches 'x' —
+  Esc clears the filter"), an empty resource type ("Nothing here yet — start with 'Add a Workspace' above") and
+  the plain fallback. It reads `btn_add.isHidden()`, not `isVisible()` — see invariant 8.
 - **Colours come from the palette**, never from a literal: `gui/theme.py` maps "ok" / "error" / "busy" and
   the hint and invalid-field colours onto the widget's own palette, choosing a light- or dark-background
   variant. `tests/qgis/test_ux.py` asserts each one clears WCAG's 3:1 contrast floor against the window
