@@ -49,6 +49,10 @@ which drops the calls black wraps):
 python scripts/update_translations.py
 ```
 
+Expect every test green — and when the suite and the commit run in one shell
+command, join them with `&&`, never `;`: a red suite must abort the commit (a red
+commit was pushed once because a `;` let `git commit` run anyway).
+
 Expect every test green. A new fix must come with a test that fails without it —
 verify that claim by temporarily reverting the fix once, not by reading the test.
 
