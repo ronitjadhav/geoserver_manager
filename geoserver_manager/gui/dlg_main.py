@@ -122,6 +122,8 @@ class GeoServerMainDialog(
         self._current_page = 0
         self._all_rows = []  # all fetched rows (list of list-of-str)
         self._filtered_rows = []  # rows after search filter
+        self._columns = []  # headers of the table as set up
+        self._sort = None  # (column, descending) applied to _filtered_rows
         self._row_actions = []  # list of (icon, tooltip, callback) for action buttons
         self._name_click_callback = None  # callback(row_data) when name is clicked
         self._extra_click_callbacks = {}  # col_header -> callback(row_data)
@@ -173,6 +175,9 @@ class GeoServerMainDialog(
         self.btn_page_last.clicked.connect(self._page_last)
         self.resultsTable.itemSelectionChanged.connect(self._on_selection_changed)
         self.resultsTable.cellClicked.connect(self._on_cell_clicked)
+        self.resultsTable.horizontalHeader().sectionClicked.connect(
+            self._on_header_clicked
+        )
 
         self._restore_settings()
 
@@ -667,10 +672,15 @@ class GeoServerMainDialog(
 
     def _setup_table(self, columns):
         """Reset the table with the given column headers."""
-        # Sorting must stay off: rows are paginated in Python and selections are
-        # mapped back by row index, so a header click would make the table delete
-        # a different resource than the one highlighted.
+        # Qt's own sorting stays off: it would reorder the items but not
+        # _filtered_rows, which every index-based lookup (selection, Enter, link
+        # clicks) reads — Delete would act on a different resource than the one
+        # highlighted. A header click sorts the rows themselves instead.
         self.resultsTable.setSortingEnabled(False)
+        if list(columns) != self._columns:
+            # Another resource type: its columns mean something else.
+            self._sort = None
+        self._columns = list(columns)
         # Loaders call this before fetching, so drop the previous rows here too:
         # a fetch that raises must not leave them to be repainted under the new
         # headers (see _reset_table_state).
@@ -688,6 +698,7 @@ class GeoServerMainDialog(
                 header.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
             else:
                 header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
+        self._show_sort_indicator()
 
     def actions_column_label(self):
         """The header text of the row-actions column.
@@ -737,8 +748,40 @@ class GeoServerMainDialog(
             ]
         else:
             self._filtered_rows = list(self._all_rows)
+        if self._sort is not None:
+            column, descending = self._sort
+
+            def sort_key(row):
+                value = row[column] if column < len(row) else None
+                return ("" if value is None else str(value)).casefold()
+
+            self._filtered_rows.sort(key=sort_key, reverse=descending)
+        self._show_sort_indicator()
         self._current_page = 0
         self._show_page()
+
+    def _on_header_clicked(self, column):
+        """Sort the rows by this column; a second click reverses the order."""
+        is_actions = self._row_actions and column == self.resultsTable.columnCount() - 1
+        if not is_actions:
+            same = self._sort is not None and self._sort[0] == column
+            self._sort = (column, same and not self._sort[1])
+        # Re-rendering also puts the indicator back where _sort says, after Qt
+        # moved it to the section that was clicked.
+        self._apply_filter()
+
+    def _show_sort_indicator(self):
+        """Draw the header arrow for _sort, or none."""
+        header = self.resultsTable.horizontalHeader()
+        header.setSortIndicatorShown(self._sort is not None)
+        if self._sort is not None:
+            column, descending = self._sort
+            order = (
+                Qt.SortOrder.DescendingOrder
+                if descending
+                else Qt.SortOrder.AscendingOrder
+            )
+            header.setSortIndicator(column, order)
 
     @property
     def _total_pages(self):

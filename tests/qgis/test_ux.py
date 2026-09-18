@@ -488,3 +488,78 @@ class TestSharedWorkspaceLink(unittest.TestCase):
         gui = Path(__file__).parents[2] / "geoserver_manager" / "gui"
         for path in gui.glob("tab_*.py"):
             self.assertNotIn("def _open_workspace_from", path.read_text(), path.name)
+
+
+class TestSortableColumns(unittest.TestCase):
+    """A header click sorts the row cache itself, so every index-based lookup
+    (selection, Enter, Delete) sees the order on screen; Qt's own sorting stays
+    off (CLAUDE.md invariant 2)."""
+
+    ROWS = [["b", "topp"], ["a", None], ["c", "nurc"]]
+
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.dlg._row_actions = [
+            ("mActionDeleteSelected.svg", "Delete", lambda row: None)
+        ]
+        self.columns = ["Name", "Workspace", self.dlg.actions_column_label()]
+        self.dlg._setup_table(self.columns)
+        self.dlg._populate_rows([list(row) for row in self.ROWS])
+        self.table = self.dlg.resultsTable
+        self.header = self.table.horizontalHeader()
+
+    def click(self, column):
+        self.header.sectionClicked.emit(column)
+
+    def names(self):
+        return [self.table.item(row, 0).text() for row in range(self.table.rowCount())]
+
+    def test_a_click_sorts_a_second_reverses_another_column_starts_ascending(self):
+        self.assertEqual(self.names(), ["b", "a", "c"])
+        self.click(0)
+        self.assertEqual(self.names(), ["a", "b", "c"])
+        self.click(0)
+        self.assertEqual(self.names(), ["c", "b", "a"])
+        self.click(1)  # an empty cell sorts first, as ""
+        self.assertEqual(self.names(), ["a", "c", "b"])
+
+    def test_the_arrow_shows_the_column_and_the_direction(self):
+        self.assertFalse(self.header.isSortIndicatorShown())
+        self.click(1)
+        self.click(1)
+        self.assertTrue(self.header.isSortIndicatorShown())
+        self.assertEqual(self.header.sortIndicatorSection(), 1)
+        self.assertEqual(self.header.sortIndicatorOrder(), Qt.SortOrder.DescendingOrder)
+
+    def test_delete_selected_and_enter_see_the_highlighted_row(self):
+        self.click(0)
+        self.table.selectRow(0)
+        self.assertEqual(self.dlg._get_selected_rows(), [["a", None]])
+
+    def test_qt_never_sorts_the_items_itself(self):
+        self.click(0)
+        self.assertFalse(self.table.isSortingEnabled())
+
+    def test_the_actions_header_is_not_a_sort_key(self):
+        self.click(1)
+        self.click(2)
+        self.assertEqual(self.dlg._sort, (1, False))
+        self.assertEqual(self.header.sortIndicatorSection(), 1)
+
+    def test_the_sort_survives_a_reload_and_not_a_tab_change(self):
+        self.click(0)
+        self.dlg._setup_table(self.columns)
+        self.dlg._populate_rows([list(row) for row in self.ROWS])
+        self.assertEqual(self.names(), ["a", "b", "c"])
+        other_tab = ["Style Name", "Workspace", self.dlg.actions_column_label()]
+        self.dlg._setup_table(other_tab)
+        self.dlg._populate_rows([list(row) for row in self.ROWS])
+        self.assertEqual(self.names(), ["b", "a", "c"])
+        self.assertFalse(self.header.isSortIndicatorShown())
+
+    def test_sorting_goes_back_to_the_first_page(self):
+        self.dlg._populate_rows([[f"r{index:02d}", ""] for index in range(25)])
+        self.dlg._page_next()
+        self.assertEqual(self.dlg._current_page, 1)
+        self.click(0)
+        self.assertEqual(self.dlg._current_page, 0)

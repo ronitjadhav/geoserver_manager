@@ -82,8 +82,10 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
    `_reset_table_state` clears those *and* every callback and the pagination buttons. A loader that fails
    mid-fetch must leave an empty table, never the previous type's rows under the new type's Delete
    handler — that was a real wrong-target delete (`tests/qgis/test_dlg_main.py` guards it).
-2. **Table sorting stays off** (`_setup_table` forces it). Rows are mapped back by index; a header click
-   would make *Delete Selected* act on a different resource than the one highlighted.
+2. **Qt's table sorting stays off** (`_setup_table` forces it); a header click sorts `_filtered_rows` itself
+   (`_on_header_clicked`), so the order on screen *is* the order of the row cache. Rows are mapped back by
+   index, and Qt reordering the items on its own would make *Delete Selected* act on a different resource
+   than the one highlighted. The sort survives a reload of the same tab and is dropped when the columns change.
 3. **Edits merge onto what the server has.** GeoServer applies a datastore PUT by *replacing* the whole
    `connectionParameters` map. Never route an edit through the typed `create_*` helpers — use
    `_update_datastore_from_values`, which overlays only the form's own keys onto the fetched params and

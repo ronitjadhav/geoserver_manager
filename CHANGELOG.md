@@ -21,6 +21,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Sortable columns**: click a header to sort by it, again to reverse; the
+  arrow shows the order. The sort is applied to the rows themselves, so
+  *Delete Selected*, Enter and the link cells act on exactly the row that is
+  highlighted, and it survives a refresh of the same tab.
 - **Keyboard shortcuts**: F5 refreshes, Ctrl+F jumps to the search box, Esc
   clears the search (and still closes the dialog when there is nothing to
   clear), and Del deletes the selected resources — only while the table has the
