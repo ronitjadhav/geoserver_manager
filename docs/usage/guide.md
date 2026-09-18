@@ -103,9 +103,11 @@ never touched.
 
 ## Layers
 
-Every published layer, with its workspace, datastore, SRS and default style.
-Click a name for the details: native name, projection policy, bounding box,
-attributes, metadata.
+Every layer of the server whatever its type — vector, raster, cascaded WMS or
+WMTS — with its workspace, type, store and default style. Click a name for the
+details: a vector layer's native name, projection policy, bounding box,
+attributes and metadata; a raster's coverage details; a cascaded layer's remote
+name and store.
 
 *Publish a Layer* has two sources:
 
@@ -118,11 +120,13 @@ attributes, metadata.
   The layer's name is made GeoServer-safe first (spaces and accents become
   `_`).
 
-Row actions: **Add to QGIS** (*Load as* WMS, WFS or WMTS — the credentials
+Row actions: **Add to QGIS** (*Load as* WMS, WMTS or, for a vector layer, WFS — the credentials
 travel as a QGIS authentication configuration, so a saved project never
 contains a password), **Set style** (pick the default style among the server's
 styles), **Style from QGIS** (upload the matching project layer's symbology
-and make it the default), **Preview in a browser** (GeoServer's own OpenLayers
+and make it the default), **Preview** (the layer on a map of its own inside QGIS — drag to pan,
+wheel to zoom, click for the feature info GeoServer returns there; nothing
+reaches the project), **Preview in a browser** (GeoServer's own OpenLayers
 page, framed on the layer's extent — the browser's session is not the
 plugin's, so a secured server asks it to log in), **Delete**.
 

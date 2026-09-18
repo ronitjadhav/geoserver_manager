@@ -151,8 +151,7 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   minutes (row 20 of #50). `verifytls` is the *Verify the server's TLS certificate* setting (default on);
   it catches `requests.exceptions.SSLError` before `OSError` so a private-CA server is reported as a
   certificate problem, not as "is the server running?".
-- **Layers of every type** (row 39 of #50, plus the per-layer GET and the coverage delete reported
-  with this change): `GET /rest/layers.json` is the one list where vector, raster and cascaded layers
+- **Layers of every type** (rows 39, 48 and 49 of #50): `GET /rest/layers.json` is the one list where vector, raster and cascaded layers
   all appear — walking datastores → feature types, as the Layers tab did, misses the others.
   `GET /rest/layers/{ws}:{name}.json` gives `type` (VECTOR / RASTER / WMS / WMTS), `defaultStyle`
   (`{"name": ""}` for a cascaded WMS layer) and `resource` with `@class` (featureType / coverage /
