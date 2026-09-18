@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Styles now travel both ways between QGIS and GeoServer.** Upload a style
+  from the symbology of a layer in the current project (a third source in the
+  upload dialog), or push it in one step from the Layers tab with *Style from
+  QGIS*, which uploads the style into the layer's workspace and makes it the
+  layer's default. In the other direction, *Apply to a QGIS layer* loads a
+  server style into a project layer, and *Save as SLD* writes any style's body
+  to disk.
+- Every SLD upload now carries the content type its own version needs. QGIS
+  writes SLD 1.1 (Symbology Encoding); sent as 1.0 — all the library can do —
+  GeoServer accepts and renders it but records it as `languageVersion 1.0.0`.
+  Pasted and file-based 1.1 documents were mislabelled the same way until now.
+  The style dialog also shows the version GeoServer stored, and says when the
+  body it displays is GeoServer's 1.0 rendition of a stored 1.1 document.
 - **Workspace WMS settings**, as a second group of the workspace dialog: give a
   workspace its own WMS service or send it back to the global one, and edit the
   service title, abstract, keywords, advertised SRS list, maximum rendering time

@@ -6,9 +6,19 @@ Styles tab — list, view/edit, upload and delete styles.
 Used as a mixin for GeoServerMainDialog.
 """
 
-from qgis.PyQt.QtWidgets import QDialog
+from pathlib import Path
+
+from qgis.PyQt.QtWidgets import QDialog, QFileDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.toolbelt.sld import (
+    SLD_1_0,
+    apply_sld_to_layer,
+    layer_to_sld,
+    sld_content_type,
+    sld_version,
+    styleable_project_layers,
+)
 
 # Styles live either globally or inside a workspace. Rows are display strings,
 # so the global scope needs a label; _scope() maps it back to None for the API.
@@ -20,6 +30,7 @@ _EDITABLE_FORMATS = ("sld", "mbstyle")
 
 _SOURCE_PASTE = "Paste SLD"
 _SOURCE_FILE = "From file"
+_SOURCE_QGIS = "From a QGIS layer"
 
 
 class StyleTabMixin:
@@ -47,6 +58,16 @@ class StyleTabMixin:
             self.tr("Workspace"): self._open_workspace_from_style_row
         }
         self._row_actions = [
+            (
+                "mActionSharingImport.svg",
+                self.tr("Apply to a QGIS layer"),
+                self._apply_style_to_qgis,
+            ),
+            (
+                "mActionFileSaveAs.svg",
+                self.tr("Save as SLD"),
+                self._save_style_to_disk,
+            ),
             ("mActionDeleteSelected.svg", self.tr("Delete"), self._delete_style),
         ]
         self._setup_table(
@@ -101,15 +122,54 @@ class StyleTabMixin:
         # Not create_style_from_string: that also rewrites the definition and
         # renames the file to <name>.sld, which changes a style that was
         # e.g. popshade.sld under the hood.
+        if style_format == "sld":
+            self._put_sld_body(name, workspace_name, body)
+            return
         self._check(
             self.gs.rest_service.create_style(
                 name, body.encode("utf-8"), workspace_name, format=style_format
             )
         )
 
+    def _put_sld_body(self, name, workspace_name, sld):
+        """PUT an SLD body with the content type its own version needs.
+
+        TODO(#50): upstream as a content type chosen from the document (or a
+        `content_type=` argument). rest_service.create_style() derives it from
+        the *format* alone and only knows application/vnd.ogc.sld+xml, so an
+        SLD 1.1 document — which is what QgsMapLayer.saveSldStyle() writes,
+        always — is stored with languageVersion 1.0.0: accepted, rendered, and
+        mislabelled. Sending application/vnd.ogc.se+xml records it as 1.1.0.
+        """
+        content_type = sld_content_type(sld)
+        if content_type == SLD_1_0:
+            self._check(
+                self.gs.rest_service.create_style(
+                    name, sld.encode("utf-8"), workspace_name, format="sld"
+                )
+            )
+            return
+        path = self.gs.rest_service.rest_endpoints.style(
+            name, workspace_name, format="sld"
+        )
+        self._raw_rest(
+            "put",
+            path,
+            data=sld.encode("utf-8"),
+            headers={"Content-Type": content_type},
+        )
+
     # -- View / edit -----------------------------------------------------------
 
-    def _style_fields(self, editable):
+    @staticmethod
+    def _language_version(definition):
+        """The SLD version GeoServer recorded for a style, or "" if unknown."""
+        value = (definition or {}).get("languageVersion")
+        if isinstance(value, dict):
+            value = value.get("version")
+        return str(value) if value else ""
+
+    def _style_fields(self, editable, language_version=""):
         """Field definitions for the style dialog."""
         return [
             {
@@ -129,6 +189,23 @@ class StyleTabMixin:
                 "label": self.tr("Format"),
                 "type": "text",
                 "read_only": True,
+            },
+            {
+                "key": "version",
+                "label": self.tr("SLD version"),
+                "type": "text",
+                "read_only": True,
+                "help": (
+                    # GeoServer keeps the 1.1 document but serves .sld as its
+                    # 1.0 rendition, so the body below is not the stored bytes.
+                    self.tr(
+                        "Stored as SLD 1.1 (Symbology Encoding) — what QGIS "
+                        "exports. GeoServer serves it here as its SLD 1.0 "
+                        "rendition, and saving stores that rendition instead."
+                    )
+                    if language_version.startswith("1.1")
+                    else None
+                ),
             },
             {
                 "key": "filename",
@@ -172,15 +249,17 @@ class StyleTabMixin:
             return
         definition, style_format, body = fetched
         editable = style_format in _EDITABLE_FORMATS
+        language_version = self._language_version(definition)
 
         dlg = ResourceFormDialog(
             title=self.tr("Style '{}'").format(name),
             description=self.tr("Modify the style") if editable else None,
-            fields=self._style_fields(editable),
+            fields=self._style_fields(editable, language_version),
             values={
                 "name": name,
                 "workspace": row_data[1],
                 "format": style_format,
+                "version": language_version or "—",
                 "filename": definition.get("filename", ""),
                 "body": body,
             },
@@ -224,7 +303,7 @@ class StyleTabMixin:
                 "key": "source",
                 "label": self.tr("Source"),
                 "type": "combo",
-                "options": [_SOURCE_PASTE, _SOURCE_FILE],
+                "options": [_SOURCE_PASTE, _SOURCE_FILE, _SOURCE_QGIS],
             },
             {
                 "key": "sld",
@@ -246,18 +325,33 @@ class StyleTabMixin:
                     ".sld, a .zip with an SLD and its resources, or .mbstyle"
                 ),
             },
+            {
+                "key": "qgis_layer",
+                "label": self.tr("QGIS layer"),
+                "type": "combo",
+                "options": [label for label, _layer in styleable_project_layers()],
+                "required": True,
+                "visible": False,
+                "group": self.tr("Style"),
+                "help": self.tr(
+                    "The layer's symbology is exported as SLD and uploaded. QGIS "
+                    "writes SLD 1.1, which GeoServer stores as such."
+                ),
+            },
         ]
 
     def _on_style_source_changed(self, dlg, source):
         dlg.set_field_visible("sld", source == _SOURCE_PASTE)
         dlg.set_field_visible("file", source == _SOURCE_FILE)
+        dlg.set_field_visible("qgis_layer", source == _SOURCE_QGIS)
 
     def _add_style(self):
         """Upload a style from pasted SLD or from a file."""
         dlg = ResourceFormDialog(
             title=self.tr("Upload a Style"),
             description=self.tr(
-                "Create a style from an SLD you paste or a file you pick."
+                "Create a style from an SLD you paste, a file you pick, or the "
+                "symbology of a layer in this QGIS project."
             ),
             fields=self._upload_fields(self._get_workspace_names()),
             parent=self,
@@ -288,13 +382,161 @@ class StyleTabMixin:
                     name, values["workspace"] or GLOBAL
                 )
             )
-        if values.get("source") == _SOURCE_FILE:
-            self._check(
-                self.gs.create_style_from_file(name, values["file"], workspace_name)
+        source = values.get("source")
+        if source == _SOURCE_FILE:
+            path = Path(values["file"])
+            if path.suffix.lower() != ".sld":
+                # A .zip carries an SLD plus its resources and an .mbstyle is
+                # not SLD at all: both are the library's job, untouched.
+                self._check(
+                    self.gs.create_style_from_file(name, str(path), workspace_name)
+                )
+                return
+            self._create_sld_style(
+                name, workspace_name, path.read_text(encoding="utf-8")
+            )
+        elif source == _SOURCE_QGIS:
+            self._create_sld_style(
+                name, workspace_name, layer_to_sld(self._picked_layer(values))
             )
         else:
-            self._check(
-                self.gs.create_style_from_string(name, values["sld"], workspace_name)
+            self._create_sld_style(name, workspace_name, values["sld"])
+
+    def _create_sld_style(self, name, workspace_name, sld):
+        """Create the style definition, then upload the body as its version."""
+        # create_style_from_string would do both, but always with the SLD 1.0
+        # content type — see _put_sld_body.
+        self._check(
+            self.gs.create_style_definition(name, f"{name}.sld", workspace_name)
+        )
+        self._put_sld_body(name, workspace_name, sld)
+
+    @staticmethod
+    def _picked_layer(values):
+        """The project layer the form's QGIS-layer combo points at."""
+        label = values["qgis_layer"]
+        for candidate, layer in styleable_project_layers():
+            if candidate == label:
+                return layer
+        raise ValueError(f"Layer '{label}' is no longer in the project.")
+
+    # -- QGIS <-> GeoServer ----------------------------------------------------
+
+    def _sld_for_qgis(self, row_data):
+        """One style's SLD body, or None once the reason has been reported.
+
+        QGIS reads SLD only, so a CSS or MBStyle style is refused here rather
+        than handed over for QGIS to fail on.
+        """
+        name, workspace_name = row_data[0], self._scope(row_data[1])
+        fetched = self._fetch(
+            lambda: self._check(self.gs.get_style_definition(name, workspace_name)),
+            self.tr("Failed to load style '{}'").format(name),
+        )
+        if fetched is None:
+            return None
+        style_format = str((fetched or {}).get("format") or "sld").lower()
+        if style_format != "sld":
+            self.show_warning_message(
+                self.tr("'{}' is a {} style — QGIS can only read SLD.").format(
+                    name, style_format.upper()
+                )
+            )
+            return None
+        return self._fetch(
+            lambda: self._style_body(name, workspace_name, "sld"),
+            self.tr("Failed to load the SLD of '{}'").format(name),
+        )
+
+    def _apply_style_to_qgis(self, row_data):
+        """Load a server style into one of the project's layers."""
+        name = row_data[0]
+        layers = styleable_project_layers()
+        if not layers:
+            self.show_warning_message(
+                self.tr("This QGIS project has no vector or raster layer to style.")
+            )
+            return
+        sld = self._sld_for_qgis(row_data)
+        if sld is None:
+            return
+
+        dlg = ResourceFormDialog(
+            title=self.tr("Apply '{}' to a QGIS layer").format(name),
+            description=self.tr(
+                "The style is applied to the layer in this project only — the "
+                "server is not touched."
+            ),
+            fields=[
+                {
+                    "key": "qgis_layer",
+                    "label": self.tr("QGIS layer"),
+                    "type": "combo",
+                    "options": [label for label, _layer in layers],
+                    "required": True,
+                }
+            ],
+            parent=self,
+        )
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        layer = self._picked_layer(dlg.get_values())
+        outcome = []
+        if not self._run_action(
+            lambda: outcome.extend(apply_sld_to_layer(layer, sld)),
+            self.tr("Failed to apply '{}' to '{}'").format(name, layer.name()),
+        ):
+            return
+        ok, message = outcome[0], outcome[1]
+        if ok:
+            self.show_success_message(
+                self.tr("'{}' now uses the style '{}'.").format(layer.name(), name)
+            )
+        else:
+            # QGIS reads less SLD than it writes; say what it could not take.
+            self.show_warning_message(
+                self.tr("QGIS could not read all of '{}': {}").format(
+                    name, message or self.tr("no detail given")
+                )
+            )
+
+    def _save_style_to_disk(self, row_data):
+        """Write a style's body to a file the user picks."""
+        name, workspace_name = row_data[0], self._scope(row_data[1])
+        definition = self._fetch(
+            lambda: self._check(self.gs.get_style_definition(name, workspace_name)),
+            self.tr("Failed to load style '{}'").format(name),
+        )
+        if definition is None:
+            return
+        style_format = str((definition or {}).get("format") or "sld").lower()
+        body = self._fetch(
+            lambda: self._style_body(name, workspace_name, style_format),
+            self.tr("Failed to load the body of '{}'").format(name),
+        )
+        if body is None:
+            return
+
+        suggested = (definition or {}).get("filename") or f"{name}.{style_format}"
+        path, _selected = QFileDialog.getSaveFileName(
+            self,
+            self.tr("Save style '{}'").format(name),
+            suggested,
+            f"{style_format.upper()} (*.{style_format});;All files (*)",
+        )
+        if not path:
+            return
+        if self._run_action(
+            lambda: Path(path).write_text(body, encoding="utf-8"),
+            self.tr("Failed to save '{}'").format(name),
+        ):
+            self.show_success_message(
+                self.tr("Style '{}' saved as {} ({}).").format(
+                    name, Path(path).name, sld_version(body)
+                )
+                if style_format == "sld"
+                else self.tr("Style '{}' saved as {}.").format(name, Path(path).name)
             )
 
     # -- Delete ----------------------------------------------------------------

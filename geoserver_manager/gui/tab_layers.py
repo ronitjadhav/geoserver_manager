@@ -10,6 +10,7 @@ from qgis.core import QgsDataSourceUri, QgsProject, QgsRasterLayer, QgsVectorLay
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.toolbelt.sld import layer_to_sld, styleable_project_layers
 
 # How a GeoServer layer can be brought into QGIS. WFS gives the actual features
 # (editable, stylable in QGIS); WMS/WMTS give rendered images. WMTS goes through
@@ -47,6 +48,11 @@ class LayerTabMixin:
                 "mActionStyleManager.svg",
                 self.tr("Set style"),
                 self._set_layer_style,
+            ),
+            (
+                "mActionSharingExport.svg",
+                self.tr("Style from QGIS"),
+                self._style_from_qgis,
             ),
             (
                 "mActionDeleteSelected.svg",
@@ -519,6 +525,124 @@ class LayerTabMixin:
         ):
             self.show_success_message(
                 self.tr("'{}' now uses style '{}'.").format(name, style)
+            )
+
+    # -- Style from QGIS -------------------------------------------------------
+
+    @staticmethod
+    def _matching_project_layer(layer_name, layers):
+        """The label of the project layer that looks like this GeoServer layer.
+
+        Matched on the name, ignoring case and any "workspace:" prefix, because
+        that is how a layer added by this plugin (or by QGIS's own browser)
+        comes into a project.
+        """
+        wanted = layer_name.split(":")[-1].casefold()
+        for label, layer in layers:
+            if layer.name().split(":")[-1].casefold() == wanted:
+                return label
+        return None
+
+    def _style_from_qgis(self, row_data):
+        """Upload a QGIS layer's symbology as this layer's style."""
+        name, ws_name = row_data[0], row_data[1]
+        layers = styleable_project_layers()
+        if not layers:
+            self.show_warning_message(
+                self.tr(
+                    "This QGIS project has no vector or raster layer to take a style from."
+                )
+            )
+            return
+        match = self._matching_project_layer(name, layers)
+
+        dlg = ResourceFormDialog(
+            title=self.tr("Style '{}' from QGIS").format(name),
+            description=self.tr(
+                "The layer's symbology is exported as SLD and uploaded to "
+                "workspace '{}'. A style of that name there is replaced — that "
+                "is how you push a change you just made in QGIS."
+            ).format(ws_name),
+            fields=[
+                {
+                    "key": "qgis_layer",
+                    "label": self.tr("QGIS layer"),
+                    "type": "combo",
+                    "options": [label for label, _layer in layers],
+                    "default": match,
+                    "required": True,
+                    "help": (
+                        None
+                        if match
+                        else self.tr("No project layer matches '{}' by name.").format(
+                            name
+                        )
+                    ),
+                },
+                {
+                    "key": "style",
+                    "label": self.tr("Style name"),
+                    "type": "text",
+                    "default": name,
+                    "required": True,
+                },
+                {
+                    "key": "set_default",
+                    "label": self.tr("Make it the layer's default style"),
+                    "type": "checkbox",
+                    "default": True,
+                },
+            ],
+            parent=self,
+        )
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        values = dlg.get_values()
+        # The export reads a live QGIS layer, so it happens here on the GUI
+        # thread, before the upload (invariant 9).
+        layer = self._picked_layer(values)
+        sld = self._fetch(
+            lambda: layer_to_sld(layer),
+            self.tr("Could not export the symbology of '{}'").format(layer.name()),
+        )
+        if sld is None:
+            return
+
+        style_name = values["style"]
+        if self._run_action(
+            lambda: self._push_qgis_style(
+                style_name, ws_name, sld, name, values["set_default"]
+            ),
+            self.tr("Failed to upload the style of '{}'").format(layer.name()),
+        ):
+            self.show_success_message(
+                self.tr("'{}' styled from '{}'.").format(name, layer.name())
+                if values["set_default"]
+                else self.tr("Style '{}' uploaded to '{}'.").format(style_name, ws_name)
+            )
+            self._reload_current_tab()
+
+    def _push_qgis_style(
+        self, style_name, workspace_name, sld, layer_name, set_default
+    ):
+        """Create or replace the style in the layer's workspace, then assign it.
+
+        Workspace styles are referenced by their qualified name, so the layer's
+        defaultStyle gets "workspace:style" — a bare name there would resolve
+        to a global style of the same name instead.
+        """
+        self._check(
+            self.gs.create_style_definition(
+                style_name, f"{style_name}.sld", workspace_name
+            )
+        )
+        self._put_sld_body(style_name, workspace_name, sld)
+        if set_default:
+            self._check(
+                self.gs.set_default_layer_style(
+                    layer_name, workspace_name, f"{workspace_name}:{style_name}"
+                )
             )
 
     # -- Add to QGIS ----------------------------------------------------------

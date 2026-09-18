@@ -23,7 +23,7 @@ Skills in `.claude/skills/` hold the step-by-step procedures:
 | `geoserver_manager/gui/tab_workspaces.py`, `tab_datastores.py`, `tab_coveragestores.py`, `tab_layers.py`, `tab_layergroups.py`, `tab_styles.py` | One mixin per resource type: load / add / edit / delete (layers also: publish, add to QGIS; layer groups also: add to QGIS; coverage stores also: publish a coverage) |
 | `geoserver_manager/gui/dlg_resource_form.py` | `ResourceFormDialog` — a modal form built from a list of field dicts (see its module docstring for the field spec) |
 | `geoserver_manager/gui/dlg_settings.py` | Options page: URL + credentials (credentials go to `QgsAuthManager`, encrypted) |
-| `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser` |
+| `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser`, `sld` (QGIS ⇄ SLD, version sniffing) |
 | `geoserver_manager/extras/*.whl` | Bundled `geoservercloud` (stripped, see below) and `xmltodict`, added to `sys.path` at startup |
 | `tests/unit/` | Runs without QGIS. `tests/qgis/` needs the QGIS Python (headless via `qgis.testing.start_app()`) |
 | `docs/github_issue_roadmap.md` | Feature backlog; GitHub milestones mirror it |
@@ -130,6 +130,15 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
 - **Thread safety:** the REST methods are stateless `requests.*` calls and are safe to run through
   `_fan_out` (the datastore list does this). `self.wms` / `self.wmts` on the client are shared state —
   OWS calls must not be fanned out the same way.
+- **SLD versions decide the content type** (row 27 of #50). GeoServer picks its SLD parser from the request's
+  content type, not from the document: `application/vnd.ogc.sld+xml` for 1.0, `application/vnd.ogc.se+xml` for
+  1.1. `rest_service.create_style()` only sends the former, so `toolbelt/sld.py` sniffs the version
+  (`StyledLayerDescriptor/@version`, else the `se:` namespace) and `_put_sld_body()` raw-PUTs the 1.1 case —
+  every SLD write in the plugin goes through it. Facts behind that: `QgsMapLayer.saveSldStyle()` always writes
+  **SLD 1.1** on QGIS 3.40, even for a single-symbol renderer; a 1.1 body sent as 1.0 is accepted and rendered
+  but recorded as `languageVersion 1.0.0`; and `GET {style}.sld` returns GeoServer's **1.0 rendition** of a
+  stored 1.1 document, so the editor shows converted text and says so. Exporting or applying a style touches a
+  live QGIS layer, so it happens on the GUI thread before any upload (invariant 9).
 - **Workspace WMS settings** (rows 25–26 of #50): `WmsSettings` models none of the service metadata
   (`title`, `abstrct`, `keywords`, `srs`, …) and there is no delete, so `tab_workspaces.py` GETs, PUTs and
   DELETEs the settings path itself. GeoServer facts behind that code: the abstract's JSON key is **`abstrct`**;

@@ -12,10 +12,14 @@ Usage from the repo root folder:
 """
 
 # standard library
+from unittest.mock import patch
+
+from qgis.PyQt.QtWidgets import QDialog
 from qgis.testing import start_app, unittest
 
 # project
 from geoserver_manager.gui.dlg_main import GeoServerMainDialog
+from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from tests.qgis.sync_dialog import SyncDialog
 
 start_app()
@@ -297,8 +301,6 @@ class TestAddToQgis(unittest.TestCase):
             GeoServerMainDialog._layer_uri("FTP", self.BASE, "x:y")
 
     def test_unreachable_layer_is_a_banner_not_a_project_entry(self):
-        from unittest.mock import patch
-
         from qgis.core import QgsProject
         from qgis.PyQt.QtWidgets import QDialog
 
@@ -556,8 +558,181 @@ class TestSetLayerStyle(unittest.TestCase):
         self.dlg._load_layers()
         self.assertEqual(
             [t for _i, t, _c in self.dlg._row_actions],
-            ["Add to QGIS", "Set style", "Delete"],
+            ["Add to QGIS", "Set style", "Style from QGIS", "Delete"],
         )
+
+
+# ############################################################################
+# ###### Style from QGIS #########
+# ################################
+
+
+class StyleFakeGS(FakeGS):
+    """Records the style calls the push makes."""
+
+    def __init__(self):
+        super().__init__()
+        self.style_calls = []
+        outer = self
+
+        class Response:
+            status_code = 200
+            text = ""
+
+            def json(inner):
+                return {}
+
+        class Client:
+            def put(inner, path, **kwargs):
+                outer.style_calls.append(("PUT", path, kwargs))
+                return Response()
+
+        class Endpoints:
+            base_url = "/rest"
+
+            def style(inner, style_name, workspace_name=None, format="json"):
+                base = (
+                    f"/rest/workspaces/{workspace_name}/styles/{style_name}"
+                    if workspace_name
+                    else f"/rest/styles/{style_name}"
+                )
+                return f"{base}.{format}"
+
+        class Rest:
+            rest_client = Client()
+            rest_endpoints = Endpoints()
+
+        self.rest_service = Rest()
+
+    def create_style_definition(self, name, filename, workspace_name=None):
+        self.style_calls.append(("definition", name, filename, workspace_name))
+        return ("", 201)
+
+    def set_default_layer_style(self, layer_name, workspace_name, style):
+        self.style_calls.append(("set_default", layer_name, workspace_name, style))
+        return ("", 200)
+
+
+class TestStyleFromQgis(unittest.TestCase):
+    def setUp(self):
+        from qgis.core import QgsProject
+
+        self.project = QgsProject.instance()
+        self.project.removeAllMapLayers()
+        self.dlg = SyncDialog()
+        self.dlg.gs = StyleFakeGS()
+        self.messages = {"warning": [], "success": []}
+        self.dlg.show_warning_message = self.messages["warning"].append
+        self.dlg.show_success_message = self.messages["success"].append
+        self.dlg.show_error_message = lambda text: self.fail(f"unexpected: {text}")
+        self.dlg._reload_current_tab = lambda: None
+
+    def tearDown(self):
+        self.project.removeAllMapLayers()
+
+    def add_layer(self, name, colour="#ff0000"):
+        from tests.qgis.test_sld import point_layer
+
+        layer = point_layer(name, colour=colour)
+        self.project.addMapLayer(layer)
+        return layer
+
+    def push(self, row_data, **edits):
+        from geoserver_manager.gui import tab_layers
+
+        class Accepting(ResourceFormDialog):
+            def exec(inner):
+                for key, value in edits.items():
+                    widget = inner.get_widget(key)
+                    if hasattr(widget, "setChecked"):
+                        widget.setChecked(value)
+                    elif hasattr(widget, "setCurrentText"):
+                        widget.setCurrentText(value)
+                    else:
+                        widget.setText(value)
+                return QDialog.DialogCode.Accepted
+
+        with patch.object(tab_layers, "ResourceFormDialog", Accepting):
+            self.dlg._style_from_qgis(row_data)
+
+    def test_the_matching_project_layer_is_found_by_name(self):
+        from tests.qgis.test_sld import point_layer
+
+        # a layer added by this plugin keeps GeoServer's "workspace:layer" name
+        layers = [
+            ("topp:roads  (vector)", point_layer("topp:roads")),
+            ("Rivers  (vector)", point_layer("Rivers")),
+        ]
+        # matched ignoring case and any workspace prefix on either side
+        self.assertEqual(
+            self.dlg._matching_project_layer("roads", layers), "topp:roads  (vector)"
+        )
+        self.assertEqual(
+            self.dlg._matching_project_layer("topp:rivers", layers),
+            "Rivers  (vector)",
+        )
+        self.assertIsNone(self.dlg._matching_project_layer("nothing", layers))
+
+    def test_the_push_creates_the_style_and_assigns_it_qualified(self):
+        self.add_layer("tasmania_roads")
+        self.push(["tasmania_roads", "topp", "taz_shapes", "EPSG:4326", "True"])
+
+        self.assertEqual(
+            self.dlg.gs.style_calls[0],
+            ("definition", "tasmania_roads", "tasmania_roads.sld", "topp"),
+        )
+        verb, path, kwargs = self.dlg.gs.style_calls[1]
+        self.assertEqual(
+            (verb, path), ("PUT", "/rest/workspaces/topp/styles/tasmania_roads.sld")
+        )
+        self.assertEqual(
+            kwargs["headers"]["Content-Type"], "application/vnd.ogc.se+xml"
+        )
+        self.assertIn(b"ff0000", kwargs["data"].lower())
+        # a workspace style is referenced as "workspace:style"; a bare name
+        # would resolve to a global style of the same name
+        self.assertEqual(
+            self.dlg.gs.style_calls[2],
+            ("set_default", "tasmania_roads", "topp", "topp:tasmania_roads"),
+        )
+
+    def test_the_style_name_is_the_layers_and_can_be_changed(self):
+        self.add_layer("tasmania_roads")
+        self.push(
+            ["tasmania_roads", "topp", "taz_shapes", "EPSG:4326", "True"],
+            style="roads_from_qgis",
+        )
+        self.assertEqual(
+            self.dlg.gs.style_calls[0],
+            ("definition", "roads_from_qgis", "roads_from_qgis.sld", "topp"),
+        )
+        self.assertEqual(self.dlg.gs.style_calls[-1][3], "topp:roads_from_qgis")
+
+    def test_unticking_the_default_uploads_without_assigning(self):
+        self.add_layer("tasmania_roads")
+        self.push(
+            ["tasmania_roads", "topp", "taz_shapes", "EPSG:4326", "True"],
+            set_default=False,
+        )
+        self.assertFalse(
+            [call for call in self.dlg.gs.style_calls if call[0] == "set_default"]
+        )
+        self.assertIn("uploaded", self.messages["success"][0])
+
+    def test_an_empty_project_is_a_banner_not_a_dialog(self):
+        from geoserver_manager.gui import tab_layers
+
+        class Recording(ResourceFormDialog):
+            opened = []
+
+            def exec(inner):
+                Recording.opened.append(inner)
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_layers, "ResourceFormDialog", Recording):
+            self.dlg._style_from_qgis(["tasmania_roads", "topp", "x", "", ""])
+        self.assertEqual(Recording.opened, [])
+        self.assertIn("no vector or raster layer", self.messages["warning"][0])
 
 
 # ############################################################################

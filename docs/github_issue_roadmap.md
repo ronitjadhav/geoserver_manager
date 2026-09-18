@@ -52,6 +52,10 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 - [x] Upload style from pasted string
 - [x] Delete style
 - [x] Set default style for a layer
+- [x] Upload a style from a QGIS layer's symbology (Styles tab, and one click
+      from the Layers tab: upload and assign)
+- [x] Apply a server style to a QGIS project layer
+- [x] Save a style to disk as `.sld`
 
 ## Layer Groups
 
