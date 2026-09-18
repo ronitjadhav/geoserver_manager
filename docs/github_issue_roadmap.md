@@ -112,10 +112,11 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 
 - [x] Async/threaded API calls (prevent UI freezing) — every tab load and the
   connection probe run in a `QgsTask`, with progress and Cancel
-- [ ] Resource list caching with TTL — partial: workspace names are cached
-  until the next refresh, no TTL
-- [ ] Keyboard shortcuts (F5 refresh, Del delete, Ctrl+F search)
-- [ ] Dark theme support
+- [x] Resource list caching with TTL — decided against. Every list is fetched
+  on tab switch and Refresh, and the one cache that existed (workspace names)
+  was removed because it left a stale picker behind. Refresh is the TTL
+- [x] Keyboard shortcuts (F5 refresh, Del delete, Ctrl+F search, Esc clear)
+- [x] Dark theme support — status and hint colours come from the palette
 - [x] i18n / translation support — the tab mixins translate in their own
   context, so extraction and lookup agree; a starter French locale ships
 - [x] Reusable resource form dialog (text, combo, checkbox, spinbox, tabs)

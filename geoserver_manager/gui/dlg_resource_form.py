@@ -73,6 +73,8 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
+from geoserver_manager.gui.theme import hint_colour, invalid_field_colour
+
 
 class ResourceFormDialog(QDialog):
     """Generic modal form dialog built from a field definition list."""
@@ -108,7 +110,9 @@ class ResourceFormDialog(QDialog):
         if description:
             desc_label = QLabel(description)
             desc_label.setWordWrap(True)
-            desc_label.setStyleSheet("color: gray; margin-bottom: 6px;")
+            desc_label.setStyleSheet(
+                f"color: {hint_colour(self.palette())}; margin-bottom: 6px;"
+            )
             layout.addWidget(desc_label)
 
         # Group fields by tab
@@ -185,7 +189,9 @@ class ResourceFormDialog(QDialog):
             if help_text:
                 help_label = QLabel(help_text)
                 help_label.setWordWrap(True)
-                help_label.setStyleSheet("color: gray; font-size: 11px;")
+                help_label.setStyleSheet(
+                    f"color: {hint_colour(self.palette())}; font-size: 11px;"
+                )
                 help_label.setSizePolicy(
                     QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
                 )
@@ -378,7 +384,9 @@ class ResourceFormDialog(QDialog):
                     self._tabs.setCurrentWidget(self._field_page[key])
                 widget = self._widgets[key]
                 widget.setFocus()
-                widget.setStyleSheet("border: 1px solid red;")
+                widget.setStyleSheet(
+                    f"border: 1px solid {invalid_field_colour(self.palette())};"
+                )
                 return
 
         self.accept()

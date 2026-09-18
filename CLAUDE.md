@@ -204,6 +204,14 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
 - The global-or-workspace scope (`GLOBAL` label + `_scope()`) lives in `tab_styles.py` and is reused by
   `tab_layergroups.py` through the shared dialog class, like `_layer_uri()` from `tab_layers.py`. A third tab
   needing it is the point to lift it out of `tab_styles` — not before.
+- **Colours come from the palette**, never from a literal: `gui/theme.py` maps "ok" / "error" / "busy" and
+  the hint and invalid-field colours onto the widget's own palette, choosing a light- or dark-background
+  variant. `tests/qgis/test_ux.py` asserts each one clears WCAG's 3:1 contrast floor against the window
+  colour in both themes, so a prettier colour that cannot be read fails the suite.
+- **Keyboard: F5 / Ctrl+F / Esc / Del** live in `GeoServerMainDialog.keyPressEvent`, not in `QShortcut`,
+  because each one has to know where the focus is: Del may only delete when the *table* has focus (the same
+  key erases a character in the search box), and Esc clears the search only when there is one, so it still
+  closes the dialog otherwise.
 - **Nothing the dialog shows comes from a cache.** Lists are fetched on every tab switch and Refresh,
   edit dialogs fetch the object when they open, pickers fetch their options when the form opens. A
   workspace-name cache once survived a Refresh and left the datastore form's combo stale; it was removed

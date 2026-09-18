@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Keyboard shortcuts**: F5 refreshes, Ctrl+F jumps to the search box, Esc
+  clears the search (and still closes the dialog when there is nothing to
+  clear), and Del deletes the selected resources — only while the table has the
+  focus, so the same key still just erases a character in the search box. The
+  shortcuts are named in the tooltips.
+- **Readable on dark themes**: the connection status, the form hints and the
+  invalid-field border take their colours from the widget palette instead of
+  literal `red` / `green` / `gray`, which on QGIS's dark themes ranged from
+  harsh to barely visible. The colours are checked against WCAG contrast in
+  both themes by the tests.
+- The dialog reopens on the tab it was closed on.
 - **Translations work.** Every string in a tab mixin is now looked up in the
   context it is extracted under, so a translation can actually be found — until
   now none of them could be, because `self.tr()` in a mixin resolves against

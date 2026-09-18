@@ -38,6 +38,7 @@ from geoserver_manager.gui.tab_layergroups import LayerGroupTabMixin
 from geoserver_manager.gui.tab_layers import LayerTabMixin
 from geoserver_manager.gui.tab_styles import StyleTabMixin
 from geoserver_manager.gui.tab_workspaces import WorkspaceTabMixin
+from geoserver_manager.gui.theme import status_colour
 from geoserver_manager.toolbelt.log_handler import PlgLogger
 from geoserver_manager.toolbelt.preferences import PlgOptionsManager
 
@@ -134,18 +135,25 @@ class GeoServerMainDialog(
 
         # Tooltips
         self.btn_close.setToolTip(self.tr("Close the dialog"))
-        self.btn_refresh.setToolTip(self.tr("Refresh resources from the GeoServer"))
+        self.btn_refresh.setToolTip(
+            self.tr("Refresh resources from the GeoServer (F5)")
+        )
         self.btn_edit_credentials.setToolTip(
             self.tr("Open settings to edit GeoServer credentials")
         )
         self.searchBox.setToolTip(
-            self.tr("Search resources by name or other attributes")
+            self.tr(
+                "Search resources by name or other attributes "
+                "(Ctrl+F to jump here, Esc to clear)"
+            )
         )
         self.btn_page_first.setToolTip(self.tr("First page"))
         self.btn_page_prev.setToolTip(self.tr("Previous page"))
         self.btn_page_next.setToolTip(self.tr("Next page"))
         self.btn_page_last.setToolTip(self.tr("Last page"))
-        self.btn_delete_selected.setToolTip(self.tr("Delete the selected resources"))
+        self.btn_delete_selected.setToolTip(
+            self.tr("Delete the selected resources (Del)")
+        )
 
         # Signals
         self.btn_close.clicked.connect(self.close)
@@ -166,6 +174,39 @@ class GeoServerMainDialog(
 
         self._restore_settings()
 
+    # -- Keyboard -----------------------------------------------------------
+
+    def keyPressEvent(self, event):  # noqa: N802 — Qt's own spelling
+        """F5 refresh, Ctrl+F search, Esc clear, Del delete the selection.
+
+        Handled here rather than with QShortcut so each key can look at where
+        the focus is: Del must delete resources only when the *table* has it,
+        never while the same key is erasing a character in the search box, and
+        Esc must keep closing the dialog when there is no search to clear.
+        """
+        key = event.key()
+        modifiers = event.modifiers()
+
+        if key == Qt.Key.Key_F5:
+            self.refresh_ui(show_message=True)
+            return
+        if key == Qt.Key.Key_F and modifiers & Qt.KeyboardModifier.ControlModifier:
+            self.searchBox.setFocus()
+            self.searchBox.selectAll()
+            return
+        if key == Qt.Key.Key_Escape and self.searchBox.text():
+            self.searchBox.clear()
+            return
+        if (
+            key == Qt.Key.Key_Delete
+            and self.resultsTable.hasFocus()
+            and self.btn_delete_selected.isEnabled()
+            and self._delete_selected_callback is not None
+        ):
+            self._delete_selected_callback(self._get_selected_rows())
+            return
+        super().keyPressEvent(event)
+
     # -- Settings persistence -----------------------------------------------
 
     def closeEvent(self, event):
@@ -176,11 +217,12 @@ class GeoServerMainDialog(
         super().closeEvent(event)
 
     def _store_settings(self):
-        """Persist dialog geometry and splitter sizes."""
+        """Persist dialog geometry, splitter sizes and the open tab."""
         self.plg_settings.set_value_from_key("dialog_geometry", self.saveGeometry())
         self.plg_settings.set_value_from_key(
             "splitter_state", self.splitter.saveState()
         )
+        self.plg_settings.set_value_from_key("last_tab", self.navList.currentRow())
 
     def _restore_settings(self):
         """Restore dialog geometry and splitter sizes."""
@@ -234,7 +276,7 @@ class GeoServerMainDialog(
         The constructor makes no network call; _probe does the real check.
         """
         if not settings.has_credentials():
-            self._set_status(self.tr("Not configured"), "red")
+            self._set_status(self.tr("Not configured"), "error")
             self.show_warning_message(
                 self.tr("GeoServer not configured — open Settings to add credentials.")
             )
@@ -242,7 +284,7 @@ class GeoServerMainDialog(
 
         username, password = settings.get_credentials()
         if not username or not password:
-            self._set_status(self.tr("Auth error"), "red")
+            self._set_status(self.tr("Auth error"), "error")
             self.show_error_message(
                 self.tr("Could not read credentials from the auth store.")
             )
@@ -354,9 +396,15 @@ class GeoServerMainDialog(
                 return f"GeoServer {version}" if version else ""
         return ""
 
-    def _set_status(self, text, color="black"):
+    def _set_status(self, text, kind="neutral"):
+        """Show the connection state, in a colour this theme can carry.
+
+        :param kind: "ok", "error", "busy" or "neutral" — never a literal
+            colour: `red` on a dark theme is what this replaces.
+        """
         self.lbl_status.setText(text)
-        self.lbl_status.setStyleSheet(f"color: {color};")
+        colour = status_colour(kind, self.palette())
+        self.lbl_status.setStyleSheet(f"color: {colour};" if colour else "")
 
     # -- Public entry point ------------------------------------------------
 
@@ -366,7 +414,7 @@ class GeoServerMainDialog(
         Returns as soon as the probe is on its way: nothing here waits for the
         server, so QGIS stays usable even when the host swallows the SYN.
         """
-        self._set_status(self.tr("Connecting…"), "gray")
+        self._set_status(self.tr("Connecting…"), "busy")
         self.gs = None
         settings = self.plg_settings.get_plg_settings()
         # Credentials come out of QgsAuthManager, so the client is built here on
@@ -385,7 +433,7 @@ class GeoServerMainDialog(
             problem, version = result
             if problem is not None:
                 status, message = problem
-                self._set_status(status, "red")
+                self._set_status(status, "error")
                 self.show_error_message(message)
                 self.log(
                     f"Connection check failed: {status}", Qgis.MessageLevel.Critical
@@ -398,7 +446,7 @@ class GeoServerMainDialog(
             status = self.tr("Connected — {}").format(url)
             if version:
                 status += f" ({version})"
-            self._set_status(status, "green")
+            self._set_status(status, "ok")
             if show_message:
                 # The rows are still on their way; _render_rows says so once
                 # they land, rather than claiming it now.
@@ -478,7 +526,7 @@ class GeoServerMainDialog(
         self.btn_refresh.setToolTip(
             self.tr("Stop loading")
             if loading
-            else self.tr("Refresh resources from the GeoServer")
+            else self.tr("Refresh resources from the GeoServer (F5)")
         )
         if loading:
             self.lbl_page_info.setText(self.tr("Loading…"))
@@ -513,7 +561,16 @@ class GeoServerMainDialog(
                 QListWidgetItem(QIcon(QgsApplication.iconPath(icon)), label)
             )
         if self.navList.count():
-            self.navList.setCurrentRow(0)
+            # Reopen on the tab this profile left open, if it still exists:
+            # TABS can gain and lose entries between versions.
+            remembered = self.plg_settings.get_value_from_key("last_tab", 0, int)
+            try:
+                remembered = int(remembered)
+            except (TypeError, ValueError):
+                remembered = 0
+            if not 0 <= remembered < self.navList.count():
+                remembered = 0
+            self.navList.setCurrentRow(remembered)
 
     def _reload_current_tab(self):
         """Reload whichever tab is selected.
