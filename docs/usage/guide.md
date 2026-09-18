@@ -118,7 +118,8 @@ name and store.
   in one request, and the layer's QGIS symbology is uploaded as its default
   style. Tick *Replace it if it already exists* to overwrite a previous upload.
   The layer's name is made GeoServer-safe first (spaces and accents become
-  `_`).
+  `_`). The upload runs as a QGIS task with progress and *Cancel*; a layer
+  whose CRS has no EPSG code is reprojected to EPSG:4326 on the way.
 
 Row actions: **Add to QGIS** (*Load as* WMS, WMTS or, for a vector layer, WFS — the credentials
 travel as a QGIS authentication configuration, so a saved project never

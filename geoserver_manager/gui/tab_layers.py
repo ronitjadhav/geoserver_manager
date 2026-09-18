@@ -8,6 +8,9 @@ Used as a mixin for GeoServerMainDialog.
 """
 
 import re
+import shutil
+import tempfile
+from pathlib import Path
 from urllib.parse import quote, unquote, urlencode
 
 from qgis.core import Qgis, QgsDataSourceUri, QgsProject, QgsRasterLayer, QgsVectorLayer
@@ -17,7 +20,13 @@ from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_preview import LayerPreviewDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.toolbelt.qgis_export import export_to_geopackage, geoserver_name
+from geoserver_manager.toolbelt.qgis_export import (
+    export_to_geopackage,
+    geoserver_name,
+    reprojection_target,
+    require_crs,
+)
+from geoserver_manager.toolbelt.rest import ProgressReader, raw_rest
 from geoserver_manager.toolbelt.sld import layer_to_sld, styleable_project_layers
 
 # How a GeoServer layer can be brought into QGIS. WFS gives the actual features
@@ -615,13 +624,19 @@ class LayerTabMixin:
             return
 
         values = dlg.get_values()
-        published = (
-            geoserver_name(values["name"])
-            if values.get("source") == _SOURCE_QGIS
-            else values["table"]
-        )
+        if values.get("source") == _SOURCE_QGIS:
+            # The checks and the export raise here, under the wait cursor; the
+            # upload then streams in a task and reports itself.
+            self._run_action(
+                lambda: self._publish_qgis_layer(values),
+                translate("LayerTabMixin", "Failed to publish '{}'").format(
+                    geoserver_name(values["name"])
+                ),
+            )
+            return
+        published = values["table"]
         if self._run_action(
-            lambda: self._publish_layer_from_values(values),
+            lambda: self._publish_table(values),
             translate("LayerTabMixin", "Failed to publish '{}'").format(published),
         ):
             self.show_success_message(
@@ -644,16 +659,21 @@ class LayerTabMixin:
         request. The data is copied: later edits in QGIS do not reach it, and
         deleting the store leaves the uploaded file in the data directory.
 
+        The layer, its CRS, the name check, the export and the SLD happen here
+        on the GUI thread — a live QGIS layer, invariant 9 — and raise into the
+        caller's _run_action; the PUT then streams in a task through
+        _run_upload, with progress and Cancel, and the metadata and the style
+        follow on the GUI thread once it lands. The client is captured now: a
+        Refresh drops self.gs while the task runs.
+
         TODO(#50): upstream as create_datastore_from_file(ws, name, path) — the
         library can only create datastores from connection parameters, so the
-        upload is a raw PUT of .../datastores/{name}/file.gpkg.
+        upload is a raw PUT of .../datastores/{name}/file.gpkg (row 28).
         """
-        import tempfile
-        from pathlib import Path
-
         ws_name = values["workspace"]
         name = geoserver_name(values["name"])
         layer = self._picked_layer(values)
+        require_crs(layer)
         if not values.get("replace"):
             for exists, message in (
                 (
@@ -676,40 +696,118 @@ class LayerTabMixin:
                         + translate("LayerTabMixin", "Tick Replace to overwrite it.")
                     )
 
-        # The export reads a live QGIS layer, so it happens here, before any
-        # request: this action runs on the GUI thread (invariant 9).
+        # A CRS without an EPSG code would be published as UNKNOWN: the export
+        # reprojects it to one GeoServer can declare (reprojection_target).
         folder = Path(tempfile.mkdtemp(prefix="gsm_publish_"))
         package = folder / f"{name}.gpkg"
         try:
-            export_to_geopackage(layer, package, name)
-            path = (
-                f"{self.gs.rest_service.rest_endpoints.base_url}"
-                f"/workspaces/{ws_name}/datastores/{name}/file.gpkg"
+            export_to_geopackage(
+                layer, package, name, target_crs=reprojection_target(layer)
             )
-            self._raw_rest(
-                "put",
-                path,
-                params={"update": "overwrite"},
-                data=package.read_bytes(),
-                headers={"Content-Type": "application/x-sqlite3"},
-            )
-        finally:
-            if package.exists():
-                package.unlink()
-            folder.rmdir()
+        except Exception:
+            shutil.rmtree(folder, ignore_errors=True)
+            raise
+        sld = layer_to_sld(layer) if values.get("with_style") else None
+        client = self.gs.rest_service.rest_client
+        upload_path = (
+            f"{self.gs.rest_service.rest_endpoints.base_url}"
+            f"/workspaces/{ws_name}/datastores/{name}/file.gpkg"
+        )
+        failure = translate("LayerTabMixin", "Failed to publish '{}'").format(name)
 
-        # Best effort: the data is published at this point, so a failure to set
-        # a performance flag belongs in the log, not in the user's face.
-        try:
-            self._make_datastore_read_only(ws_name, name)
-        except Exception as error:
-            self.log(
-                f"Could not mark '{ws_name}:{name}' read-only: {error}",
-                log_level=Qgis.MessageLevel.Warning,
+        def work(task):
+            try:
+                with open(package, "rb") as handle:
+                    body = ProgressReader(
+                        handle,
+                        package.stat().st_size,
+                        on_progress=task.setProgress if task is not None else None,
+                        is_cancelled=task.isCanceled if task is not None else None,
+                    )
+                    raw_rest(
+                        client,
+                        "put",
+                        upload_path,
+                        params={"update": "overwrite"},
+                        data=body,
+                        headers={"Content-Type": "application/x-sqlite3"},
+                    )
+            finally:
+                shutil.rmtree(folder, ignore_errors=True)
+
+        def published(_result):
+            if self.gs is None:  # a Refresh dropped the client meanwhile
+                self.show_warning_message(
+                    translate(
+                        "LayerTabMixin",
+                        "Layer '{}' uploaded — reconnect to finish its metadata "
+                        "and style.",
+                    ).format(name)
+                )
+                return
+
+            def finish():
+                # Best effort: the data is published at this point, so a
+                # failure to set a performance flag belongs in the log, not in
+                # the user's face.
+                try:
+                    self._make_datastore_read_only(ws_name, name)
+                except Exception as error:
+                    self.log(
+                        f"Could not mark '{ws_name}:{name}' read-only: {error}",
+                        log_level=Qgis.MessageLevel.Warning,
+                    )
+                self._set_feature_type_metadata(ws_name, name, values)
+                if sld is not None:
+                    self._push_qgis_style(name, ws_name, sld, name, True)
+
+            if self._run_action(finish, failure):
+                self.show_success_message(
+                    translate("LayerTabMixin", "Layer '{}' published.").format(name)
+                )
+            # The user may have moved to another tab while it uploaded.
+            self._reload_current_tab()
+
+        self._run_upload(
+            failure,
+            work,
+            published,
+            lambda _task: self._report_cancelled_layer_upload(ws_name, name),
+        )
+
+    def _report_cancelled_layer_upload(self, ws_name, name):
+        """Say what a cancelled upload left behind — measured on 2.28.5.
+
+        The same two cases as a raster (see _report_cancelled_raster_upload):
+        an aborted first upload leaves nothing; an aborted *Replace* keeps the
+        store and its layer, but GeoServer has already deleted the previous
+        file.
+        """
+        kept = None
+        if self.gs is not None:  # a Refresh may have dropped the client meanwhile
+            try:
+                kept = self._resource_exists(self.gs.get_datastore, ws_name, name)
+            except Exception:  # the report must not fail the cancel
+                kept = None
+        if kept:
+            message = translate(
+                "LayerTabMixin",
+                "Upload of '{}' cancelled. GeoServer kept the datastore and its "
+                "layer but had already removed their data file — publish it again "
+                "with Replace ticked, or delete the datastore.",
             )
-        self._set_feature_type_metadata(ws_name, name, values)
-        if values.get("with_style"):
-            self._push_qgis_style(name, ws_name, layer_to_sld(layer), name, True)
+        elif kept is None:
+            message = translate(
+                "LayerTabMixin",
+                "Upload of '{}' cancelled — check the Datastores tab for what was "
+                "left.",
+            )
+        else:
+            message = translate(
+                "LayerTabMixin",
+                "Upload of '{}' cancelled — nothing was left on the server.",
+            )
+        self.show_warning_message(message.format(name))
 
     def _make_datastore_read_only(self, workspace_name, name):
         """Mark an uploaded GeoPackage store read-only.

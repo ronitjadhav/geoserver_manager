@@ -1079,6 +1079,9 @@ class GpkgPublishFakeGS(StyleFakeGS):
 
         class Client:
             def put(inner, path, **kwargs):
+                body = kwargs.get("data")
+                if hasattr(body, "read"):  # a streaming upload: record its bytes
+                    kwargs = {**kwargs, "data": body.read()}
                 outer.style_calls.append(("PUT", path, kwargs))
                 if path.endswith("file.gpkg"):
                     # GeoServer creates the datastore from the uploaded file
@@ -1276,6 +1279,67 @@ class TestPublishQgisLayer(unittest.TestCase):
             }
         )
         self.assertEqual(self.dlg.gs.created[-1]["layer_name"], "plugin_demo")
+
+
+class TestVectorUploadRunsInATask(unittest.TestCase):
+    """The real dialog: the GeoPackage streams off the GUI thread, with progress."""
+
+    def setUp(self):
+        from qgis.core import QgsProject
+
+        from geoserver_manager.gui.dlg_main import GeoServerMainDialog
+
+        self.project = QgsProject.instance()
+        self.project.removeAllMapLayers()
+        self.dlg = GeoServerMainDialog()
+        self.dlg.gs = GpkgPublishFakeGS()
+        self.successes, self.errors = [], []
+        self.dlg.show_success_message = self.successes.append
+        self.dlg.show_error_message = self.errors.append
+        self.dlg.show_warning_message = lambda text: None
+        self.dlg._reload_current_tab = lambda: None
+
+    def tearDown(self):
+        self.dlg._closing = True
+        self.dlg._cancel_load(user=True)
+        self.project.removeAllMapLayers()
+
+    def test_the_upload_is_a_task_with_progress_and_the_dialog_stays_usable(self):
+        from qgis.PyQt.QtTest import QTest
+
+        from tests.qgis.test_sld import point_layer
+
+        self.project.addMapLayer(point_layer("Roads (2024)", colour="#ff0000"))
+        self.dlg._publish_layer_from_values(
+            {
+                "source": "A layer from this QGIS project",
+                "workspace": "topp",
+                "qgis_layer": "Roads (2024)  (vector)",
+                "name": "Roads (2024)",
+                "replace": False,
+                "with_style": False,
+                "title": "",
+                "abstract": "",
+                "keywords": "",
+            }
+        )
+        self.assertIsNotNone(self.dlg._upload)  # the upload slot, not a load
+        self.assertEqual(self.dlg.btn_refresh.text(), "Cancel")
+
+        waited = 0
+        while self.dlg._loading() and waited < 20000:
+            QTest.qWait(20)
+            waited += 20
+        puts = [
+            call
+            for call in self.dlg.gs.style_calls
+            if call[0] == "PUT" and call[1].endswith("file.gpkg")
+        ]
+        self.assertEqual(len(puts), 1)
+        self.assertTrue(puts[0][2]["data"].startswith(b"SQLite format 3"))
+        self.assertEqual(self.errors, [])
+        self.assertEqual(self.successes, ["Layer 'Roads_2024' published."])
+        self.assertEqual(self.dlg.btn_refresh.text(), "Refresh")
 
 
 class TestPublishForm(unittest.TestCase):
