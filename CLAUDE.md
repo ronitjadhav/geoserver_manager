@@ -20,8 +20,9 @@ Skills in `.claude/skills/` hold the step-by-step procedures:
 |---|---|
 | `geoserver_manager/plugin_main.py` | QGIS entry point: `initGui` / `unload` / `run`. Shows the dialog, then connects. |
 | `geoserver_manager/gui/dlg_main.py` | `GeoServerMainDialog(QDialog, <one mixin per tab>)` — nav list, results table, search, pagination, and every helper the tabs share |
-| `geoserver_manager/gui/tab_workspaces.py`, `tab_datastores.py`, `tab_coveragestores.py`, `tab_cascaded.py`, `tab_layers.py`, `tab_layergroups.py`, `tab_styles.py`, `tab_gwc.py` | One mixin per resource type: load / add / edit / delete (layers also: publish, add to QGIS; layer groups also: add to QGIS; coverage stores also: publish a coverage; cascaded stores also: publish / view / delete a remote layer; tile cache: configure, truncate, stop caching) |
+| `geoserver_manager/gui/tab_workspaces.py`, `tab_datastores.py`, `tab_coveragestores.py`, `tab_cascaded.py`, `tab_layers.py`, `tab_layergroups.py`, `tab_styles.py`, `tab_gwc.py` | One mixin per resource type: load / add / edit / delete (layers also: publish, add to QGIS, preview; layer groups also: add to QGIS; coverage stores also: publish a coverage; cascaded stores also: publish / view / delete a remote layer; tile cache: configure, truncate, stop caching) |
 | `geoserver_manager/gui/dlg_resource_form.py` | `ResourceFormDialog` — a modal form built from a list of field dicts (see its module docstring for the field spec) |
+| `geoserver_manager/gui/dlg_preview.py` | `LayerPreviewDialog` — a `QgsMapCanvas` showing one WMS layer of the server, with GetFeatureInfo on click; non-modal, nothing reaches the project |
 | `geoserver_manager/gui/dlg_settings.py` | Options page: URL + credentials (credentials go to `QgsAuthManager`, encrypted) and *Test connection*, which probes the fields as typed |
 | `geoserver_manager/gui/layer_tree.py` | `LayerTreeMenu` — the *GeoServer Manager* submenu of the layer tree's context menu: push / apply the clicked layer's style through the main dialog's connection and its `_push_qgis_style` / `_style_body`; outcomes go to `iface.messageBar()` |
 | `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser`, `probe` (the bounded connection check the dialog and Settings share), `rest` (the raw REST call and the streaming upload body — no QGIS import), `sld` and `qgis_export` (QGIS ↔ GeoServer conversions, pure) |
@@ -176,6 +177,13 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   browser* is GeoServer's own OpenLayers GetMap page, built by the pure `_preview_url` from
   `latLonBoundingBox` (a group: its `bounds`) with a world fallback; the browser's session is not the
   plugin's, so a secured server asks it to log in, which the tooltip says.
+- **Embedded preview** (`gui/dlg_preview.py`): a `QgsMapCanvas` with a WMS `QgsRasterLayer` from
+  `_layer_uri` — never added to the project — and the provider's own `identify()` for GetFeatureInfo:
+  `IdentifyText` is what the WMS provider offers and GeoServer answers as `text/plain`; a file raster
+  offers `IdentifyValue`, which is how the dialog is tested without a server. The WMS provider needs the
+  canvas extent and size to turn the point into a pixel. One map tool does both: a drag pans, a release
+  within 3 px of the press identifies. `WA_DeleteOnClose` plus `stopRendering()` in `closeEvent` make
+  closing mid-render safe, and the window is non-modal so the main dialog's tasks carry on.
 - **Thread safety:** the REST methods are stateless `requests.*` calls and are safe to run through
   `_fan_out` (the datastore list does this). `self.wms` / `self.wmts` on the client are shared state —
   OWS calls must not be fanned out the same way.
@@ -255,8 +263,8 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   is why the WMTS publish does not use `create_wmts_layer()` (it fetches the remote capabilities from
   the *plugin's* machine, forces EPSG:4326 and deletes an existing layer first); a cascaded layer
   DELETE needs `recurse=true` or GeoServer answers 403 "wms layer referenced by layer(s)"; a store
-  DELETE with `recurse=true` takes its layers along. Cascaded layers are *not* in the Layers tab, which
-  walks feature types and coverages — the Cascaded Stores tab is where they live.
+  DELETE with `recurse=true` takes its layers along. Cascaded layers also appear in the Layers tab (it
+  reads `/rest/layers`), which reaches this tab's detail and delete helpers for them.
 - **Tile cache — GeoWebCache** (rows 42–47 of #50): GeoServer caches every layer and layer group
   by itself, so `GET /gwc/rest/layers.json` — a bare JSON array of names, `ws:name`, a global group bare —
   lists about everything published, and *Add a Layer to the Cache* only ever offers what was removed.

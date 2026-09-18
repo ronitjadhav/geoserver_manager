@@ -2,7 +2,7 @@
 
 """
 Layers tab — every published layer, whatever its type: list, inspect,
-style, add to QGIS, delete.
+preview, style, add to QGIS, delete.
 
 Used as a mixin for GeoServerMainDialog.
 """
@@ -15,6 +15,7 @@ from qgis.PyQt.QtCore import QCoreApplication, QUrl
 from qgis.PyQt.QtGui import QDesktopServices
 from qgis.PyQt.QtWidgets import QDialog
 
+from geoserver_manager.gui.dlg_preview import LayerPreviewDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.toolbelt.qgis_export import export_to_geopackage, geoserver_name
 from geoserver_manager.toolbelt.sld import layer_to_sld, styleable_project_layers
@@ -83,6 +84,16 @@ class LayerTabMixin:
                     "LayerTabMixin",
                     "Preview in a browser — GeoServer's own OpenLayers page. A "
                     "secured server will ask the browser to log in.",
+                ),
+            ),
+            (
+                "mActionZoomToLayer.svg",
+                translate("LayerTabMixin", "Preview"),
+                self._preview_layer,
+                translate(
+                    "LayerTabMixin",
+                    "Preview on a map inside QGIS — click the map for the feature "
+                    "info at that point. Nothing is added to the project.",
                 ),
             ),
             (
@@ -1108,6 +1119,46 @@ class LayerTabMixin:
                 workspace=ws_name or None,
             )
         )
+
+    # -- Preview inside QGIS ---------------------------------------------------
+
+    def _preview_layer(self, row_data):
+        """Show the layer on a map of its own, with the feature info on click.
+
+        The map layer is built like *Add to QGIS* builds one — credentials as
+        the auth config id — but it lives in the preview window only: nothing
+        reaches the project.
+        """
+        name, ws_name = row_data[0], row_data[1]
+        detail = self._fetch(
+            lambda: self._layer_resource(row_data),
+            translate("LayerTabMixin", "Failed to load layer details"),
+        )
+        if detail is None:
+            return
+        detail = detail if isinstance(detail, dict) else {}
+        # latLonBoundingBox is EPSG:4326 by definition, which is the map's CRS.
+        bbox, _srs = self._bbox_from(detail.get("latLonBoundingBox"))
+        qualified = f"{ws_name}:{name}" if ws_name else name
+
+        def build():
+            settings = self.plg_settings.get_plg_settings()
+            uri, provider = self._layer_uri(
+                "WMS", settings.geoserver_url, qualified, settings.geoserver_auth_cfg_id
+            )
+            # Reading the capabilities is a request. An invalid layer is not
+            # an error here: the window explains it in place of the map.
+            return QgsRasterLayer(uri, qualified, provider)
+
+        layer = self._fetch(
+            build,
+            translate("LayerTabMixin", "Could not build the preview of '{}'").format(
+                name
+            ),
+        )
+        if layer is None:
+            return
+        LayerPreviewDialog(qualified, layer, bbox, parent=self).show()
 
     def _add_layer_to_qgis(self, row_data):
         """Ask which protocol, then add the layer to the current QGIS project."""

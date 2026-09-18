@@ -457,6 +457,30 @@ class TestEveryLayerType(unittest.TestCase):
             self.assertIn(f"layers={layer}", url)
             self.assertIn("bbox=-103.87,44.37,-103.62,44.5", url)
 
+    def test_the_map_preview_opens_a_window_on_the_layers_extent(self):
+        windows = []
+
+        class Window:
+            def __init__(inner, title, layer, bbox=None, parent=None):
+                windows.append((title, layer, bbox, parent))
+
+            def show(inner):
+                pass
+
+        with patch.object(tab_layers, "LayerPreviewDialog", Window):
+            self.dlg._preview_layer(self.rows["sfdem"])
+
+        title, layer, bbox, parent = windows[0]
+        self.assertEqual(title, "sf:sfdem")
+        self.assertEqual(bbox, (-103.87, 44.37, -103.62, 44.5))
+        self.assertIs(parent, self.dlg)
+        # built like Add to QGIS builds it, never added to the project
+        self.assertIn("layers=sf:sfdem", layer.source())
+        self.assertIn("url=http://127.0.0.1:1/geoserver/ows", layer.source())
+        from qgis.core import QgsProject
+
+        self.assertNotIn(layer.id(), QgsProject.instance().mapLayers())
+
 
 class TestLayerDetailPrefill(unittest.TestCase):
     """The view is built from what the server returned, not from the row."""
@@ -851,6 +875,7 @@ class TestSetLayerStyle(unittest.TestCase):
             [
                 "Add to QGIS",
                 "Preview in a browser",
+                "Preview",
                 "Set style",
                 "Style from QGIS",
                 "Delete",

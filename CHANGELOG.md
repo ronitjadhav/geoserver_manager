@@ -59,6 +59,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **CRS checks before publishing a raster**: a layer without a CRS, or with a
   CRS that has no EPSG code — GeoServer could not declare it — is refused
   before anything is sent.
+- **Preview** on the Layers tab: the layer on a map of its own inside QGIS —
+  a WMS layer built like *Add to QGIS* builds one, but nothing reaches the
+  project. Drag to pan, wheel to zoom, click for the feature info GeoServer
+  returns at that point. A layer that does not load says so in place of the
+  map.
 - **Cascaded Stores tab**: the WMS and WMTS stores that proxy another
   server, listed across every workspace. Create one from a GetCapabilities
   URL, publish the layers the remote advertises (under the remote name or

@@ -126,8 +126,9 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 ## Layer Preview
 
 - [x] Preview a layer in a browser (GeoServer's OpenLayers page)
-- [ ] Embedded OpenLayers map preview of WMS layers
-- [ ] GetFeatureInfo on click
+- [x] Embedded map preview of a layer — a QgsMapCanvas with the WMS layer, no
+      web engine (`gui/dlg_preview.py`)
+- [x] GetFeatureInfo on click, through the provider's own identify
 
 ## UX & Infrastructure
 
