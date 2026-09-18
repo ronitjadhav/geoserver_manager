@@ -36,6 +36,7 @@ from geoserver_manager.gui.scope import scope
 from geoserver_manager.gui.tab_cascaded import CascadedStoreTabMixin
 from geoserver_manager.gui.tab_coveragestores import CoverageStoreTabMixin
 from geoserver_manager.gui.tab_datastores import DatastoreTabMixin
+from geoserver_manager.gui.tab_gwc import GwcTabMixin
 from geoserver_manager.gui.tab_layergroups import LayerGroupTabMixin
 from geoserver_manager.gui.tab_layers import LayerTabMixin
 from geoserver_manager.gui.tab_styles import StyleTabMixin
@@ -97,6 +98,7 @@ class GeoServerMainDialog(
     LayerTabMixin,
     LayerGroupTabMixin,
     StyleTabMixin,
+    GwcTabMixin,
 ):
     """Main dialog — GeoServer resource browser."""
 
@@ -578,6 +580,7 @@ class GeoServerMainDialog(
         ("Layers", "mIconVector.svg", "_load_layers"),
         ("Layer Groups", "mActionAddGroup.svg", "_load_layer_groups"),
         ("Styles", "mActionStyleManager.svg", "_load_styles"),
+        ("Tile Cache", "mActionAddXyzLayer.svg", "_load_gwc_layers"),
     )
 
     def _setup_nav(self):

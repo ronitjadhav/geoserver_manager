@@ -58,6 +58,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   URL, publish the layers the remote advertises (under the remote name or
   one of your own), inspect and delete the cascaded layers, delete the
   store — the remote server is never touched.
+- **Tile Cache tab**: what GeoWebCache caches, with each layer's gridsets and
+  formats. Edit a layer's cache configuration (enabled, gridsets, formats,
+  meta-tiling, expiry), truncate its tiles, stop caching it, or add a layer
+  whose cache was removed — GeoServer caches new layers by itself.
 - **Publish a QGIS raster layer** as a coverage store: the Coverage Stores
   tab's Add form takes a raster layer of the project, writes it to a tiled,
   compressed GeoTIFF — or uploads the file as it is when it already is one —

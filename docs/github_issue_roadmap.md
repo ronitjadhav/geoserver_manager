@@ -101,9 +101,13 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 
 ## GeoWebCache
 
-- [ ] View GWC tile cache status for a layer
-- [ ] Publish / un-publish layer to GWC
-- [ ] Create custom gridsets
+- [x] View GWC tile cache status for a layer — the Tile Cache tab lists every
+      cached layer with its gridsets, formats and enabled flag, and edits the
+      configuration (meta-tiling, expiry, gutter)
+- [x] Publish / un-publish layer to GWC — add a layer to the cache, truncate
+      its tiles, stop caching it
+- [ ] Create custom gridsets (the picker lists the server's; creating one is
+      an XML PUT the library's `create_gridset()` only knows for three EPSG codes)
 
 ## User & Role Management
 

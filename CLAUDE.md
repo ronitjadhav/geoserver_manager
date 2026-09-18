@@ -20,7 +20,7 @@ Skills in `.claude/skills/` hold the step-by-step procedures:
 |---|---|
 | `geoserver_manager/plugin_main.py` | QGIS entry point: `initGui` / `unload` / `run`. Shows the dialog, then connects. |
 | `geoserver_manager/gui/dlg_main.py` | `GeoServerMainDialog(QDialog, <one mixin per tab>)` — nav list, results table, search, pagination, and every helper the tabs share |
-| `geoserver_manager/gui/tab_workspaces.py`, `tab_datastores.py`, `tab_coveragestores.py`, `tab_cascaded.py`, `tab_layers.py`, `tab_layergroups.py`, `tab_styles.py` | One mixin per resource type: load / add / edit / delete (layers also: publish, add to QGIS; layer groups also: add to QGIS; coverage stores also: publish a coverage; cascaded stores also: publish / view / delete a remote layer) |
+| `geoserver_manager/gui/tab_workspaces.py`, `tab_datastores.py`, `tab_coveragestores.py`, `tab_cascaded.py`, `tab_layers.py`, `tab_layergroups.py`, `tab_styles.py`, `tab_gwc.py` | One mixin per resource type: load / add / edit / delete (layers also: publish, add to QGIS; layer groups also: add to QGIS; coverage stores also: publish a coverage; cascaded stores also: publish / view / delete a remote layer; tile cache: configure, truncate, stop caching) |
 | `geoserver_manager/gui/dlg_resource_form.py` | `ResourceFormDialog` — a modal form built from a list of field dicts (see its module docstring for the field spec) |
 | `geoserver_manager/gui/dlg_settings.py` | Options page: URL + credentials (credentials go to `QgsAuthManager`, encrypted) and *Test connection*, which probes the fields as typed |
 | `geoserver_manager/gui/layer_tree.py` | `LayerTreeMenu` — the *GeoServer Manager* submenu of the layer tree's context menu: push / apply the clicked layer's style through the main dialog's connection and its `_push_qgis_style` / `_style_body`; outcomes go to `iface.messageBar()` |
@@ -243,6 +243,23 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   DELETE needs `recurse=true` or GeoServer answers 403 "wms layer referenced by layer(s)"; a store
   DELETE with `recurse=true` takes its layers along. Cascaded layers are *not* in the Layers tab, which
   walks feature types and coverages — the Cascaded Stores tab is where they live.
+- **Tile cache — GeoWebCache** (the tile-cache rows of #50): GeoServer caches every layer and layer group
+  by itself, so `GET /gwc/rest/layers.json` — a bare JSON array of names, `ws:name`, a global group bare —
+  lists about everything published, and *Add a Layer to the Cache* only ever offers what was removed.
+  GWC's REST is XML-first, and on 2.28.5 its **JSON writes are broken**: a PUT of the very document a GET
+  returned fails with "Duplicate field mimeFormats" (any array) or "defaultValue" (the STYLES parameter
+  filter loses its class); the one JSON shape it accepts is the library's `publish_gwc_layer()` template,
+  which comes back as a degraded configuration — no formats, 0×0 meta-tiles, one gridset, no STYLES
+  filter. So `tab_gwc.py` reads JSON and writes XML: `GET .xml` → `PUT .xml` round-trips byte for byte
+  (200 "layer saved"), and a new layer's document is the one GeoServer writes itself, the id left to the
+  server. Truncate is `POST /gwc/rest/masstruncate` with `<truncateLayer><layerName>…` sent as **`text/xml`**
+  (200, empty body) — `application/xml` there is a 400 "Format extension unknown", while the layer PUTs
+  take `application/xml`; the seed endpoint wants one request per gridset × format. `DELETE /gwc/rest/layers/{name}.json` drops
+  the tiles and the configuration and leaves the layer published. `get_gwc_layer()` / `delete_gwc_layer()`
+  take a workspace and a layer, so a global layer group — cached under its bare name — goes raw, and
+  `GwcEndpoints.layers(ws)` ignores its argument. Gridsets: the list is a JSON array of names; a JSON PUT
+  fails the same way ("Duplicate field coords"), an XML PUT creates one (201), DELETE removes it, and
+  deleting a gridset in use answers 500 with an empty body.
 - **Layer groups** are the biggest library gap so far (rows 16–19 of #50): every layer-group call requires a
   `workspace_name`, so the *global* groups are unreachable; `create_layer_group` re-qualifies every layer with
   the group's own workspace (no cross-workspace and no nested group), always sends a world bbox from a
