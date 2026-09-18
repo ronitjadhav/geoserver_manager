@@ -25,6 +25,10 @@ black --check --target-version=py39 geoserver_manager/ tests/ scripts/
 flake8 geoserver_manager --config=setup.cfg --select=E9,F63,F7,F82,QGS101,QGS102,QGS103,QGS104,QGS106
 ```
 
+Stage new files first (`git add`): `pre-commit run -a` only sees tracked files, so
+an untracked module passes here and then gets reformatted by the commit hook,
+which aborts the commit — re-add and commit again.
+
 Known gotcha: ruff-format and black occasionally disagree on one construct; a
 commit then fails with "files were modified by this hook". Re-add and commit again.
 

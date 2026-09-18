@@ -1,12 +1,17 @@
 # GeoServer Manager — QGIS Plugin
 
-Browse and manage GeoServer instances from inside QGIS: list, create, edit and
-delete workspaces and datastores without switching to the GeoServer web admin.
+Manage a GeoServer from inside QGIS. Browse, create, edit and delete
+workspaces, datastores, coverage stores, layers, layer groups and styles;
+publish a table or a layer of the open project; bring what the server has back
+into QGIS as WMS, WFS or WMTS — without switching to the GeoServer web admin.
 
-Built on [`python-geoservercloud`](https://github.com/camptocamp/python-geoservercloud).
+Built on [`python-geoservercloud`](https://github.com/camptocamp/python-geoservercloud):
+every request goes through the library, and what the library cannot do yet is
+recorded in [issue #50](https://github.com/ronitjadhav/geoserver_manager/issues/50)
+so that it gets added there rather than worked around here.
 
-> **Status:** experimental. Workspaces and datastores are implemented; layers,
-> styles and layer upload are on the [roadmap](docs/github_issue_roadmap.md).
+> **Status:** experimental, not yet released. Developed against GeoServer 2.28;
+> what is still missing is on the [roadmap](docs/github_issue_roadmap.md).
 
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
@@ -15,14 +20,21 @@ Built on [`python-geoservercloud`](https://github.com/camptocamp/python-geoserve
 
 ## Features
 
-| Resource | Supported |
-| :------- | :-------- |
-| Workspaces | list, search, create, rename, toggle isolation, set default, delete (single + bulk) |
-| Datastores | list across all workspaces, create PostGIS / PostGIS (JNDI) / PMTiles, edit, delete (single + bulk, recursive) |
-| Connection | URL + credentials, credentials encrypted in the QGIS authentication database, live connection check with GeoServer version |
+| Tab | What you can do |
+| :-- | :-------------- |
+| Workspaces | list (the default workspace is marked), create, rename, toggle isolation, set as default, edit the workspace's WMS service settings (title, abstract, keywords, SRS list, …), delete |
+| Datastores | list across every workspace; create PostGIS, PostGIS (JNDI), Shapefile, directory of shapefiles, GeoPackage or PMTiles stores — or any other type through a `key = value` parameter editor; edit (only the fields you change are sent), delete |
+| Coverage stores | list, create from a GeoTIFF, a COG or an ImageMosaic, browse the coverages of a store, publish a coverage as a layer, delete |
+| Layers | list with type, store, SRS and default style; publish a table of a datastore, or a layer of the open QGIS project — uploaded as a GeoPackage together with its symbology; change the default style, including one made from a QGIS layer's symbology; add to QGIS as WMS, WFS or WMTS; delete |
+| Layer groups | list global and workspace groups, create (ordered layers with their styles), inspect, add to QGIS, delete |
+| Styles | list global and workspace styles; create by pasting an SLD, from a file (`.sld`, a `.zip` with its resources, `.mbstyle`) or from a QGIS layer's symbology; view and edit the SLD; apply a server style to a QGIS layer; save it to disk; delete |
 
-Results are searchable and paginated (20 per page); the datastore list links
-back to its workspace.
+Every list is searchable, sortable by column and paginated (20 per page), and
+loads in the background — QGIS stays usable, and *Cancel* stops a slow one.
+Deletes ask first and name what they cascade to. Keyboard: F5 refreshes, Ctrl+F
+jumps to the search box, Enter opens the selected row, Del deletes the
+selection, Esc clears the filter. Colours follow the QGIS theme, dark ones
+included; the interface is translatable and ships a French locale.
 
 ## Requirements
 
@@ -49,14 +61,18 @@ For a development install, see [Development](#development) below.
 
 *Settings → Options → GeoServer Manager*, or the plugin menu's *Settings* entry:
 
-| Field | Example |
-| :---- | :------ |
-| GeoServer URL | `https://example.com/geoserver` (must start with `http://` or `https://`) |
-| Username / Password | stored encrypted via `QgsAuthManager` — QGIS will ask for its master password |
+| Field | Notes |
+| :---- | :---- |
+| Base URL | e.g. `https://example.com/geoserver` — must start with `http://` or `https://` |
+| Username / Password | stored encrypted via `QgsAuthManager`; QGIS asks for its master password |
+| Verify the server's TLS certificate | on by default; untick only for a private CA or a self-signed certificate you trust |
+| Test connection | probes the server with the fields as typed, without saving them |
 
 Then open the plugin from the toolbar. The status line shows the connected
-server and its version; connection, authentication and HTTP errors are reported
-in the dialog's message bar and in the QGIS log panel (*GeoServer Manager* tab).
+server and its version; connection, authentication and HTTP problems are
+reported in the dialog's message bar and in the QGIS log panel (*GeoServer
+Manager* tab). Over plain `http://` to a remote host the password travels
+unencrypted — the plugin says so once, when saving.
 
 ## Development
 
