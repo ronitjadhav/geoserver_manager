@@ -94,8 +94,12 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
    keeps the server's `type` and `enabled`.
 4. **Add refuses an existing name.** `create_workspace` / `create_datastore` are upserts (POST, then PUT
    on 409). Check `_resource_exists` first or a live resource is silently reconfigured and reported "created".
-5. **Never prefill or re-send a password.** GeoServer returns `passwd` encrypted (`crypt1:…`) or not at all;
-   posting it back stores the ciphertext as the password. The field is blank and required on edit.
+5. **Never show a password.** GeoServer returns `passwd` and `WFSDataStoreFactory:PASSWORD` encrypted (`crypt1:…`) or
+   not at all; prefilled, the ciphertext would read as the password and get edited into garbage. GeoServer *does*
+   accept its own ciphertext back — measured on 2.28.5: a PostGIS store still listed its tables after the round
+   trip, and stopped doing so with a wrong plaintext — so on edit the field is blank, blank means **keep** (the stored
+   value is sent back) and typed means **replace**. The encryption is randomised: the same plaintext saves as a
+   different `crypt1:` value every time, so ciphertexts cannot be compared.
 6. **No rename for datastores** (`name` is read-only in edit mode). A rename would upsert: duplicate the
    store, or overwrite whatever holds the new name.
 7. **Delete confirmations name the cascade.** Both delete paths send `recurse=true`.
@@ -159,6 +163,11 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   carry **`dbtype: geopkg`** — that is how GeoServer picks the factory — and an empty `charset` is omitted
   rather than sent blank, because blank is not "use your default". GeoServer fills in `namespace` itself, and
   the edit merge keeps it along with everything else the form does not show.
+- **Cascaded WFS datastores** (row 41 of #50): type `Web Feature Server (NG)`, every parameter prefixed
+  `WFSDataStoreFactory:` (`GET_CAPABILITIES_URL`, `USERNAME`, `PASSWORD`, `TIMEOUT`, `MAXFEATURES`, `LENIENT`);
+  GeoServer adds `namespace` itself. A PUT without a key drops it (the map is replaced, invariant 3), and
+  `featuretypes.json?list=available` lists the remote's feature types, so *Publish a Layer → a table in a
+  datastore* cascades them. The typed creators stop before it; the form goes through the generic `create_datastore`.
 - **Publishing a QGIS layer** (rows 28–29 of #50) uploads a GeoPackage: `PUT
   .../datastores/{name}/file.gpkg?update=overwrite`. GeoServer then creates the store *and* configures one
   feature type per table in the file, with the SRS, bounding box and attributes read from the data — so the

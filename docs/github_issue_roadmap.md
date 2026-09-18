@@ -29,6 +29,7 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 - [x] Edit datastore connection parameters
 - [x] Delete datastore (single + bulk, with recurse)
 - [x] Cross-navigation: click workspace name → open workspace detail
+- [x] Web Feature Server (NG): cascade a remote WFS as a datastore (typed form)
 
 ## Layers / Feature Types
 

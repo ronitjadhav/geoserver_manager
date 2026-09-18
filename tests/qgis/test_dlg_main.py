@@ -469,14 +469,10 @@ class TestUnsupportedTypeDialog(unittest.TestCase):
                     {
                         # A type the form has no dedicated fields for: those
                         # are what the generic editor is for.
-                        "type": "Web Feature Server (NG)",
+                        "type": "Oracle NG",
                         "enabled": True,
                         "connectionParameters": {
-                            "entry": {
-                                "WFSDataStoreFactory:GET_CAPABILITIES_URL": (
-                                    "http://other/geoserver/wfs?request=GetCapabilities"
-                                )
-                            }
+                            "entry": {"host": "oracle.example.org"}
                         },
                     },
                     200,
@@ -625,20 +621,20 @@ class TestGenericParameterEditor(unittest.TestCase):
 
     def test_editor_is_authoritative_but_keeps_masked_secrets(self):
         stored = {
-            "WFSDataStoreFactory:GET_CAPABILITIES_URL": "http://old/wfs",
-            "WFSDataStoreFactory:TIMEOUT": "3000",
-            "WFSDataStoreFactory:PASSWORD": "crypt1:SECRET",
+            "host": "old.example.org",
+            "port": "3000",
+            "passwd": "crypt1:SECRET",
             "obsolete": "x",
         }
-        detail = {"type": "Web Feature Server (NG)", "enabled": False}
+        detail = {"type": "Oracle NG", "enabled": False}
         values = {
             "workspace": "topp",
             "name": "cascaded",
             "description": "",
             "raw_params": (
-                "WFSDataStoreFactory:GET_CAPABILITIES_URL = http://new/wfs\n"
-                "WFSDataStoreFactory:TIMEOUT = 5000\n"
-                "WFSDataStoreFactory:PASSWORD = ••••\n"  # 'obsolete' removed
+                "host = new.example.org\n"
+                "port = 5000\n"
+                "passwd = ••••\n"  # 'obsolete' removed
             ),
         }
 
@@ -647,13 +643,13 @@ class TestGenericParameterEditor(unittest.TestCase):
         self.assertEqual(
             self.sent["connection_parameters"],
             {
-                "WFSDataStoreFactory:GET_CAPABILITIES_URL": "http://new/wfs",
-                "WFSDataStoreFactory:TIMEOUT": "5000",
-                "WFSDataStoreFactory:PASSWORD": "crypt1:SECRET",
+                "host": "new.example.org",
+                "port": "5000",
+                "passwd": "crypt1:SECRET",
             },
         )
         self.assertEqual(
-            self.sent["datastore_type"], "Web Feature Server (NG)"
+            self.sent["datastore_type"], "Oracle NG"
         )  # server's type, not the combo
         self.assertIs(self.sent["enabled"], False)  # still disabled
 
@@ -661,8 +657,8 @@ class TestGenericParameterEditor(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.dlg._update_datastore_from_values(
                 {"workspace": "w", "name": "n", "raw_params": "no equals here"},
-                {"type": "Web Feature Server (NG)"},
-                {"WFSDataStoreFactory:GET_CAPABILITIES_URL": "http://old/wfs"},
+                {"type": "Oracle NG"},
+                {"host": "old.example.org"},
             )
         self.assertEqual(self.sent, {})
 

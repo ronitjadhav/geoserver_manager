@@ -61,13 +61,14 @@ and the workspace falls back to the global WMS configuration.
 ## Datastores
 
 Listed across every workspace. *Add a Datastore* offers PostGIS, PostGIS
-(JNDI), PMTiles, Shapefile, *Directory of spatial files (shapefiles)* and
-GeoPackage with a form each; any other type gets a *Connection parameters*
+(JNDI), PMTiles, Shapefile, *Directory of spatial files (shapefiles)*,
+GeoPackage and *Web Feature Server (NG)* — a remote WFS cascaded as a
+datastore, whose feature types then publish like tables — with a form each; any other type gets a *Connection parameters*
 editor, one `key = value` per line, exactly as GeoServer stores them.
 
 Click a name to modify a store. A datastore cannot be renamed. The password is
-never shown or sent back — GeoServer only ever returns it encrypted — so the
-field is blank and must be typed again to save a PostGIS store. Everything the
+never shown — GeoServer only returns it encrypted — so the field is blank when
+you edit: leave it empty to keep the stored password, type to replace it. Everything the
 form does not show (extra parameters, the `enabled` flag) is kept as the
 server has it.
 

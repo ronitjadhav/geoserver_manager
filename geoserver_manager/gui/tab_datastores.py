@@ -16,6 +16,7 @@ from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 _SHAPEFILE = "Shapefile"
 _SHAPEFILE_DIRECTORY = "Directory of spatial files (shapefiles)"
 _GEOPACKAGE = "GeoPackage"
+_WFS = "Web Feature Server (NG)"
 _SUPPORTED_TYPES = [
     "PostGIS",
     "PostGIS (JNDI)",
@@ -23,7 +24,16 @@ _SUPPORTED_TYPES = [
     _SHAPEFILE,
     _SHAPEFILE_DIRECTORY,
     _GEOPACKAGE,
+    _WFS,
 ]
+
+# GeoServer prefixes every parameter of a cascaded WFS store with its factory.
+_WFS_KEY = "WFSDataStoreFactory:"
+_WFS_URL, _WFS_USER, _WFS_PASSWORD = (
+    _WFS_KEY + "GET_CAPABILITIES_URL",
+    _WFS_KEY + "USERNAME",
+    _WFS_KEY + "PASSWORD",
+)
 
 # GeoServer picks the GeoPackage factory by this connection parameter, so it
 # travels with every GeoPackage store the form saves.
@@ -48,6 +58,12 @@ _TYPE_SPECIFIC_FIELDS = (
     "gpkg_database",
     "gpkg_read_only",
     "gpkg_expose_pk",
+    "wfs_url",
+    "wfs_user",
+    "wfs_password",
+    "wfs_timeout",
+    "wfs_max_features",
+    "wfs_lenient",
 )
 
 
@@ -58,6 +74,19 @@ _TYPE_SPECIFIC_FIELDS = (
 # MRO — so every lookup would miss. A wrapper function would not be extracted
 # at all (pylupdate only understands a literal context), hence the repetition.
 translate = QCoreApplication.translate
+
+
+def _is_secret(key):
+    """A parameter GeoServer stores encrypted: `passwd`, `WFSDataStoreFactory:PASSWORD`, …"""
+    return key.lower().endswith(("passwd", "password"))
+
+
+def _as_int(value, default):
+    """An integer parameter as GeoServer returned it, or the default."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 class DatastoreTabMixin:
@@ -222,12 +251,12 @@ class DatastoreTabMixin:
                 "key": "pg_password",
                 "label": translate("DatastoreTabMixin", "Password"),
                 "type": "text",
-                "required": True,
+                "required": not edit_mode,
                 "echo_password": True,
                 "group": translate("DatastoreTabMixin", "Connection"),
                 "help": (
                     translate(
-                        "DatastoreTabMixin", "Re-enter the password to save changes"
+                        "DatastoreTabMixin", "Leave empty to keep the stored password"
                     )
                     if edit_mode
                     else None
@@ -364,7 +393,108 @@ class DatastoreTabMixin:
                     "Publish the tables' primary key as an attribute",
                 ),
             },
+            # --- Web Feature Server (NG): a remote WFS cascaded as a datastore ---
+            {
+                "key": "wfs_url",
+                "label": translate("DatastoreTabMixin", "GetCapabilities URL"),
+                "type": "text",
+                "required": True,
+                "visible": False,
+                "placeholder": "https://example.com/geoserver/wfs?service=WFS&request=GetCapabilities",
+                "group": translate("DatastoreTabMixin", "Connection"),
+                "help": translate(
+                    "DatastoreTabMixin",
+                    "The remote WFS's capabilities document. Its feature types can "
+                    "then be published as layers of this server (Publish a Layer, "
+                    "a table in a datastore).",
+                ),
+            },
+            {
+                "key": "wfs_user",
+                "label": translate("DatastoreTabMixin", "User"),
+                "type": "text",
+                "visible": False,
+                "placeholder": translate(
+                    "DatastoreTabMixin", "Leave empty for a public service"
+                ),
+                "group": translate("DatastoreTabMixin", "Connection"),
+            },
+            {
+                "key": "wfs_password",
+                "label": translate("DatastoreTabMixin", "Password"),
+                "type": "text",
+                "echo_password": True,
+                "visible": False,
+                "group": translate("DatastoreTabMixin", "Connection"),
+                "help": (
+                    translate(
+                        "DatastoreTabMixin", "Leave empty to keep the stored password"
+                    )
+                    if edit_mode
+                    else None
+                ),
+            },
+            {
+                "key": "wfs_timeout",
+                "label": translate("DatastoreTabMixin", "Timeout (ms)"),
+                "type": "spinbox",
+                "default": 3000,
+                "min": 0,
+                "max": 3600000,
+                "visible": False,
+                "group": translate("DatastoreTabMixin", "Connection"),
+            },
+            {
+                "key": "wfs_max_features",
+                "label": translate("DatastoreTabMixin", "Max features"),
+                "type": "spinbox",
+                "default": 0,
+                "min": 0,
+                "max": 100000000,
+                "visible": False,
+                "group": translate("DatastoreTabMixin", "Connection"),
+                "help": translate("DatastoreTabMixin", "0 means no limit"),
+            },
+            {
+                "key": "wfs_lenient",
+                "label": translate("DatastoreTabMixin", "Lenient parsing"),
+                "type": "checkbox",
+                "default": True,
+                "visible": False,
+                "group": translate("DatastoreTabMixin", "Connection"),
+                "help": translate(
+                    "DatastoreTabMixin",
+                    "Tolerate responses that do not match the remote's schema exactly",
+                ),
+            },
         ]
+
+    @staticmethod
+    def _wfs_params(values, stored=None):
+        """Connection parameters for a cascaded WFS store, from the typed fields.
+
+        `stored` is the server's current map on an edit: a blank password keeps
+        the stored one — GeoServer accepts its own `crypt1:` value back
+        (measured on 2.28.5: a store still connected after the round trip) —
+        and a blank user means no credentials at all.
+
+        TODO(#50): upstream as create_wfs_datastore(ws, name, capabilities_url,
+        user=None, password=None, timeout=3000, max_features=0, lenient=True),
+        next to create_pg_datastore() (row 41).
+        """
+        params = {
+            _WFS_URL: (values.get("wfs_url") or "").strip(),
+            _WFS_KEY + "TIMEOUT": str(int(values.get("wfs_timeout") or 0)),
+            _WFS_KEY + "MAXFEATURES": str(int(values.get("wfs_max_features") or 0)),
+            _WFS_KEY + "LENIENT": str(bool(values.get("wfs_lenient", True))).lower(),
+        }
+        user = (values.get("wfs_user") or "").strip()
+        if user:
+            params[_WFS_USER] = user
+            password = values.get("wfs_password") or (stored or {}).get(_WFS_PASSWORD)
+            if password:
+                params[_WFS_PASSWORD] = password
+        return params
 
     @staticmethod
     def _file_store_params(ds_type, values):
@@ -430,6 +560,12 @@ class DatastoreTabMixin:
         is_geopackage = new_type == _GEOPACKAGE
         for key in ("gpkg_database", "gpkg_read_only", "gpkg_expose_pk"):
             dlg.set_field_visible(key, is_geopackage)
+
+        # Cascaded WFS fields
+        is_wfs = new_type == _WFS
+        for key in _TYPE_SPECIFIC_FIELDS:
+            if key.startswith("wfs_"):
+                dlg.set_field_visible(key, is_wfs)
 
     def _add_datastore(self):
         """Open a form dialog to create a new datastore."""
@@ -577,6 +713,16 @@ class DatastoreTabMixin:
                     description=description,
                 )
             )
+        elif ds_type == _WFS:
+            self._check(
+                self.gs.create_datastore(
+                    workspace_name=ws,
+                    datastore_name=name,
+                    datastore_type=ds_type,
+                    connection_parameters=self._wfs_params(values),
+                    description=description,
+                )
+            )
         else:
             raise ValueError(f"Unsupported datastore type: {ds_type}")
 
@@ -607,7 +753,9 @@ class DatastoreTabMixin:
                     "port": int(values.get("pg_port", 5432)),
                     "database": values.get("pg_db", ""),
                     "user": values.get("pg_user", ""),
-                    "passwd": values.get("pg_password", ""),
+                    # Blank keeps the stored (encrypted) value; see _wfs_params.
+                    "passwd": values.get("pg_password")
+                    or conn_params.get("passwd", ""),
                     "schema": values.get("pg_schema", "public") or "public",
                 }
             )
@@ -622,6 +770,12 @@ class DatastoreTabMixin:
             merged["pmtiles"] = values.get("pmtiles_url", "")
         elif ds_type in (_SHAPEFILE, _SHAPEFILE_DIRECTORY, _GEOPACKAGE):
             merged.update(self._file_store_params(ds_type, values))
+        elif ds_type == _WFS:
+            params = self._wfs_params(values, conn_params)
+            merged.update(params)
+            for key in (_WFS_USER, _WFS_PASSWORD):
+                if key not in params:  # credentials cleared in the form
+                    merged.pop(key, None)
         else:
             # Generic editor: what the user left in the textarea is the whole
             # map (removed lines remove keys); a masked value keeps the original.
@@ -696,9 +850,17 @@ class DatastoreTabMixin:
                 conn_params.get("Expose primary keys", "false")
             ).lower()
             == "true",
+            # Cascaded WFS; the password is never prefilled (see pg_password)
+            "wfs_url": conn_params.get(_WFS_URL, ""),
+            "wfs_user": conn_params.get(_WFS_USER, ""),
+            "wfs_password": "",
+            "wfs_timeout": _as_int(conn_params.get(_WFS_KEY + "TIMEOUT"), 3000),
+            "wfs_max_features": _as_int(conn_params.get(_WFS_KEY + "MAXFEATURES"), 0),
+            "wfs_lenient": str(conn_params.get(_WFS_KEY + "LENIENT", "true")).lower()
+            == "true",
             # Generic editor for types without dedicated fields; secrets masked
             "raw_params": "\n".join(
-                f"{key} = {_MASKED if key.lower() in ('passwd', 'password') else value}"
+                f"{key} = {_MASKED if _is_secret(key) else value}"
                 for key, value in sorted(conn_params.items())
             ),
         }

@@ -13,14 +13,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   The header buttons are now disabled for that moment, and anything still
   clickable — row actions, link cells — says "Not connected to GeoServer" and
   does nothing.
+- The generic connection-parameter editor masked only a key *named*
+  `password`, so a WFS store's `WFSDataStoreFactory:PASSWORD` showed its
+  ciphertext. Any key ending in `password` or `passwd` is masked now.
 - About one string in seven never reached the translation files: `pylupdate5`
   silently skips a `translate()` call that black wrapped onto several lines, or
   whose text is written as adjacent literals. Extraction now uses `pylupdate6`
   (`scripts/update_translations.py`), and a test checks every string in the
   code against the `.ts`.
 
+### Changed
+
+- Editing a PostGIS store no longer demands the password again: leave the
+  field empty to keep the stored one, type to replace it. GeoServer accepts
+  its own encrypted value back — measured, a store still connected after the
+  round trip — so re-typing bought nothing but friction.
+
 ### Added
 
+- **Web Feature Server (NG) datastores** — a remote WFS cascaded as a
+  datastore — get a form of their own: capabilities URL, optional
+  credentials, timeout, max features, lenient parsing. Its feature types then
+  publish like any table (*Publish a Layer → a table in a datastore*).
 - **Cascaded Stores tab**: the WMS and WMTS stores that proxy another
   server, listed across every workspace. Create one from a GetCapabilities
   URL, publish the layers the remote advertises (under the remote name or
