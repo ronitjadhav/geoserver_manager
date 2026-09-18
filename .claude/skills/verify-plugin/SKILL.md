@@ -40,6 +40,19 @@ QT_QPA_PLATFORM=offscreen PYTHONPATH=. python3 -m unittest discover -s tests/qgi
 Expect every test green. A new fix must come with a test that fails without it —
 verify that claim by temporarily reverting the fix once, not by reading the test.
 
+**CI runs the suite with pytest, which executes test classes in file order, while
+`unittest discover` sorts them alphabetically.** Any state shared between classes —
+a `Recording.opened` list, a module-level counter — can therefore pass locally and
+fail on CI. Without pytest, re-run the file with its classes named in file order:
+
+```sh
+QT_QPA_PLATFORM=offscreen PYTHONPATH=. python3 -m unittest \
+  tests.qgis.test_tab_x.TestFirstClassInFile tests.qgis.test_tab_x.TestSecondClassInFile …
+```
+
+Anything that asserts "no dialog was opened" must clear that shared list in its own
+`setUp`, not rely on another class having cleared it.
+
 **Run `tests/unit` in an interpreter that has no `qgis`** (a plain venv), because
 that is what the CI unit job is. Your system Python probably has QGIS installed, so
 it will happily pass a test whose import chain pulls in `qgis.core` — CI won't. The

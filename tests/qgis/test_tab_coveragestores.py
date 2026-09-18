@@ -265,6 +265,9 @@ class TestCoverageStoresTab(unittest.TestCase):
 class TestStoreAndCoverageDetail(unittest.TestCase):
     """The detail views read what GeoServer stores, not what the models keep."""
 
+    def setUp(self):
+        Recording.opened.clear()  # class-level: order must not matter
+
     def test_store_prefill_keeps_the_description(self):
         values = CoverageStoreTabMixin._coverage_store_form_values(
             SFDEM_STORE, ["sfdem"]
@@ -477,6 +480,7 @@ class TestCreateCoverageStore(unittest.TestCase):
 
 class TestPublishAndDelete(unittest.TestCase):
     def setUp(self):
+        Recording.opened.clear()  # class-level: order must not matter
         self.dlg = SyncDialog()
         self.dlg.gs = FakeGS()
         self.dlg._confirm_delete = lambda kind, labels, cascade="": True
