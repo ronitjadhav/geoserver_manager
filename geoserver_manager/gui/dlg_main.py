@@ -11,7 +11,6 @@ to _start_load, which returns immediately and renders the rows when they land.
 """
 
 from concurrent.futures import ThreadPoolExecutor
-from functools import partial
 from pathlib import Path
 
 from qgis.core import Qgis, QgsApplication, QgsTask
@@ -416,6 +415,10 @@ class GeoServerMainDialog(
         """
         self._set_status(self.tr("Connecting…"), "busy")
         self.gs = None
+        # The rows on screen belong to the connection just dropped; the loader
+        # re-arms these once the probe lands.
+        self.btn_add.setEnabled(False)
+        self.btn_delete_selected.setEnabled(False)
         settings = self.plg_settings.get_plg_settings()
         # Credentials come out of QgsAuthManager, so the client is built here on
         # the GUI thread; its constructor makes no network call.
@@ -624,6 +627,7 @@ class GeoServerMainDialog(
 
     def _setup_add_button(self, text, tooltip, callback):
         """Configure the header Add button for the current tab."""
+        self.btn_add.setEnabled(True)
         self.btn_add.setText(text)
         self.btn_add.setToolTip(tooltip)
         self.btn_add.setVisible(True)
@@ -631,7 +635,8 @@ class GeoServerMainDialog(
             self.btn_add.clicked.disconnect()
         except TypeError:
             pass
-        self.btn_add.clicked.connect(callback)
+        # Guarded: the button stays armed while a refresh re-probes the server.
+        self.btn_add.clicked.connect(lambda: self._require_connection() and callback())
 
     def _setup_delete_selected_button(self, callback):
         """Configure the header Delete Selected button for the current tab."""
@@ -643,7 +648,7 @@ class GeoServerMainDialog(
         except TypeError:
             pass
         self.btn_delete_selected.clicked.connect(
-            lambda: callback(self._get_selected_rows())
+            lambda: self._require_connection() and callback(self._get_selected_rows())
         )
 
     def _setup_table(self, columns):
@@ -785,7 +790,7 @@ class GeoServerMainDialog(
     def _on_cell_clicked(self, row, col):
         """Open the resource behind a link cell; other cells just select."""
         callback = self._cell_click_callback(col)
-        if callback is None:
+        if callback is None or not self._require_connection():
             return
         index = self._current_page * self._page_size + row
         if index < len(self._filtered_rows):
@@ -803,7 +808,11 @@ class GeoServerMainDialog(
             btn.setToolTip(tooltip)
             btn.setFlat(True)
             btn.setFixedSize(24, 24)
-            btn.clicked.connect(partial(callback, row_data))
+            btn.clicked.connect(
+                lambda _checked=False, cb=callback, row=row_data: (
+                    self._require_connection() and cb(row)
+                )
+            )
             layout.addWidget(btn)
         return widget
 
@@ -848,6 +857,24 @@ class GeoServerMainDialog(
         if body and not body.startswith("<") and body not in str(error):
             return f"{error}: {body.splitlines()[0][:300]}"
         return str(error)
+
+    def _require_connection(self):
+        """True when there is a client to talk to; otherwise say so and refuse.
+
+        A loaded table outlives the connection it came from: refresh_ui()
+        clears self.gs the moment it starts and the probe that sets it again
+        runs in a QgsTask, so for that window — up to _PROBE_TIMEOUT against a
+        server that has gone away — the rows and their buttons are still on
+        screen and clickable. Every user-triggered action passes through here,
+        which is why the check lives at the four places actions are dispatched
+        rather than in each of the twenty methods behind them.
+        """
+        if self.gs is not None:
+            return True
+        self.show_warning_message(
+            self.tr("Not connected to GeoServer — press Refresh (F5) to connect.")
+        )
+        return False
 
     def _run_action(self, action, failure_message):
         """Run a server action under a wait cursor and report if it fails.

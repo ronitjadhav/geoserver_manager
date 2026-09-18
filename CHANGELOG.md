@@ -4,6 +4,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## Unreleased
 
+### Fixed
+
+- Acting on a table while the plugin was reconnecting crashed with
+  `AttributeError: 'NoneType' object has no attribute 'get_workspaces'`. A
+  refresh drops the connection immediately and re-probes in the background, so
+  the rows and buttons on screen briefly belonged to a client that was gone.
+  The header buttons are now disabled for that moment, and anything still
+  clickable — row actions, link cells — says "Not connected to GeoServer" and
+  does nothing.
+
 ### Added
 
 - **Keyboard shortcuts**: F5 refreshes, Ctrl+F jumps to the search box, Esc

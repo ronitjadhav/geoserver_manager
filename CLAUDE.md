@@ -101,7 +101,14 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
    back as `(rows, failures)` and is rendered by `_render_rows` on the GUI thread. A cancelled
    or failed load renders nothing, which is safe only because the loader reset the table
    *before* starting the task — that is what keeps "no stale rows" true here too.
-10. **Nav labels in `TABS` are logic keys as well as text.** The `tr("Actions")` column and the
+10. **A loaded table outlives its connection.** `refresh_ui()` clears `self.gs` at once and re-probes in a
+   task, so for up to `_PROBE_TIMEOUT` the rows on screen and their buttons belong to a client that is gone.
+   Every user-triggered action therefore passes `_require_connection()`, and that check lives at the four
+   places actions are dispatched — the Add button, Delete Selected, the row-action buttons and the link-cell
+   click — never in the twenty methods behind them, so a new tab cannot forget it. A refresh also disables the
+   header buttons immediately; the loader re-arms them. This was a reported crash:
+   `AttributeError: 'NoneType' object has no attribute 'get_workspaces'` from *Publish a Layer*.
+11. **Nav labels in `TABS` are logic keys as well as text.** The `tr("Actions")` column and the
    `tr("Workspace")` key in `_extra_click_callbacks` must match the header strings exactly.
 
 ## geoservercloud — facts the code relies on

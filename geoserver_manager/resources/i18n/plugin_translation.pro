@@ -13,6 +13,7 @@ SOURCES =	../../gui/dlg_main.py \
 	../../gui/tab_layers.py \
 	../../gui/tab_styles.py \
 	../../gui/tab_workspaces.py \
+	../../gui/theme.py \
 	../../plugin_main.py \
 	../../toolbelt/dependencies.py \
 	../../toolbelt/env_var_parser.py \

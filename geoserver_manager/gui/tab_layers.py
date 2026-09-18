@@ -46,8 +46,11 @@ class LayerTabMixin:
     def _load_layers(self):
         """Arm the Layers tab, then fetch its rows in the background."""
         self._setup_add_button(
-            translate("LayerTabMixin", "Publish a Table"),
-            translate("LayerTabMixin", "Publish a table of a datastore as a new layer"),
+            translate("LayerTabMixin", "Publish a Layer"),
+            translate(
+                "LayerTabMixin",
+                "Publish a table of a datastore, or a layer of this QGIS project",
+            ),
             self._publish_layer,
         )
         self._setup_delete_selected_button(self._delete_selected_layers)

@@ -16,6 +16,7 @@ import time
 from unittest.mock import patch
 
 from qgis.PyQt.QtCore import QEventLoop, QTimer
+from qgis.PyQt.QtWidgets import QDialog, QPushButton
 from qgis.testing import start_app, unittest
 
 # project
@@ -508,6 +509,7 @@ class TestLinkCells(unittest.TestCase):
 
     def setUp(self):
         self.dlg = SyncDialog()
+        self.dlg.gs = object()  # a click needs a connection; see TestConnectionGuard
         self.opened = []
         self.dlg._name_click_callback = self.opened.append
         self.dlg._extra_click_callbacks = {
@@ -1224,6 +1226,131 @@ class TestFileStoreFormBehaviour(unittest.TestCase):
         # GeoServer creates the index unless told otherwise.
         values = self.dlg._datastore_form_values("topp", "s", "Shapefile", {}, {})
         self.assertIs(values["spatial_index"], True)
+
+
+# ############################################################################
+# ##### Connection guard #########
+# ################################
+
+
+class TestConnectionGuard(unittest.TestCase):
+    """A table outlives its connection; its buttons must not crash.
+
+    Reported from QGIS 3.44: clicking *Publish a Layer* raised
+    AttributeError: 'NoneType' object has no attribute 'get_workspaces'.
+    refresh_ui() clears self.gs immediately and probes in a QgsTask, so for
+    that window the loaded rows and their armed buttons are still clickable.
+    """
+
+    class FakeGS:
+        def get_workspaces(inner):
+            return ([{"name": "topp"}], 200)
+
+        def get_datastores(inner, workspace_name):
+            return ([], 200)
+
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.dlg.gs = self.FakeGS()
+        self.warnings = []
+        self.dlg.show_warning_message = self.warnings.append
+        self.dlg.show_error_message = lambda text: self.fail(f"unexpected: {text}")
+        self.dlg.show_success_message = lambda text: None
+        # If the guard ever breaks, a row action would reach the modal delete
+        # confirmation and hang the suite instead of failing it.
+        self.dlg._confirm_delete = lambda kind, labels, cascade="": False
+        self.dlg._load_layers()  # arms the buttons, as a loaded tab does
+        self.dlg.gs = None  # what refresh_ui() does while it re-probes
+
+    def test_the_add_button_explains_itself_instead_of_raising(self):
+        self.dlg.btn_add.click()
+        self.assertEqual(len(self.warnings), 1)
+        self.assertIn("Not connected", self.warnings[0])
+
+    def test_a_row_action_explains_itself_too(self):
+        from geoserver_manager.gui import tab_layers
+        from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+
+        class Rejecting(ResourceFormDialog):
+            """A broken guard would open a modal here and hang the suite."""
+
+            def exec(inner):
+                return QDialog.DialogCode.Rejected
+
+        widget = self.dlg._make_action_widget(["tasmania_roads", "topp", "taz_shapes"])
+        button = widget.findChildren(QPushButton)[0]
+        self.assertEqual(button.toolTip(), "Add to QGIS")  # the first row action
+        with patch.object(tab_layers, "ResourceFormDialog", Rejecting):
+            button.click()
+        self.assertEqual(len(self.warnings), 1)
+        self.assertIn("Refresh", self.warnings[0])
+
+    def test_delete_selected_is_refused(self):
+        deleted = []
+        self.dlg._setup_delete_selected_button(deleted.append)
+        self.dlg._populate_rows([["a"], ["b"]])
+        self.dlg.resultsTable.selectRow(0)
+        self.dlg.btn_delete_selected.click()
+        self.assertEqual(deleted, [])
+        self.assertTrue(self.warnings)
+
+    def test_a_link_cell_click_is_refused(self):
+        opened = []
+        self.dlg._name_click_callback = opened.append
+        self.dlg._populate_rows([["tasmania_roads", "topp"]])
+        self.dlg._on_cell_clicked(0, 0)
+        self.assertEqual(opened, [])
+        self.assertTrue(self.warnings)
+
+    def test_everything_works_again_once_connected(self):
+        self.dlg.gs = self.FakeGS()
+        opened = []
+        self.dlg._name_click_callback = opened.append
+        self.dlg._populate_rows([["tasmania_roads", "topp"]])
+        self.dlg._on_cell_clicked(0, 0)
+        self.assertEqual(opened, [["tasmania_roads", "topp"]])
+        self.assertEqual(self.warnings, [])
+
+    def test_a_refresh_disarms_the_header_buttons_at_once(self):
+        """Prevention, not just a catch: the buttons go grey immediately."""
+
+        class Settings:
+            geoserver_url = "http://gs.example.org/geoserver"
+            geoserver_verify_tls = True
+            geoserver_auth_cfg_id = ""
+
+            def has_credentials(inner):
+                return True
+
+            def get_credentials(inner):
+                return ("admin", "geoserver")
+
+        class PlgSettings:
+            def get_plg_settings(inner):
+                return Settings()
+
+            def get_value_from_key(inner, *args, **kwargs):
+                return None
+
+            def set_value_from_key(inner, *args, **kwargs):
+                return True
+
+        self.dlg.gs = self.FakeGS()
+        self.dlg._load_layers()
+        self.assertTrue(self.dlg.btn_add.isEnabled())
+
+        self.dlg.plg_settings = PlgSettings()
+        self.dlg._build_client = lambda settings: self.FakeGS()
+        self.dlg._probe = lambda gs, url: None
+        self.dlg._fetch_version_label = lambda gs: ""
+        self.dlg._run_in_task = (
+            lambda message, work, on_success: None
+        )  # still in flight
+
+        self.dlg.refresh_ui()
+        self.assertIsNone(self.dlg.gs)
+        self.assertFalse(self.dlg.btn_add.isEnabled())
+        self.assertFalse(self.dlg.btn_delete_selected.isEnabled())
 
 
 # ############################################################################
