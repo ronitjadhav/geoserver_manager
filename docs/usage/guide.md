@@ -1,0 +1,147 @@
+# Using the plugin
+
+## Connect
+
+*Settings → Options → GeoServer Manager* (or the plugin menu's *Settings*
+entry):
+
+| Field | Notes |
+| :---- | :---- |
+| Base URL | e.g. `https://example.com/geoserver` — must start with `http://` or `https://` |
+| Username / Password | kept encrypted in the QGIS authentication database; QGIS asks for its master password |
+| Verify the server's TLS certificate | on by default; untick only for a private CA or a self-signed certificate you trust |
+| Test connection | probes the server with the fields as typed, without saving them |
+
+Then click the toolbar icon. The dialog connects in the background and the
+status line reads *Connected — url (version)*. *Refresh* (F5) reconnects and
+reloads the open tab. When something is wrong the status line says what:
+
+| Status | Meaning | What to do |
+| :----- | :------ | :--------- |
+| Not configured | no URL or credentials saved | open Settings |
+| Server unreachable | nothing answers at that host and port (after 10 s at most) | check the URL, the network, that GeoServer is running |
+| Certificate not trusted | TLS certificate this machine does not trust | fix the CA, or untick the verification for a certificate you trust |
+| Authentication failed | GeoServer answered 401/403 | check username and password |
+| HTTP error *N* | the URL answers, but not with the REST API (a wrong path) | check the URL — it should end in `/geoserver` |
+| Not a GeoServer REST endpoint | an HTML page came back (a proxy login page, a portal) | check the URL, or the proxy in front of GeoServer |
+
+Details for every failure go to the QGIS log panel, *GeoServer Manager* tab.
+Over plain `http://` to a remote host the password travels unencrypted; the
+plugin says so once, when saving.
+
+## The dialog
+
+The list on the left picks the resource type; the table on the right shows it.
+
+- **Search** (Ctrl+F) filters every column of the loaded list; Esc clears it.
+- **Sort** by clicking a column header; click again to reverse. The sort stays
+  through a refresh and resets when you change tab.
+- **Pages** of 20 rows; the buttons under the table move between them.
+- **Names** are links: click one (or select the row and press Enter) to open
+  the resource's details. The *Workspace* column jumps to that workspace.
+- **Actions**: the button above the table adds or publishes, *Delete Selected*
+  removes every highlighted row (Del does the same while the table has the
+  focus), and the right-hand column holds the per-row actions.
+- Lists load in the background — QGIS stays usable, the task bar shows the
+  progress, and *Refresh* turns into *Cancel* while a load runs.
+
+Every delete asks first and names what it cascades to; GeoServer deletes
+recursively (a workspace takes its stores, layers and styles with it).
+
+## Workspaces
+
+*Add a Workspace*: name, optionally isolated, optionally the default. Click a
+name for *Modify workspace settings*: rename, toggle isolation, make it the
+default — GeoServer always has exactly one default workspace, so the box is
+read-only on the current one — and, under *WMS*, the workspace's own WMS
+service settings (*Own WMS settings*): title, abstract, keywords, SRS list,
+rendering limits, default locale. Unticking *Own WMS settings* removes them
+and the workspace falls back to the global WMS configuration.
+
+## Datastores
+
+Listed across every workspace. *Add a Datastore* offers PostGIS, PostGIS
+(JNDI), PMTiles, Shapefile, *Directory of spatial files (shapefiles)* and
+GeoPackage with a form each; any other type gets a *Connection parameters*
+editor, one `key = value` per line, exactly as GeoServer stores them.
+
+Click a name to modify a store. A datastore cannot be renamed. The password is
+never shown or sent back — GeoServer only ever returns it encrypted — so the
+field is blank and must be typed again to save a PostGIS store. Everything the
+form does not show (extra parameters, the `enabled` flag) is kept as the
+server has it.
+
+## Coverage stores
+
+*Add a Coverage Store* from a GeoTIFF path on the GeoServer machine, a COG URL,
+or an ImageMosaic (a server directory, or a properties ZIP to upload). The
+*Coverages* action lists the coverages of a store — native name, SRS, size in
+pixels, bounds, bands — and *Publish a coverage* makes one of them a layer,
+with a title, an abstract, keywords and the layer name.
+
+## Layers
+
+Every published layer, with its workspace, datastore, SRS and default style.
+Click a name for the details: native name, projection policy, bounding box,
+attributes, metadata.
+
+*Publish a Layer* has two sources:
+
+- **A table in a datastore** — pick workspace, datastore and table, declare
+  the SRS, add title, abstract and keywords.
+- **A layer from this QGIS project** — the layer is written to a GeoPackage and
+  uploaded; GeoServer creates a datastore of that name and publishes the layer
+  in one request, and the layer's QGIS symbology is uploaded as its default
+  style. Tick *Replace it if it already exists* to overwrite a previous upload.
+  The layer's name is made GeoServer-safe first (spaces and accents become
+  `_`).
+
+Row actions: **Add to QGIS** (*Load as* WMS, WFS or WMTS — the credentials
+travel as a QGIS authentication configuration, so a saved project never
+contains a password), **Set style** (pick the default style among the server's
+styles), **Style from QGIS** (upload the matching project layer's symbology
+and make it the default), **Delete**.
+
+## Layer groups
+
+Global groups and per-workspace groups; the *Workspace* column shows
+`(global)` for the former. *Create a Layer Group*: name, title, abstract,
+mode, then the layers in order (*Add a layer* appends one, with its style);
+GeoServer computes the bounds. **Add to QGIS** loads the group as a WMS layer.
+The detail dialog is read-only: to change a group, create it again or delete
+it.
+
+## Styles
+
+Global and per-workspace styles, with their format and SLD version.
+*Upload a Style* takes its definition from three sources: **Paste SLD**,
+**From file** (`.sld`, a `.zip` with an SLD and its resources, `.mbstyle`), or
+**From a QGIS layer** — the project layer's symbology exported as SLD 1.1.
+Click a name to view and modify the definition (GeoServer shows a stored
+SLD 1.1 document in its 1.0 rendition; the editor says so).
+
+Row actions: **Apply to a QGIS layer** (pick a project layer and get the
+server's style on it), **Save as SLD** (to disk), **Delete** — GeoServer refuses
+to delete a style that a layer still uses.
+
+## Keyboard
+
+| Key | Does |
+| :-- | :--- |
+| F5 | refresh — reconnects and reloads the open tab |
+| Ctrl+F | jump to the search box |
+| Esc | clear the search; with an empty search, close the dialog |
+| Enter | open the selected row |
+| Del | delete the selected rows (while the table has the focus) |
+
+## Good to know
+
+- Nothing is cached: every tab switch and every *Refresh* fetches the list
+  again, and every form fetches its options when it opens.
+- Deleting a datastore or coverage store created from an upload leaves the
+  uploaded file in GeoServer's data directory.
+- The plugin's TLS setting does not reach QGIS's own WMS/WFS providers: a
+  layer added to QGIS uses QGIS's certificate handling.
+- The interface follows the QGIS theme, dark ones included, and is translated
+  where a locale exists (French so far — contributions welcome, see the
+  translation page).

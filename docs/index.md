@@ -17,6 +17,8 @@ caption: Usage
 maxdepth: 1
 ---
 Installation <usage/installation>
+Using the plugin <usage/guide>
+Roadmap <github_issue_roadmap>
 ```
 
 ```{toctree}

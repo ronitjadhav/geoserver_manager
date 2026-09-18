@@ -31,7 +31,7 @@ QGIS plugins manager settings panel to see it.
 
 If you define yourself as early adopter or a tester and can't wait for the release, the plugin is automatically packaged for each commit to main, so you can use this address as repository URL in your QGIS extensions manager settings:
 
-```url
+```text
 https://ronitjadhav.github.io/geoserver_manager/plugins.xml
 ```
 

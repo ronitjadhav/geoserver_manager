@@ -146,6 +146,9 @@ Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the
 Written in Markdown under `docs/`, built with Sphinx + myst-parser and
 published to <https://ronitjadhav.github.io/geoserver_manager/>.
 
+Start with the [usage guide](docs/usage/guide.md): connecting, what each tab
+does, publishing from QGIS, styles both ways, keyboard shortcuts, troubleshooting.
+
 ## License
 
 Distributed under the terms of the [`GPLv2+` license](LICENSE).
