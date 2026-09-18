@@ -37,8 +37,16 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
   `_setup_nav` builds the list from it and `_on_nav_changed` calls `getattr(self, loader)()`.
   A new resource type = one line in `TABS` + one mixin added to the class bases.
 - **A loader** sets up the header buttons, `_name_click_callback`, `_extra_click_callbacks`,
-  `_row_actions`, calls `_setup_table(columns)`, fetches, then `_populate_rows(rows)`.
-  Rows are plain lists of display strings; column 0 is the resource name.
+  `_row_actions`, calls `_setup_table(columns)` — and then hands a fetch function to
+  `_start_load(failure_message, fetch)` and returns. Rows are plain lists of display strings;
+  column 0 is the resource name.
+- **Loads run off the GUI thread.** `_start_load` wraps the fetch in a `_FetchTask` (a
+  `QgsTask`), so `_load_x()` returns before a single row exists: QGIS's task bar shows the
+  progress, *Refresh* turns into *Cancel*, and `finished()` comes back on the GUI thread to
+  render. A fetch is `_fetch_<x>_rows(task=None) -> (rows, failures)`; it runs in a worker,
+  so it must not touch a widget, and it only gets at the task by passing it to `_fan_out`.
+  Mutations (add / edit / delete) still run inline under `_run_action` — they are one request
+  and the user is waiting for the dialog they just confirmed.
 - **The table is paginated in Python** (`_page_size = 20`, `_all_rows` → `_filtered_rows` → one page).
   `_get_selected_rows()` maps a selected view row back through `_filtered_rows` by index.
 - **Server calls go through the helpers on the dialog**, never hand-rolled in a mixin:
@@ -53,7 +61,10 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
   | `_raw_rest(method, path, **kw)` | endpoints the library lacks; raises with GeoServer's response body |
   | `_name_of(item)` | the name of a list entry (dict or str) |
   | `_get_workspace_names()` | workspace names for combos — a fresh GET every call, deliberately uncached |
-  | `_fan_out(fn, items) -> [(result, error)]` | parallel per-item GETs; a failing item yields `(None, exc)` instead of aborting |
+  | `_start_load(failure_message, fetch)` | a tab load: runs `fetch(task)` in a `QgsTask`, renders `(rows, failures)` when it lands |
+  | `_run_in_task(failure_message, work, on_success)` | the same for anything that is not rows (the connection probe) |
+  | `_cancel_load(user=False)` | stop the running load; `user=True` is the Cancel button, which also explains itself in a banner |
+  | `_fan_out(fn, items, task=None) -> [(result, error)]` | parallel per-item GETs; a failing item yields `(None, exc)` instead of aborting. With the task: progress per item, and a cancel stops the loop |
   | `_report_partial_failures([(label, exc)])` | one warning banner + log lines for what a listing could not fetch |
   | `_delete_many(kind, [(label, fn)], reload_fn, cascade=…)` | confirm + run + report one or many deletions |
   | `_reload_current_tab()` | after an action reachable from another tab |
@@ -86,7 +97,11 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
 7. **Delete confirmations name the cascade.** Both delete paths send `recurse=true`.
 8. **`isVisible()` lies on inactive tab pages.** `ResourceFormDialog` tracks hidden fields in
    `_hidden_keys`; validation uses that, not Qt, and switches to the tab holding the offending field.
-9. **Nav labels in `TABS` are logic keys as well as text.** The `tr("Actions")` column and the
+9. **A fetch never touches a widget.** It runs in a worker thread; everything it learns comes
+   back as `(rows, failures)` and is rendered by `_render_rows` on the GUI thread. A cancelled
+   or failed load renders nothing, which is safe only because the loader reset the table
+   *before* starting the task — that is what keeps "no stale rows" true here too.
+10. **Nav labels in `TABS` are logic keys as well as text.** The `tr("Actions")` column and the
    `tr("Workspace")` key in `_extra_click_callbacks` must match the header strings exactly.
 
 ## geoservercloud — facts the code relies on
@@ -106,8 +121,10 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
   plugin therefore shows the default read-only-and-checked, marks it in the Workspaces list, and reads it
   live from the server on every load and every edit dialog — if it looks "out of sync" with the web UI,
   the web UI is the one lying.
-- The client strips trailing `/` from the URL itself. It has no timeout parameter (`TIMEOUT = 120` is a
-  module constant). `verifytls` is the *Verify the server's TLS certificate* setting (default on);
+- The client strips trailing `/` from the URL itself. It has no timeout parameter at all
+  (`TIMEOUT = 120` is a module constant and `RestClient.get` takes no `timeout`), which is why
+  `_probe` is the one call that uses `requests` directly — a dead host must cost 10 s, not two
+  minutes (row 20 of #50). `verifytls` is the *Verify the server's TLS certificate* setting (default on);
   `_probe` catches `requests.exceptions.SSLError` before `OSError` so a private-CA server is reported as a
   certificate problem, not as "is the server running?".
 - **Thread safety:** the REST methods are stateless `requests.*` calls and are safe to run through
@@ -170,6 +187,11 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
   `GeoServerMainDialog()` directly and drive its methods. Fake the server by assigning `dlg.gs = FakeGS()`.
   `tests/qgis/conftest.py` puts the bundled wheels on `sys.path`, so tests may also import the real
   `geoservercloud` models to lock payload shapes (see `test_library_contract.py`).
+- **Testing a load.** What is loaded: call the seam, `rows, failures = dlg._fetch_x_rows()`.
+  A whole loader: use `tests/qgis/sync_dialog.SyncDialog`, which runs the fetch inline, so
+  `dlg._load_x(); dlg._all_rows` still works. The threading itself: the real dialog plus
+  `spin_until()` from `test_dlg_main.py` (`TestBackgroundLoading`) — those tests all fail if
+  a load ever goes back to running on the GUI thread.
 - Commit messages: conventional prefix (`fix:`, `feat:`, `refactor:`, `chore:`, `ci:`, `docs:`), a body
   that says *why*. Pre-commit runs ruff, ruff-format, black, isort, flake8(+flake8-qgis) and the
   hygiene hooks on every commit; if black rewrites a file the commit aborts — re-add and commit again.

@@ -11,7 +11,7 @@ from qgis.core import Qgis, QgsApplication, QgsSettings
 from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import QCoreApplication, QLocale, QTranslator, QUrl
 from qgis.PyQt.QtGui import QDesktopServices, QIcon
-from qgis.PyQt.QtWidgets import QAction, QApplication, QMessageBox
+from qgis.PyQt.QtWidgets import QAction, QMessageBox
 
 # project
 from geoserver_manager.__about__ import (
@@ -198,12 +198,8 @@ class GeoServerManagerPlugin:
         if not self.main_dialog:
             self.main_dialog = GeoServerMainDialog(self.iface.mainWindow(), self.iface)
 
-        # Show and paint the window BEFORE the first request. That request is
-        # synchronous and, against a host that swallows the SYN (VPN down,
-        # firewall DROP), blocks for the library's full 120 s timeout — which
-        # used to happen with no window on screen at all, so QGIS simply looked
-        # hung. ponytail: processEvents only gets it painted; the real fix is
-        # running the probe in a QgsTask (roadmap: async/threaded API calls).
+        # refresh_ui only starts the connection probe — it runs in a QgsTask
+        # and calls back when it lands — so the window paints straight away
+        # even against a host that swallows the SYN (VPN down, firewall DROP).
         self.main_dialog.show()
-        QApplication.processEvents()
         self.main_dialog.refresh_ui()

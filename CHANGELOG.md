@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Loading no longer freezes QGIS.** Every tab load and the connection probe
+  run in a `QgsTask`: the dialog paints and stays usable while requests are in
+  flight, QGIS's task bar shows progress, and *Refresh* becomes *Cancel* for as
+  long as a load is running. A server that accepts the connection and never
+  answers now costs 10 seconds and a "Server unreachable" banner instead of two
+  minutes of a frozen window.
 - **Layer Groups tab**: the global layer groups and every workspace's, with
   mode and size; open one to see its layers in drawing order (with their
   styles and any nested group), title, abstract and bounds; create a group

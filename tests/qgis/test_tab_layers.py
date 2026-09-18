@@ -16,6 +16,7 @@ from qgis.testing import start_app, unittest
 
 # project
 from geoserver_manager.gui.dlg_main import GeoServerMainDialog
+from tests.qgis.sync_dialog import SyncDialog
 
 start_app()
 
@@ -89,7 +90,7 @@ class FakeGS:
 
 class TestLayersTab(unittest.TestCase):
     def setUp(self):
-        self.dlg = GeoServerMainDialog()
+        self.dlg = SyncDialog()
         self.warnings = []
         self.dlg.show_warning_message = self.warnings.append
         self.dlg.show_error_message = lambda text: self.fail(
@@ -316,7 +317,7 @@ class TestAddToQgis(unittest.TestCase):
             def get_plg_settings(self):
                 return Settings()
 
-        dlg = GeoServerMainDialog()
+        dlg = SyncDialog()
         dlg.plg_settings = Prefs()
         errors = []
         dlg.show_error_message = errors.append
@@ -371,7 +372,7 @@ class PublishFakeGS(FakeGS):
 
 class TestPublish(unittest.TestCase):
     def setUp(self):
-        self.dlg = GeoServerMainDialog()
+        self.dlg = SyncDialog()
         self.dlg.gs = PublishFakeGS()
         self.dlg.show_warning_message = lambda t: None
 
@@ -465,7 +466,7 @@ class TestSetLayerStyle(unittest.TestCase):
     """The default style is read from the layer and written through the library."""
 
     def setUp(self):
-        self.dlg = GeoServerMainDialog()
+        self.dlg = SyncDialog()
         outer = self
         self.set_calls = []
 

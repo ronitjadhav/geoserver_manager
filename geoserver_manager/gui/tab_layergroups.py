@@ -35,69 +35,72 @@ class LayerGroupTabMixin:
     # -- Listing ---------------------------------------------------------------
 
     def _load_layer_groups(self):
-        """List the global layer groups and every workspace's."""
-
-        def load():
-            self._setup_add_button(
-                self.tr("Create a Layer Group"),
-                self.tr("Publish several layers as one"),
-                self._add_layer_group,
-            )
-            self._setup_delete_selected_button(self._delete_selected_layer_groups)
-            self._name_click_callback = self._show_layer_group_info
-            self._extra_click_callbacks = {
-                self.tr("Workspace"): self._open_workspace_from_group_row
-            }
-            self._row_actions = [
-                (
-                    "mActionAddLayer.svg",
-                    self.tr("Add to QGIS"),
-                    self._add_group_to_qgis,
-                ),
-                (
-                    "mActionDeleteSelected.svg",
-                    self.tr("Delete"),
-                    self._delete_layer_group,
-                ),
+        """Arm the Layer Groups tab, then fetch its rows in the background."""
+        self._setup_add_button(
+            self.tr("Create a Layer Group"),
+            self.tr("Publish several layers as one"),
+            self._add_layer_group,
+        )
+        self._setup_delete_selected_button(self._delete_selected_layer_groups)
+        self._name_click_callback = self._show_layer_group_info
+        self._extra_click_callbacks = {
+            self.tr("Workspace"): self._open_workspace_from_group_row
+        }
+        self._row_actions = [
+            (
+                "mActionAddLayer.svg",
+                self.tr("Add to QGIS"),
+                self._add_group_to_qgis,
+            ),
+            (
+                "mActionDeleteSelected.svg",
+                self.tr("Delete"),
+                self._delete_layer_group,
+            ),
+        ]
+        self._setup_table(
+            [
+                self.tr("Layer Group"),
+                self.tr("Workspace"),
+                self.tr("Mode"),
+                self.tr("Layers"),
+                self.tr("Actions"),
             ]
-            self._setup_table(
-                [
-                    self.tr("Layer Group"),
-                    self.tr("Workspace"),
-                    self.tr("Mode"),
-                    self.tr("Layers"),
-                    self.tr("Actions"),
-                ]
-            )
+        )
+        self._start_load(
+            self.tr("Failed to load layer groups"), self._fetch_layer_group_rows
+        )
 
-            groups = [(name, GLOBAL) for name in self._global_group_names()]
-            failures = []
-            ws_names = self._get_workspace_names()
-            for ws_name, (names, error) in zip(
+    def _fetch_layer_group_rows(self, task=None):
+        """(rows, failures) for the Layer Groups table. Runs in a worker thread."""
+        groups = [(name, GLOBAL) for name in self._global_group_names()]
+        failures = []
+        ws_names = self._get_workspace_names()
+        for ws_name, (names, error) in zip(
+            ws_names,
+            self._fan_out(
+                lambda ws: self._fetch_list(self.gs.get_layer_groups, ws),
                 ws_names,
-                self._fan_out(
-                    lambda ws: self._fetch_list(self.gs.get_layer_groups, ws), ws_names
-                ),
-            ):
-                if error:
-                    failures.append((ws_name, error))
-                    continue
-                groups.extend((self._name_of(group), ws_name) for group in names)
+                task,
+            ),
+        ):
+            if error:
+                failures.append((ws_name, error))
+                continue
+            groups.extend((self._name_of(group), ws_name) for group in names)
 
-            # Mode and size are only in the group itself, so one GET per group.
-            rows = []
-            for (name, ws_label), (summary, error) in zip(
-                groups, self._fan_out(lambda group: self._group_summary(*group), groups)
-            ):
-                if error:
-                    failures.append((f"{ws_label}/{name}", error))
-                    continue
-                mode, layer_count = summary
-                rows.append([name, ws_label, mode, str(layer_count)])
-            self._populate_rows(rows)
-            self._report_partial_failures(failures)
-
-        self._run_action(load, self.tr("Failed to load layer groups"))
+        # Mode and size are only in the group itself, so one GET per group.
+        rows = []
+        for (name, ws_label), (summary, error) in zip(
+            groups,
+            self._fan_out(lambda group: self._group_summary(*group), groups, task),
+        ):
+            if error:
+                failures.append((f"{ws_label}/{name}", error))
+                continue
+            mode, layer_count = summary
+            rows.append([name, ws_label, mode, str(layer_count)])
+        return rows, failures
 
     def _open_workspace_from_group_row(self, row_data):
         """The Workspace column links to the workspace — not for global groups."""

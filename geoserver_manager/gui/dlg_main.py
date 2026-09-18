@@ -3,15 +3,18 @@
 """
 Main plugin dialog — GeoServer resource browser.
 
-Left panel: navigation tabs (Workspaces, Datastores, Layers, Styles).
+Left panel: navigation tabs, one per resource type (see TABS).
 Right panel: search bar + results table for the selected tab.
+
+Every load runs in a QgsTask: a loader arms the GUI and hands a fetch function
+to _start_load, which returns immediately and renders the rows when they land.
 """
 
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from pathlib import Path
 
-from qgis.core import Qgis, QgsApplication
+from qgis.core import Qgis, QgsApplication, QgsTask
 from qgis.gui import QgsMessageBar
 from qgis.PyQt import uic
 from qgis.PyQt.QtCore import QByteArray, Qt, QTimer
@@ -38,9 +41,46 @@ from geoserver_manager.toolbelt.log_handler import PlgLogger
 from geoserver_manager.toolbelt.preferences import PlgOptionsManager
 
 # Listing a nested resource needs one GET per parent plus one per item. Eight
-# parallel requests keep that bearable; the calls still block the GUI thread
-# (issue #31 tracks the QgsTask move).
+# parallel requests keep that bearable. They run inside a _FetchTask, so they
+# never block the GUI thread.
 _MAX_PARALLEL_REQUESTS = 8
+
+# The connection probe is the request the user waits for before anything is on
+# screen, so it gets its own short ceiling. The library cannot do this: its
+# RestClient hardcodes timeout=TIMEOUT (120 s) — see _probe and issue #50.
+_PROBE_TIMEOUT = 10
+
+
+class _FetchTask(QgsTask):
+    """Runs one dialog fetch off the GUI thread.
+
+    QgsTask brings QGIS's own progress bar and Cancel button, and calls
+    finished() back on the GUI thread — the only thread allowed to touch a
+    widget. Whatever run() collects is handed to the callback untouched.
+    """
+
+    def __init__(self, description, work, on_finished):
+        super().__init__(description, QgsTask.Flag.CanCancel)
+        self._work = work
+        self._on_finished = on_finished
+        self._result = None
+        self._error = None
+        # Set by _cancel_load: tells "the user pressed Cancel" apart from
+        # "another load superseded this one".
+        self.user_cancelled = False
+
+    def run(self):
+        """Worker thread. No widget may be touched from here."""
+        try:
+            self._result = self._work(self)
+        except Exception as e:  # reported on the GUI thread, by _run_in_task
+            self._error = e
+            return False
+        return not self.isCanceled()
+
+    def finished(self, result):
+        """Back on the GUI thread, whatever happened."""
+        self._on_finished(self, result, self._result, self._error)
 
 
 class GeoServerMainDialog(
@@ -85,6 +125,11 @@ class GeoServerMainDialog(
             None  # callback(list[row_data]) for bulk delete
         )
 
+        # Background loading state
+        self._task = None  # the running _FetchTask, if any
+        self._closing = False  # set in closeEvent: a late finish must stay away
+        self._announce_after_load = None  # banner to show once rows have landed
+
         # Tooltips
         self.btn_close.setToolTip(self.tr("Close the dialog"))
         self.btn_refresh.setToolTip(self.tr("Refresh resources from the GeoServer"))
@@ -102,7 +147,7 @@ class GeoServerMainDialog(
 
         # Signals
         self.btn_close.clicked.connect(self.close)
-        self.btn_refresh.clicked.connect(lambda: self.refresh_ui(show_message=True))
+        self.btn_refresh.clicked.connect(self._on_refresh_clicked)
         self.btn_edit_credentials.clicked.connect(self._edit_credentials)
         self.navList.currentRowChanged.connect(self._on_nav_changed)
         self._search_timer = QTimer(self)
@@ -122,6 +167,9 @@ class GeoServerMainDialog(
     # -- Settings persistence -----------------------------------------------
 
     def closeEvent(self, event):
+        # A running task would call back into widgets that are on their way out.
+        self._closing = True
+        self._cancel_load()
         self._store_settings()
         super().closeEvent(event)
 
@@ -178,34 +226,6 @@ class GeoServerMainDialog(
             raise RuntimeError(f"HTTP {status_code}: {content}")
         return content
 
-    def _connect(self):
-        """Create the GeoServerCloud client and verify the server answers.
-
-        Sets self.gs on success. Every failure leaves self.gs = None, paints
-        the status label red and explains itself in the message bar.
-        """
-        self.gs = None
-        settings = self.plg_settings.get_plg_settings()
-        gs = self._build_client(settings)
-        if gs is None:
-            return False
-
-        problem = self._probe(gs, settings.geoserver_url)
-        if problem is not None:
-            status, message = problem
-            self._set_status(status, "red")
-            self.show_error_message(message)
-            self.log(f"Connection check failed: {status}", Qgis.MessageLevel.Critical)
-            return False
-
-        self.gs = gs
-        status = self.tr("Connected — {}").format(settings.geoserver_url)
-        version = self._fetch_version_label()
-        if version:
-            status += f" ({version})"
-        self._set_status(status, "green")
-        return True
-
     def _build_client(self, settings):
         """Return a GeoServerCloud client from the saved settings, or None.
 
@@ -236,19 +256,25 @@ class GeoServerMainDialog(
         )
 
     def _probe(self, gs, url):
-        """Make one real request. Return None if it worked, else (status, message).
+        """Make one bounded request. Return None if it worked, else (status, message).
 
-        HTTPError must be caught before OSError: every requests exception
-        subclasses OSError, so a 401 would otherwise read as "unreachable".
+        TODO(#50): the one call in the plugin that does not go through the
+        library. `RestClient` hardcodes `timeout=TIMEOUT` (120 s) and takes no
+        timeout argument, and this is the request the user waits for before the
+        first table appears — so it uses `requests` directly with
+        _PROBE_TIMEOUT, reusing the client's own auth and TLS setting.
         """
-        from requests.exceptions import HTTPError, SSLError
+        import requests
+        from requests.exceptions import SSLError
 
+        client = gs.rest_service.rest_client
         try:
-            content, status_code = gs.get_workspaces()
-        except HTTPError as e:
-            # raise_for_status() always attaches the response; 500 is a safe
-            # stand-in that lands in the generic HTTP branch below.
-            status_code = e.response.status_code if e.response is not None else 500
+            response = requests.get(
+                f"{url.rstrip('/')}/rest/workspaces.json",
+                auth=client.auth,
+                timeout=_PROBE_TIMEOUT,
+                verify=client.verifytls,
+            )
         except SSLError:
             # Before OSError (it is a ConnectionError): a private-CA or
             # self-signed certificate used to read as "is the server running?"
@@ -261,7 +287,9 @@ class GeoServerMainDialog(
                 ).format(url=url),
             )
         except OSError:
-            # ConnectionError / Timeout: refused, unreachable, wrong host
+            # ConnectionError / Timeout: refused, unreachable, wrong host, or
+            # a host that swallows the SYN — that one now gives up after
+            # _PROBE_TIMEOUT instead of the library's two minutes.
             return (
                 self.tr("Server unreachable"),
                 self.tr(
@@ -274,23 +302,27 @@ class GeoServerMainDialog(
                 self.tr("Connection failed: {}").format(e),
             )
 
-        if status_code in (401, 403):
+        if response.status_code in (401, 403):
             return (
                 self.tr("Authentication failed"),
                 self.tr(
                     "Authentication failed — check your username and password in Settings."
                 ),
             )
-        if status_code >= 400:
-            # 404 is the one status the library does not raise on: the URL
-            # usually points at something that is not a GeoServer REST endpoint.
+        if response.status_code >= 400:
+            # The URL usually points at something that is not a GeoServer REST
+            # endpoint at all.
             return (
-                self.tr("HTTP error {}").format(status_code),
+                self.tr("HTTP error {}").format(response.status_code),
                 self.tr(
                     "GeoServer returned HTTP {code} for {url} — check the URL in Settings."
-                ).format(code=status_code, url=url),
+                ).format(code=response.status_code, url=url),
             )
-        if not isinstance(content, list):
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = None
+        if not isinstance(payload, dict) or "workspaces" not in payload:
             # An SSO / reverse-proxy login page answers 200 with HTML. Without
             # this check it showed a green "Connected" and empty tables.
             return (
@@ -302,14 +334,14 @@ class GeoServerMainDialog(
             )
         return None
 
-    def _fetch_version_label(self):
+    def _fetch_version_label(self, gs):
         """Best-effort 'GeoServer x.y.z' string for the status bar.
 
         Not required for a successful connection — if it fails, we still
         show "Connected" without the version suffix.
         """
         try:
-            info = self._check(self.gs.get_version())
+            info = self._check(gs.get_version())
         except Exception:
             return ""
         if not isinstance(info, dict):
@@ -327,18 +359,136 @@ class GeoServerMainDialog(
     # -- Public entry point ------------------------------------------------
 
     def refresh_ui(self, show_message=False):
-        """Connect and reload the current tab."""
-        # Say what is happening: _connect blocks, so this label is the only
-        # feedback the user gets while it does.
+        """Connect in the background, then reload the current tab.
+
+        Returns as soon as the probe is on its way: nothing here waits for the
+        server, so QGIS stays usable even when the host swallows the SYN.
+        """
         self._set_status(self.tr("Connecting…"), "gray")
-        if self._connect():
-            self._on_nav_changed(self.navList.currentRow())
-            if show_message:
-                self.show_success_message(self.tr("Resources loaded."))
-        else:
-            # Clearing only the visible rows would leave the dead server's data
-            # in the row cache, still reachable through search and pagination.
+        self.gs = None
+        settings = self.plg_settings.get_plg_settings()
+        # Credentials come out of QgsAuthManager, so the client is built here on
+        # the GUI thread; its constructor makes no network call.
+        gs = self._build_client(settings)
+        if gs is None:
             self._reset_table_state()
+            return
+        url = settings.geoserver_url
+
+        def connect(task):
+            problem = self._probe(gs, url)
+            return problem, ("" if problem else self._fetch_version_label(gs))
+
+        def connected(result):
+            problem, version = result
+            if problem is not None:
+                status, message = problem
+                self._set_status(status, "red")
+                self.show_error_message(message)
+                self.log(
+                    f"Connection check failed: {status}", Qgis.MessageLevel.Critical
+                )
+                # Clearing only the visible rows would leave the dead server's
+                # data in the row cache, reachable through search and pagination.
+                self._reset_table_state()
+                return
+            self.gs = gs
+            status = self.tr("Connected — {}").format(url)
+            if version:
+                status += f" ({version})"
+            self._set_status(status, "green")
+            if show_message:
+                # The rows are still on their way; _render_rows says so once
+                # they land, rather than claiming it now.
+                self._announce_after_load = self.tr("Resources loaded.")
+            self._on_nav_changed(self.navList.currentRow())
+
+        self._run_in_task(self.tr("Connection failed"), connect, connected)
+
+    # -- Background loading ------------------------------------------------
+
+    def _run_in_task(self, failure_message, work, on_success):
+        """Run work(task) off the GUI thread, then on_success(result) here.
+
+        Only stateless REST reads belong in work: the client's wms / wmts
+        attributes are shared state. A failed run reports itself and calls
+        nothing; a cancelled one does neither — which is why every loader
+        resets the table *before* starting a task, so an empty table is what
+        either outcome leaves behind.
+        """
+        self._cancel_load()
+        self._set_loading(True)
+
+        def finished(task, ok, result, error):
+            if self._closing or self._task is not task:
+                # The dialog is going away, or a newer load took over: that
+                # one owns the table and the Cancel button now.
+                return
+            self._task = None
+            self._set_loading(False)
+            if error is not None:
+                detail = self._error_text(error)
+                self.show_error_message(f"{failure_message}: {detail}")
+                self.log(
+                    f"{failure_message}: {detail}", log_level=Qgis.MessageLevel.Critical
+                )
+                return
+            if not ok:
+                if task.user_cancelled:
+                    self.show_warning_message(self.tr("Loading cancelled."))
+                return
+            on_success(result)
+
+        self._task = _FetchTask(failure_message, work, finished)
+        QgsApplication.taskManager().addTask(self._task)
+
+    def _start_load(self, failure_message, fetch):
+        """Fetch a tab's rows in the background and render them when they land.
+
+        `fetch(task) -> (rows, failures)` runs in a worker thread, so it must
+        not touch a widget: everything it returns is rendered here instead.
+        """
+        self._run_in_task(
+            failure_message, fetch, lambda result: self._render_rows(*result)
+        )
+
+    def _render_rows(self, rows, failures):
+        """GUI side of a load: paint the rows, then report what could not load."""
+        self._populate_rows(rows)
+        self._report_partial_failures(failures)
+        if self._announce_after_load:
+            self.show_success_message(self._announce_after_load)
+            self._announce_after_load = None
+
+    def _cancel_load(self, user=False):
+        """Cancel the running load, if any. `user` marks the Cancel button."""
+        if self._task is not None:
+            self._task.user_cancelled = user
+            self._task.cancel()
+
+    def _loading(self):
+        """True while a background load is running."""
+        return self._task is not None
+
+    def _set_loading(self, loading):
+        """Say that a load is running, and offer Cancel in place of Refresh."""
+        self.btn_refresh.setText(self.tr("Cancel") if loading else self.tr("Refresh"))
+        self.btn_refresh.setToolTip(
+            self.tr("Stop loading")
+            if loading
+            else self.tr("Refresh resources from the GeoServer")
+        )
+        if loading:
+            self.lbl_page_info.setText(self.tr("Loading…"))
+        elif not self._all_rows:
+            self.lbl_page_info.setText(self.tr("No results"))
+
+    def _on_refresh_clicked(self):
+        """One button: Refresh when idle, Cancel while loading."""
+        if self._loading():
+            self._cancel_load(user=True)
+        else:
+            self.refresh_ui(show_message=True)
 
     # -- Left navigation ---------------------------------------------------
 
@@ -703,13 +853,18 @@ class GeoServerMainDialog(
         return [self._name_of(ws) for ws in self._fetch_list(self.gs.get_workspaces)]
 
     @staticmethod
-    def _fan_out(fn, items):
+    def _fan_out(fn, items, task=None):
         """Run fn(item) for every item on a small thread pool.
 
         Returns [(result, error)] in input order. A worker that raises yields
         (None, exception) instead of aborting the whole listing, so one broken
         workspace cannot blank the table. Only stateless REST reads belong
         here: GeoServerCloud.wms / .wmts are shared state.
+
+        Given the running task, each finished item reports progress and a
+        cancel stops the loop. ponytail: the requests already in flight (up to
+        _MAX_PARALLEL_REQUESTS) still run to the end — cancelling means "stop
+        after this round", not "abort the sockets".
         """
 
         def guarded(item):
@@ -718,8 +873,17 @@ class GeoServerMainDialog(
             except Exception as e:  # reported by the caller, per item
                 return (None, e)
 
+        results = []
         with ThreadPoolExecutor(max_workers=_MAX_PARALLEL_REQUESTS) as pool:
-            return list(pool.map(guarded, items))
+            for done, result in enumerate(pool.map(guarded, items), start=1):
+                results.append(result)
+                if task is not None:
+                    # ponytail: a fetch with several fan-outs sweeps the
+                    # progress bar once per stage; the task bar can live with it.
+                    task.setProgress(100 * done / len(items))
+                    if task.isCanceled():
+                        break
+        return results
 
     def _report_partial_failures(self, failures):
         """One warning banner for the items a listing could not fetch.

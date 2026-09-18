@@ -16,9 +16,9 @@ from qgis.testing import start_app, unittest
 
 # project
 from geoserver_manager.gui import tab_styles
-from geoserver_manager.gui.dlg_main import GeoServerMainDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.tab_styles import GLOBAL
+from tests.qgis.sync_dialog import SyncDialog
 
 start_app()
 
@@ -116,7 +116,7 @@ class Recording(ResourceFormDialog):
 
 class TestStylesTab(unittest.TestCase):
     def setUp(self):
-        self.dlg = GeoServerMainDialog()
+        self.dlg = SyncDialog()
         self.dlg.gs = FakeGS()
         self.warnings = []
         self.dlg.show_warning_message = self.warnings.append

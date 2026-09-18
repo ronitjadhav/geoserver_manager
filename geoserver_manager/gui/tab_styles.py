@@ -35,46 +35,44 @@ class StyleTabMixin:
         return None if workspace_label in ("", GLOBAL) else workspace_label
 
     def _load_styles(self):
-        """List global styles and every workspace's styles."""
+        """Arm the Styles tab, then fetch its rows in the background."""
+        self._setup_add_button(
+            self.tr("Upload a Style"),
+            self.tr("Upload a style from an SLD file or pasted SLD"),
+            self._add_style,
+        )
+        self._setup_delete_selected_button(self._delete_selected_styles)
+        self._name_click_callback = self._show_style_info
+        self._extra_click_callbacks = {
+            self.tr("Workspace"): self._open_workspace_from_style_row
+        }
+        self._row_actions = [
+            ("mActionDeleteSelected.svg", self.tr("Delete"), self._delete_style),
+        ]
+        self._setup_table(
+            [self.tr("Style Name"), self.tr("Workspace"), self.tr("Actions")]
+        )
+        self._start_load(self.tr("Failed to load styles"), self._fetch_style_rows)
 
-        def load():
-            self._setup_add_button(
-                self.tr("Upload a Style"),
-                self.tr("Upload a style from an SLD file or pasted SLD"),
-                self._add_style,
-            )
-            self._setup_delete_selected_button(self._delete_selected_styles)
-            self._name_click_callback = self._show_style_info
-            self._extra_click_callbacks = {
-                self.tr("Workspace"): self._open_workspace_from_style_row
-            }
-            self._row_actions = [
-                ("mActionDeleteSelected.svg", self.tr("Delete"), self._delete_style),
-            ]
-            self._setup_table(
-                [self.tr("Style Name"), self.tr("Workspace"), self.tr("Actions")]
-            )
-
-            rows = [
-                [self._name_of(style), GLOBAL]
-                for style in self._fetch_list(self.gs.get_styles)
-            ]
-            ws_names = self._get_workspace_names()
-            failures = []
-            for ws_name, (styles, error) in zip(
-                ws_names,
-                self._fan_out(
-                    lambda ws: self._fetch_list(self.gs.get_styles, ws), ws_names
-                ),
-            ):
-                if error:
-                    failures.append((ws_name, error))
-                    continue
-                rows.extend([self._name_of(style), ws_name] for style in styles)
-            self._populate_rows(rows)
-            self._report_partial_failures(failures)
-
-        self._run_action(load, self.tr("Failed to load styles"))
+    def _fetch_style_rows(self, task=None):
+        """(rows, failures) for the Styles table. Runs in a worker thread."""
+        rows = [
+            [self._name_of(style), GLOBAL]
+            for style in self._fetch_list(self.gs.get_styles)
+        ]
+        ws_names = self._get_workspace_names()
+        failures = []
+        for ws_name, (styles, error) in zip(
+            ws_names,
+            self._fan_out(
+                lambda ws: self._fetch_list(self.gs.get_styles, ws), ws_names, task
+            ),
+        ):
+            if error:
+                failures.append((ws_name, error))
+                continue
+            rows.extend([self._name_of(style), ws_name] for style in styles)
+        return rows, failures
 
     def _open_workspace_from_style_row(self, row_data):
         """The Workspace column links to the workspace — unless it is the global scope."""

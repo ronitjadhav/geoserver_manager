@@ -41,60 +41,61 @@ class DatastoreTabMixin:
     """
 
     def _load_datastores(self):
-        """Fetch all datastores across all workspaces and display them."""
-
-        def load():
-            self._setup_add_button(
-                self.tr("Add a New Datastore"),
-                self.tr("Create a new datastore"),
-                self._add_datastore,
-            )
-            self._setup_delete_selected_button(self._delete_selected_datastores)
-            self._name_click_callback = self._show_datastore_info
-            self._extra_click_callbacks = {
-                self.tr("Workspace"): self._open_workspace_from_row
-            }
-            self._row_actions = [
-                (
-                    "mActionDeleteSelected.svg",
-                    self.tr("Delete"),
-                    self._delete_datastore,
-                ),
+        """Arm the Datastores tab, then fetch its rows in the background."""
+        self._setup_add_button(
+            self.tr("Add a New Datastore"),
+            self.tr("Create a new datastore"),
+            self._add_datastore,
+        )
+        self._setup_delete_selected_button(self._delete_selected_datastores)
+        self._name_click_callback = self._show_datastore_info
+        self._extra_click_callbacks = {
+            self.tr("Workspace"): self._open_workspace_from_row
+        }
+        self._row_actions = [
+            (
+                "mActionDeleteSelected.svg",
+                self.tr("Delete"),
+                self._delete_datastore,
+            ),
+        ]
+        self._setup_table(
+            [
+                self.tr("Datastore Name"),
+                self.tr("Workspace"),
+                self.tr("Type"),
+                self.tr("Enabled"),
+                self.tr("Actions"),
             ]
-            self._setup_table(
-                [
-                    self.tr("Datastore Name"),
-                    self.tr("Workspace"),
-                    self.tr("Type"),
-                    self.tr("Enabled"),
-                    self.tr("Actions"),
-                ]
-            )
+        )
+        self._start_load(
+            self.tr("Failed to load datastores"), self._fetch_datastore_rows
+        )
 
-            ws_names = self._get_workspace_names()
-            listed = self._fan_out(self._datastore_names, ws_names)
-            pairs = [
-                (ws_name, ds_name)
-                for ws_name, (ds_names, error) in zip(ws_names, listed)
-                if error is None
-                for ds_name in ds_names
-            ]
-            details = self._fan_out(lambda pair: self._datastore_summary(*pair), pairs)
-            rows = [
-                [ds_name, ws_name, *(summary or ("—", "—"))]
-                for (ws_name, ds_name), (summary, _error) in zip(pairs, details)
-            ]
-            self._populate_rows(rows)
-
-            failures = [(ws, err) for ws, (_names, err) in zip(ws_names, listed) if err]
-            failures += [
-                (f"{ws}/{ds}", err)
-                for (ws, ds), (_summary, err) in zip(pairs, details)
-                if err
-            ]
-            self._report_partial_failures(failures)
-
-        self._run_action(load, self.tr("Failed to load datastores"))
+    def _fetch_datastore_rows(self, task=None):
+        """(rows, failures) for the Datastores table. Runs in a worker thread."""
+        ws_names = self._get_workspace_names()
+        listed = self._fan_out(self._datastore_names, ws_names, task)
+        pairs = [
+            (ws_name, ds_name)
+            for ws_name, (ds_names, error) in zip(ws_names, listed)
+            if error is None
+            for ds_name in ds_names
+        ]
+        details = self._fan_out(
+            lambda pair: self._datastore_summary(*pair), pairs, task
+        )
+        rows = [
+            [ds_name, ws_name, *(summary or ("—", "—"))]
+            for (ws_name, ds_name), (summary, _error) in zip(pairs, details)
+        ]
+        failures = [(ws, err) for ws, (_names, err) in zip(ws_names, listed) if err]
+        failures += [
+            (f"{ws}/{ds}", err)
+            for (ws, ds), (_summary, err) in zip(pairs, details)
+            if err
+        ]
+        return rows, failures
 
     def _datastore_names(self, workspace_name):
         """Return the datastore names of one workspace. Raises on HTTP errors."""

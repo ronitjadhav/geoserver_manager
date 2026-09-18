@@ -24,43 +24,44 @@ class WorkspaceTabMixin:
     """
 
     def _load_workspaces(self):
-        """Fetch all workspaces and display them in the results table."""
-
-        def load():
-            self._setup_add_button(
-                self.tr("Add a New Workspace"),
-                self.tr("Create a new workspace"),
-                self._add_workspace,
-            )
-            self._setup_delete_selected_button(self._delete_selected_workspaces)
-            self._name_click_callback = self._show_workspace_info
-            self._extra_click_callbacks = {}
-            self._row_actions = [
-                (
-                    "mActionDeleteSelected.svg",
-                    self.tr("Delete"),
-                    self._delete_workspace,
-                ),
+        """Arm the Workspaces tab, then fetch its rows in the background."""
+        self._setup_add_button(
+            self.tr("Add a New Workspace"),
+            self.tr("Create a new workspace"),
+            self._add_workspace,
+        )
+        self._setup_delete_selected_button(self._delete_selected_workspaces)
+        self._name_click_callback = self._show_workspace_info
+        self._extra_click_callbacks = {}
+        self._row_actions = [
+            (
+                "mActionDeleteSelected.svg",
+                self.tr("Delete"),
+                self._delete_workspace,
+            ),
+        ]
+        self._setup_table(
+            [
+                self.tr("Workspace Name"),
+                self.tr("Default"),
+                self.tr("Actions"),
             ]
-            self._setup_table(
-                [
-                    self.tr("Workspace Name"),
-                    self.tr("Default"),
-                    self.tr("Actions"),
-                ]
-            )
-            workspaces = self._fetch_list(self.gs.get_workspaces)
-            # Shown in the list so the server's truth is visible at a glance:
-            # GeoServer always has exactly one default and it cannot be unset.
-            default = self._default_workspace_name()
-            self._populate_rows(
-                [
-                    [name, self.tr("default") if name == default else ""]
-                    for name in (self._name_of(ws) for ws in workspaces)
-                ]
-            )
+        )
+        self._start_load(
+            self.tr("Failed to load workspaces"), self._fetch_workspace_rows
+        )
 
-        self._run_action(load, self.tr("Failed to load workspaces"))
+    def _fetch_workspace_rows(self, task=None):
+        """(rows, failures) for the Workspaces table. Runs in a worker thread."""
+        workspaces = self._fetch_list(self.gs.get_workspaces)
+        # Shown in the list so the server's truth is visible at a glance:
+        # GeoServer always has exactly one default and it cannot be unset.
+        default = self._default_workspace_name()
+        rows = [
+            [name, self.tr("default") if name == default else ""]
+            for name in (self._name_of(ws) for ws in workspaces)
+        ]
+        return rows, []
 
     def _workspace_fields(self, is_default=False):
         """Return workspace form field definitions.

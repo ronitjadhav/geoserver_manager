@@ -17,10 +17,10 @@ from qgis.testing import start_app, unittest
 
 # project
 from geoserver_manager.gui import tab_layergroups
-from geoserver_manager.gui.dlg_main import GeoServerMainDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.tab_layergroups import LayerGroupTabMixin
 from geoserver_manager.gui.tab_styles import GLOBAL
+from tests.qgis.sync_dialog import SyncDialog
 
 start_app()
 
@@ -178,7 +178,7 @@ class Recording(ResourceFormDialog):
 
 class TestLayerGroupsTab(unittest.TestCase):
     def setUp(self):
-        self.dlg = GeoServerMainDialog()
+        self.dlg = SyncDialog()
         self.dlg.gs = FakeGS()
         self.warnings = []
         self.dlg.show_warning_message = self.warnings.append
@@ -247,7 +247,7 @@ class TestGroupDetail(unittest.TestCase):
         self.assertEqual(values["title"], "en: Roads; fr: Routes")
 
     def test_dialog_is_read_only(self):
-        dlg = GeoServerMainDialog()
+        dlg = SyncDialog()
         dlg.gs = FakeGS()
         with patch.object(tab_layergroups, "ResourceFormDialog", Recording):
             dlg._show_layer_group_info(["tasmania", GLOBAL])
@@ -258,7 +258,7 @@ class TestGroupDetail(unittest.TestCase):
 
 class TestCreateLayerGroup(unittest.TestCase):
     def setUp(self):
-        self.dlg = GeoServerMainDialog()
+        self.dlg = SyncDialog()
         self.dlg.gs = FakeGS()
 
     def posted(self):
@@ -403,7 +403,7 @@ class TestCreateLayerGroup(unittest.TestCase):
 
 class TestDeleteAndAddToQgis(unittest.TestCase):
     def setUp(self):
-        self.dlg = GeoServerMainDialog()
+        self.dlg = SyncDialog()
         self.dlg.gs = FakeGS()
         self.dlg._confirm_delete = lambda kind, labels, cascade="": True
         self.dlg.show_success_message = lambda text: None

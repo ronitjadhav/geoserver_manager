@@ -35,23 +35,30 @@ class StyleTabMixin:
     """Mixin that adds style CRUD methods to the main dialog."""
 
     def _load_styles(self):
-        def load():
-            self._setup_add_button(self.tr("Add a New Style"), self.tr("Create a style"), self._add_style)
-            self._setup_delete_selected_button(self._delete_selected_styles)
-            self._name_click_callback = self._show_style_info
-            self._extra_click_callbacks = {self.tr("Workspace"): self._open_workspace_from_row}
-            self._row_actions = [("mActionDeleteSelected.svg", self.tr("Delete"), self._delete_style)]
-            self._setup_table([self.tr("Style Name"), self.tr("Workspace"), self.tr("Actions")])
-            rows = [[self._name_of(s), ws] for ws, s in self._fetch_styles()]
-            self._populate_rows(rows)
+        """Arm the tab, then fetch its rows in the background."""
+        self._setup_add_button(self.tr("Add a New Style"), self.tr("Create a style"), self._add_style)
+        self._setup_delete_selected_button(self._delete_selected_styles)
+        self._name_click_callback = self._show_style_info
+        self._extra_click_callbacks = {self.tr("Workspace"): self._open_workspace_from_row}
+        self._row_actions = [("mActionDeleteSelected.svg", self.tr("Delete"), self._delete_style)]
+        self._setup_table([self.tr("Style Name"), self.tr("Workspace"), self.tr("Actions")])
+        self._start_load(self.tr("Failed to load styles"), self._fetch_style_rows)
 
-        self._run_action(load, self.tr("Failed to load styles"))
+    def _fetch_style_rows(self, task=None):
+        """(rows, failures) for the table. Runs in a worker thread."""
+        rows = [[self._name_of(s), ws] for ws, s in self._fetch_styles(task)]
+        return rows, []
 ```
 
 Rules for the mixin:
 
 - **Column 0 is the resource name.** Row lists are display strings; keep the
   order stable because callbacks index into them (`row[0]`, `row[1]`, …).
+- **The loader only arms the GUI.** Buttons, callbacks and `_setup_table` on the GUI
+  thread, then `_start_load(failure_message, fetch)` and return. The fetch is
+  `_fetch_<x>_rows(task=None) -> (rows, failures)`: it runs in a `QgsTask`, so it must
+  not touch a widget, must not read `self._all_rows`, and reaches the task only by
+  handing it to `_fan_out`. Everything it collects is rendered for it.
 - **All server calls through the dialog helpers** (`_run_action`, `_fetch`,
   `_check`, `_fetch_list`, `_resource_exists`, `_raw_rest`). Never write a
   `try/except … setCursor` block yourself.
@@ -69,11 +76,12 @@ Rules for the mixin:
 - Forms: build the field list with `ResourceFormDialog` field dicts; put
   type-specific fields in a `group`, toggle them with `dlg.set_field_visible`,
   and if a type combo drives visibility, reuse the `_wire_type_combo` pattern.
-- Fan out per-item GETs with `self._fan_out(fn, items)` — **only** stateless REST
-  reads, never OWS calls (`self.wms`/`self.wmts` are shared state). It returns
-  `[(result, error)]` in order; render what loaded and hand the failures to
-  `self._report_partial_failures([(label, error), …])` so one broken parent
-  costs one warning, not the whole table (see `_load_datastores`).
+- Fan out per-item GETs with `self._fan_out(fn, items, task)` — **only** stateless REST
+  reads, never OWS calls (`self.wms`/`self.wmts` are shared state). Passing the task is
+  what gives the load its progress bar and its Cancel. It returns `[(result, error)]` in
+  order; return the failures as the second half of the tuple and `_render_rows` hands
+  them to `_report_partial_failures`, so one broken parent costs one warning, not the
+  whole table (see `_fetch_datastore_rows`).
 
 ## 3. Register it — two lines in `dlg_main.py`
 
@@ -97,18 +105,23 @@ Headless, no server:
 
 ```python
 from qgis.testing import start_app, unittest
-from geoserver_manager.gui.dlg_main import GeoServerMainDialog
+from tests.qgis.sync_dialog import SyncDialog  # runs the load inline
 start_app()
 
 class FakeGS:
     def get_styles(self, ws=None): return ([{"name": "a"}, {"name": "b"}], 200)
 
 class TestStylesTab(unittest.TestCase):
-    def test_loads_rows(self):
-        dlg = GeoServerMainDialog(); dlg.gs = FakeGS()
-        dlg._load_styles()
+    def test_fetches_rows(self):
+        dlg = SyncDialog(); dlg.gs = FakeGS()
+        rows, failures = dlg._fetch_style_rows()      # the seam: no task, no widgets
+        self.assertEqual([r[0] for r in rows], ["a", "b"])
+        dlg._load_styles()                            # the whole loader, inline
         self.assertEqual([r[0] for r in dlg._all_rows], ["a", "b"])
 ```
+
+Never instantiate `GeoServerMainDialog` for a load test: its loads are asynchronous, so
+the assertions would race the task. `SyncDialog` exists for exactly this.
 
 Cover at least: rows load, the pure `_form_values` prefill, and that an edit
 payload preserves fields the form does not model. Run the test against the code

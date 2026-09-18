@@ -12,12 +12,15 @@ Usage from the repo root folder:
 """
 
 # standard library
+import time
 from unittest.mock import patch
 
+from qgis.PyQt.QtCore import QEventLoop, QTimer
 from qgis.testing import start_app, unittest
 
 # project
 from geoserver_manager.gui.dlg_main import GeoServerMainDialog
+from tests.qgis.sync_dialog import SyncDialog
 
 start_app()
 
@@ -32,7 +35,7 @@ class TestTableState(unittest.TestCase):
     """
 
     def setUp(self):
-        self.dlg = GeoServerMainDialog()
+        self.dlg = SyncDialog()
         self.dlg._setup_table(["Workspace Name", "Actions"])
         self.dlg._populate_rows([[f"ws{i:02d}"] for i in range(25)])
 
@@ -108,7 +111,7 @@ class TestDatastoreUpdate(unittest.TestCase):
     }
 
     def setUp(self):
-        self.dlg = GeoServerMainDialog()
+        self.dlg = SyncDialog()
         self.captured = {}
 
         class FakeGS:
@@ -210,7 +213,7 @@ class TestListingTolerance(unittest.TestCase):
     """One broken workspace must cost one warning, not the whole table."""
 
     def setUp(self):
-        self.dlg = GeoServerMainDialog()
+        self.dlg = SyncDialog()
         self.warnings = []
         self.dlg.show_warning_message = self.warnings.append
         self.dlg.show_error_message = lambda t: self.fail(f"unexpected error: {t}")
@@ -252,37 +255,94 @@ class TestListingTolerance(unittest.TestCase):
         self.assertEqual(self.warnings, [])
 
 
+# ############################################################################
+# ####### Probe fakes ############
+# ################################
+
+
+class ProbeResponse:
+    """What requests.get gives the probe."""
+
+    def __init__(self, status_code=200, payload=None, html=False):
+        self.status_code = status_code
+        self._payload = payload if payload is not None else {"workspaces": ""}
+        self._html = html
+
+    def json(self):
+        if self._html:
+            raise ValueError("no JSON object could be decoded")
+        return self._payload
+
+
+class ProbeGS:
+    """Only what _probe reads off the client: its auth and TLS setting."""
+
+    class rest_service:
+        class rest_client:
+            auth = ("admin", "geoserver")
+            verifytls = True
+
+
+def patched_requests_get(response=None, raises=None, recorder=None):
+    """A stand-in for requests.get that records its kwargs."""
+
+    def fake_get(url, **kwargs):
+        if recorder is not None:
+            recorder.append((url, kwargs))
+        if raises is not None:
+            raise raises
+        return response if response is not None else ProbeResponse()
+
+    return fake_get
+
+
 class TestNonJsonResponses(unittest.TestCase):
     """A proxy login page answers 200 with HTML; that is not 'Connected'."""
 
     def setUp(self):
-        self.dlg = GeoServerMainDialog()
+        self.dlg = SyncDialog()
 
     def test_fetch_list_refuses_a_non_list_payload(self):
         with self.assertRaises(RuntimeError):
             self.dlg._fetch_list(lambda: ("<html>login</html>", 200))
 
     def test_probe_rejects_html_with_status_200(self):
-        class FakeGS:
-            def get_workspaces(inner):
-                return ("<html>login</html>", 200)
-
-        problem = self.dlg._probe(FakeGS(), "http://proxy.example.org/geoserver")
+        with patch("requests.get", patched_requests_get(ProbeResponse(html=True))):
+            problem = self.dlg._probe(ProbeGS(), "http://proxy.example.org/geoserver")
         self.assertIsNotNone(problem)
-        status, message = problem
+        status, _message = problem
         self.assertIn("Not a GeoServer", status)
 
-    def test_probe_accepts_a_real_list(self):
-        class FakeGS:
-            def get_workspaces(inner):
-                return ([{"name": "ws"}], 200)
+    def test_probe_accepts_a_workspaces_payload(self):
+        payload = {"workspaces": {"workspace": [{"name": "topp"}]}}
+        with patch(
+            "requests.get", patched_requests_get(ProbeResponse(payload=payload))
+        ):
+            self.assertIsNone(self.dlg._probe(ProbeGS(), "http://gs"))
 
-        self.assertIsNone(self.dlg._probe(FakeGS(), "http://gs"))
+    def test_probe_reports_bad_credentials_as_such(self):
+        with patch(
+            "requests.get", patched_requests_get(ProbeResponse(status_code=401))
+        ):
+            status, message = self.dlg._probe(ProbeGS(), "http://gs")
+        self.assertIn("Authentication", status)
+        self.assertIn("password", message)
+
+    def test_probe_gives_up_long_before_the_librarys_timeout(self):
+        """A host that swallows the SYN must not hold the dialog for 120 s."""
+        calls = []
+        with patch("requests.get", patched_requests_get(recorder=calls)):
+            self.dlg._probe(ProbeGS(), "http://gs/geoserver/")
+        url, kwargs = calls[0]
+        self.assertEqual(url, "http://gs/geoserver/rest/workspaces.json")
+        self.assertLessEqual(kwargs["timeout"], 10)
+        self.assertEqual(kwargs["auth"], ("admin", "geoserver"))
+        self.assertIs(kwargs["verify"], True)
 
 
 class TestDefaultWorkspaceHandling(unittest.TestCase):
     def setUp(self):
-        self.dlg = GeoServerMainDialog()
+        self.dlg = SyncDialog()
         self.warnings, self.calls = [], []
         self.dlg.show_warning_message = self.warnings.append
 
@@ -337,7 +397,7 @@ class TestServerSync(unittest.TestCase):
     """What the dialog shows must come from the server, not from a cache."""
 
     def setUp(self):
-        self.dlg = GeoServerMainDialog()
+        self.dlg = SyncDialog()
         outer = self
         self.calls = 0
 
@@ -411,7 +471,7 @@ class TestUnsupportedTypeDialog(unittest.TestCase):
                     200,
                 )
 
-        dlg = GeoServerMainDialog()
+        dlg = SyncDialog()
         dlg.gs = FakeGS()
         with patch.object(tab_datastores, "ResourceFormDialog", Recording):
             dlg._show_datastore_info(["taz_shapes", "topp", "Shapefile", "True"])
@@ -435,7 +495,7 @@ class TestLinkCells(unittest.TestCase):
     """Name cells open the resource but must stay real, selectable items."""
 
     def setUp(self):
-        self.dlg = GeoServerMainDialog()
+        self.dlg = SyncDialog()
         self.opened = []
         self.dlg._name_click_callback = self.opened.append
         self.dlg._extra_click_callbacks = {
@@ -486,13 +546,9 @@ class TestTlsVerification(unittest.TestCase):
     def test_probe_names_a_certificate_problem(self):
         import requests
 
-        class FakeGS:
-            def get_workspaces(inner):
-                raise requests.exceptions.SSLError("CERTIFICATE_VERIFY_FAILED")
-
-        status, message = GeoServerMainDialog()._probe(
-            FakeGS(), "https://gs.example.org"
-        )
+        error = requests.exceptions.SSLError("CERTIFICATE_VERIFY_FAILED")
+        with patch("requests.get", patched_requests_get(raises=error)):
+            status, message = SyncDialog()._probe(ProbeGS(), "https://gs.example.org")
         self.assertIn("Certificate", status)
         self.assertNotIn("is the server running", message)
         self.assertIn("Verify the server", message)  # points at the setting
@@ -521,7 +577,7 @@ class TestTlsVerification(unittest.TestCase):
                 return ("admin", "secret")
 
         with patch.dict(sys.modules, {"geoservercloud": fake}):
-            GeoServerMainDialog()._build_client(Settings())
+            SyncDialog()._build_client(Settings())
         self.assertIs(seen["verifytls"], False)
         self.assertEqual(seen["url"], "https://gs.example.org")
 
@@ -530,7 +586,7 @@ class TestGenericParameterEditor(unittest.TestCase):
     """Any datastore type is editable through 'key = value' lines."""
 
     def setUp(self):
-        self.dlg = GeoServerMainDialog()
+        self.dlg = SyncDialog()
         self.sent = {}
         outer = self
 
@@ -618,7 +674,7 @@ class TestErrorText(unittest.TestCase):
         self.assertEqual(GeoServerMainDialog._error_text(ValueError("nope")), "nope")
 
     def test_delete_failure_shows_the_reason(self):
-        dlg = GeoServerMainDialog()
+        dlg = SyncDialog()
         errors = []
         dlg.show_error_message = errors.append
         dlg._confirm_delete = lambda kind, labels, cascade="": True
@@ -631,6 +687,231 @@ class TestErrorText(unittest.TestCase):
         dlg._delete_many("layer", [("ws/ds/l", boom)], lambda: None)
         self.assertEqual(len(errors), 1)
         self.assertIn("layer group 'x'", errors[0])
+
+
+# ############################################################################
+# ###### Background loading ######
+# ################################
+
+
+class SlowGS:
+    """A server that answers correctly, but slowly."""
+
+    def __init__(self, latency=0.2, workspaces=50):
+        self.latency = latency
+        self.names = [f"ws{index:02d}" for index in range(workspaces)]
+
+    def get_workspaces(self):
+        time.sleep(self.latency)
+        return ([{"name": name} for name in self.names], 200)
+
+    def get_datastores(self, workspace_name):
+        time.sleep(self.latency)
+        return ([{"name": f"{workspace_name}_store"}], 200)
+
+    def get_datastore(self, workspace_name, datastore_name):
+        time.sleep(self.latency)
+        return ({"type": "PostGIS", "enabled": True}, 200)
+
+
+def spin_until(predicate, timeout_ms=20000):
+    """Run the event loop until predicate(); return how often a timer fired.
+
+    A tick proves the GUI thread was free to process events while the load was
+    running — which is the whole point of moving loads into a QgsTask.
+    """
+    ticks = []
+    loop = QEventLoop()
+
+    def tick():
+        ticks.append(1)
+        if predicate():
+            loop.quit()
+
+    heartbeat = QTimer()
+    heartbeat.setInterval(20)
+    heartbeat.timeout.connect(tick)
+    guard = QTimer()
+    guard.setSingleShot(True)
+    guard.setInterval(timeout_ms)
+    guard.timeout.connect(loop.quit)
+    heartbeat.start()
+    guard.start()
+    loop.exec()
+    heartbeat.stop()
+    guard.stop()
+    return len(ticks)
+
+
+class TestBackgroundLoading(unittest.TestCase):
+    """The real dialog, the real task manager: loads must not block the GUI."""
+
+    def setUp(self):
+        self.dlg = GeoServerMainDialog()  # not SyncDialog: the point is the task
+        self.warnings, self.errors = [], []
+        self.dlg.show_warning_message = self.warnings.append
+        self.dlg.show_error_message = self.errors.append
+        self.dlg.show_success_message = lambda text: None
+
+    def tearDown(self):
+        self.dlg._closing = True
+        self.dlg._cancel_load()
+
+    def test_a_slow_load_keeps_the_dialog_responsive(self):
+        """50 workspaces at 200 ms a request: the event loop keeps running."""
+        self.dlg.gs = SlowGS(latency=0.2, workspaces=50)
+        self.dlg._load_workspaces()
+
+        self.assertEqual(self.dlg._all_rows, [])  # nothing blocks, nothing yet
+        self.assertEqual(self.dlg.lbl_page_info.text(), "Loading…")
+        self.assertEqual(self.dlg.btn_refresh.text(), "Cancel")
+
+        ticks = spin_until(lambda: bool(self.dlg._all_rows))
+        self.assertGreater(ticks, 1)
+        self.assertEqual(len(self.dlg._all_rows), 50)
+        self.assertEqual(self.dlg.btn_refresh.text(), "Refresh")
+        self.assertEqual(self.errors, [])
+
+    def test_cancel_stops_the_load_and_leaves_no_rows(self):
+        self.dlg.gs = SlowGS(latency=0.05, workspaces=50)
+        self.dlg._load_datastores()  # fans out over every workspace
+        spin_until(lambda: self.dlg._task is not None and self.dlg._task.progress() > 0)
+
+        self.dlg._cancel_load(user=True)
+        spin_until(lambda: self.dlg._task is None)
+
+        self.assertEqual(self.dlg._all_rows, [])  # never stale rows
+        self.assertEqual(len(self.warnings), 1)
+        self.assertIn("cancelled", self.warnings[0].lower())
+        self.assertEqual(self.dlg.btn_refresh.text(), "Refresh")
+
+    def test_the_refresh_button_cancels_while_loading(self):
+        self.dlg.gs = SlowGS(latency=0.05, workspaces=20)
+        self.dlg._load_datastores()
+        self.assertTrue(self.dlg._loading())
+
+        self.dlg._on_refresh_clicked()  # the same button, now Cancel
+        spin_until(lambda: not self.dlg._loading())
+        self.assertEqual(self.dlg._all_rows, [])
+        self.assertIn("cancelled", self.warnings[0].lower())
+
+    def test_a_failed_fetch_reports_and_leaves_no_rows(self):
+        class BrokenGS(SlowGS):
+            def get_workspaces(inner):
+                raise RuntimeError("HTTP 500: boom")
+
+        self.dlg.gs = BrokenGS(latency=0)
+        self.dlg._load_workspaces()
+        spin_until(lambda: not self.dlg._loading())
+
+        self.assertEqual(self.dlg._all_rows, [])
+        self.assertEqual(len(self.errors), 1)
+        self.assertIn("boom", self.errors[0])
+        self.assertEqual(self.dlg.lbl_page_info.text(), "No results")
+
+    def test_a_load_that_lands_after_close_touches_nothing(self):
+        """The task outlives the dialog; its callback must stay away."""
+        self.dlg.gs = SlowGS(latency=0.05, workspaces=20)
+        self.dlg._load_datastores()
+        task = self.dlg._task
+        self.dlg.close()
+
+        spin_until(lambda: task.isCanceled() and self.dlg._task is task)
+        self.assertTrue(self.dlg._closing)
+        self.assertEqual(self.dlg._all_rows, [])
+        self.assertEqual(self.warnings, [])  # not even a banner
+
+    def test_a_second_load_supersedes_the_first(self):
+        self.dlg.gs = SlowGS(latency=0.05, workspaces=30)
+        self.dlg._load_datastores()
+        first = self.dlg._task
+        self.dlg._load_workspaces()  # e.g. the user switched tabs
+        self.assertIsNot(self.dlg._task, first)
+        self.assertTrue(first.isCanceled())
+
+        spin_until(lambda: bool(self.dlg._all_rows))
+        self.assertEqual(len(self.dlg._all_rows), 30)  # the workspace rows
+        self.assertEqual(self.warnings, [])  # superseding is not "cancelled"
+
+    def test_refresh_does_not_wait_for_the_probe(self):
+        """plugin_main shows the dialog and calls this; it must return at once."""
+
+        class Settings:
+            geoserver_url = "http://gs.example.org/geoserver"
+            geoserver_verify_tls = True
+            geoserver_auth_cfg_id = ""
+
+            def has_credentials(inner):
+                return True
+
+            def get_credentials(inner):
+                return ("admin", "geoserver")
+
+        class PlgSettings:
+            def get_plg_settings(inner):
+                return Settings()
+
+            def get_value_from_key(inner, *args, **kwargs):
+                return None
+
+            def set_value_from_key(inner, *args, **kwargs):
+                return True
+
+        self.dlg.plg_settings = PlgSettings()
+        self.dlg._build_client = lambda settings: SlowGS(latency=0)
+        probed = []
+
+        def slow_probe(gs, url):
+            time.sleep(0.3)
+            probed.append(url)
+            return None
+
+        self.dlg._probe = slow_probe
+        self.dlg._fetch_version_label = lambda gs: "GeoServer 2.28.5"
+
+        started = time.monotonic()
+        self.dlg.refresh_ui()
+        self.assertLess(time.monotonic() - started, 0.2)  # the probe is still running
+        self.assertEqual(self.dlg.lbl_status.text(), "Connecting…")
+
+        ticks = spin_until(lambda: bool(probed) and self.dlg.gs is not None)
+        self.assertGreater(ticks, 1)
+        self.assertIn("Connected", self.dlg.lbl_status.text())
+        self.assertIn("2.28.5", self.dlg.lbl_status.text())
+
+
+class TestFanOutProgress(unittest.TestCase):
+    """_fan_out is where progress is reported and a cancel is noticed."""
+
+    class FakeTask:
+        def __init__(self, cancel_after=None):
+            self.reported = []
+            self.cancel_after = cancel_after
+
+        def setProgress(self, value):
+            self.reported.append(round(value))
+
+        def isCanceled(self):
+            return (
+                self.cancel_after is not None
+                and len(self.reported) >= self.cancel_after
+            )
+
+    def test_progress_is_reported_per_finished_item(self):
+        task = self.FakeTask()
+        results = GeoServerMainDialog._fan_out(lambda n: n * 2, [1, 2, 3, 4], task)
+        self.assertEqual(task.reported, [25, 50, 75, 100])
+        self.assertEqual(results, [(2, None), (4, None), (6, None), (8, None)])
+
+    def test_a_cancel_stops_the_loop(self):
+        task = self.FakeTask(cancel_after=2)
+        results = GeoServerMainDialog._fan_out(lambda n: n * 2, [1, 2, 3, 4], task)
+        self.assertEqual(task.reported, [25, 50])
+        self.assertEqual(len(results), 2)
+
+    def test_without_a_task_nothing_changes(self):
+        results = GeoServerMainDialog._fan_out(lambda n: n * 2, [1, 2])
+        self.assertEqual(results, [(2, None), (4, None)])
 
 
 # ############################################################################

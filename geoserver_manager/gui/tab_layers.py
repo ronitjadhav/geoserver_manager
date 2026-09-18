@@ -26,83 +26,85 @@ class LayerTabMixin:
     """
 
     def _load_layers(self):
-        """List every feature type on the server, with its SRS and enabled flag."""
-
-        def load():
-            self._setup_add_button(
-                self.tr("Publish a Table"),
-                self.tr("Publish a table of a datastore as a new layer"),
-                self._publish_layer,
-            )
-            self._setup_delete_selected_button(self._delete_selected_layers)
-            self._name_click_callback = self._show_layer_info
-            self._extra_click_callbacks = {
-                self.tr("Workspace"): self._open_workspace_from_row
-            }
-            self._row_actions = [
-                (
-                    "mActionAddLayer.svg",
-                    self.tr("Add to QGIS"),
-                    self._add_layer_to_qgis,
-                ),
-                (
-                    "mActionStyleManager.svg",
-                    self.tr("Set style"),
-                    self._set_layer_style,
-                ),
-                (
-                    "mActionDeleteSelected.svg",
-                    self.tr("Delete"),
-                    self._delete_layer,
-                ),
+        """Arm the Layers tab, then fetch its rows in the background."""
+        self._setup_add_button(
+            self.tr("Publish a Table"),
+            self.tr("Publish a table of a datastore as a new layer"),
+            self._publish_layer,
+        )
+        self._setup_delete_selected_button(self._delete_selected_layers)
+        self._name_click_callback = self._show_layer_info
+        self._extra_click_callbacks = {
+            self.tr("Workspace"): self._open_workspace_from_row
+        }
+        self._row_actions = [
+            (
+                "mActionAddLayer.svg",
+                self.tr("Add to QGIS"),
+                self._add_layer_to_qgis,
+            ),
+            (
+                "mActionStyleManager.svg",
+                self.tr("Set style"),
+                self._set_layer_style,
+            ),
+            (
+                "mActionDeleteSelected.svg",
+                self.tr("Delete"),
+                self._delete_layer,
+            ),
+        ]
+        self._setup_table(
+            [
+                self.tr("Layer Name"),
+                self.tr("Workspace"),
+                self.tr("Datastore"),
+                self.tr("SRS"),
+                self.tr("Enabled"),
+                self.tr("Actions"),
             ]
-            self._setup_table(
-                [
-                    self.tr("Layer Name"),
-                    self.tr("Workspace"),
-                    self.tr("Datastore"),
-                    self.tr("SRS"),
-                    self.tr("Enabled"),
-                    self.tr("Actions"),
-                ]
-            )
+        )
+        self._start_load(self.tr("Failed to load layers"), self._fetch_layer_rows)
 
-            # Three levels: workspaces -> datastores -> feature types, then one
-            # detail GET per feature type for the SRS and enabled columns (the
-            # list endpoint only returns names). Each level is fanned out and
-            # tolerant, so one unreadable parent costs a warning, not the table.
-            failures = []
-            stores = []
-            ws_names = self._get_workspace_names()
-            for ws_name, (ds_names, error) in zip(
-                ws_names, self._fan_out(self._datastore_names, ws_names)
-            ):
-                if error:
-                    failures.append((ws_name, error))
-                    continue
-                stores.extend((ws_name, ds_name) for ds_name in ds_names)
+    def _fetch_layer_rows(self, task=None):
+        """(rows, failures) for the Layers table. Runs in a worker thread.
 
-            layers = []
-            for (ws_name, ds_name), (names, error) in zip(
-                stores, self._fan_out(lambda store: self._layer_names(*store), stores)
-            ):
-                if error:
-                    failures.append((f"{ws_name}/{ds_name}", error))
-                    continue
-                layers.extend((ws_name, ds_name, name) for name in names)
+        Three levels: workspaces -> datastores -> feature types, then one
+        detail GET per feature type for the SRS and enabled columns (the list
+        endpoint only returns names). Each level is fanned out and tolerant, so
+        one unreadable parent costs a warning, not the table.
+        """
+        failures = []
+        stores = []
+        ws_names = self._get_workspace_names()
+        for ws_name, (ds_names, error) in zip(
+            ws_names, self._fan_out(self._datastore_names, ws_names, task)
+        ):
+            if error:
+                failures.append((ws_name, error))
+                continue
+            stores.extend((ws_name, ds_name) for ds_name in ds_names)
 
-            summaries = self._fan_out(lambda layer: self._layer_summary(*layer), layers)
-            rows = []
-            for (ws_name, ds_name, name), (summary, error) in zip(layers, summaries):
-                if error:
-                    failures.append((f"{ws_name}/{ds_name}/{name}", error))
-                srs, enabled = summary or ("—", "—")
-                rows.append([name, ws_name, ds_name, srs, enabled])
+        layers = []
+        for (ws_name, ds_name), (names, error) in zip(
+            stores,
+            self._fan_out(lambda store: self._layer_names(*store), stores, task),
+        ):
+            if error:
+                failures.append((f"{ws_name}/{ds_name}", error))
+                continue
+            layers.extend((ws_name, ds_name, name) for name in names)
 
-            self._populate_rows(rows)
-            self._report_partial_failures(failures)
-
-        self._run_action(load, self.tr("Failed to load layers"))
+        summaries = self._fan_out(
+            lambda layer: self._layer_summary(*layer), layers, task
+        )
+        rows = []
+        for (ws_name, ds_name, name), (summary, error) in zip(layers, summaries):
+            if error:
+                failures.append((f"{ws_name}/{ds_name}/{name}", error))
+            srs, enabled = summary or ("—", "—")
+            rows.append([name, ws_name, ds_name, srs, enabled])
+        return rows, failures
 
     def _layer_names(self, workspace_name, datastore_name):
         """Feature-type names in one datastore. Raises on HTTP errors."""

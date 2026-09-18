@@ -105,9 +105,8 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 
 ## UX & Infrastructure
 
-- [ ] Async/threaded API calls (prevent UI freezing) — partial: the datastore
-  list fans its per-store GETs out over a thread pool, but the call still
-  blocks the GUI thread
+- [x] Async/threaded API calls (prevent UI freezing) — every tab load and the
+  connection probe run in a `QgsTask`, with progress and Cancel
 - [ ] Resource list caching with TTL — partial: workspace names are cached
   until the next refresh, no TTL
 - [ ] Keyboard shortcuts (F5 refresh, Del delete, Ctrl+F search)
