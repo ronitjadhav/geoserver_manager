@@ -17,11 +17,13 @@ from qgis.core import (
     QgsRasterLayer,
     QgsVectorLayer,
 )
+from qgis.PyQt.QtTest import QTest
 from qgis.PyQt.QtWidgets import QDialog
 from qgis.testing import start_app, unittest
 
 # project
 from geoserver_manager.gui import tab_coveragestores
+from geoserver_manager.gui.dlg_main import GeoServerMainDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.tab_coveragestores import (
     COG,
@@ -691,12 +693,21 @@ class TestRasterProjectLayers(RasterFixture):
 
 
 class TestPublishQgisRaster(RasterFixture):
-    """The raster twin of the GeoPackage upload: one PUT, GeoServer does the rest."""
+    """The raster twin of the GeoPackage upload: one PUT, GeoServer does the rest.
+
+    SyncDialog runs the upload task inline, so the requests are recorded by
+    the time _publish_qgis_raster returns.
+    """
 
     def setUp(self):
         super().setUp()
         self.dlg = SyncDialog()
         self.dlg.gs = FakeGS()
+        self.errors, self.warnings, self.successes = [], [], []
+        self.dlg.show_error_message = self.errors.append
+        self.dlg.show_warning_message = self.warnings.append
+        self.dlg.show_success_message = self.successes.append
+        self.dlg._reload_current_tab = lambda: None
 
     def values(self, **extra):
         return {
@@ -713,7 +724,7 @@ class TestPublishQgisRaster(RasterFixture):
 
     def test_a_local_geotiff_is_uploaded_as_it_is_under_a_safe_name(self):
         self.add_layer("dem")
-        self.dlg._create_coverage_store_from_values(self.values())
+        self.dlg._publish_qgis_raster(self.values())
         ((_verb, path, kwargs),) = self.puts()
         self.assertEqual(path, "/rest/workspaces/sf/coveragestores/My_DEM/file.geotiff")
         self.assertEqual(
@@ -724,13 +735,16 @@ class TestPublishQgisRaster(RasterFixture):
         self.assertFalse(
             [call for call in self.dlg.gs.calls if call[0].startswith("create")]
         )
+        self.assertEqual(
+            self.successes, ["Raster 'My_DEM' uploaded and published as a layer."]
+        )
 
     def test_another_format_is_re_encoded_and_the_temporary_file_removed(self):
         import glob
         import tempfile
 
         self.add_layer("dem", "dem.img", driver="HFA")
-        self.dlg._create_coverage_store_from_values(self.values())
+        self.dlg._publish_qgis_raster(self.values())
         ((_verb, _path, kwargs),) = self.puts()
         self.assertIn(kwargs["data"][:4], (b"II*\x00", b"MM\x00*"))  # TIFF magic
         self.assertNotEqual(kwargs["data"], (self.folder / "dem.img").read_bytes())
@@ -739,17 +753,17 @@ class TestPublishQgisRaster(RasterFixture):
     def test_an_existing_store_is_refused_unless_replace_is_ticked(self):
         self.add_layer("dem")
         self.dlg.gs = FakeGS(exists=True)
-        with self.assertRaises(ValueError) as caught:
-            self.dlg._create_coverage_store_from_values(self.values())
-        self.assertIn("Replace", str(caught.exception))
+        self.dlg._publish_qgis_raster(self.values())
+        self.assertEqual(len(self.errors), 1)
+        self.assertIn("Replace", self.errors[0])
         self.assertEqual(self.puts(), [])
 
-        self.dlg._create_coverage_store_from_values(self.values(replace=True))
+        self.dlg._publish_qgis_raster(self.values(replace=True))
         self.assertEqual(len(self.puts()), 1)
 
     def test_title_and_abstract_go_in_a_partial_coverage_put(self):
         self.add_layer("dem")
-        self.dlg._create_coverage_store_from_values(
+        self.dlg._publish_qgis_raster(
             self.values(title="Elevation", abstract="Metres above the sea")
         )
         _upload, (_verb, path, kwargs) = self.puts()
@@ -763,17 +777,42 @@ class TestPublishQgisRaster(RasterFixture):
 
     def test_without_metadata_the_upload_is_the_only_request(self):
         self.add_layer("dem")
-        self.dlg._create_coverage_store_from_values(self.values(title="", abstract=""))
+        self.dlg._publish_qgis_raster(self.values(title="", abstract=""))
         self.assertEqual(len(self.puts()), 1)
 
     def test_a_raster_without_a_crs_is_refused_before_anything_is_sent(self):
         self.add_layer("dem", epsg=None)
-        with self.assertRaises(ValueError) as caught:
-            self.dlg._create_coverage_store_from_values(
-                self.values(qgis_layer="dem  (no CRS)")
-            )
-        self.assertIn("CRS", str(caught.exception))
+        self.dlg._publish_qgis_raster(self.values(qgis_layer="dem  (no CRS)"))
+        self.assertEqual(len(self.errors), 1)
+        self.assertIn("CRS", self.errors[0])
         self.assertEqual(self.puts(), [])
+
+    def test_a_crs_without_an_epsg_code_is_refused_rasters_are_not_reprojected(self):
+        layer = self.add_layer("dem")
+        layer.setCrs(
+            QgsCoordinateReferenceSystem.fromProj(
+                "+proj=tmerc +lat_0=0 +lon_0=9 +k=1 +x_0=500000 +y_0=0 "
+                "+ellps=WGS84 +units=m +no_defs"
+            )
+        )
+        label = next(label for label, _l in tab_coveragestores.raster_project_layers())
+        self.dlg._publish_qgis_raster(self.values(qgis_layer=label))
+        self.assertEqual(len(self.errors), 1)
+        self.assertIn("EPSG", self.errors[0])
+        self.assertEqual(self.puts(), [])
+
+    def test_a_cancelled_upload_says_what_the_server_kept(self):
+        self.dlg.gs = FakeGS(exists=False)
+        self.dlg._report_cancelled_raster_upload("sf", "My_DEM")
+        self.assertIn("nothing was left", self.warnings[-1])
+
+        self.dlg.gs = FakeGS(exists=True)  # a Replace: the store outlives its file
+        self.dlg._report_cancelled_raster_upload("sf", "My_DEM")
+        self.assertIn("removed their data file", self.warnings[-1])
+
+        self.dlg.gs = None  # a Refresh dropped the client meanwhile
+        self.dlg._report_cancelled_raster_upload("sf", "My_DEM")
+        self.assertIn("check the Coverage Stores tab", self.warnings[-1])
 
     def test_the_form_shows_that_types_fields_and_prefills_a_safe_name(self):
         self.add_layer("Rivière DEM")
@@ -793,9 +832,6 @@ class TestPublishQgisRaster(RasterFixture):
 
     def test_the_whole_add_flow_ends_in_a_banner_naming_the_layer(self):
         self.add_layer("dem")
-        successes = []
-        self.dlg.show_success_message = successes.append
-        self.dlg._load_coverage_stores = lambda: None
 
         class Accepting(ResourceFormDialog):
             def exec(inner):
@@ -806,7 +842,54 @@ class TestPublishQgisRaster(RasterFixture):
         with patch.object(tab_coveragestores, "ResourceFormDialog", Accepting):
             self.dlg._add_coverage_store()
         self.assertEqual(len(self.puts()), 1)
-        self.assertEqual(successes, ["Raster 'dem' uploaded and published as a layer."])
+        self.assertEqual(
+            self.successes, ["Raster 'dem' uploaded and published as a layer."]
+        )
+
+
+class TestRasterUploadRunsInATask(RasterFixture):
+    """The real dialog: the PUT streams off the GUI thread, with progress."""
+
+    def setUp(self):
+        super().setUp()
+        self.dlg = GeoServerMainDialog()
+        self.dlg.gs = FakeGS()
+        self.successes, self.errors = [], []
+        self.dlg.show_success_message = self.successes.append
+        self.dlg.show_error_message = self.errors.append
+        self.dlg._reload_current_tab = lambda: None
+
+    def tearDown(self):
+        self.dlg._closing = True
+        self.dlg._cancel_load(user=True)
+        super().tearDown()
+
+    def test_the_upload_is_a_task_with_progress_and_the_dialog_stays_usable(self):
+        self.add_layer("dem")
+        self.dlg._publish_qgis_raster(
+            {
+                "name": "dem",
+                "workspace": "sf",
+                "qgis_layer": "dem  (EPSG:4326)",
+                "replace": False,
+            }
+        )
+        self.assertIsNotNone(self.dlg._upload)  # the upload slot, not a load
+        self.assertEqual(self.dlg.btn_refresh.text(), "Cancel")
+        self.assertEqual(self.dlg.lbl_page_info.text(), "Uploading…")
+
+        waited = 0
+        while self.dlg._loading() and waited < 20000:
+            QTest.qWait(20)
+            waited += 20
+        puts = [call for call in self.dlg.gs.calls if call[0] == "PUT"]
+        self.assertEqual(len(puts), 1)
+        self.assertEqual(puts[0][2]["data"], (self.folder / "dem.tif").read_bytes())
+        self.assertEqual(self.errors, [])
+        self.assertEqual(
+            self.successes, ["Raster 'dem' uploaded and published as a layer."]
+        )
+        self.assertEqual(self.dlg.btn_refresh.text(), "Refresh")
 
     def test_the_viewer_prefers_the_abstract_over_the_generated_description(self):
         both = {"abstract": "Written by hand", "description": "Generated from GeoTIFF"}

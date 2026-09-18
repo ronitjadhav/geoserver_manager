@@ -254,6 +254,7 @@ class TestShippedFrenchLocale(unittest.TestCase):
             "GeoServerMainDialogBase",
             "GeoServerManagerPlugin",
             "LayerTreeMenu",
+            "QgisExport",
             "ResourceFormDialog",
             "wdg_geoserver_manager_settings",
         }

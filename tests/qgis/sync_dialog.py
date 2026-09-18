@@ -16,11 +16,14 @@ from geoserver_manager.gui.dlg_main import GeoServerMainDialog
 
 
 class SyncDialog(GeoServerMainDialog):
-    """Loads tabs synchronously, reporting failures the way the real one does."""
+    """Loads tabs — and uploads — synchronously, reporting failures the way the real one does."""
 
-    def _run_in_task(self, failure_message, work, on_success):
+    def _launch_task(
+        self, slot, failure_message, work, on_success, on_cancel, busy_text=None
+    ):
         # No task, so nothing to cancel and no progress to report: work() gets
-        # None where the real loader passes the running task.
+        # None where the real dialog passes the running task. Both _run_in_task
+        # and _run_upload come through here.
         try:
             result = work(None)
         except Exception as e:

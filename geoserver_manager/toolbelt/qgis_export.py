@@ -46,14 +46,53 @@ def geoserver_name(text):
     return cleaned
 
 
-def export_to_geopackage(layer, path, table_name):
+def require_crs(layer):
+    """Refuse, before any request, a layer GeoServer could not declare an SRS for.
+
+    Raises ValueError with the sentence the forms show. Both publish paths
+    call it first, so a vector and a raster without a CRS get the same answer.
+    """
+    if not layer.crs().isValid():
+        from qgis.PyQt.QtCore import QCoreApplication
+
+        raise ValueError(
+            QCoreApplication.translate(
+                "QgisExport", "'{}' has no CRS — set one in its layer properties first."
+            ).format(layer.name())
+        )
+
+
+def reprojection_target(layer):
+    """The CRS to write the layer in for GeoServer, or None when its own will do.
+
+    GeoServer declares a layer's SRS by EPSG code; a CRS without one (a custom
+    or user-defined CRS, `USER:100001`) would be published as UNKNOWN and the
+    layer would not render in any client. EPSG:4326 is the code every
+    GeoServer knows. Vectors are reprojected on export
+    (`export_to_geopackage(..., target_crs=…)`); a raster is uploaded as it
+    is, so its caller refuses instead.
+    """
+    from qgis.core import QgsCoordinateReferenceSystem
+
+    if layer.crs().authid().upper().startswith("EPSG:"):
+        return None
+    return QgsCoordinateReferenceSystem("EPSG:4326")
+
+
+def export_to_geopackage(layer, path, table_name, target_crs=None):
     """Write one QGIS vector layer into a single-table GeoPackage.
 
     GUI thread only. The table name becomes the published layer's name, because
     GeoServer configures a feature type per table when the file is uploaded.
-    Raises RuntimeError with QGIS's own message when the write fails.
+    With `target_crs` the geometries are reprojected on the way and the table
+    is written in that CRS. Raises RuntimeError with QGIS's own message when
+    the write fails.
     """
-    from qgis.core import QgsCoordinateTransformContext, QgsVectorFileWriter
+    from qgis.core import (
+        QgsCoordinateTransform,
+        QgsCoordinateTransformContext,
+        QgsVectorFileWriter,
+    )
 
     options = QgsVectorFileWriter.SaveVectorOptions()
     options.driverName = "GPKG"
@@ -61,6 +100,10 @@ def export_to_geopackage(layer, path, table_name):
     options.actionOnExistingFile = (
         QgsVectorFileWriter.ActionOnExistingFile.CreateOrOverwriteFile
     )
+    if target_crs is not None and target_crs != layer.crs():
+        options.ct = QgsCoordinateTransform(
+            layer.crs(), target_crs, QgsCoordinateTransformContext()
+        )
     result = QgsVectorFileWriter.writeAsVectorFormatV3(
         layer, str(path), QgsCoordinateTransformContext(), options
     )

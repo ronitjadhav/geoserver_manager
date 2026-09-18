@@ -42,6 +42,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   when it has several). A layer loaded from the server is matched through its
   source; any other by name. Without a connection the entries are disabled and
   say so, next to an entry that opens the plugin.
+- **Uploads run in the background**: publishing a raster from the project
+  streams the GeoTIFF in a QGIS task — the task bar shows the progress, the
+  dialog stays usable, and *Cancel* (the Refresh button while it runs) aborts
+  the transfer instead of waiting for it. The cancel message says what
+  GeoServer kept: nothing for a new store; for a *Replace*, the store and its
+  layer without their data file, which GeoServer removes before the upload
+  ends (measured on 2.28.5). A tab switch, F5 or closing the dialog let an
+  upload finish.
+- **CRS checks before publishing a raster**: a layer without a CRS, or with a
+  CRS that has no EPSG code — GeoServer could not declare it — is refused
+  before anything is sent.
 - **Cascaded Stores tab**: the WMS and WMTS stores that proxy another
   server, listed across every workspace. Create one from a GetCapabilities
   URL, publish the layers the remote advertises (under the remote name or

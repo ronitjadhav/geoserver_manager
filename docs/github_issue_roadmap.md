@@ -85,8 +85,13 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 - [ ] Batch upload multiple layers
 - [x] Upload associated SLD style with layer (and make it the layer's default)
 - [x] Overwrite existing layer option
-- [ ] CRS validation & auto-reprojection
-- [ ] Progress bar during upload
+- [ ] CRS validation & auto-reprojection — a raster refuses a missing or
+      non-EPSG CRS before anything is sent; `export_to_geopackage(target_crs=…)`
+      reprojects a vector to EPSG:4326, to be wired into the vector publish
+      together with the switch below
+- [ ] Progress bar during upload — done for the raster upload (`_run_upload`:
+      a QgsTask with progress and Cancel); the vector upload switches to the
+      same helper once the Layers-tab work lands
 
 ## Load GeoServer Layer into QGIS
 

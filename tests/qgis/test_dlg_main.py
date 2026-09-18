@@ -12,6 +12,7 @@ Usage from the repo root folder:
 """
 
 # standard library
+import threading
 import time
 from unittest.mock import patch
 
@@ -23,6 +24,7 @@ from qgis.testing import start_app, unittest
 from geoserver_manager.gui.dlg_main import GeoServerMainDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.tab_datastores import DatastoreTabMixin
+from geoserver_manager.toolbelt.rest import UploadCancelled
 from tests.qgis.sync_dialog import SyncDialog
 
 start_app()
@@ -894,6 +896,118 @@ class TestBackgroundLoading(unittest.TestCase):
         self.assertGreater(ticks, 1)
         self.assertIn("Connected", self.dlg.lbl_status.text())
         self.assertIn("2.28.5", self.dlg.lbl_status.text())
+
+
+class TestUploadTask(unittest.TestCase):
+    """_run_upload: a mutation in a task, in its own slot, with its own Cancel."""
+
+    def setUp(self):
+        self.dlg = GeoServerMainDialog()
+        self.warnings, self.errors, self.done, self.cancelled = [], [], [], []
+        self.dlg.show_warning_message = self.warnings.append
+        self.dlg.show_error_message = self.errors.append
+        self.dlg.show_success_message = lambda text: None
+        self.dlg._setup_table(["Name", "Actions"])
+        self.dlg._populate_rows([["a"], ["b"]])
+        self.release = threading.Event()  # what a blocked work() waits on
+
+    def tearDown(self):
+        self.release.set()
+        self.dlg._closing = True
+        self.dlg._cancel_load(user=True)
+        self.dlg._cancel_load()
+
+    def upload(self, work):
+        return self.dlg._run_upload(
+            "Upload failed", work, self.done.append, self.cancelled.append
+        )
+
+    def blocked(self, task):
+        self.release.wait(10)
+        return "sent"
+
+    def test_the_work_runs_off_the_gui_thread_and_lands_back_on_it(self):
+        threads = {}
+
+        def work(task):
+            threads["worker"] = threading.current_thread()
+            task.setProgress(50)
+            return "sent"
+
+        self.assertTrue(self.upload(work))
+        self.assertEqual(self.dlg.btn_refresh.text(), "Cancel")
+        self.assertEqual(self.dlg.lbl_page_info.text(), "Uploading…")
+
+        spin_until(lambda: self.done)
+        self.assertEqual(self.done, ["sent"])
+        self.assertIsNot(threads["worker"], threading.main_thread())
+        self.assertFalse(self.dlg._loading())
+        self.assertEqual(self.dlg.btn_refresh.text(), "Refresh")
+        # the rows stayed on screen; the label goes back to them
+        self.assertEqual(
+            self.dlg.lbl_page_info.text(), "Results 1 to 2 (out of 2 items)"
+        )
+        self.assertEqual(self.errors, [])
+
+    def test_a_load_started_meanwhile_does_not_cancel_it(self):
+        self.upload(self.blocked)
+        self.dlg.gs = SlowGS(latency=0, workspaces=3)
+        self.dlg._load_workspaces()  # supersedes a *load*, never the upload
+        spin_until(lambda: self.dlg._task is None)
+
+        self.assertEqual(len(self.dlg._all_rows), 3)
+        self.assertIsNotNone(self.dlg._upload)
+        self.assertFalse(self.dlg._upload.isCanceled())
+        self.release.set()
+        spin_until(lambda: self.done)
+        self.assertEqual((self.done, self.cancelled), (["sent"], []))
+
+    def test_a_refresh_meanwhile_leaves_the_upload_running(self):
+        """F5 drops the client and re-probes; the upload holds its own."""
+        self.upload(self.blocked)
+        self.dlg.refresh_ui()
+        self.assertIsNotNone(self.dlg._upload)
+        self.assertFalse(self.dlg._upload.isCanceled())
+        self.release.set()
+        spin_until(lambda: self.done)
+        self.assertEqual(self.done, ["sent"])
+
+    def test_cancel_from_the_refresh_button_calls_on_cancel_only(self):
+        started = threading.Event()
+
+        def work(task):
+            started.set()
+            while not task.isCanceled():
+                time.sleep(0.01)
+            raise UploadCancelled()  # what ProgressReader does on the next read
+
+        self.upload(work)
+        started.wait(10)
+        self.dlg._on_refresh_clicked()  # the same button, now Cancel
+        spin_until(lambda: self.cancelled)
+
+        self.assertEqual(len(self.cancelled), 1)
+        self.assertTrue(self.cancelled[0].user_cancelled)
+        self.assertEqual((self.done, self.errors), ([], []))
+        self.assertEqual(self.dlg.btn_refresh.text(), "Refresh")
+
+    def test_a_failing_upload_reports_and_calls_nothing(self):
+        def work(task):
+            raise RuntimeError("HTTP 500: boom")
+
+        self.upload(work)
+        spin_until(lambda: not self.dlg._loading())
+        self.assertEqual(len(self.errors), 1)
+        self.assertIn("boom", self.errors[0])
+        self.assertEqual((self.done, self.cancelled), ([], []))
+
+    def test_a_second_upload_is_refused_while_one_runs(self):
+        self.assertTrue(self.upload(self.blocked))
+        self.assertFalse(self.upload(lambda task: "never"))
+        self.assertIn("already running", self.warnings[0])
+        self.release.set()
+        spin_until(lambda: self.done)
+        self.assertEqual(self.done, ["sent"])
 
 
 class TestFanOutProgress(unittest.TestCase):

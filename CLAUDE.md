@@ -24,7 +24,7 @@ Skills in `.claude/skills/` hold the step-by-step procedures:
 | `geoserver_manager/gui/dlg_resource_form.py` | `ResourceFormDialog` — a modal form built from a list of field dicts (see its module docstring for the field spec) |
 | `geoserver_manager/gui/dlg_settings.py` | Options page: URL + credentials (credentials go to `QgsAuthManager`, encrypted) and *Test connection*, which probes the fields as typed |
 | `geoserver_manager/gui/layer_tree.py` | `LayerTreeMenu` — the *GeoServer Manager* submenu of the layer tree's context menu: push / apply the clicked layer's style through the main dialog's connection and its `_push_qgis_style` / `_style_body`; outcomes go to `iface.messageBar()` |
-| `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser`, `probe` (the bounded connection check the dialog and Settings share), `sld` and `qgis_export` (QGIS ↔ GeoServer conversions, pure) |
+| `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser`, `probe` (the bounded connection check the dialog and Settings share), `rest` (the raw REST call and the streaming upload body — no QGIS import), `sld` and `qgis_export` (QGIS ↔ GeoServer conversions, pure) |
 | `geoserver_manager/extras/*.whl` | Bundled `geoservercloud` (stripped, see below) and `xmltodict`, added to `sys.path` at startup |
 | `tests/unit/` | Runs without QGIS. `tests/qgis/` needs the QGIS Python (headless via `qgis.testing.start_app()`) |
 | `docs/github_issue_roadmap.md` | Feature backlog; GitHub milestones mirror it |
@@ -49,7 +49,11 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   render. A fetch is `_fetch_<x>_rows(task=None) -> (rows, failures)`; it runs in a worker,
   so it must not touch a widget, and it only gets at the task by passing it to `_fan_out`.
   Mutations (add / edit / delete) still run inline under `_run_action` — they are one request
-  and the user is waiting for the dialog they just confirmed.
+  and the user is waiting for the dialog they just confirmed. The exception is an upload
+  (`_run_upload`): its body is a `toolbelt.rest.ProgressReader`, which moves the task bar from each
+  `read()` and raises on Cancel so `requests` drops the connection mid-body; the work gets the REST
+  client as an argument, because a Refresh clears `self.gs` while it runs (`toolbelt.rest.raw_rest`
+  is `_raw_rest` for a client you hold).
 - **The table is paginated in Python** (`_page_size = 20`, `_all_rows` → `_filtered_rows` → one page).
   `_get_selected_rows()` maps a selected view row back through `_filtered_rows` by index.
 - **Server calls go through the helpers on the dialog**, never hand-rolled in a mixin:
@@ -66,6 +70,7 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   | `_get_workspace_names()` | workspace names for combos — a fresh GET every call, deliberately uncached |
   | `_start_load(failure_message, fetch)` | a tab load: runs `fetch(task)` in a `QgsTask`, renders `(rows, failures)` when it lands |
   | `_run_in_task(failure_message, work, on_success)` | the same for anything that is not rows (the connection probe) |
+  | `_run_upload(failure_message, work, on_success, on_cancel)` | a long PUT: streams in its own task slot (`_upload`) with progress and Cancel; a load never supersedes it and it never touches the table — `on_success` reloads through `_reload_current_tab()`, `on_cancel` says what the server kept |
   | `_cancel_load(user=False)` | stop the running load; `user=True` is the Cancel button, which also explains itself in a banner |
   | `_fan_out(fn, items, task=None) -> [(result, error)]` | parallel per-item GETs; a failing item yields `(None, exc)` instead of aborting. With the task: progress per item, and a cancel stops the loop |
   | `_report_partial_failures([(label, exc)])` | one warning banner + log lines for what a listing could not fetch |
@@ -109,7 +114,9 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
 9. **A fetch never touches a widget.** It runs in a worker thread; everything it learns comes
    back as `(rows, failures)` and is rendered by `_render_rows` on the GUI thread. A cancelled
    or failed load renders nothing, which is safe only because the loader reset the table
-   *before* starting the task — that is what keeps "no stale rows" true here too.
+   *before* starting the task — that is what keeps "no stale rows" true here too. An upload's
+   `work(task)` is held to the same rule: the file, the paths and the REST client are arguments
+   captured on the GUI side, and progress goes through `task.setProgress`.
 10. **A loaded table outlives its connection.** `refresh_ui()` clears `self.gs` at once and re-probes in a
    task, so for up to `PROBE_TIMEOUT` the rows on screen and their buttons belong to a client that is gone.
    Every user-triggered action therefore passes `_require_connection()`, and that check lives at the four
@@ -191,6 +198,14 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   override means — so `export_to_geotiff` passes `layer.crs()`; a raster that already is a plain local GeoTIFF
   (no subdataset, no `/vsicurl/`, no override) is uploaded as it is. GeoServer's `description` on a configured
   coverage is its own "Generated from <file>" note; the abstract is `abstract`, and the viewer prefers that.
+  **A cancelled upload** (measured with the body aborted at 1.5 of 18 MB): a first upload leaves *nothing* —
+  no store, no coverage, no file — but a *Replace* keeps the store, coverage and layer configured while
+  GeoServer has already deleted the previous file, i.e. a layer with no data behind it. So the upload streams
+  through `_run_upload`, `_report_cancelled_raster_upload` GETs the store afterwards and says which of the two
+  happened, and closing the dialog lets an upload finish rather than stopping it. **CRS**: GeoServer declares an
+  SRS by EPSG code, so `qgis_export.require_crs()` refuses a layer without a CRS and `reprojection_target()`
+  names EPSG:4326 for a CRS without an EPSG code — a vector is reprojected on export
+  (`export_to_geopackage(target_crs=…)`), a raster is refused because it is uploaded as it is.
 - **SLD versions decide the content type** (row 27 of #50). GeoServer picks its SLD parser from the request's
   content type, not from the document: `application/vnd.ogc.sld+xml` for 1.0, `application/vnd.ogc.se+xml` for
   1.1. `rest_service.create_style()` only sends the former, so `toolbelt/sld.py` sniffs the version
@@ -301,7 +316,9 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   mixin's own class — so every lookup missed. Each mixin file aliases `translate = QCoreApplication.translate`
   and repeats its context at the call site, because `pylupdate` only understands a literal context (a wrapper
   function is not extracted at all — measured, not assumed). `GeoServerMainDialog`, `ResourceFormDialog` and
-  the settings page are real QObject subclasses and keep `self.tr()`. A string that is *compared* rather than
+  the settings page are real QObject subclasses and keep `self.tr()`; a toolbelt module translates under its
+  own literal context (`ConnectionProbe`, `QgisExport`), listed in `test_i18n.py`'s known contexts. A string
+  that is *compared* rather than
   only displayed must come from one place: the row-actions column label is `self.actions_column_label()` on
   the dialog, so `_setup_table`'s comparison cannot drift from the header once a locale is installed.
   `tests/qgis/test_i18n.py` fails if a mixin goes back to `self.tr()`, if a `translate()` call names another

@@ -30,7 +30,10 @@ from geoserver_manager.toolbelt.qgis_export import (
     local_geotiff_path,
     raster_layer_by_label,
     raster_project_layers,
+    reprojection_target,
+    require_crs,
 )
+from geoserver_manager.toolbelt.rest import ProgressReader, raw_rest
 
 # Store types offered by the Add form. GeoServer knows more (ArcGrid, WorldImage,
 # NetCDF, …); these are the ones the library has a call for — plus the upload
@@ -712,25 +715,21 @@ class CoverageStoreTabMixin:
             return
 
         values = dlg.get_values()
+        if values["type"] == QGIS_RASTER:
+            # A file leaves this machine: in a task, with progress and Cancel.
+            self._publish_qgis_raster(values)
+            return
         if self._run_action(
             lambda: self._create_coverage_store_from_values(values),
             translate(
                 "CoverageStoreTabMixin", "Failed to create coverage store '{}'"
             ).format(values["name"]),
         ):
-            if values["type"] == QGIS_RASTER:
-                self.show_success_message(
-                    translate(
-                        "CoverageStoreTabMixin",
-                        "Raster '{}' uploaded and published as a layer.",
-                    ).format(geoserver_name(values["name"]))
-                )
-            else:
-                self.show_success_message(
-                    translate(
-                        "CoverageStoreTabMixin", "Coverage store '{}' created."
-                    ).format(values["name"])
-                )
+            self.show_success_message(
+                translate(
+                    "CoverageStoreTabMixin", "Coverage store '{}' created."
+                ).format(values["name"])
+            )
             self._warn_if_cog_settings_dropped(values)
             self._load_coverage_stores()
 
@@ -760,31 +759,24 @@ class CoverageStoreTabMixin:
             )
 
     def _create_coverage_store_from_values(self, values):
-        """Create a store through the library, refusing an existing name."""
+        """Create a store through the library, refusing an existing name.
+
+        The upload of a project raster is not here: it streams in a task, see
+        _publish_qgis_raster.
+        """
         name, ws_name, store_type = values["name"], values["workspace"], values["type"]
-        if store_type == QGIS_RASTER:
-            # Also the coverage's and the layer's name, so it has to be one a
-            # layer can carry.
-            name = geoserver_name(name)
         # create_coverage_store POSTs to the collection, and GeoServer answers
         # 409 for a name in use — but the message is clearer from here, and the
-        # mosaic calls and the upload are PUTs, which overwrite the store instead.
-        replacing = store_type == QGIS_RASTER and values.get("replace")
-        if not replacing and self._resource_exists(
-            self.gs.get_coverage_store, ws_name, name
-        ):
-            message = translate(
-                "CoverageStoreTabMixin", "Coverage store '{}' already exists in '{}'."
-            ).format(name, ws_name)
-            if store_type == QGIS_RASTER:
-                message += " " + translate(
-                    "CoverageStoreTabMixin", "Tick Replace to overwrite it."
-                )
-            raise ValueError(message)
+        # mosaic calls are PUTs, which overwrite the store instead.
+        if self._resource_exists(self.gs.get_coverage_store, ws_name, name):
+            raise ValueError(
+                translate(
+                    "CoverageStoreTabMixin",
+                    "Coverage store '{}' already exists in '{}'.",
+                ).format(name, ws_name)
+            )
 
-        if store_type == QGIS_RASTER:
-            self._upload_qgis_raster(ws_name, name, values)
-        elif store_type == MOSAIC_DIRECTORY:
+        if store_type == MOSAIC_DIRECTORY:
             self._check(
                 self.gs.create_imagemosaic_store_from_directory(
                     ws_name, name, values["directory"]
@@ -808,7 +800,7 @@ class CoverageStoreTabMixin:
                 )
             )
 
-    def _upload_qgis_raster(self, ws_name, name, values):
+    def _publish_qgis_raster(self, values):
         """Upload a project raster as a GeoTIFF store and publish its coverage.
 
         One request does it all (measured on 2.28.5): GeoServer saves the file
@@ -819,66 +811,160 @@ class CoverageStoreTabMixin:
         is all *Replace* needs. The data is copied: later edits in QGIS do not
         reach it, and deleting the store leaves the file in the data directory.
 
+        The layer, its CRS, the name check and the export happen here on the
+        GUI thread — a live QGIS layer, invariant 9 — and the PUTs stream in a
+        task through _run_upload, with progress and Cancel. The client is
+        captured now: a Refresh drops self.gs while they run.
+
         TODO(#50): upstream as create_coverage_store_from_file(ws, name, path,
         coverage_name=None) — create_coverage_store() only points at a path
         already on the server, so the upload is a raw PUT of
         .../coveragestores/{name}/file.geotiff.
         """
-        layer = raster_layer_by_label(values["qgis_layer"])
-        if not layer.crs().isValid():
-            raise ValueError(
-                translate(
-                    "CoverageStoreTabMixin",
-                    "'{}' has no CRS — set one in its layer properties first.",
-                ).format(layer.name())
-            )
-        # The export reads a live QGIS layer, so it happens here, before any
-        # request: this action runs on the GUI thread (invariant 9).
-        folder = None
-        source = local_geotiff_path(layer)
-        if source is None:
-            folder = Path(tempfile.mkdtemp(prefix="gsm_publish_"))
-            source = export_to_geotiff(layer, folder / f"{name}.tif")
-        try:
-            path = (
-                f"{self.gs.rest_service.rest_endpoints.base_url}"
-                f"/workspaces/{ws_name}/coveragestores/{name}/file.geotiff"
-            )
-            # ponytail: one inline request under _run_action, so a large raster
-            # holds the dialog until it is through; progress and cancel are the
-            # QgsTask upload of #40.
-            with open(source, "rb") as handle:
-                self._raw_rest(
-                    "put",
-                    path,
-                    params={"configure": "first", "coverageName": name},
-                    data=handle,
-                    headers={"Content-Type": "image/tiff"},
-                )
-        finally:
-            if folder is not None:
-                shutil.rmtree(folder, ignore_errors=True)
-        self._set_coverage_metadata(ws_name, name, values)
-
-    def _set_coverage_metadata(self, ws_name, store_name, values):
-        """Add the form's title and abstract to the coverage GeoServer configured.
-
-        A partial coverage PUT merges (measured on 2.28.5), so the SRS, bounds
-        and grid read from the file stay as they are.
-
-        TODO(#50): upstream as update_coverage(ws, store, name, title=…,
-        abstract=…) — create_coverage() POSTs a new coverage and cannot touch
-        an existing one.
-        """
+        ws_name = values["workspace"]
+        # Also the coverage's and the layer's name, so it has to be one a layer
+        # can carry.
+        name = geoserver_name(values["name"])
+        failure = translate(
+            "CoverageStoreTabMixin", "Failed to publish raster '{}'"
+        ).format(name)
+        prepared = self._fetch(
+            lambda: self._prepare_qgis_raster(ws_name, name, values), failure
+        )
+        if prepared is None:
+            return
+        source, folder = prepared
+        client = self.gs.rest_service.rest_client
+        endpoints = self.gs.rest_service.rest_endpoints
+        upload_path = (
+            f"{endpoints.base_url}/workspaces/{ws_name}"
+            f"/coveragestores/{name}/file.geotiff"
+        )
         metadata = {
             key: values[key] for key in ("title", "abstract") if values.get(key)
         }
-        if not metadata:
-            return
-        path = self.gs.rest_service.rest_endpoints.coverage(
-            ws_name, store_name, store_name
+        metadata_path = endpoints.coverage(ws_name, name, name)
+
+        def work(task):
+            try:
+                with open(source, "rb") as handle:
+                    body = ProgressReader(
+                        handle,
+                        source.stat().st_size,
+                        on_progress=task.setProgress if task is not None else None,
+                        is_cancelled=task.isCanceled if task is not None else None,
+                    )
+                    raw_rest(
+                        client,
+                        "put",
+                        upload_path,
+                        params={"configure": "first", "coverageName": name},
+                        data=body,
+                        headers={"Content-Type": "image/tiff"},
+                    )
+                if metadata:
+                    # A partial coverage PUT merges (measured), so the SRS,
+                    # bounds and grid read from the file stay. TODO(#50):
+                    # update_coverage(ws, store, name, title=…, abstract=…) —
+                    # create_coverage() POSTs a new one.
+                    raw_rest(client, "put", metadata_path, json={"coverage": metadata})
+            finally:
+                if folder is not None:
+                    shutil.rmtree(folder, ignore_errors=True)
+
+        def published(_result):
+            self.show_success_message(
+                translate(
+                    "CoverageStoreTabMixin",
+                    "Raster '{}' uploaded and published as a layer.",
+                ).format(name)
+            )
+            # The user may have moved to another tab while it uploaded.
+            self._reload_current_tab()
+
+        self._run_upload(
+            failure,
+            work,
+            published,
+            lambda _task: self._report_cancelled_raster_upload(ws_name, name),
         )
-        self._raw_rest("put", path, json={"coverage": metadata})
+
+    def _prepare_qgis_raster(self, ws_name, name, values):
+        """GUI-thread half of the raster upload: the checks, then the file to send.
+
+        Returns (path, temporary folder or None). Refuses, before any request,
+        a layer without a CRS or with one GeoServer cannot declare — a raster
+        is uploaded as it is, never reprojected — and a taken name unless
+        *Replace* is ticked, because the PUT would overwrite the store silently.
+        """
+        layer = raster_layer_by_label(values["qgis_layer"])
+        require_crs(layer)
+        if reprojection_target(layer) is not None:
+            raise ValueError(
+                translate(
+                    "CoverageStoreTabMixin",
+                    "'{}' uses a CRS without an EPSG code, which GeoServer cannot "
+                    "declare. Reproject the raster in QGIS first — rasters are "
+                    "uploaded as they are.",
+                ).format(layer.name())
+            )
+        if not values.get("replace") and self._resource_exists(
+            self.gs.get_coverage_store, ws_name, name
+        ):
+            raise ValueError(
+                translate(
+                    "CoverageStoreTabMixin",
+                    "Coverage store '{}' already exists in '{}'.",
+                ).format(name, ws_name)
+                + " "
+                + translate("CoverageStoreTabMixin", "Tick Replace to overwrite it.")
+            )
+        source = local_geotiff_path(layer)
+        if source is not None:
+            return source, None
+        # ponytail: the export runs here and holds the dialog for a big raster;
+        # QgsRasterFileWriterTask is the upgrade path if that ever hurts.
+        folder = Path(tempfile.mkdtemp(prefix="gsm_publish_"))
+        try:
+            return export_to_geotiff(layer, folder / f"{name}.tif"), folder
+        except Exception:
+            shutil.rmtree(folder, ignore_errors=True)
+            raise
+
+    def _report_cancelled_raster_upload(self, ws_name, name):
+        """Say what a cancelled upload left behind — measured on 2.28.5.
+
+        An aborted first upload leaves nothing: no store, no file, whatever
+        was already sent. An aborted *Replace* keeps the store, its coverage
+        and its layer configured, but GeoServer has already deleted the
+        previous file — a layer with no data behind it — so that one is a
+        warning with the way out.
+        """
+        kept = None
+        if self.gs is not None:  # a Refresh may have dropped the client meanwhile
+            try:
+                kept = self._resource_exists(self.gs.get_coverage_store, ws_name, name)
+            except Exception:  # the report must not fail the cancel
+                kept = None
+        if kept:
+            message = translate(
+                "CoverageStoreTabMixin",
+                "Upload of '{}' cancelled. GeoServer kept the store and its layer "
+                "but had already removed their data file — upload it again with "
+                "Replace ticked, or delete the store.",
+            )
+        elif kept is None:
+            message = translate(
+                "CoverageStoreTabMixin",
+                "Upload of '{}' cancelled — check the Coverage Stores tab for what "
+                "was left.",
+            )
+        else:
+            message = translate(
+                "CoverageStoreTabMixin",
+                "Upload of '{}' cancelled — nothing was left on the server.",
+            )
+        self.show_warning_message(message.format(name))
 
     # -- Delete ----------------------------------------------------------------
 

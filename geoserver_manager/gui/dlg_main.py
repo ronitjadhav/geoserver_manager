@@ -44,6 +44,7 @@ from geoserver_manager.gui.theme import status_colour
 from geoserver_manager.toolbelt.log_handler import PlgLogger
 from geoserver_manager.toolbelt.preferences import PlgOptionsManager
 from geoserver_manager.toolbelt.probe import probe
+from geoserver_manager.toolbelt.rest import raw_rest
 
 # Listing a nested resource needs one GET per parent plus one per item. Eight
 # parallel requests keep that bearable. They run inside a _FetchTask, so they
@@ -135,6 +136,7 @@ class GeoServerMainDialog(
 
         # Background loading state
         self._task = None  # the running _FetchTask, if any
+        self._upload = None  # the running upload task, its own slot: _run_upload
         self._closing = False  # set in closeEvent: a late finish must stay away
         self._announce_after_load = None  # banner to show once rows have landed
 
@@ -229,6 +231,9 @@ class GeoServerMainDialog(
 
     def closeEvent(self, event):
         # A running task would call back into widgets that are on their way out.
+        # An upload is left to finish: stopping it mid-body would leave a
+        # replaced store without its file (measured, see _run_upload), and the
+        # task is visible in QGIS's own task bar with its own Cancel.
         self._closing = True
         self._cancel_load()
         self._store_settings()
@@ -418,18 +423,74 @@ class GeoServerMainDialog(
         attributes are shared state. A failed run reports itself and calls
         nothing; a cancelled one does neither — which is why every loader
         resets the table *before* starting a task, so an empty table is what
-        either outcome leaves behind.
+        either outcome leaves behind. A new load supersedes the running one.
         """
         self._cancel_load()
-        self._set_loading(True)
+
+        def cancelled(task):
+            if task.user_cancelled:
+                self.show_warning_message(self.tr("Loading cancelled."))
+
+        self._launch_task("_task", failure_message, work, on_success, cancelled)
+
+    def _run_upload(self, failure_message, work, on_success, on_cancel):
+        """Stream a long PUT off the GUI thread, with progress and Cancel.
+
+        `work(task)` runs in a worker: give it everything it needs as
+        arguments — the REST client above all, because a Refresh clears
+        `self.gs` while it runs — and hand `task.setProgress` /
+        `task.isCanceled` to a `toolbelt.rest.ProgressReader` so the task bar
+        moves and Cancel aborts the transfer instead of waiting for it. Unlike
+        a load it is not superseded: a tab switch or F5 cancels `_task` only,
+        and it does not touch the table — `on_success` reloads through
+        `_reload_current_tab()` if it wants to, because the user may be on
+        another tab by then. `on_cancel(task)` is where the caller says what
+        the server was left with; measured for the raster upload, that is
+        nothing for a new store and a store *without its file* for a replaced
+        one, which is also why closing the dialog lets an upload finish.
+        One upload at a time: a second is refused with a warning.
+        """
+        if self._upload is not None:
+            self.show_warning_message(
+                self.tr("An upload is already running — wait for it or cancel it.")
+            )
+            return False
+        self._launch_task(
+            "_upload",
+            failure_message,
+            work,
+            on_success,
+            on_cancel,
+            busy_text=self.tr("Uploading…"),
+        )
+        return True
+
+    def _launch_task(
+        self, slot, failure_message, work, on_success, on_cancel, busy_text=None
+    ):
+        """Park a _FetchTask in `slot` ("_task" or "_upload") and start it.
+
+        The two slots never cancel each other. `finished` comes back on the
+        GUI thread: a cancel — the user's, a superseding load's, or our own
+        abort raised inside the worker — goes to on_cancel, an exception is
+        reported, anything else is on_success(result).
+        """
 
         def finished(task, ok, result, error):
-            if self._closing or self._task is not task:
+            if self._closing or getattr(self, slot) is not task:
                 # The dialog is going away, or a newer load took over: that
                 # one owns the table and the Cancel button now.
+                if slot == "_upload" and error is not None:
+                    self.log(
+                        f"{failure_message}: {self._error_text(error)}",
+                        log_level=Qgis.MessageLevel.Critical,
+                    )
                 return
-            self._task = None
-            self._set_loading(False)
+            setattr(self, slot, None)
+            self._set_loading(self._loading())
+            if task.isCanceled():
+                on_cancel(task)
+                return
             if error is not None:
                 detail = self._error_text(error)
                 self.show_error_message(f"{failure_message}: {detail}")
@@ -437,14 +498,13 @@ class GeoServerMainDialog(
                     f"{failure_message}: {detail}", log_level=Qgis.MessageLevel.Critical
                 )
                 return
-            if not ok:
-                if task.user_cancelled:
-                    self.show_warning_message(self.tr("Loading cancelled."))
-                return
-            on_success(result)
+            if ok:
+                on_success(result)
 
-        self._task = _FetchTask(failure_message, work, finished)
-        QgsApplication.taskManager().addTask(self._task)
+        task = _FetchTask(failure_message, work, finished)
+        setattr(self, slot, task)
+        self._set_loading(True, busy_text)
+        QgsApplication.taskManager().addTask(task)
 
     def _start_load(self, failure_message, fetch):
         """Fetch a tab's rows in the background and render them when they land.
@@ -465,17 +525,26 @@ class GeoServerMainDialog(
             self._announce_after_load = None
 
     def _cancel_load(self, user=False):
-        """Cancel the running load, if any. `user` marks the Cancel button."""
+        """Cancel the running load, if any. `user` marks the Cancel button.
+
+        The button stops a running upload first — that is the transfer the
+        user sees a bar for — and only a user does: a superseding load
+        (`user=False`) never touches an upload.
+        """
+        if user and self._upload is not None:
+            self._upload.user_cancelled = True
+            self._upload.cancel()
+            return
         if self._task is not None:
             self._task.user_cancelled = user
             self._task.cancel()
 
     def _loading(self):
-        """True while a background load is running."""
-        return self._task is not None
+        """True while a background load or an upload is running."""
+        return self._task is not None or self._upload is not None
 
-    def _set_loading(self, loading):
-        """Say that a load is running, and offer Cancel in place of Refresh."""
+    def _set_loading(self, loading, busy_text=None):
+        """Say that a task is running, and offer Cancel in place of Refresh."""
         self.btn_refresh.setText(self.tr("Cancel") if loading else self.tr("Refresh"))
         self.btn_refresh.setToolTip(
             self.tr("Stop loading")
@@ -483,9 +552,12 @@ class GeoServerMainDialog(
             else self.tr("Refresh resources from the GeoServer (F5)")
         )
         if loading:
-            self.lbl_page_info.setText(self.tr("Loading…"))
+            self.lbl_page_info.setText(busy_text or self.tr("Loading…"))
         elif not self._all_rows:
             self.lbl_page_info.setText(self.tr("No results"))
+        else:
+            # An upload borrowed the label while the rows stayed on screen.
+            self.lbl_page_info.setText(self._page_info_text())
 
     def _on_refresh_clicked(self):
         """One button: Refresh when idle, Cancel while loading."""
@@ -757,15 +829,7 @@ class GeoServerMainDialog(
 
         # Update pagination controls
         self.lbl_page_number.setText(str(self._current_page + 1))
-
-        if total == 0:
-            self.lbl_page_info.setText(self._empty_state_text())
-        else:
-            self.lbl_page_info.setText(
-                self.tr("Results {} to {} (out of {} items)").format(
-                    start + 1, end, total
-                )
-            )
+        self.lbl_page_info.setText(self._page_info_text())
 
         self.btn_page_first.setEnabled(self._current_page > 0)
         self.btn_page_prev.setEnabled(self._current_page > 0)
@@ -780,6 +844,16 @@ class GeoServerMainDialog(
         """
         if scope(row_data[1]) is not None:
             self._show_workspace_info([row_data[1]])
+
+    def _page_info_text(self):
+        """The line under the table: which rows are shown, or why there are none."""
+        total = len(self._filtered_rows)
+        if total == 0:
+            return self._empty_state_text()
+        start = self._current_page * self._page_size
+        return self.tr("Results {} to {} (out of {} items)").format(
+            start + 1, min(start + self._page_size, total), total
+        )
 
     def _empty_state_text(self):
         """What an empty table should say: why it is empty, and what helps."""
@@ -930,11 +1004,10 @@ class GeoServerMainDialog(
         Raises with GeoServer's own response body on any HTTP error, so the
         message the user sees is the same shape as _check's. Every caller is a
         library gap: list it in issue #50 and mark the call site TODO(#50).
+        A worker thread calls `toolbelt.rest.raw_rest` with the client it was
+        handed instead: `self.gs` is not its to read.
         """
-        response = getattr(self.gs.rest_service.rest_client, method)(path, **kwargs)
-        if response.status_code >= 400:
-            raise RuntimeError(f"HTTP {response.status_code}: {response.text}")
-        return response
+        return raw_rest(self.gs.rest_service.rest_client, method, path, **kwargs)
 
     def _resource_exists(self, getter, *args):
         """True when a GET for the resource returns 200, False on 404.
