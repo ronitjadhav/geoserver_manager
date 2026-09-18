@@ -1351,6 +1351,24 @@ class TestConnectionGuard(unittest.TestCase):
     """
 
     class FakeGS:
+        class rest_service:
+            """Enough for the Layers tab's GET /rest/layers.json: no layers."""
+
+            class rest_endpoints:
+                base_url = "http://gs/rest"
+
+            class rest_client:
+                @staticmethod
+                def get(path, **kwargs):
+                    class Response:
+                        status_code = 200
+                        text = ""
+
+                        def json(inner):
+                            return {"layers": ""}
+
+                    return Response()
+
         def get_workspaces(inner):
             return ([{"name": "topp"}], 200)
 

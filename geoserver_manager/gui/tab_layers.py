@@ -1,12 +1,14 @@
 #! python3  # noqa: E265
 
 """
-Layers tab — list, view and delete feature types.
+Layers tab — every published layer, whatever its type: list, inspect,
+style, add to QGIS, delete.
 
 Used as a mixin for GeoServerMainDialog.
 """
 
-from urllib.parse import urlencode
+import re
+from urllib.parse import quote, unquote, urlencode
 
 from qgis.core import Qgis, QgsDataSourceUri, QgsProject, QgsRasterLayer, QgsVectorLayer
 from qgis.PyQt.QtCore import QCoreApplication, QUrl
@@ -35,6 +37,10 @@ _WMTS_TILE_MATRIX_SET = "EPSG:900913"
 # GeoServer's own Layer Preview page renders at 768 px on the long side.
 _PREVIEW_SIZE = 768
 
+# GeoServer's layer types, as /rest/layers writes them. The Type column
+# carries them verbatim: they decide which resource a row's actions talk to.
+VECTOR, RASTER, WMS, WMTS = "VECTOR", "RASTER", "WMS", "WMTS"
+
 
 # Every user-visible string in this file goes through translate() with this
 # file's own class as the context. self.tr() cannot: pylupdate extracts it
@@ -46,7 +52,7 @@ translate = QCoreApplication.translate
 
 
 class LayerTabMixin:
-    """Mixin that adds feature-type methods to the main dialog."""
+    """Mixin that adds the Layers tab: every published layer, of any type."""
 
     def _load_layers(self):
         """Arm the Layers tab, then fetch its rows in the background."""
@@ -99,9 +105,9 @@ class LayerTabMixin:
             [
                 translate("LayerTabMixin", "Layer Name"),
                 translate("LayerTabMixin", "Workspace"),
-                translate("LayerTabMixin", "Datastore"),
-                translate("LayerTabMixin", "SRS"),
-                translate("LayerTabMixin", "Enabled"),
+                translate("LayerTabMixin", "Type"),
+                translate("LayerTabMixin", "Store"),
+                translate("LayerTabMixin", "Default style"),
                 self.actions_column_label(),
             ]
         )
@@ -112,60 +118,86 @@ class LayerTabMixin:
     def _fetch_layer_rows(self, task=None):
         """(rows, failures) for the Layers table. Runs in a worker thread.
 
-        Three levels: workspaces -> datastores -> feature types, then one
-        detail GET per feature type for the SRS and enabled columns (the list
-        endpoint only returns names). Each level is fanned out and tolerant, so
-        one unreadable parent costs a warning, not the table.
+        GeoServer's own layer list first — every published layer, whatever its
+        type: vector, raster, cascaded WMS or WMTS — then one GET per layer,
+        fanned out, for the type, the store and the default style. A layer
+        whose detail cannot be read still gets a row, with placeholders, and
+        a warning names it.
         """
-        failures = []
-        stores = []
-        ws_names = self._get_workspace_names()
-        for ws_name, (ds_names, error) in zip(
-            ws_names, self._fan_out(self._datastore_names, ws_names, task)
+        names = self._all_layer_names()
+        rows, failures = [], []
+        for qualified, (summary, error) in zip(
+            names, self._fan_out(self._layer_summary, names, task)
         ):
+            workspace, _, name = qualified.rpartition(":")
             if error:
-                failures.append((ws_name, error))
-                continue
-            stores.extend((ws_name, ds_name) for ds_name in ds_names)
-
-        layers = []
-        for (ws_name, ds_name), (names, error) in zip(
-            stores,
-            self._fan_out(lambda store: self._layer_names(*store), stores, task),
-        ):
-            if error:
-                failures.append((f"{ws_name}/{ds_name}", error))
-                continue
-            layers.extend((ws_name, ds_name, name) for name in names)
-
-        summaries = self._fan_out(
-            lambda layer: self._layer_summary(*layer), layers, task
-        )
-        rows = []
-        for (ws_name, ds_name, name), (summary, error) in zip(layers, summaries):
-            if error:
-                failures.append((f"{ws_name}/{ds_name}/{name}", error))
-            srs, enabled = summary or ("—", "—")
-            rows.append([name, ws_name, ds_name, srs, enabled])
+                failures.append((qualified, error))
+            kind, store, style = summary or ("—", "—", "—")
+            rows.append([name, workspace, kind, store, style])
         return rows, failures
 
-    def _layer_names(self, workspace_name, datastore_name):
-        """Feature-type names in one datastore. Raises on HTTP errors."""
-        return [
-            self._name_of(ft)
-            for ft in self._fetch_list(
-                self.gs.get_feature_types, workspace_name, datastore_name
-            )
-        ]
+    def _layers_url(self, qualified_name=None):
+        """/rest/layers.json, or one layer's own document under it."""
+        base = self.gs.rest_service.rest_endpoints.base_url
+        if qualified_name is None:
+            return f"{base}/layers.json"
+        return f"{base}/layers/{quote(qualified_name, safe=':')}.json"
 
-    def _layer_summary(self, workspace_name, datastore_name, name):
-        """(srs, enabled) for the list view. Raises on HTTP errors."""
-        detail = self._check(
-            self.gs.get_feature_type(workspace_name, datastore_name, name)
+    def _all_layer_names(self):
+        """Every layer's qualified name ("workspace:layer"), from GeoServer's
+        own list. Raises on HTTP errors.
+
+        TODO(#50): row 39 — the facade has no get_layers(). Walking the
+        datastores instead, as this tab did, misses every raster and cascaded
+        layer; the workspace-less list is the one place they all appear.
+        """
+        payload = self._raw_rest("get", self._layers_url()).json()
+        layers = payload.get("layers") if isinstance(payload, dict) else None
+        layers = layers.get("layer") if isinstance(layers, dict) else None
+        if isinstance(layers, dict):  # a single layer is not a list
+            layers = [layers]
+        return sorted(self._name_of(layer) for layer in layers or [])
+
+    def _layer_summary(self, qualified_name):
+        """(type, store, default style) of one layer. Raises on HTTP errors.
+
+        TODO(#50): rest_service.get_layer() exists, but its Layer model keeps
+        only the resource's *name* — not its class or href, which is where the
+        store comes from — so this reads GeoServer's payload itself.
+        """
+        payload = self._raw_rest("get", self._layers_url(qualified_name)).json()
+        layer = payload.get("layer") if isinstance(payload, dict) else None
+        layer = layer if isinstance(layer, dict) else {}
+        kind = layer.get("type") or "—"
+        store = self._store_from_href((layer.get("resource") or {}).get("href"))
+        if store is None and kind == WMTS:
+            # GeoServer 2.28.5 writes no href for a wmtsLayer resource, so the
+            # store has to be found among the workspace's WMTS stores.
+            workspace, _, name = qualified_name.rpartition(":")
+            store = self._wmts_store_of(workspace, name)
+        style = (layer.get("defaultStyle") or {}).get("name") or "—"
+        return kind, store or "—", style
+
+    @staticmethod
+    def _store_from_href(href):
+        """The store in a resource href — .../workspaces/{ws}/{kind}stores/
+        {store}/... — whatever host GeoServer wrote it with (behind a proxy it
+        is not the one the plugin talks to, which is why the href is parsed
+        and never followed). None when there is no such segment."""
+        match = re.search(
+            r"/workspaces/[^/]+/(?:data|coverage|wms|wmts)stores/([^/]+)/", href or ""
         )
-        if not isinstance(detail, dict):
-            return ("—", "—")
-        return (detail.get("srs", "—"), str(detail.get("enabled", True)))
+        return unquote(match.group(1)) if match else None
+
+    def _wmts_store_of(self, workspace_name, layer_name):
+        """The WMTS store holding this cascaded layer, or None (helpers of the
+        Cascaded Stores tab, reached through the shared dialog class)."""
+        for store, kind in self._cascaded_store_names(workspace_name):
+            if kind == WMTS and layer_name in self._cascaded_layer_names(
+                workspace_name, store, kind
+            ):
+                return store
+        return None
 
     @staticmethod
     def _layer_form_values(row_data, detail):
@@ -175,7 +207,8 @@ class LayerTabMixin:
         _show_layer_info), so this is a view: the interesting fields, flattened
         for display.
         """
-        name, ws_name, ds_name = row_data[0], row_data[1], row_data[2]
+        # A row is [name, workspace, type, store, default style].
+        name, ws_name, ds_name = row_data[0], row_data[1], row_data[3]
         detail = detail if isinstance(detail, dict) else {}
 
         # The library's FeatureType.asdict() normalises keywords to a list and
@@ -282,33 +315,63 @@ class LayerTabMixin:
         ]
         return fields
 
-    def _show_layer_info(self, row_data):
-        """Open a read-only view of one feature type.
+    def _layer_resource(self, row_data):
+        """The resource behind a layer row, as GeoServer stores it: a feature
+        type, a coverage or a cascaded layer — by the row's type and store."""
+        name, ws_name, kind, store = row_data[0], row_data[1], row_data[2], row_data[3]
+        if kind == VECTOR:
+            return self._check(self.gs.get_feature_type(ws_name, store, name))
+        if kind == RASTER:
+            return self._coverage_detail(ws_name, store, name)
+        if kind in (WMS, WMTS):
+            return self._cascaded_layer_detail(ws_name, store, kind, name)
+        raise ValueError(
+            translate("LayerTabMixin", "Unsupported layer type '{}'").format(kind)
+        )
 
-        View-only on purpose: the library's create_feature_type upserts from a
-        handful of arguments, so saving through it would drop everything the
-        form does not model (projection policy, bounding boxes, attributes) —
-        exactly the destruction the datastore merge exists to avoid. Editing
-        needs an update_feature_type that merges; tracked in #50.
+    def _show_layer_info(self, row_data):
+        """Open a read-only view of one layer's resource, whatever its type.
+
+        The vector view is this tab's own; the coverage and cascaded-layer
+        views are borrowed from the Coverage Stores and Cascaded Stores tabs,
+        minus their picker. View-only on purpose: the library's create_*
+        helpers upsert from a handful of arguments, so saving through them
+        would drop everything the form does not model — exactly the
+        destruction the datastore merge exists to avoid. Editing needs an
+        update that merges; tracked in #50.
         """
         detail = self._fetch(
-            lambda: self._check(
-                self.gs.get_feature_type(row_data[1], row_data[2], row_data[0])
-            ),
+            lambda: self._layer_resource(row_data),
             translate("LayerTabMixin", "Failed to load layer details"),
         )
         if detail is None:
             return
+        detail = detail if isinstance(detail, dict) else {}
+        name, ws_name, kind, store = row_data[0], row_data[1], row_data[2], row_data[3]
+        if kind == RASTER:
+            fields = [f for f in self._coverage_fields([]) if f["key"] != "coverage"]
+            values = self._coverage_form_values(detail)
+            origin = translate("LayerTabMixin", "Coverage of store {ws}/{store}.")
+        elif kind in (WMS, WMTS):
+            fields = [f for f in self._cascaded_layer_fields([]) if f["key"] != "layer"]
+            values = self._cascaded_layer_form_values(detail)
+            origin = translate(
+                "LayerTabMixin", "Cascaded through {type} store {ws}/{store}."
+            )
+        else:
+            fields = self._layer_fields()
+            values = self._layer_form_values(row_data, detail)
+            origin = translate("LayerTabMixin", "Published from {ws}/{store}.")
 
         dlg = ResourceFormDialog(
-            title=translate("LayerTabMixin", "Layer '{}'").format(row_data[0]),
-            description=translate(
-                "LayerTabMixin",
-                "Published from {ws}/{ds}. Read-only here — GeoServer's web UI can "
-                "change it.",
-            ).format(ws=row_data[1], ds=row_data[2]),
-            fields=self._layer_fields(),
-            values=self._layer_form_values(row_data, detail),
+            title=translate("LayerTabMixin", "Layer '{}'").format(name),
+            description=origin.format(ws=ws_name, store=store, type=kind)
+            + " "
+            + translate(
+                "LayerTabMixin", "Read-only here — GeoServer's web UI can change it."
+            ),
+            fields=fields,
+            values=values,
             parent=self,
         )
         dlg.hide_save_button()
@@ -1027,9 +1090,9 @@ class LayerTabMixin:
 
     def _preview_layer_in_browser(self, row_data):
         """Open GeoServer's own preview of the layer, on its extent."""
-        name, ws_name, ds_name = row_data[0], row_data[1], row_data[2]
+        name, ws_name = row_data[0], row_data[1]
         detail = self._fetch(
-            lambda: self._check(self.gs.get_feature_type(ws_name, ds_name, name)),
+            lambda: self._layer_resource(row_data),
             translate("LayerTabMixin", "Failed to load layer details"),
         )
         if detail is None:
@@ -1039,30 +1102,42 @@ class LayerTabMixin:
         self._open_in_browser(
             self._preview_url(
                 self.plg_settings.get_plg_settings().geoserver_url,
-                f"{ws_name}:{name}",
+                f"{ws_name}:{name}" if ws_name else name,
                 bbox,
                 srs,
-                workspace=ws_name,
+                workspace=ws_name or None,
             )
         )
 
     def _add_layer_to_qgis(self, row_data):
         """Ask which protocol, then add the layer to the current QGIS project."""
-        name, ws_name = row_data[0], row_data[1]
-        dlg = ResourceFormDialog(
-            title=translate("LayerTabMixin", "Add '{}' to QGIS").format(name),
-            description=translate(
+        name, ws_name, kind = row_data[0], row_data[1], row_data[2]
+        if kind == VECTOR:
+            protocols = list(PROTOCOLS)
+            description = translate(
                 "LayerTabMixin",
                 "WFS loads the features themselves (editable, styled in QGIS); WMS "
                 "and WMTS load rendered images. Credentials come from the plugin's "
                 "saved connection, not from the layer.",
-            ),
+            )
+        else:
+            # A raster or a cascaded layer has no features to serve over WFS.
+            protocols = [protocol for protocol in PROTOCOLS if protocol != "WFS"]
+            description = translate(
+                "LayerTabMixin",
+                "WMS and WMTS load rendered images — this layer has no features to "
+                "serve over WFS. Credentials come from the plugin's saved "
+                "connection, not from the layer.",
+            )
+        dlg = ResourceFormDialog(
+            title=translate("LayerTabMixin", "Add '{}' to QGIS").format(name),
+            description=description,
             fields=[
                 {
                     "key": "protocol",
                     "label": translate("LayerTabMixin", "Load as"),
                     "type": "combo",
-                    "options": list(PROTOCOLS),
+                    "options": protocols,
                     "default": "WMS",
                     "required": True,
                 }
@@ -1103,30 +1178,49 @@ class LayerTabMixin:
             )
 
     def _delete_layer(self, row_data):
-        """Delete a single feature type after confirmation."""
+        """Delete a single layer, with its resource, after confirmation."""
         self._delete_selected_layers([row_data])
 
+    def _delete_layer_resource(self, workspace_name, kind, store, name):
+        """Remove the resource behind a layer — the published layer goes with it."""
+        if kind == VECTOR:
+            self._check(self.gs.delete_feature_type(workspace_name, store, name))
+        elif kind == RASTER:
+            # TODO(#50): no delete_coverage() in the library, only
+            # delete_coverage_store(). Workaround: DELETE the coverage with
+            # recurse=true, which removes the layer and keeps the store.
+            path = self.gs.rest_service.rest_endpoints.coverage(
+                workspace_name, store, name
+            )
+            self._raw_rest("delete", path, params={"recurse": "true"})
+        elif kind in (WMS, WMTS):
+            self._delete_cascaded_layer(workspace_name, store, kind, name)
+        else:
+            raise ValueError(
+                translate("LayerTabMixin", "Unsupported layer type '{}'").format(kind)
+            )
+
     def _delete_selected_layers(self, selected_rows):
-        """Delete one or more feature types after confirmation."""
+        """Delete one or more layers, each through its own resource type."""
         self._delete_many(
             translate("LayerTabMixin", "layer"),
             [
                 (
-                    f"{row[1]}/{row[2]}/{row[0]}",
-                    lambda ws=row[1], ds=row[2], name=row[0]: self._check(
-                        self.gs.delete_feature_type(ws, ds, name)
+                    f"{row[1]}:{row[0]}" if row[1] else row[0],
+                    lambda row=row: self._delete_layer_resource(
+                        row[1], row[2], row[3], row[0]
                     ),
                 )
                 for row in selected_rows
             ],
             self._load_layers,
-            # delete_feature_type sends recurse=true, which removes the
+            # Every resource delete sends recurse=true, which removes the
             # published layer — but GeoServer refuses outright while a layer
             # group still references it (verified against 2.28.5).
             cascade=translate(
                 "LayerTabMixin",
-                "The published layer goes too; the table or file behind it is not "
-                "touched. GeoServer refuses if a layer group still uses the "
-                "layer — remove it from the group first.\n\n",
+                "The published layer goes too; the table, file or remote layer "
+                "behind it is not touched. GeoServer refuses if a layer group "
+                "still uses the layer — remove it from the group first.\n\n",
             ),
         )

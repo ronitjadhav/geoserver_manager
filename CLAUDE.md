@@ -150,6 +150,20 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   minutes (row 20 of #50). `verifytls` is the *Verify the server's TLS certificate* setting (default on);
   it catches `requests.exceptions.SSLError` before `OSError` so a private-CA server is reported as a
   certificate problem, not as "is the server running?".
+- **Layers of every type** (row 39 of #50, plus the per-layer GET and the coverage delete reported
+  with this change): `GET /rest/layers.json` is the one list where vector, raster and cascaded layers
+  all appear — walking datastores → feature types, as the Layers tab did, misses the others.
+  `GET /rest/layers/{ws}:{name}.json` gives `type` (VECTOR / RASTER / WMS / WMTS), `defaultStyle`
+  (`{"name": ""}` for a cascaded WMS layer) and `resource` with `@class` (featureType / coverage /
+  wmsLayer / wmtsLayer) and an `href` — except a **wmtsLayer, which has no href** on 2.28.5, so its
+  store is found by asking the workspace's WMTS stores for their layers. The href carries GeoServer's
+  own idea of its base URL (behind a proxy, an inside name), so the tab parses the store segment out
+  of it and never follows it. `rest_service.get_layer()` exists, but its `Layer` model keeps only the
+  resource's name. Per type, the detail view, the browser preview and the delete go to the resource:
+  feature type through the library, coverage through the Coverage Stores tab's `_coverage_detail`
+  and a raw `DELETE …/coverages/{name}?recurse=true` (no `delete_coverage()` upstream), cascaded
+  layer through the Cascaded Stores tab's helpers — all reached on the shared dialog class. *Add to
+  QGIS* offers WFS for VECTOR only.
 - **Legend and browser preview** (rows 39–40 of #50): `get_legend_graphic()` is a plain GET through the REST client —
   stateless, so worker-safe — but it returns the raw `Response`: an OGC exception is **HTTP 200 with an
   XML body**, so the content type decides, and it runs with the client's 120 s timeout. GetLegendGraphic

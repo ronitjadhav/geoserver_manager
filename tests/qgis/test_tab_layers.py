@@ -8,7 +8,7 @@ Usage from the repo root folder:
     # for whole tests
     python -m unittest tests.qgis.test_tab_layers
     # for specific test
-    python -m unittest tests.qgis.test_tab_layers.TestLayersTab.test_lists_every_feature_type
+    python -m unittest tests.qgis.test_tab_layers.TestLayersTab.test_lists_every_layer_of_every_type
 """
 
 # standard library
@@ -18,6 +18,7 @@ from qgis.PyQt.QtWidgets import QDialog
 from qgis.testing import start_app, unittest
 
 # project
+from geoserver_manager.gui import tab_layers
 from geoserver_manager.gui.dlg_main import GeoServerMainDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from tests.qgis.sync_dialog import SyncDialog
@@ -57,38 +58,185 @@ DETAIL = {
 }
 
 
-class FakeGS:
-    """Two workspaces, one with a store holding two feature types."""
+BASE = "http://gs/geoserver/rest"
 
-    def __init__(self, broken_workspace=None, broken_detail=None):
-        self.broken_workspace = broken_workspace
+# What /rest/layers knows about each layer: GeoServer's type, the segments of
+# the resource href (a WMTS resource has none), the store, the default style.
+LAYERS = {
+    "topp:tasmania_roads": (
+        "VECTOR",
+        "datastores",
+        "taz_shapes",
+        "featuretypes",
+        "simple_roads",
+    ),
+    "topp:tasmania_cities": (
+        "VECTOR",
+        "datastores",
+        "taz_shapes",
+        "featuretypes",
+        "capitals",
+    ),
+    "sf:sfdem": ("RASTER", "coveragestores", "sfdem", "coverages", "dem"),
+    "sf:roads_cascade": ("WMS", "wmsstores", "remote_wms", "wmslayers", ""),
+    "sf:tiles": ("WMTS", None, "remote_wmts", None, "raster"),
+}
+LLBBOX = {
+    "minx": -103.87,
+    "maxx": -103.62,
+    "miny": 44.37,
+    "maxy": 44.5,
+    "crs": "EPSG:4326",
+}
+COVERAGE = {
+    "name": "sfdem",
+    "nativeName": "sfdem",
+    "title": "Spearfish DEM",
+    "srs": "EPSG:26713",
+    "enabled": True,
+    "nativeFormat": "GeoTIFF",
+    "latLonBoundingBox": LLBBOX,
+    "nativeBoundingBox": {
+        "minx": 589980,
+        "miny": 4913700,
+        "maxx": 609000,
+        "maxy": 4928010,
+        "crs": {"@class": "projected", "$": "EPSG:26713"},
+    },
+    "grid": {"range": {"low": "0 0", "high": "634 477"}},
+    "dimensions": {
+        "coverageDimension": {"name": "GRAY_INDEX", "range": {"min": 1000, "max": 2000}}
+    },
+    "abstract": "Elevation",
+}
+CASCADED = {
+    "name": "roads_cascade",
+    "nativeName": "sf:roads",
+    "title": "Spearfish roads",
+    "srs": "EPSG:26713",
+    "enabled": True,
+    "latLonBoundingBox": LLBBOX,
+    "keywords": {"string": ["roads"]},
+    "abstract": "",
+}
+
+
+class FakeGS:
+    """GeoServer as /rest/layers shows it — five layers of four types — plus
+    the library calls the tab still makes for vectors, publishing and styles."""
+
+    def __init__(self, broken_detail=None, broken_list=False):
         self.broken_detail = broken_detail
+        self.broken_list = broken_list
         self.deleted = []
+        self.requests = []
+        outer = self
+
+        class Response:
+            def __init__(inner, payload, status_code=200):
+                inner._payload, inner.status_code = payload, status_code
+                inner.text = str(payload)
+
+            def json(inner):
+                return inner._payload
+
+        class Client:
+            def get(inner, path, **kwargs):
+                outer.requests.append(("get", path))
+                return Response(*outer.answer(path))
+
+            def delete(inner, path, **kwargs):
+                outer.deleted.append(("DELETE", path, kwargs.get("params")))
+                return Response("", 200)
+
+        class Endpoints:
+            base_url = BASE
+
+            def coverage(inner, ws, store, name):
+                return f"{BASE}/workspaces/{ws}/coveragestores/{store}/coverages/{name}.json"
+
+            def wmsstores(inner, ws):
+                return f"{BASE}/workspaces/{ws}/wmsstores.json"
+
+            def wmtsstores(inner, ws):
+                return f"{BASE}/workspaces/{ws}/wmtsstores.json"
+
+            def wmslayers(inner, ws, store):
+                return f"{BASE}/workspaces/{ws}/wmsstores/{store}/wmslayers.json"
+
+            def wmtslayers(inner, ws, store):
+                return f"{BASE}/workspaces/{ws}/wmtsstores/{store}/layers.json"
+
+            def wmtslayer(inner, ws, store, name):
+                return f"{BASE}/workspaces/{ws}/wmtsstores/{store}/layers/{name}.json"
+
+        class Rest:
+            rest_client = Client()
+            rest_endpoints = Endpoints()
+
+        self.rest_service = Rest()
+
+    def answer(self, path):
+        """(payload, status) for the raw GETs the tab makes."""
+        if path == f"{BASE}/layers.json":
+            if self.broken_list:
+                return ("boom", 500)
+            layers = [{"name": n, "href": f"{BASE}/layers/{n}.json"} for n in LAYERS]
+            return ({"layers": {"layer": layers}}, 200)
+        if path.startswith(f"{BASE}/layers/"):
+            qualified = path[len(f"{BASE}/layers/") : -len(".json")]
+            if qualified == self.broken_detail:
+                return ("gone", 500)
+            if qualified not in LAYERS:
+                return ("no such layer", 404)
+            kind, stores, store, resources, style = LAYERS[qualified]
+            ws, _, name = qualified.rpartition(":")
+            resource = {"name": qualified}
+            if stores:
+                # Another host on purpose: behind a proxy GeoServer writes its
+                # own idea of the base URL, so the href must never be followed.
+                resource["href"] = (
+                    f"http://inside:8080/geoserver/rest/workspaces/{ws}/{stores}/"
+                    f"{store}/{resources}/{name}.json"
+                )
+            layer = {"name": name, "type": kind, "resource": resource}
+            layer["defaultStyle"] = {"name": style}
+            return ({"layer": layer}, 200)
+        if path == f"{BASE}/workspaces/sf/wmsstores.json":
+            return ({"wmsStores": ""}, 200)
+        if path == f"{BASE}/workspaces/sf/wmtsstores.json":
+            return ({"wmtsStores": {"wmtsStore": [{"name": "remote_wmts"}]}}, 200)
+        if path == f"{BASE}/workspaces/sf/wmtsstores/remote_wmts/layers.json":
+            return ({"wmtsLayers": {"wmtsLayer": [{"name": "tiles"}]}}, 200)
+        if path == f"{BASE}/workspaces/sf/wmtsstores/remote_wmts/layers/tiles.json":
+            detail = dict(CASCADED, name="tiles", nativeName="topp:states")
+            return ({"wmtsLayer": detail}, 200)
+        if path.endswith("/coveragestores/sfdem/coverages/sfdem.json"):
+            return ({"coverage": COVERAGE}, 200)
+        raise AssertionError(f"unexpected GET {path}")
+
+    # -- the library calls the tab still makes --
 
     def get_workspaces(self):
         return ([{"name": "topp"}, {"name": "empty"}], 200)
 
     def get_datastores(self, workspace_name):
-        if workspace_name == self.broken_workspace:
-            raise RuntimeError("HTTP 500: boom")
         if workspace_name == "empty":
             return ([], 200)
         return ([{"name": "taz_shapes"}], 200)
 
-    def get_feature_types(self, workspace_name, datastore_name):
-        return ([{"name": "tasmania_roads"}, {"name": "tasmania_cities"}], 200)
-
     def get_feature_type(self, workspace_name, datastore_name, name):
-        if name == self.broken_detail:
-            raise RuntimeError("HTTP 404: gone")
-        detail = dict(DETAIL, name=name)
-        if name == "tasmania_cities":
-            detail["srs"] = "EPSG:3857"
-            detail["enabled"] = False
-        return (detail, 200)
+        return (dict(DETAIL, name=name), 200)
+
+    def get_wms_layer(self, workspace_name, store_name, name):
+        return (dict(CASCADED, name=name), 200)
 
     def delete_feature_type(self, workspace_name, datastore_name, name):
         self.deleted.append((workspace_name, datastore_name, name))
+        return ("", 200)
+
+    def delete_wms_layer(self, workspace_name, store_name, name):
+        self.deleted.append(("wms", workspace_name, store_name, name))
         return ("", 200)
 
 
@@ -112,14 +260,17 @@ class TestLayersTab(unittest.TestCase):
         self.assertEqual(loader, "_load_layers")
         self.assertTrue(hasattr(self.dlg, loader))
 
-    def test_lists_every_feature_type(self):
+    def test_lists_every_layer_of_every_type(self):
         self.dlg._load_layers()
 
         self.assertEqual(
             self.dlg._all_rows,
             [
-                ["tasmania_roads", "topp", "taz_shapes", "EPSG:4326", "True"],
-                ["tasmania_cities", "topp", "taz_shapes", "EPSG:3857", "False"],
+                ["roads_cascade", "sf", "WMS", "remote_wms", "—"],
+                ["sfdem", "sf", "RASTER", "sfdem", "dem"],
+                ["tiles", "sf", "WMTS", "remote_wmts", "raster"],
+                ["tasmania_cities", "topp", "VECTOR", "taz_shapes", "capitals"],
+                ["tasmania_roads", "topp", "VECTOR", "taz_shapes", "simple_roads"],
             ],
         )
         headers = [
@@ -128,35 +279,58 @@ class TestLayersTab(unittest.TestCase):
         ]
         self.assertEqual(
             headers,
-            ["Layer Name", "Workspace", "Datastore", "SRS", "Enabled", "Actions"],
+            ["Layer Name", "Workspace", "Type", "Store", "Default style", "Actions"],
         )
         self.assertEqual(self.warnings, [])
+        # one request for the list, one per layer; the datastores are not walked
+        gets = [path for verb, path in self.dlg.gs.requests if verb == "get"]
+        self.assertEqual(gets.count(f"{BASE}/layers.json"), 1)
+        self.assertEqual([path for path in gets if "/datastores/" in path], [])
 
-    def test_one_unreadable_workspace_costs_a_warning_not_the_table(self):
-        self.dlg.gs = FakeGS(broken_workspace="topp")
+    def test_a_wmts_layer_finds_its_store_among_the_workspaces_stores(self):
+        # GeoServer 2.28.5 writes no href for a wmtsLayer resource
         self.dlg._load_layers()
+        gets = [path for verb, path in self.dlg.gs.requests if verb == "get"]
+        self.assertIn(f"{BASE}/workspaces/sf/wmtsstores/remote_wmts/layers.json", gets)
 
-        self.assertEqual(self.dlg._all_rows, [])  # topp held them all
-        self.assertEqual(len(self.warnings), 1)
-        self.assertIn("topp", self.warnings[0])
+    def test_the_store_is_read_off_the_href_and_the_href_never_followed(self):
+        self.dlg._load_layers()
+        self.assertEqual(
+            [path for _verb, path in self.dlg.gs.requests if "inside:8080" in path], []
+        )
+        store_from_href = tab_layers.LayerTabMixin._store_from_href
+        self.assertEqual(
+            store_from_href(
+                "http://inside:8080/geoserver/rest/workspaces/sf/coveragestores/"
+                "my%20dem/coverages/x.json"
+            ),
+            "my dem",
+        )
+        self.assertIsNone(store_from_href(None))
+        self.assertIsNone(store_from_href("http://gs/geoserver/rest/styles/x.json"))
 
-    def test_one_unreadable_detail_still_lists_the_row(self):
-        self.dlg.gs = FakeGS(broken_detail="tasmania_cities")
+    def test_one_unreadable_layer_still_gets_a_row(self):
+        self.dlg.gs = FakeGS(broken_detail="topp:tasmania_cities")
         self.dlg._load_layers()
 
         rows = {row[0]: row for row in self.dlg._all_rows}
-        self.assertEqual(rows["tasmania_roads"][3], "EPSG:4326")
-        self.assertEqual(rows["tasmania_cities"][3], "—")  # placeholder, not missing
+        self.assertEqual(rows["tasmania_cities"][2:], ["—", "—", "—"])  # placeholders
+        self.assertEqual(rows["tasmania_roads"][2], "VECTOR")
         self.assertEqual(len(self.warnings), 1)
-        self.assertIn("tasmania_cities", self.warnings[0])
+        self.assertIn("topp:tasmania_cities", self.warnings[0])
+
+    def test_an_unreadable_list_fails_the_load(self):
+        self.dlg.gs = FakeGS(broken_list=True)
+        with self.assertRaises(RuntimeError):
+            self.dlg._fetch_layer_rows()
 
     def test_name_and_workspace_columns_are_links(self):
         self.dlg._load_layers()
         self.assertIsNotNone(self.dlg._cell_click_callback(0))  # name
         self.assertIsNotNone(self.dlg._cell_click_callback(1))  # workspace
-        self.assertIsNone(self.dlg._cell_click_callback(3))  # SRS is plain
+        self.assertIsNone(self.dlg._cell_click_callback(2))  # type is plain
 
-    def test_delete_targets_the_right_feature_type(self):
+    def test_delete_goes_through_each_types_own_call(self):
         self.dlg._load_layers()
         confirmed = {}
         self.dlg._confirm_delete = (
@@ -165,14 +339,123 @@ class TestLayersTab(unittest.TestCase):
             )
             or True
         )
+        rows = {row[0]: row for row in self.dlg._all_rows}
 
-        self.dlg._delete_selected_layers([self.dlg._all_rows[1]])
-
-        self.assertEqual(
-            self.dlg.gs.deleted, [("topp", "taz_shapes", "tasmania_cities")]
+        self.dlg._delete_selected_layers(
+            [
+                rows["tasmania_cities"],
+                rows["sfdem"],
+                rows["roads_cascade"],
+                rows["tiles"],
+            ]
         )
-        self.assertEqual(confirmed["labels"], ["topp/taz_shapes/tasmania_cities"])
+
+        deleted = self.dlg.gs.deleted
+        self.assertIn(("topp", "taz_shapes", "tasmania_cities"), deleted)  # library
+        self.assertIn(("wms", "sf", "remote_wms", "roads_cascade"), deleted)  # library
+        raw = [(entry[1], entry[2]) for entry in deleted if entry[0] == "DELETE"]
+        self.assertIn(
+            (
+                f"{BASE}/workspaces/sf/coveragestores/sfdem/coverages/sfdem.json",
+                {"recurse": "true"},
+            ),
+            raw,
+        )
+        self.assertIn(
+            (
+                f"{BASE}/workspaces/sf/wmtsstores/remote_wmts/layers/tiles.json",
+                {"recurse": "true"},
+            ),
+            raw,
+        )
+        self.assertEqual(
+            confirmed["labels"],
+            ["topp:tasmania_cities", "sf:sfdem", "sf:roads_cascade", "sf:tiles"],
+        )
         self.assertIn("layer group", confirmed["cascade"])  # recurse=true is stated
+
+
+class TestEveryLayerType(unittest.TestCase):
+    """The row's type decides which resource the actions read, and which
+    protocols make sense for it."""
+
+    class Settings:
+        geoserver_url = "http://127.0.0.1:1/geoserver"  # nothing listens here
+        geoserver_auth_cfg_id = ""
+
+    class Prefs:
+        def get_plg_settings(self):
+            return TestEveryLayerType.Settings()
+
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.dlg.gs = FakeGS()
+        self.dlg.plg_settings = self.Prefs()
+        self.dlg.show_error_message = lambda text: self.fail(f"unexpected: {text}")
+        self.dlg.show_warning_message = lambda text: None
+        self.dlg._load_layers()
+        self.rows = {row[0]: row for row in self.dlg._all_rows}
+
+    def opened(self, action, row):
+        opened = []
+
+        class Recording(ResourceFormDialog):
+            def exec(inner):
+                opened.append(inner)
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_layers, "ResourceFormDialog", Recording):
+            action(row)
+        return opened[0]
+
+    def test_a_raster_layer_shows_its_coverage(self):
+        form = self.opened(self.dlg._show_layer_info, self.rows["sfdem"])
+        self.assertEqual(form.get_widget("size").text(), "634 × 477")
+        self.assertEqual(form.get_widget("srs").text(), "EPSG:26713")
+        self.assertIn("GRAY_INDEX", form.get_widget("bands").toPlainText())
+        self.assertIsNone(form.get_widget("coverage"))  # the picker stays home
+
+    def test_a_cascaded_layer_shows_its_remote_details(self):
+        form = self.opened(self.dlg._show_layer_info, self.rows["roads_cascade"])
+        self.assertEqual(form.get_widget("native_name").text(), "sf:roads")
+        self.assertEqual(form.get_widget("title").text(), "Spearfish roads")
+        self.assertIsNone(form.get_widget("layer"))
+        form = self.opened(self.dlg._show_layer_info, self.rows["tiles"])
+        self.assertEqual(form.get_widget("native_name").text(), "topp:states")
+
+    def test_a_vector_layer_keeps_the_feature_type_view(self):
+        form = self.opened(self.dlg._show_layer_info, self.rows["tasmania_roads"])
+        self.assertIn("the_geom", form.get_widget("attributes").toPlainText())
+        self.assertEqual(form.get_widget("datastore").text(), "taz_shapes")
+
+    def test_add_to_qgis_offers_wfs_only_for_vectors(self):
+        for name, expected in (
+            ("tasmania_roads", ["WMS", "WFS", "WMTS"]),
+            ("sfdem", ["WMS", "WMTS"]),
+            ("roads_cascade", ["WMS", "WMTS"]),
+            ("tiles", ["WMS", "WMTS"]),
+        ):
+            combo = self.opened(
+                self.dlg._add_layer_to_qgis, self.rows[name]
+            ).get_widget("protocol")
+            self.assertEqual(
+                [combo.itemText(i) for i in range(combo.count())], expected, name
+            )
+
+    def test_the_browser_preview_frames_any_type_on_its_extent(self):
+        opened = []
+        with patch.object(
+            tab_layers.QDesktopServices,
+            "openUrl",
+            lambda url: opened.append(url.toString()) or True,
+        ):
+            self.dlg._preview_layer_in_browser(self.rows["sfdem"])
+            self.dlg._preview_layer_in_browser(self.rows["tiles"])
+        self.assertEqual(len(opened), 2)
+        for url, layer in zip(opened, ("sf:sfdem", "sf:tiles")):
+            self.assertTrue(url.startswith("http://127.0.0.1:1/geoserver/sf/wms?"), url)
+            self.assertIn(f"layers={layer}", url)
+            self.assertIn("bbox=-103.87,44.37,-103.62,44.5", url)
 
 
 class TestLayerDetailPrefill(unittest.TestCase):
@@ -180,7 +463,7 @@ class TestLayerDetailPrefill(unittest.TestCase):
 
     def test_flattens_the_interesting_fields(self):
         values = GeoServerMainDialog._layer_form_values(
-            ["tasmania_roads", "topp", "taz_shapes", "EPSG:4326", "True"], DETAIL
+            ["tasmania_roads", "topp", "VECTOR", "taz_shapes", "simple_roads"], DETAIL
         )
 
         self.assertEqual(values["native_name"], "tasmania_roads")
@@ -193,7 +476,9 @@ class TestLayerDetailPrefill(unittest.TestCase):
         self.assertIs(values["enabled"], True)
 
     def test_survives_a_sparse_payload(self):
-        values = GeoServerMainDialog._layer_form_values(["l", "ws", "ds"], {})
+        values = GeoServerMainDialog._layer_form_values(
+            ["l", "ws", "VECTOR", "ds", ""], {}
+        )
 
         self.assertEqual(values["name"], "l")
         self.assertEqual(values["bbox"], "—")
@@ -206,7 +491,9 @@ class TestLayerDetailPrefill(unittest.TestCase):
             "keywords": "Solo",
             "attributes": {"attribute": {"name": "geom", "binding": "a.b.Point"}},
         }
-        values = GeoServerMainDialog._layer_form_values(["l", "ws", "ds"], detail)
+        values = GeoServerMainDialog._layer_form_values(
+            ["l", "ws", "VECTOR", "ds", ""], detail
+        )
 
         self.assertIn("en: Roads", values["title"])
         self.assertEqual(values["keywords"], "Solo")
@@ -238,7 +525,7 @@ class TestLibraryPayloadShape(unittest.TestCase):
 
     def test_library_normalised_lists(self):
         values = GeoServerMainDialog._layer_form_values(
-            ["tasmania_roads", "topp", "taz_shapes"], self.LIBRARY_SHAPE
+            ["tasmania_roads", "topp", "VECTOR", "taz_shapes", ""], self.LIBRARY_SHAPE
         )
         self.assertEqual(values["keywords"], "Roads, Tasmania")
         self.assertIn("the_geom : MultiLineString", values["attributes"])
@@ -246,14 +533,14 @@ class TestLibraryPayloadShape(unittest.TestCase):
 
     def test_raw_rest_wrapped_dicts(self):
         values = GeoServerMainDialog._layer_form_values(
-            ["tasmania_roads", "topp", "taz_shapes"], DETAIL
+            ["tasmania_roads", "topp", "VECTOR", "taz_shapes", ""], DETAIL
         )
         self.assertEqual(values["keywords"], "Roads, Tasmania")
         self.assertIn("the_geom : MultiLineString", values["attributes"])
 
     def test_attribute_without_a_binding(self):
         values = GeoServerMainDialog._layer_form_values(
-            ["l", "ws", "ds"], {"attributes": [{"name": "plain"}]}
+            ["l", "ws", "VECTOR", "ds", ""], {"attributes": [{"name": "plain"}]}
         )
         self.assertEqual(values["attributes"], "plain : ")
 
@@ -325,7 +612,7 @@ class TestAddToQgis(unittest.TestCase):
         dlg.show_error_message = errors.append
         before = len(QgsProject.instance().mapLayers())
         with patch.object(tab_layers, "ResourceFormDialog", Accepting):
-            dlg._add_layer_to_qgis(["roads", "topp", "ds", "EPSG:4326", "True"])
+            dlg._add_layer_to_qgis(["roads", "topp", "VECTOR", "ds", ""])
 
         self.assertEqual(len(errors), 1)
         self.assertIn("Could not add 'roads'", errors[0])
@@ -481,7 +768,10 @@ class TestSetLayerStyle(unittest.TestCase):
                 return (LayerModel(), 200)
 
         class GS(FakeGS):
-            rest_service = Rest()
+            def __init__(inner):
+                super().__init__()
+                # keep the base's client and endpoints; add the layer getter
+                inner.rest_service.get_layer = Rest().get_layer
 
             def get_styles(inner, workspace_name=None):
                 if workspace_name is None:
@@ -524,7 +814,7 @@ class TestSetLayerStyle(unittest.TestCase):
 
         with patch.object(tab_layers, "ResourceFormDialog", Recording):
             self.dlg._set_layer_style(
-                ["tasmania_roads", "topp", "taz_shapes", "EPSG:4326", "True"]
+                ["tasmania_roads", "topp", "VECTOR", "taz_shapes", "simple_roads"]
             )
         combo = opened[0].get_widget("style")
         self.assertEqual(combo.currentText(), "simple_roads")
@@ -549,7 +839,7 @@ class TestSetLayerStyle(unittest.TestCase):
 
         with patch.object(tab_layers, "ResourceFormDialog", Choosing):
             self.dlg._set_layer_style(
-                ["tasmania_roads", "topp", "taz_shapes", "EPSG:4326", "True"]
+                ["tasmania_roads", "topp", "VECTOR", "taz_shapes", "simple_roads"]
             )
         self.assertEqual(self.set_calls, [("tasmania_roads", "topp", "population")])
 
@@ -681,7 +971,7 @@ class TestStyleFromQgis(unittest.TestCase):
 
     def test_the_push_creates_the_style_and_assigns_it_qualified(self):
         self.add_layer("tasmania_roads")
-        self.push(["tasmania_roads", "topp", "taz_shapes", "EPSG:4326", "True"])
+        self.push(["tasmania_roads", "topp", "VECTOR", "taz_shapes", "simple_roads"])
 
         self.assertEqual(
             self.dlg.gs.style_calls[0],
@@ -705,7 +995,7 @@ class TestStyleFromQgis(unittest.TestCase):
     def test_the_style_name_is_the_layers_and_can_be_changed(self):
         self.add_layer("tasmania_roads")
         self.push(
-            ["tasmania_roads", "topp", "taz_shapes", "EPSG:4326", "True"],
+            ["tasmania_roads", "topp", "VECTOR", "taz_shapes", "simple_roads"],
             style="roads_from_qgis",
         )
         self.assertEqual(
@@ -717,7 +1007,7 @@ class TestStyleFromQgis(unittest.TestCase):
     def test_unticking_the_default_uploads_without_assigning(self):
         self.add_layer("tasmania_roads")
         self.push(
-            ["tasmania_roads", "topp", "taz_shapes", "EPSG:4326", "True"],
+            ["tasmania_roads", "topp", "VECTOR", "taz_shapes", "simple_roads"],
             set_default=False,
         )
         self.assertFalse(
@@ -736,7 +1026,7 @@ class TestStyleFromQgis(unittest.TestCase):
                 return QDialog.DialogCode.Rejected
 
         with patch.object(tab_layers, "ResourceFormDialog", Recording):
-            self.dlg._style_from_qgis(["tasmania_roads", "topp", "x", "", ""])
+            self.dlg._style_from_qgis(["tasmania_roads", "topp", "VECTOR", "x", ""])
         self.assertEqual(Recording.opened, [])
         self.assertIn("no vector or raster layer", self.messages["warning"][0])
 
@@ -1133,7 +1423,7 @@ class TestPreviewInBrowser(unittest.TestCase):
             lambda url: opened.append(url.toString()) or True,
         ):
             dlg._preview_layer_in_browser(
-                ["states", "topp", "states_shapefile", "EPSG:4326", "True"]
+                ["states", "topp", "VECTOR", "states_shapefile", "polygon"]
             )
         self.assertEqual(len(opened), 1, opened)
         self.assertTrue(opened[0].startswith("http://gs/geoserver/topp/wms?"), opened)

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- The Layers tab listed only the feature types it found by walking the
+  datastores, so a raster layer — including one just published from QGIS —
+  and a cascaded WMS or WMTS layer never appeared there. It now shows
+  GeoServer's own layer list, every type included, with the type, the store
+  and the default style; the detail view, *Add to QGIS* (no WFS for a raster
+  or a cascaded layer), *Preview in a browser* and *Delete* follow the type.
 - Acting on a table while the plugin was reconnecting crashed with
   `AttributeError: 'NoneType' object has no attribute 'get_workspaces'`. A
   refresh drops the connection immediately and re-probes in the background, so

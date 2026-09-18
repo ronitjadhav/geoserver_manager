@@ -34,6 +34,8 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 ## Layers / Feature Types
 
 - [x] List all feature types across workspaces/datastores
+- [x] List every layer of every type — vector, raster, cascaded WMS / WMTS —
+      from GeoServer's own layer list, with type, store and default style
 - [x] View feature type details (SRS, bounding box, title, keywords)
 - [x] Publish a DB table as a new feature type
 - [x] Delete feature type (single + bulk)
