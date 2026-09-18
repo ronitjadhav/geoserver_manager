@@ -148,6 +148,22 @@ Row actions: **Apply to a QGIS layer** (pick a project layer and get the
 server's style on it), **Save as SLD** (to disk), **Delete** — GeoServer refuses
 to delete a style that a layer still uses.
 
+## From the layer tree
+
+Right-click a vector or raster layer in QGIS's layer tree for the **GeoServer
+Manager** submenu:
+
+- **Push style to GeoServer…** — the layer's symbology becomes the matching
+  server layer's style, after a confirmation that names the target and lets you
+  choose the style name and whether it becomes the layer's default.
+- **Apply style from GeoServer…** — the server layer's style on the QGIS layer,
+  with a picker when it has several.
+
+A layer loaded from the server (WFS, WMS, WMTS) is matched through its source;
+any other layer by name, `workspace:` prefix or not. Without a connection the
+entries are disabled and say so, next to an entry that opens the plugin.
+Outcomes appear in QGIS's own message bar.
+
 ## Keyboard
 
 | Key | Does |

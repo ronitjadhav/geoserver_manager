@@ -30,6 +30,7 @@ so that it gets added there rather than worked around here.
 | Layers | list with type, store, SRS and default style; publish a table of a datastore, or a layer of the open QGIS project — uploaded as a GeoPackage together with its symbology; change the default style, including one made from a QGIS layer's symbology; add to QGIS as WMS, WFS or WMTS; preview in a browser on GeoServer's own OpenLayers page; delete |
 | Layer groups | list global and workspace groups, create (ordered layers with their styles), inspect, add to QGIS, preview in a browser, delete |
 | Styles | list global and workspace styles; create by pasting an SLD, from a file (`.sld`, a `.zip` with its resources, `.mbstyle`) or from a QGIS layer's symbology; view and edit the SLD next to the legend GeoServer renders for it; apply a server style to a QGIS layer; save it to disk; delete |
+| Layer tree | right-click a layer in QGIS for *Push style to GeoServer…* and *Apply style from GeoServer…* — a layer that came from the server is matched through its source, any other by name; the entries say when the plugin is not connected |
 
 Every list is searchable, sortable by column and paginated (20 per page), and
 loads in the background — QGIS stays usable, and *Cancel* stops a slow one.
