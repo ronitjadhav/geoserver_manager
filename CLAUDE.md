@@ -130,6 +130,13 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
 - **Thread safety:** the REST methods are stateless `requests.*` calls and are safe to run through
   `_fan_out` (the datastore list does this). `self.wms` / `self.wmts` on the client are shared state —
   OWS calls must not be fanned out the same way.
+- **Workspace WMS settings** (rows 25–26 of #50): `WmsSettings` models none of the service metadata
+  (`title`, `abstrct`, `keywords`, `srs`, …) and there is no delete, so `tab_workspaces.py` GETs, PUTs and
+  DELETEs the settings path itself. GeoServer facts behind that code: the abstract's JSON key is **`abstrct`**;
+  a partial PUT **merges**, so sending only the form's fields is what keeps the watermark and metadata links
+  intact (a full template would overwrite them); the settings are **created with PUT** (POST answers 405) and
+  removed with DELETE; and `defaultLocale` must be `""` when empty — `null` makes GeoServer's `LocaleConverter`
+  throw an NPE (500). The library's `unset_default_locale_for_service()` silently does nothing at all.
 - **Coverages** (rows 21–24 of #50): there is no `get_coverage_stores(ws)` at all; `get_coverages` hardcodes
   `list=all`, so "what is published" needs its own call (`list=configured`) — the difference is what the
   *Publish* action offers; `CoverageStore` drops the store's description and its `put_payload()` raises

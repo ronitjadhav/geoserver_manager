@@ -11,6 +11,10 @@ from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 
+# GeoServer spells the WMS abstract "abstrct" in its JSON — a typo old enough to
+# be API. Keywords and the SRS list arrive wrapped as {"string": [...]}.
+_ABSTRACT = "abstrct"
+
 
 class WorkspaceTabMixin:
     """Mixin that adds workspace CRUD methods to the main dialog.
@@ -63,14 +67,16 @@ class WorkspaceTabMixin:
         ]
         return rows, []
 
-    def _workspace_fields(self, is_default=False):
+    def _workspace_fields(self, is_default=False, with_wms=False):
         """Return workspace form field definitions.
 
         :param is_default: the workspace being edited already is GeoServer's
             default; the checkbox is then shown ticked and locked, because the
             REST API has no "unset default", only "set another one".
+        :param with_wms: append the WMS service group. Only for an existing
+            workspace: its settings can only be PUT once it exists.
         """
-        return [
+        fields = [
             {"key": "name", "label": self.tr("Name"), "type": "text", "required": True},
             {
                 "key": "isolated",
@@ -100,6 +106,177 @@ class WorkspaceTabMixin:
                 ),
             },
         ]
+        return fields + self._wms_fields() if with_wms else fields
+
+    # -- WMS service settings --------------------------------------------------
+
+    def _wms_fields(self):
+        """The WMS group: one workspace's own WMS service settings."""
+        group = self.tr("WMS")
+        return [
+            {
+                "key": "wms_own",
+                "label": self.tr("Own WMS settings"),
+                "type": "checkbox",
+                "group": group,
+                "help": self.tr(
+                    "Untick to fall back to GeoServer's global WMS settings — the "
+                    "workspace's own are then removed."
+                ),
+            },
+            {
+                "key": "wms_enabled",
+                "label": self.tr("Service enabled"),
+                "type": "checkbox",
+                "group": group,
+                "help": self.tr("Serve WMS for this workspace at all"),
+            },
+            {
+                "key": "wms_title",
+                "label": self.tr("Title"),
+                "type": "text",
+                "group": group,
+            },
+            {
+                "key": "wms_abstract",
+                "label": self.tr("Abstract"),
+                "type": "textarea",
+                "group": group,
+            },
+            {
+                "key": "wms_keywords",
+                "label": self.tr("Keywords"),
+                "type": "text",
+                "group": group,
+                "help": self.tr("Comma separated"),
+            },
+            {
+                "key": "wms_srs",
+                "label": self.tr("SRS list"),
+                "type": "text",
+                "group": group,
+                "help": self.tr(
+                    "EPSG codes without the prefix, comma separated (4326, 3857). "
+                    "Empty advertises every SRS GeoServer knows."
+                ),
+            },
+            {
+                "key": "wms_max_rendering_time",
+                "label": self.tr("Max rendering time (s)"),
+                "type": "spinbox",
+                "min": 0,
+                "max": 86400,
+                "group": group,
+                "help": self.tr("0 means no limit"),
+            },
+            {
+                "key": "wms_max_rendering_errors",
+                "label": self.tr("Max rendering errors"),
+                "type": "spinbox",
+                "min": 0,
+                "max": 1000000,
+                "group": group,
+                "help": self.tr("0 means no limit"),
+            },
+            {
+                "key": "wms_default_locale",
+                "label": self.tr("Default locale"),
+                "type": "text",
+                "group": group,
+                "help": self.tr(
+                    "Language of the internationalised title and abstract, e.g. en"
+                ),
+            },
+        ]
+
+    def _wms_settings_path(self, workspace_name):
+        return self.gs.rest_service.rest_endpoints.workspace_wms_settings(
+            workspace_name
+        )
+
+    def _wms_settings(self, workspace_name):
+        """One workspace's WMS settings, or None when it has none of its own.
+
+        TODO(#50): upstream — WmsSettings models neither the title, the
+        abstract, the keywords nor the SRS list, so
+        get_workspace_wms_settings() cannot show what this form is for. The
+        facade call is still what answers "does this workspace have its own
+        settings" (404 when it does not); the payload comes from a raw GET.
+        """
+        if not self._resource_exists(
+            self.gs.get_workspace_wms_settings, workspace_name
+        ):
+            return None
+        payload = self._raw_rest("get", self._wms_settings_path(workspace_name)).json()
+        return payload.get("wms") or {}
+
+    @staticmethod
+    def _joined(value):
+        """A GeoServer string list ({"string": [...]}, or a bare value) as text."""
+        items = value.get("string") if isinstance(value, dict) else value
+        if isinstance(items, (str, int)):
+            items = [items]
+        return ", ".join(str(item) for item in (items or []))
+
+    @classmethod
+    def _wms_form_values(cls, settings):
+        """Prefill for the WMS group; settings is None for "no own settings"."""
+        present = settings is not None
+        settings = settings or {}
+        return {
+            "wms_own": present,
+            "wms_enabled": bool(settings.get("enabled", True)),
+            "wms_title": settings.get("title") or "",
+            "wms_abstract": settings.get(_ABSTRACT) or "",
+            "wms_keywords": cls._joined(settings.get("keywords")),
+            "wms_srs": cls._joined(settings.get("srs")),
+            "wms_max_rendering_time": int(settings.get("maxRenderingTime") or 0),
+            "wms_max_rendering_errors": int(settings.get("maxRenderingErrors") or 0),
+            "wms_default_locale": settings.get("defaultLocale") or "",
+        }
+
+    def _on_wms_own_changed(self, dlg, own):
+        """The WMS fields only matter when the workspace keeps its own settings."""
+        for field in self._wms_fields()[1:]:
+            dlg.set_field_visible(field["key"], own)
+
+    @staticmethod
+    def _split(text):
+        return [item.strip() for item in text.split(",") if item.strip()]
+
+    def _apply_wms_settings(self, workspace_name, values, existed):
+        """Create, update or remove one workspace's own WMS settings.
+
+        TODO(#50): see _wms_settings — put_workspace_wms_settings() cannot
+        carry the title, abstract, keywords or SRS list, so this PUTs the
+        settings path itself.
+        """
+        path = self._wms_settings_path(workspace_name)
+        if not values["wms_own"]:
+            if existed:
+                self._raw_rest("delete", path)
+            return
+
+        # A partial PUT merges: GeoServer keeps every field this form does not
+        # model (watermark, buffers, metadata links, …) — verified on 2.28.5 —
+        # and the same PUT creates the settings when the workspace has none
+        # (a POST there answers 405).
+        settings = {
+            "workspace": {"name": workspace_name},
+            "name": "WMS",
+            "enabled": values["wms_enabled"],
+            "title": values["wms_title"],
+            _ABSTRACT: values["wms_abstract"],
+            "keywords": {"string": self._split(values["wms_keywords"])},
+            "srs": {"string": self._split(values["wms_srs"])},
+            "maxRenderingTime": values["wms_max_rendering_time"],
+            "maxRenderingErrors": values["wms_max_rendering_errors"],
+            # Empty, never null: GeoServer's LocaleConverter throws an NPE on
+            # a null defaultLocale (500, "Cannot invoke String.indexOf … in is
+            # null"), while "" is accepted and reads back as no locale.
+            "defaultLocale": values["wms_default_locale"].strip(),
+        }
+        self._raw_rest("put", path, json={"wms": settings})
 
     def _default_workspace_name(self):
         """Name of GeoServer's default workspace, or None if it cannot be read.
@@ -183,37 +360,47 @@ class WorkspaceTabMixin:
             self._load_workspaces()
 
     def _show_workspace_info(self, row_data):
-        """Open a form dialog to view/edit an existing workspace."""
+        """Open a form dialog to view/edit an existing workspace and its WMS."""
         old_name = row_data[0]
-        detail = self._fetch(
-            lambda: self._check(self.gs.get_workspace(old_name)),
+        fetched = self._fetch(
+            lambda: (
+                self._check(self.gs.get_workspace(old_name)),
+                self._wms_settings(old_name),
+            ),
             self.tr("Failed to load workspace details"),
         )
-        if detail is None:
+        if fetched is None:
             return
+        detail, wms_settings = fetched
 
         is_default = self._default_workspace_name() == old_name
+        values = {
+            "name": old_name,
+            "isolated": (
+                bool(detail.get("isolated", False))
+                if isinstance(detail, dict)
+                else False
+            ),
+            "set_default": is_default,
+        }
+        values.update(self._wms_form_values(wms_settings))
         dlg = ResourceFormDialog(
             title=self.tr("Edit Workspace '{}'").format(old_name),
             description=self.tr("Modify workspace settings"),
-            fields=self._workspace_fields(is_default=is_default),
-            values={
-                "name": old_name,
-                "isolated": (
-                    bool(detail.get("isolated", False))
-                    if isinstance(detail, dict)
-                    else False
-                ),
-                "set_default": is_default,
-            },
+            fields=self._workspace_fields(is_default=is_default, with_wms=True),
+            values=values,
             parent=self,
         )
+        own = dlg.get_widget("wms_own")
+        own.toggled.connect(lambda checked: self._on_wms_own_changed(dlg, checked))
+        self._on_wms_own_changed(dlg, own.isChecked())
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         values = dlg.get_values()
+        had_wms = wms_settings is not None
         if self._run_action(
-            lambda: self._save_workspace(values, old_name=old_name),
+            lambda: self._save_workspace_and_wms(values, old_name, had_wms),
             self.tr("Failed to update workspace '{}'").format(values["name"]),
         ):
             self.show_success_message(
@@ -221,6 +408,15 @@ class WorkspaceTabMixin:
             )
             # Reachable from the datastore tab, so reload whatever is on screen
             self._reload_current_tab()
+
+    def _save_workspace_and_wms(self, values, old_name, had_wms):
+        """Save the workspace, then its WMS settings — in that order.
+
+        A rename has to land first: the settings live under the workspace's
+        (new) name.
+        """
+        self._save_workspace(values, old_name=old_name)
+        self._apply_wms_settings(values["name"], values, had_wms)
 
     def _delete_workspace(self, row_data):
         """Delete a single workspace after confirmation."""

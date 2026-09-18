@@ -18,7 +18,7 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 - [x] Create workspace (name, isolated, set default)
 - [x] Edit / rename workspace
 - [x] Delete workspace (single + bulk)
-- [ ] View/edit workspace WMS settings
+- [x] View/edit workspace WMS settings
 
 ## Datastores
 

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Workspace WMS settings**, as a second group of the workspace dialog: give a
+  workspace its own WMS service or send it back to the global one, and edit the
+  service title, abstract, keywords, advertised SRS list, maximum rendering time
+  and errors, and default locale. Only the fields shown are sent, so everything
+  else GeoServer keeps for that service — watermark, buffers, metadata links,
+  interpolation — is left exactly as it was.
 - **Coverage Stores tab**: every raster store across the workspaces with its
   type and how many coverages it publishes; open one for its URL, description
   and published coverages, or the *Coverages* action to read one coverage's
