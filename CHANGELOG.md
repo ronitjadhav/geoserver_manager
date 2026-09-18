@@ -13,8 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   symbology can travel with it as the layer's default style, the title,
   abstract and keywords are merged onto what GeoServer computed, and an
   existing layer of that name is only replaced when asked. The uploaded store
-  is marked read-only, which GeoCat Bridge reports as a large performance gain
-  for file-based stores.
+  is marked read-only — the recommended setting for a file-based store nobody
+  writes to.
 - A QGIS layer name is not a GeoServer layer name: "Rivière (2024)" is
   published as `Riviere_2024`. Accents are folded rather than replaced, a
   leading digit keeps its digit, and the suggested name stays editable. Style

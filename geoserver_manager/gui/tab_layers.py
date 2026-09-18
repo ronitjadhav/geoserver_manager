@@ -598,9 +598,11 @@ class LayerTabMixin:
     def _make_datastore_read_only(self, workspace_name, name):
         """Mark an uploaded GeoPackage store read-only.
 
-        GeoCat Bridge reports a large performance gain from this, and nothing
-        writes to a store the plugin has just uploaded. Merged onto the
-        server's own parameters, never sent as a template (invariant 3).
+        Nothing writes to a GeoPackage the plugin has just uploaded, and a
+        read-only file store is the recommended setting for that case — it
+        lets GeoServer serve it without taking write locks (not measured
+        here). Merged onto the server's own parameters, never sent as a
+        template (invariant 3).
         """
         detail = self._check(self.gs.get_datastore(workspace_name, name))
         params = dict(self._connection_params(detail))

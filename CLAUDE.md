@@ -29,7 +29,7 @@ Skills in `.claude/skills/` hold the step-by-step procedures:
 | `docs/github_issue_roadmap.md` | Feature backlog; GitHub milestones mirror it |
 | `docker-compose.yml` | Throwaway GeoServer 2.28.5 (`:8080`, admin/geoserver) + PostGIS, for testing against a real server |
 
-The `Inspiration/` folder is untracked reference code from another plugin. Never import from it.
+The `Inspiration/` folder is untracked reference code. Never import from it.
 
 ## How the dialog works
 
@@ -136,8 +136,8 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
   layer is published by that one request, and the table name inside the GeoPackage is the layer's name. Three
   things follow from that: metadata is added with a **partial** feature-type PUT, which merges (a
   `create_feature_type()` template would replace the computed values); the store is marked `read_only` by
-  merging onto its own parameters (a performance gain GeoCat Bridge documents), best-effort, because the data
-  is already published by then and a flag must not fail the publish; and deleting the store later **leaves the
+  merging onto its own parameters (the recommended setting for a file store nobody writes to), best-effort,
+  because the data is already published by then and a flag must not fail the publish; and deleting the store later **leaves the
   uploaded file** in the data directory. A QGIS layer name must pass `toolbelt/qgis_export.geoserver_name()`
   first — it becomes a WFS type name, so it has to be an XML NCName.
 - **SLD versions decide the content type** (row 27 of #50). GeoServer picks its SLD parser from the request's
