@@ -37,6 +37,14 @@ QT_QPA_PLATFORM=offscreen PYTHONPATH=. python -m pytest tests/qgis    # needs QG
 QT_QPA_PLATFORM=offscreen PYTHONPATH=. python3 -m unittest discover -s tests/qgis -t .
 ```
 
+Changed a user-visible string? Re-extract first, or `test_i18n` fails on the
+string the `.ts` lacks (`pylupdate6`, from `pip install PyQt6` — never `pylupdate5`,
+which drops the calls black wraps):
+
+```sh
+python scripts/update_translations.py
+```
+
 Expect every test green. A new fix must come with a test that fails without it —
 verify that claim by temporarily reverting the fix once, not by reading the test.
 

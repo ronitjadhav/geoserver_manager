@@ -13,6 +13,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   The header buttons are now disabled for that moment, and anything still
   clickable — row actions, link cells — says "Not connected to GeoServer" and
   does nothing.
+- About one string in seven never reached the translation files: `pylupdate5`
+  silently skips a `translate()` call that black wrapped onto several lines, or
+  whose text is written as adjacent literals. Extraction now uses `pylupdate6`
+  (`scripts/update_translations.py`), and a test checks every string in the
+  code against the `.ts`.
 
 ### Added
 

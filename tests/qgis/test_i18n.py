@@ -11,6 +11,7 @@ Usage from the repo root folder:
     QT_QPA_PLATFORM=offscreen python -m unittest tests.qgis.test_i18n
 """
 
+import ast
 import re
 import xml.etree.ElementTree as ElementTree
 from pathlib import Path
@@ -98,6 +99,41 @@ class TestExtractionContextMatchesTheCode(unittest.TestCase):
         """A new tab must not slip past these checks."""
         on_disk = {path.name for path in GUI.glob("tab_*.py")}
         self.assertEqual(on_disk, set(CONTEXTS))
+
+    def test_every_string_in_the_code_is_in_the_ts(self):
+        """A string the extractor missed is a string nobody can translate.
+
+        pylupdate5 silently skipped a translate() call that black had wrapped
+        onto several lines, or whose text is written as adjacent literals —
+        65 of 455 strings when measured. When this fails, regenerate the .ts
+        with `python scripts/update_translations.py`.
+        """
+        root = ElementTree.parse(I18N / "geoserver_manager_en.ts").getroot()
+        extracted = {
+            (context.find("name").text, message.find("source").text)
+            for context in root.findall("context")
+            for message in context.findall("message")
+        }
+        anywhere = {source for _, source in extracted}
+        missing = []
+        for path in sorted(GUI.parent.rglob("*.py")):
+            for node in ast.walk(ast.parse(path.read_text())):
+                if not isinstance(node, ast.Call):
+                    continue
+                name = getattr(node.func, "attr", None) or getattr(
+                    node.func, "id", None
+                )
+                literals = [
+                    arg.value
+                    for arg in node.args[:2]
+                    if isinstance(arg, ast.Constant) and isinstance(arg.value, str)
+                ]
+                if name == "translate" and len(literals) == 2:
+                    if tuple(literals) not in extracted:
+                        missing.append(f"{path.name}:{node.lineno} {literals[1]!r}")
+                elif name == "tr" and literals and literals[0] not in anywhere:
+                    missing.append(f"{path.name}:{node.lineno} {literals[0]!r}")
+        self.assertEqual(missing, [])
 
 
 class TestRuntimeContext(unittest.TestCase):

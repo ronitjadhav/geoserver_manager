@@ -246,7 +246,10 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   only displayed must come from one place: the row-actions column label is `self.actions_column_label()` on
   the dialog, so `_setup_table`'s comparison cannot drift from the header once a locale is installed.
   `tests/qgis/test_i18n.py` fails if a mixin goes back to `self.tr()`, if a `translate()` call names another
-  file's context, or if a new `tab_*.py` appears without being covered.
+  file's context, if a new `tab_*.py` appears without being covered — or if the code has a string the
+  `.ts` lacks. Extraction is `python scripts/update_translations.py` (pylupdate6, `pip install PyQt6`);
+  run it after changing a user-visible string. Never pylupdate5: it silently skipped every `translate()`
+  black wrapped onto several lines or wrote as adjacent literals — 65 of 455 strings when measured.
 - Messages: user-facing outcomes go to the dialog's message bar (`show_*_message`); details go to the QGIS
   log (`self.log(..., log_level=Qgis.MessageLevel.Critical)`). `_run_action` does both.
 - Qt6-compatible enums only: `Qt.CursorShape.WaitCursor`, `QDialog.DialogCode.Accepted`,
@@ -276,6 +279,8 @@ pre-commit run -a
 # tests (unit needs no QGIS; qgis needs the QGIS python, headless is fine)
 python -m pytest tests/unit
 QT_QPA_PLATFORM=offscreen python -m pytest tests/qgis
+# after changing any user-visible string (needs pip install PyQt6); test_i18n fails otherwise
+python scripts/update_translations.py
 # build the zip qgis-plugin-ci would release (~125 KB, 23 files)
 qgis-plugin-ci package 0.1.0 --allow-uncommitted-changes && rm geoserver_manager.0.1.0.zip
 ```

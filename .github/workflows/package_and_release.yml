@@ -59,13 +59,12 @@ jobs:
       - name: Install translation requirements
         run: |
           sudo apt update
-          sudo apt install qt5-qmake qttools5-dev-tools
-          python3 -m pip install -U pyqt5-tools
+          sudo apt install qttools5-dev-tools
+          # pylupdate6, never pylupdate5: that one drops the strings black wraps
+          python3 -m pip install -U PyQt6
 
       - name: Update translations
-        run: |
-            python3 scripts/generate_translation_profile.py
-            pylupdate5 -noobsolete -verbose ${{ env.PROJECT_FOLDER }}/resources/i18n/plugin_translation.pro
+        run: python3 scripts/update_translations.py
 
       - name: Compile translations
         run: lrelease ${{ env.PROJECT_FOLDER }}/resources/i18n/*.ts
