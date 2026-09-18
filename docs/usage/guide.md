@@ -84,8 +84,11 @@ The fifth source, **A raster layer from this QGIS project**, publishes a raster
 of the open project: it is written to a tiled, compressed GeoTIFF (or sent as
 it is when the layer already is a plain local GeoTIFF) and uploaded, and
 GeoServer creates the store, the coverage and the layer in that one request.
-Tick *Replace it if it already exists* to overwrite a previous upload. Large
-rasters block the dialog for the duration of the upload.
+Tick *Replace it if it already exists* to overwrite a previous upload. The
+upload runs as a QGIS task: the task bar shows the progress, the dialog stays
+usable, and *Cancel* (the Refresh button while it runs) aborts the transfer —
+the message then says what GeoServer kept. A layer without a CRS, or with one
+that has no EPSG code, is refused before anything is sent.
 
 ## Cascaded stores
 
