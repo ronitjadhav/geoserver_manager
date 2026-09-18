@@ -151,6 +151,17 @@ Row actions: **Apply to a QGIS layer** (pick a project layer and get the
 server's style on it), **Save as SLD** (to disk), **Delete** — GeoServer refuses
 to delete a style that a layer still uses.
 
+## Tile cache
+
+What GeoWebCache caches: by default every layer and every layer group, listed
+with their gridsets and formats (the *Workspace* column reads `(global)` for a
+global group). Click a name to edit the caching — enabled, gridsets (*Add a
+gridset* picks from the server's list), formats and, under *Advanced*,
+meta-tiling, gutter and expiry. Row actions: **Truncate** (deletes the cached
+tiles, after confirmation; they are rendered again on demand), **Remove from
+cache** (the layer itself stays published). *Add a Layer to the Cache* offers
+the published layers and groups that are not cached yet.
+
 ## From the layer tree
 
 Right-click a vector or raster layer in QGIS's layer tree for the **GeoServer

@@ -243,7 +243,7 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   DELETE needs `recurse=true` or GeoServer answers 403 "wms layer referenced by layer(s)"; a store
   DELETE with `recurse=true` takes its layers along. Cascaded layers are *not* in the Layers tab, which
   walks feature types and coverages — the Cascaded Stores tab is where they live.
-- **Tile cache — GeoWebCache** (the tile-cache rows of #50): GeoServer caches every layer and layer group
+- **Tile cache — GeoWebCache** (rows 42–47 of #50): GeoServer caches every layer and layer group
   by itself, so `GET /gwc/rest/layers.json` — a bare JSON array of names, `ws:name`, a global group bare —
   lists about everything published, and *Add a Layer to the Cache* only ever offers what was removed.
   GWC's REST is XML-first, and on 2.28.5 its **JSON writes are broken**: a PUT of the very document a GET
