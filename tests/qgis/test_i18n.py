@@ -253,6 +253,7 @@ class TestShippedFrenchLocale(unittest.TestCase):
             "GeoServerMainDialog",
             "GeoServerMainDialogBase",
             "GeoServerManagerPlugin",
+            "LayerTreeMenu",
             "ResourceFormDialog",
             "wdg_geoserver_manager_settings",
         }

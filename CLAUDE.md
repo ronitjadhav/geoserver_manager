@@ -23,6 +23,7 @@ Skills in `.claude/skills/` hold the step-by-step procedures:
 | `geoserver_manager/gui/tab_workspaces.py`, `tab_datastores.py`, `tab_coveragestores.py`, `tab_cascaded.py`, `tab_layers.py`, `tab_layergroups.py`, `tab_styles.py` | One mixin per resource type: load / add / edit / delete (layers also: publish, add to QGIS; layer groups also: add to QGIS; coverage stores also: publish a coverage; cascaded stores also: publish / view / delete a remote layer) |
 | `geoserver_manager/gui/dlg_resource_form.py` | `ResourceFormDialog` — a modal form built from a list of field dicts (see its module docstring for the field spec) |
 | `geoserver_manager/gui/dlg_settings.py` | Options page: URL + credentials (credentials go to `QgsAuthManager`, encrypted) and *Test connection*, which probes the fields as typed |
+| `geoserver_manager/gui/layer_tree.py` | `LayerTreeMenu` — the *GeoServer Manager* submenu of the layer tree's context menu: push / apply the clicked layer's style through the main dialog's connection and its `_push_qgis_style` / `_style_body`; outcomes go to `iface.messageBar()` |
 | `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser`, `probe` (the bounded connection check the dialog and Settings share), `sld` and `qgis_export` (QGIS ↔ GeoServer conversions, pure) |
 | `geoserver_manager/extras/*.whl` | Bundled `geoservercloud` (stripped, see below) and `xmltodict`, added to `sys.path` at startup |
 | `tests/unit/` | Runs without QGIS. `tests/qgis/` needs the QGIS Python (headless via `qgis.testing.start_app()`) |
@@ -275,6 +276,13 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   the hint and invalid-field colours onto the widget's own palette, choosing a light- or dark-background
   variant. `tests/qgis/test_ux.py` asserts each one clears WCAG's 3:1 contrast floor against the window
   colour in both themes, so a prettier colour that cannot be read fails the suite.
+- **Every hook into QGIS is undone in `unload()`.** `LayerTreeMenu` connects
+  `QgsLayerTreeView.contextMenuAboutToShow` in `initGui` and disconnects it in `unload()` *before* the dialog
+  is destroyed: plugin_reloader is how this repo is developed, and a hook left behind fires into the dead
+  plugin on the next reload. `tests/qgis/test_layer_tree.py` drives `initGui` → `unload` on a fake `iface`
+  and checks the menu stops appearing. The menu never acts silently — pushing confirms target and style name,
+  pulling picks when there are several styles — and it disables its entries with the reason when the
+  dialog has no connection, rather than opening a form that complains.
 - **Keyboard: F5 / Ctrl+F / Esc / Del** live in `GeoServerMainDialog.keyPressEvent`, not in `QShortcut`,
   because each one has to know where the focus is: Del may only delete when the *table* has focus (the same
   key erases a character in the search box), and Esc clears the search only when there is one, so it still

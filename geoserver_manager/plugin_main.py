@@ -22,6 +22,7 @@ from geoserver_manager.__about__ import (
 )
 from geoserver_manager.gui.dlg_main import GeoServerMainDialog
 from geoserver_manager.gui.dlg_settings import PlgOptionsFactory
+from geoserver_manager.gui.layer_tree import LayerTreeMenu
 from geoserver_manager.toolbelt.log_handler import PlgLogger
 from geoserver_manager.toolbelt.preferences import PlgOptionsManager
 
@@ -42,6 +43,7 @@ class GeoServerManagerPlugin:
         self.log = PlgLogger().log
         self.plg_settings = PlgOptionsManager()
         self.main_dialog = None
+        self.layer_tree_menu = None
 
         # translation
         # initialize the locale
@@ -129,6 +131,13 @@ class GeoServerManagerPlugin:
             self.action_help_plugin_menu_documentation
         )
 
+        # -- Layer tree context menu: push / apply the clicked layer's style.
+        # The connection is the main dialog's, which exists once run() has
+        # opened it; until then the entries are disabled and say so.
+        self.layer_tree_menu = LayerTreeMenu(
+            self.iface, dialog=lambda: self.main_dialog, open_dialog=self.run
+        )
+
     def tr(self, message: str) -> str:
         """Get the translation for a string using Qt translation API.
 
@@ -142,6 +151,12 @@ class GeoServerManagerPlugin:
 
     def unload(self) -> None:
         """Cleans up when plugin is disabled/uninstalled."""
+        # -- The layer-tree hook first: left connected, it would fire into a
+        # dead plugin after the next reload.
+        if self.layer_tree_menu:
+            self.layer_tree_menu.unload()
+            self.layer_tree_menu = None
+
         # -- Close and destroy the main dialog (it is a child of the QGIS main
         # window, so dropping the reference alone would keep it alive)
         if self.main_dialog:

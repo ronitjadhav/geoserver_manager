@@ -35,6 +35,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   datastore — get a form of their own: capabilities URL, optional
   credentials, timeout, max features, lenient parsing. Its feature types then
   publish like any table (*Publish a Layer → a table in a datastore*).
+- **GeoServer Manager in the layer tree's context menu**: right-click a vector
+  or raster layer for *Push style to GeoServer…* (its symbology becomes the
+  matching server layer's style, after a confirmation that names the target)
+  and *Apply style from GeoServer…* (the server layer's style, with a picker
+  when it has several). A layer loaded from the server is matched through its
+  source; any other by name. Without a connection the entries are disabled and
+  say so, next to an entry that opens the plugin.
 - **Cascaded Stores tab**: the WMS and WMTS stores that proxy another
   server, listed across every workspace. Create one from a GetCapabilities
   URL, publish the layers the remote advertises (under the remote name or

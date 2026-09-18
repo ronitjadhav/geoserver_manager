@@ -58,6 +58,8 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 - [x] Apply a server style to a QGIS project layer
 - [x] Save a style to disk as `.sld`
 - [x] Legend preview for a style (GetLegendGraphic, rendered by GeoServer)
+- [x] Layer-tree context menu: push a layer's style to GeoServer, apply the
+      server's style to it
 
 ## Layer Groups
 
