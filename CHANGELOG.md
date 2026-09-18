@@ -21,6 +21,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Test connection** in Settings: tries the URL and credentials as typed,
+  without saving them, and reports the outcome in the same words the main
+  dialog uses. The URL placeholder is a plain `http://localhost:8080/geoserver`.
 - **Sortable columns**: click a header to sort by it, again to reverse; the
   arrow shows the order. The sort is applied to the rows themselves, so
   *Delete Selected*, Enter and the link cells act on exactly the row that is

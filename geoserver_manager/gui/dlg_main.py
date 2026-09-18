@@ -42,6 +42,7 @@ from geoserver_manager.gui.tab_workspaces import WorkspaceTabMixin
 from geoserver_manager.gui.theme import status_colour
 from geoserver_manager.toolbelt.log_handler import PlgLogger
 from geoserver_manager.toolbelt.preferences import PlgOptionsManager
+from geoserver_manager.toolbelt.probe import probe
 
 # Listing a nested resource needs one GET per parent plus one per item. Eight
 # parallel requests keep that bearable. They run inside a _FetchTask, so they
@@ -51,7 +52,6 @@ _MAX_PARALLEL_REQUESTS = 8
 # The connection probe is the request the user waits for before anything is on
 # screen, so it gets its own short ceiling. The library cannot do this: its
 # RestClient hardcodes timeout=TIMEOUT (120 s) — see _probe and issue #50.
-_PROBE_TIMEOUT = 10
 
 
 class _FetchTask(QgsTask):
@@ -318,81 +318,11 @@ class GeoServerMainDialog(
     def _probe(self, gs, url):
         """Make one bounded request. Return None if it worked, else (status, message).
 
-        TODO(#50): the one call in the plugin that does not go through the
-        library. `RestClient` hardcodes `timeout=TIMEOUT` (120 s) and takes no
-        timeout argument, and this is the request the user waits for before the
-        first table appears — so it uses `requests` directly with
-        _PROBE_TIMEOUT, reusing the client's own auth and TLS setting.
+        The request itself lives in toolbelt/probe.py, shared with the Settings
+        page; this reuses the client's own auth and TLS setting.
         """
-        import requests
-        from requests.exceptions import SSLError
-
         client = gs.rest_service.rest_client
-        try:
-            response = requests.get(
-                f"{url.rstrip('/')}/rest/workspaces.json",
-                auth=client.auth,
-                timeout=_PROBE_TIMEOUT,
-                verify=client.verifytls,
-            )
-        except SSLError:
-            # Before OSError (it is a ConnectionError): a private-CA or
-            # self-signed certificate used to read as "is the server running?"
-            return (
-                self.tr("Certificate not trusted"),
-                self.tr(
-                    "{url} presented a TLS certificate this machine does not trust. "
-                    "If it is your own private CA or a self-signed certificate, untick "
-                    '"Verify the server\'s TLS certificate" in Settings.'
-                ).format(url=url),
-            )
-        except OSError:
-            # ConnectionError / Timeout: refused, unreachable, wrong host, or
-            # a host that swallows the SYN — that one now gives up after
-            # _PROBE_TIMEOUT instead of the library's two minutes.
-            return (
-                self.tr("Server unreachable"),
-                self.tr(
-                    "Cannot reach GeoServer at {url} — is the server running?"
-                ).format(url=url),
-            )
-        except Exception as e:
-            return (
-                self.tr("Connection error"),
-                self.tr("Connection failed: {}").format(e),
-            )
-
-        if response.status_code in (401, 403):
-            return (
-                self.tr("Authentication failed"),
-                self.tr(
-                    "Authentication failed — check your username and password in Settings."
-                ),
-            )
-        if response.status_code >= 400:
-            # The URL usually points at something that is not a GeoServer REST
-            # endpoint at all.
-            return (
-                self.tr("HTTP error {}").format(response.status_code),
-                self.tr(
-                    "GeoServer returned HTTP {code} for {url} — check the URL in Settings."
-                ).format(code=response.status_code, url=url),
-            )
-        try:
-            payload = response.json()
-        except ValueError:
-            payload = None
-        if not isinstance(payload, dict) or "workspaces" not in payload:
-            # An SSO / reverse-proxy login page answers 200 with HTML. Without
-            # this check it showed a green "Connected" and empty tables.
-            return (
-                self.tr("Not a GeoServer REST endpoint"),
-                self.tr(
-                    "{url} answered, but not with the GeoServer REST API (a login "
-                    "page?) — check the URL, or the proxy in front of it."
-                ).format(url=url),
-            )
-        return None
+        return probe(url, client.auth, client.verifytls)
 
     def _fetch_version_label(self, gs):
         """Best-effort 'GeoServer x.y.z' string for the status bar.
@@ -946,7 +876,7 @@ class GeoServerMainDialog(
 
         A loaded table outlives the connection it came from: refresh_ui()
         clears self.gs the moment it starts and the probe that sets it again
-        runs in a QgsTask, so for that window — up to _PROBE_TIMEOUT against a
+        runs in a QgsTask, so for that window — up to the probe's 10 s timeout against a
         server that has gone away — the rows and their buttons are still on
         screen and clickable. Every user-triggered action passes through here,
         which is why the check lives at the four places actions are dispatched

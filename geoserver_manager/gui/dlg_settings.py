@@ -16,9 +16,9 @@ from urllib.parse import quote, urlparse
 from qgis.core import Qgis, QgsApplication
 from qgis.gui import QgsOptionsPageWidget, QgsOptionsWidgetFactory
 from qgis.PyQt import uic
-from qgis.PyQt.QtCore import QUrl
+from qgis.PyQt.QtCore import Qt, QUrl
 from qgis.PyQt.QtGui import QDesktopServices, QIcon
-from qgis.PyQt.QtWidgets import QWidget
+from qgis.PyQt.QtWidgets import QApplication, QWidget
 
 # project
 from geoserver_manager.__about__ import (
@@ -28,11 +28,13 @@ from geoserver_manager.__about__ import (
     __uri_tracker__,
     __version__,
 )
+from geoserver_manager.gui.theme import status_colour
 from geoserver_manager.toolbelt.log_handler import PlgLogger
 from geoserver_manager.toolbelt.preferences import (
     PlgOptionsManager,
     PlgSettingsStructure,
 )
+from geoserver_manager.toolbelt.probe import probe
 
 # ############################################################################
 # ########## Classes ###############
@@ -88,6 +90,12 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         self.btn_reset.setIcon(QIcon(QgsApplication.iconPath("mActionUndo.svg")))
         self.btn_reset.pressed.connect(self.on_reset_settings)
 
+        self.btn_test_connection.clicked.connect(self.test_connection)
+        # A result describes the fields as they were; editing any of them ends it.
+        for field in (self.txt_gs_url, self.txt_gs_username, self.txt_gs_password):
+            field.textChanged.connect(self.lbl_test_result.clear)
+        self.opt_verify_tls.toggled.connect(self.lbl_test_result.clear)
+
         # load previously saved settings
         self.load_settings()
 
@@ -130,8 +138,9 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
             # previous URL and warn — dropping out here would also discard the
             # credentials the user just typed.
             self.log(
-                message="GeoServer URL must start with http:// or https:// — "
-                "URL not saved.",
+                message=self.tr(
+                    "GeoServer URL must start with http:// or https:// — URL not saved."
+                ),
                 log_level=Qgis.MessageLevel.Warning,
                 push=True,
             )
@@ -148,9 +157,10 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
             else:
                 # Typically the user dismissed the master password prompt
                 self.log(
-                    message="Could not store the credentials in the QGIS "
-                    "authentication database. Check that the master password "
-                    "is set, then save again.",
+                    message=self.tr(
+                        "Could not store the credentials in the QGIS authentication "
+                        "database. Check that the master password is set, then save again."
+                    ),
                     log_level=Qgis.MessageLevel.Critical,
                     push=True,
                 )
@@ -178,11 +188,43 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         if not self._password_travels_in_clear(url, username, password):
             return
         self.log(
-            message=f"{url} is plain HTTP, so the password is sent unencrypted "
-            "with every request. Use https:// where the server offers it.",
+            message=self.tr(
+                "{url} is plain HTTP, so the password is sent unencrypted with every "
+                "request. Use https:// where the server offers it."
+            ).format(url=url),
             log_level=Qgis.MessageLevel.Warning,
             push=True,
         )
+
+    def test_connection(self) -> None:
+        """Probe the server with the fields as typed — saved or not."""
+        url = self.txt_gs_url.text().strip()
+        if not url.startswith(("http://", "https://")):
+            self._show_test_result(
+                self.tr("Enter a URL starting with http:// or https:// first."),
+                "error",
+            )
+            return
+        auth = (self.txt_gs_username.text(), self.txt_gs_password.text())
+        # ponytail: blocks the Options dialog for up to PROBE_TIMEOUT (10 s)
+        # against a dead host; QgsTask.fromFunction plus a deleted-widget guard
+        # if that ever hurts.
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            problem = probe(url, auth, self.opt_verify_tls.isChecked())
+        finally:
+            QApplication.restoreOverrideCursor()
+        if problem is None:
+            self._show_test_result(self.tr("Connected — GeoServer answered."), "ok")
+        else:
+            _status, message = problem
+            self._show_test_result(message, "error")
+
+    def _show_test_result(self, text: str, kind: str) -> None:
+        """Show the outcome under the button, in a colour this theme can carry."""
+        self.lbl_test_result.setText(text)
+        colour = status_colour(kind, self.palette())
+        self.lbl_test_result.setStyleSheet(f"color: {colour};" if colour else "")
 
     def load_settings(self) -> None:
         """Load options from QgsSettings + QgsAuthManager into UI form."""

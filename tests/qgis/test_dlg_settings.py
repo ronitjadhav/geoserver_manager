@@ -8,6 +8,8 @@ Usage from the repo root folder:
     QT_QPA_PLATFORM=offscreen python -m unittest tests.qgis.test_dlg_settings
 """
 
+from unittest.mock import patch
+
 from qgis.core import Qgis
 from qgis.testing import start_app, unittest
 
@@ -158,3 +160,58 @@ class TestApplyWarnsAndStillSaves(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTestConnection(unittest.TestCase):
+    """The button probes what is typed, saved or not, and says what it found."""
+
+    def setUp(self):
+        self.page = ConfigOptionsPage(None)
+        self.page.plg_settings = FakeSettingsManager(FakeSettings())
+        self.page.txt_gs_url.setText("http://gs.example.org/geoserver")
+        self.page.txt_gs_username.setText("admin")
+        self.page.txt_gs_password.setText("typed-not-saved")
+        self.page.opt_verify_tls.setChecked(False)
+        self.calls = []
+
+    def probe(self, result):
+        def fake(url, auth, verify_tls):
+            self.calls.append((url, auth, verify_tls))
+            return result
+
+        return patch("geoserver_manager.gui.dlg_settings.probe", fake)
+
+    def test_it_probes_the_fields_as_typed(self):
+        with self.probe(None):
+            self.page.btn_test_connection.click()
+        self.assertEqual(
+            self.calls,
+            [("http://gs.example.org/geoserver", ("admin", "typed-not-saved"), False)],
+        )
+        self.assertIn("Connected", self.page.lbl_test_result.text())
+
+    def test_a_problem_shows_its_message(self):
+        problem = ("Server unreachable", "Cannot reach GeoServer — is it running?")
+        with self.probe(problem):
+            self.page.btn_test_connection.click()
+        self.assertIn("is it running", self.page.lbl_test_result.text())
+
+    def test_a_url_without_a_scheme_is_not_even_tried(self):
+        self.page.txt_gs_url.setText("gs.example.org/geoserver")
+        with self.probe(None):
+            self.page.btn_test_connection.click()
+        self.assertEqual(self.calls, [])
+        self.assertIn("http://", self.page.lbl_test_result.text())
+
+    def test_editing_a_field_retires_the_result(self):
+        with self.probe(None):
+            self.page.btn_test_connection.click()
+        self.assertTrue(self.page.lbl_test_result.text())
+        self.page.txt_gs_password.setText("other")
+        self.assertEqual(self.page.lbl_test_result.text(), "")
+
+    def test_testing_saves_nothing(self):
+        with self.probe(None):
+            self.page.btn_test_connection.click()
+        self.assertEqual(self.page.plg_settings.saved, [])
+        self.assertEqual(self.page.plg_settings.settings.saved_credentials, [])

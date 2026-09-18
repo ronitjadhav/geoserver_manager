@@ -22,8 +22,8 @@ Skills in `.claude/skills/` hold the step-by-step procedures:
 | `geoserver_manager/gui/dlg_main.py` | `GeoServerMainDialog(QDialog, <one mixin per tab>)` — nav list, results table, search, pagination, and every helper the tabs share |
 | `geoserver_manager/gui/tab_workspaces.py`, `tab_datastores.py`, `tab_coveragestores.py`, `tab_layers.py`, `tab_layergroups.py`, `tab_styles.py` | One mixin per resource type: load / add / edit / delete (layers also: publish, add to QGIS; layer groups also: add to QGIS; coverage stores also: publish a coverage) |
 | `geoserver_manager/gui/dlg_resource_form.py` | `ResourceFormDialog` — a modal form built from a list of field dicts (see its module docstring for the field spec) |
-| `geoserver_manager/gui/dlg_settings.py` | Options page: URL + credentials (credentials go to `QgsAuthManager`, encrypted) |
-| `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser`, `sld` (QGIS ⇄ SLD, version sniffing), `qgis_export` (GeoServer-safe names, GeoPackage export) |
+| `geoserver_manager/gui/dlg_settings.py` | Options page: URL + credentials (credentials go to `QgsAuthManager`, encrypted) and *Test connection*, which probes the fields as typed |
+| `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser`, `probe` (the bounded connection check the dialog and Settings share), `sld` and `qgis_export` (QGIS ↔ GeoServer conversions, pure) |
 | `geoserver_manager/extras/*.whl` | Bundled `geoservercloud` (stripped, see below) and `xmltodict`, added to `sys.path` at startup |
 | `tests/unit/` | Runs without QGIS. `tests/qgis/` needs the QGIS Python (headless via `qgis.testing.start_app()`) |
 | `docs/github_issue_roadmap.md` | Feature backlog; GitHub milestones mirror it |
@@ -104,7 +104,7 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
    or failed load renders nothing, which is safe only because the loader reset the table
    *before* starting the task — that is what keeps "no stale rows" true here too.
 10. **A loaded table outlives its connection.** `refresh_ui()` clears `self.gs` at once and re-probes in a
-   task, so for up to `_PROBE_TIMEOUT` the rows on screen and their buttons belong to a client that is gone.
+   task, so for up to `PROBE_TIMEOUT` the rows on screen and their buttons belong to a client that is gone.
    Every user-triggered action therefore passes `_require_connection()`, and that check lives at the four
    places actions are dispatched — the Add button, Delete Selected, the row-action buttons and the link-cell
    click — never in the twenty methods behind them, so a new tab cannot forget it. A refresh also disables the
@@ -117,7 +117,7 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
 
 - Every REST verb calls `raise_for_status()` **except** GET/DELETE on 404 and POST on 409. Those three come
   back as `(content, status)` — which is exactly why `_check` exists. `requests` exceptions all subclass
-  `OSError`, so catch `HTTPError` *before* `OSError` (see `_probe`).
+  `OSError`, so catch `HTTPError` *before* `OSError` (see `toolbelt/probe.py`).
 - `create_workspace` and `create_datastore` **upsert**. There is no `update_*`, no `delete_datastore`, no
   workspace rename, no "set default workspace" call (the `set_default_workspace=True` kwarg only sets a
   client-side attribute). Those are `_raw_rest` workarounds carrying `TODO(#50)`, each with a row in
@@ -132,9 +132,9 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   the web UI is the one lying.
 - The client strips trailing `/` from the URL itself. It has no timeout parameter at all
   (`TIMEOUT = 120` is a module constant and `RestClient.get` takes no `timeout`), which is why
-  `_probe` is the one call that uses `requests` directly — a dead host must cost 10 s, not two
+  `toolbelt/probe.py` is the one call that uses `requests` directly — a dead host must cost 10 s, not two
   minutes (row 20 of #50). `verifytls` is the *Verify the server's TLS certificate* setting (default on);
-  `_probe` catches `requests.exceptions.SSLError` before `OSError` so a private-CA server is reported as a
+  it catches `requests.exceptions.SSLError` before `OSError` so a private-CA server is reported as a
   certificate problem, not as "is the server running?".
 - **Thread safety:** the REST methods are stateless `requests.*` calls and are safe to run through
   `_fan_out` (the datastore list does this). `self.wms` / `self.wmts` on the client are shared state —

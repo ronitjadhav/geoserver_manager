@@ -247,6 +247,8 @@ class TestShippedFrenchLocale(unittest.TestCase):
     def test_every_context_it_names_still_exists_in_the_code(self):
         """Catches a .ts left behind by a renamed class."""
         known = set(CONTEXTS.values()) | {
+            "ConfigOptionsPage",
+            "ConnectionProbe",
             "GeoServerMainDialog",
             "GeoServerMainDialogBase",
             "GeoServerManagerPlugin",
