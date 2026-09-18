@@ -10,22 +10,37 @@ flattens GeoServer's collection payloads (LayerGroupTabMixin).
 
 A coverage store is to rasters what a datastore is to tables, with one twist:
 creating the store does not publish anything (except for an ImageMosaic built
-from a directory, which auto-discovers its coverages), so a new store starts
-with zero coverages and the *Publish* row action turns one into a layer.
+from a directory, which auto-discovers its coverages, and a raster uploaded
+from this QGIS project, which GeoServer publishes on arrival), so a new store
+usually starts with zero coverages and the *Publish* row action turns one into
+a layer.
 """
+
+import shutil
+import tempfile
+from pathlib import Path
 
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.toolbelt.qgis_export import (
+    export_to_geotiff,
+    geoserver_name,
+    local_geotiff_path,
+    raster_layer_by_label,
+    raster_project_layers,
+)
 
 # Store types offered by the Add form. GeoServer knows more (ArcGrid, WorldImage,
-# NetCDF, …); these are the ones the library has a call for.
+# NetCDF, …); these are the ones the library has a call for — plus the upload
+# of a raster from this project, which is a GeoTIFF store GeoServer fills itself.
 GEOTIFF = "GeoTIFF"
 COG = "GeoTIFF (COG)"
 MOSAIC_DIRECTORY = "ImageMosaic (server directory)"
 MOSAIC_ZIP = "ImageMosaic (properties ZIP)"
-STORE_TYPES = (GEOTIFF, COG, MOSAIC_DIRECTORY, MOSAIC_ZIP)
+QGIS_RASTER = "A raster layer from this QGIS project"
+STORE_TYPES = (GEOTIFF, COG, MOSAIC_DIRECTORY, MOSAIC_ZIP, QGIS_RASTER)
 
 # A cloud-optimised GeoTIFF is a GeoTIFF store plus this metadata entry; the
 # library turns {"cogSettings": …} into GeoServer's {"@key": "CogSettings.Key"}
@@ -38,7 +53,11 @@ _TYPE_FIELDS = {
     COG: ("url",),
     MOSAIC_DIRECTORY: ("directory",),
     MOSAIC_ZIP: ("zip",),
+    QGIS_RASTER: ("qgis_layer", "replace", "title", "abstract"),
 }
+_TYPED_KEYS = tuple(
+    dict.fromkeys(key for keys in _TYPE_FIELDS.values() for key in keys)
+)
 
 
 # Every user-visible string in this file goes through translate() with this
@@ -61,7 +80,8 @@ class CoverageStoreTabMixin:
             translate("CoverageStoreTabMixin", "Add a Coverage Store"),
             translate(
                 "CoverageStoreTabMixin",
-                "Create a raster store from a GeoTIFF, a COG or an ImageMosaic",
+                "Create a raster store from a GeoTIFF, a COG, an ImageMosaic — or "
+                "a raster layer of this project, uploaded and published",
             ),
             self._add_coverage_store,
         )
@@ -335,7 +355,10 @@ class CoverageStoreTabMixin:
             "size": size,
             "bounds": bounds,
             "keywords": ", ".join(str(keyword) for keyword in keywords),
-            "abstract": detail.get("description") or detail.get("abstract") or "",
+            # The abstract is what the capabilities carry; "description" is
+            # GeoServer's own "Generated from <file>" note on a configured
+            # coverage, worth showing only when nobody wrote an abstract.
+            "abstract": detail.get("abstract") or detail.get("description") or "",
             "bands": bands or "—",
         }
 
@@ -599,13 +622,62 @@ class CoverageStoreTabMixin:
                     "granule index table behind, and a re-used name picks it up.",
                 ),
             },
+            {
+                "key": "qgis_layer",
+                "label": translate("CoverageStoreTabMixin", "QGIS layer"),
+                "type": "combo",
+                "options": [label for label, _layer in raster_project_layers()],
+                "required": True,
+                "visible": False,
+                "group": translate("CoverageStoreTabMixin", "Source"),
+                "help": translate(
+                    "CoverageStoreTabMixin",
+                    "File-based rasters of this project. The layer is written to a "
+                    "GeoTIFF and uploaded — a copy, not a link — and GeoServer "
+                    "publishes it under the store's name. A large raster keeps the "
+                    "dialog busy until the upload is through.",
+                ),
+            },
+            {
+                "key": "replace",
+                "label": translate(
+                    "CoverageStoreTabMixin", "Replace it if it already exists"
+                ),
+                "type": "checkbox",
+                "default": False,
+                "visible": False,
+                "group": translate("CoverageStoreTabMixin", "Source"),
+            },
+            {
+                "key": "title",
+                "label": translate("CoverageStoreTabMixin", "Title"),
+                "type": "text",
+                "visible": False,
+                "placeholder": translate("CoverageStoreTabMixin", "Optional"),
+            },
+            {
+                "key": "abstract",
+                "label": translate("CoverageStoreTabMixin", "Abstract"),
+                "type": "textarea",
+                "visible": False,
+                "placeholder": translate("CoverageStoreTabMixin", "Optional"),
+            },
         ]
 
     def _on_store_type_changed(self, dlg, store_type):
         """Show only the fields the chosen store type needs."""
         wanted = _TYPE_FIELDS.get(store_type, ())
-        for key in ("url", "directory", "zip"):
+        for key in _TYPED_KEYS:
             dlg.set_field_visible(key, key in wanted)
+        if store_type == QGIS_RASTER:
+            self._prefill_store_name(dlg, dlg.get_widget("qgis_layer").currentText())
+
+    @staticmethod
+    def _prefill_store_name(dlg, label):
+        """Suggest the GeoServer-safe form of the picked layer's name."""
+        widget = dlg.get_widget("name")
+        if label and not widget.text().strip():
+            widget.setText(geoserver_name(label.rsplit("  (", 1)[0]))
 
     def _add_coverage_store(self):
         """Create a coverage store."""
@@ -621,8 +693,9 @@ class CoverageStoreTabMixin:
             description=translate(
                 "CoverageStoreTabMixin",
                 "A coverage store is a source of rasters. Creating it does not "
-                "publish anything — except an ImageMosaic from a directory, "
-                "which discovers its coverages itself.",
+                "publish anything — except an ImageMosaic from a directory, which "
+                "discovers its coverages itself, and a raster uploaded from this "
+                "project, which GeoServer publishes as a layer on arrival.",
             ),
             fields=self._coverage_store_fields(workspace_names),
             parent=self,
@@ -630,6 +703,9 @@ class CoverageStoreTabMixin:
         )
         dlg.get_widget("type").currentTextChanged.connect(
             lambda store_type: self._on_store_type_changed(dlg, store_type)
+        )
+        dlg.get_widget("qgis_layer").currentTextChanged.connect(
+            lambda label: self._prefill_store_name(dlg, label)
         )
         self._on_store_type_changed(dlg, GEOTIFF)
         if dlg.exec() != QDialog.DialogCode.Accepted:
@@ -642,11 +718,19 @@ class CoverageStoreTabMixin:
                 "CoverageStoreTabMixin", "Failed to create coverage store '{}'"
             ).format(values["name"]),
         ):
-            self.show_success_message(
-                translate(
-                    "CoverageStoreTabMixin", "Coverage store '{}' created."
-                ).format(values["name"])
-            )
+            if values["type"] == QGIS_RASTER:
+                self.show_success_message(
+                    translate(
+                        "CoverageStoreTabMixin",
+                        "Raster '{}' uploaded and published as a layer.",
+                    ).format(geoserver_name(values["name"]))
+                )
+            else:
+                self.show_success_message(
+                    translate(
+                        "CoverageStoreTabMixin", "Coverage store '{}' created."
+                    ).format(values["name"])
+                )
             self._warn_if_cog_settings_dropped(values)
             self._load_coverage_stores()
 
@@ -678,18 +762,29 @@ class CoverageStoreTabMixin:
     def _create_coverage_store_from_values(self, values):
         """Create a store through the library, refusing an existing name."""
         name, ws_name, store_type = values["name"], values["workspace"], values["type"]
+        if store_type == QGIS_RASTER:
+            # Also the coverage's and the layer's name, so it has to be one a
+            # layer can carry.
+            name = geoserver_name(name)
         # create_coverage_store POSTs to the collection, and GeoServer answers
         # 409 for a name in use — but the message is clearer from here, and the
-        # mosaic calls are PUTs, which would overwrite the store instead.
-        if self._resource_exists(self.gs.get_coverage_store, ws_name, name):
-            raise ValueError(
-                translate(
-                    "CoverageStoreTabMixin",
-                    "Coverage store '{}' already exists in '{}'.",
-                ).format(name, ws_name)
-            )
+        # mosaic calls and the upload are PUTs, which overwrite the store instead.
+        replacing = store_type == QGIS_RASTER and values.get("replace")
+        if not replacing and self._resource_exists(
+            self.gs.get_coverage_store, ws_name, name
+        ):
+            message = translate(
+                "CoverageStoreTabMixin", "Coverage store '{}' already exists in '{}'."
+            ).format(name, ws_name)
+            if store_type == QGIS_RASTER:
+                message += " " + translate(
+                    "CoverageStoreTabMixin", "Tick Replace to overwrite it."
+                )
+            raise ValueError(message)
 
-        if store_type == MOSAIC_DIRECTORY:
+        if store_type == QGIS_RASTER:
+            self._upload_qgis_raster(ws_name, name, values)
+        elif store_type == MOSAIC_DIRECTORY:
             self._check(
                 self.gs.create_imagemosaic_store_from_directory(
                     ws_name, name, values["directory"]
@@ -712,6 +807,78 @@ class CoverageStoreTabMixin:
                     metadata=_COG_METADATA if store_type == COG else None,
                 )
             )
+
+    def _upload_qgis_raster(self, ws_name, name, values):
+        """Upload a project raster as a GeoTIFF store and publish its coverage.
+
+        One request does it all (measured on 2.28.5): GeoServer saves the file
+        as data/{ws}/{store}/{store}.geotiff, creates a GeoTIFF store and, with
+        configure=first&coverageName, configures one coverage of that name,
+        published as a layer with the SRS and bounds read from the file. A PUT
+        to an existing store replaces the file and re-reads the coverage, which
+        is all *Replace* needs. The data is copied: later edits in QGIS do not
+        reach it, and deleting the store leaves the file in the data directory.
+
+        TODO(#50): upstream as create_coverage_store_from_file(ws, name, path,
+        coverage_name=None) — create_coverage_store() only points at a path
+        already on the server, so the upload is a raw PUT of
+        .../coveragestores/{name}/file.geotiff.
+        """
+        layer = raster_layer_by_label(values["qgis_layer"])
+        if not layer.crs().isValid():
+            raise ValueError(
+                translate(
+                    "CoverageStoreTabMixin",
+                    "'{}' has no CRS — set one in its layer properties first.",
+                ).format(layer.name())
+            )
+        # The export reads a live QGIS layer, so it happens here, before any
+        # request: this action runs on the GUI thread (invariant 9).
+        folder = None
+        source = local_geotiff_path(layer)
+        if source is None:
+            folder = Path(tempfile.mkdtemp(prefix="gsm_publish_"))
+            source = export_to_geotiff(layer, folder / f"{name}.tif")
+        try:
+            path = (
+                f"{self.gs.rest_service.rest_endpoints.base_url}"
+                f"/workspaces/{ws_name}/coveragestores/{name}/file.geotiff"
+            )
+            # ponytail: one inline request under _run_action, so a large raster
+            # holds the dialog until it is through; progress and cancel are the
+            # QgsTask upload of #40.
+            with open(source, "rb") as handle:
+                self._raw_rest(
+                    "put",
+                    path,
+                    params={"configure": "first", "coverageName": name},
+                    data=handle,
+                    headers={"Content-Type": "image/tiff"},
+                )
+        finally:
+            if folder is not None:
+                shutil.rmtree(folder, ignore_errors=True)
+        self._set_coverage_metadata(ws_name, name, values)
+
+    def _set_coverage_metadata(self, ws_name, store_name, values):
+        """Add the form's title and abstract to the coverage GeoServer configured.
+
+        A partial coverage PUT merges (measured on 2.28.5), so the SRS, bounds
+        and grid read from the file stay as they are.
+
+        TODO(#50): upstream as update_coverage(ws, store, name, title=…,
+        abstract=…) — create_coverage() POSTs a new coverage and cannot touch
+        an existing one.
+        """
+        metadata = {
+            key: values[key] for key in ("title", "abstract") if values.get(key)
+        }
+        if not metadata:
+            return
+        path = self.gs.rest_service.rest_endpoints.coverage(
+            ws_name, store_name, store_name
+        )
+        self._raw_rest("put", path, json={"coverage": metadata})
 
     # -- Delete ----------------------------------------------------------------
 

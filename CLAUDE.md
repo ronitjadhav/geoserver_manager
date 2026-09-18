@@ -155,6 +155,18 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   because the data is already published by then and a flag must not fail the publish; and deleting the store later **leaves the
   uploaded file** in the data directory. A QGIS layer name must pass `toolbelt/qgis_export.geoserver_name()`
   first — it becomes a WFS type name, so it has to be an XML NCName.
+- **Publishing a QGIS raster** (rows 31–32 of #50) uploads a GeoTIFF: `PUT
+  .../coveragestores/{name}/file.geotiff?configure=first&coverageName={name}` with `Content-Type: image/tiff`.
+  Measured on 2.28.5: GeoServer saves the body as `data/{ws}/{store}/{store}.geotiff`, creates a GeoTIFF store
+  and configures one coverage named by `coverageName` (the store's name without it), published as a layer with
+  the SRS and bounds read from the file; a second PUT to the same store **replaces the file and re-reads the
+  coverage** — no `update` parameter needed, so *Replace* is the same request again; a partial coverage PUT
+  merges (`title`, `abstract`, `keywords`); and deleting the store, or even its workspace, leaves the file in
+  the data directory. On the QGIS side, `QgsRasterFileWriter` honours `COMPRESS=DEFLATE`/`TILED=YES` and, given
+  the layer's CRS, writes a CRS override into the file *without* reprojecting the pixels — which is what an
+  override means — so `export_to_geotiff` passes `layer.crs()`; a raster that already is a plain local GeoTIFF
+  (no subdataset, no `/vsicurl/`, no override) is uploaded as it is. GeoServer's `description` on a configured
+  coverage is its own "Generated from <file>" note; the abstract is `abstract`, and the viewer prefers that.
 - **SLD versions decide the content type** (row 27 of #50). GeoServer picks its SLD parser from the request's
   content type, not from the document: `application/vnd.ogc.sld+xml` for 1.0, `application/vnd.ogc.se+xml` for
   1.1. `rest_service.create_style()` only sends the former, so `toolbelt/sld.py` sniffs the version

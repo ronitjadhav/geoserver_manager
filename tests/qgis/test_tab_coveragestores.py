@@ -11,6 +11,12 @@ Usage from the repo root folder:
 # standard library
 from unittest.mock import patch
 
+from qgis.core import (
+    QgsCoordinateReferenceSystem,
+    QgsProject,
+    QgsRasterLayer,
+    QgsVectorLayer,
+)
 from qgis.PyQt.QtWidgets import QDialog
 from qgis.testing import start_app, unittest
 
@@ -23,6 +29,12 @@ from geoserver_manager.gui.tab_coveragestores import (
     MOSAIC_DIRECTORY,
     MOSAIC_ZIP,
     CoverageStoreTabMixin,
+)
+from geoserver_manager.toolbelt.qgis_export import (
+    export_to_geotiff,
+    local_geotiff_path,
+    raster_layer_by_label,
+    raster_project_layers,
 )
 from tests.qgis.sync_dialog import SyncDialog
 
@@ -90,6 +102,13 @@ class FakeGS:
             def get(inner, path, **kwargs):
                 outer.calls.append(("GET", path, kwargs))
                 return Response(outer.payload_for(path, kwargs.get("params") or {}))
+
+            def put(inner, path, **kwargs):
+                data = kwargs.pop("data", None)
+                if hasattr(data, "read"):  # an upload streams a file handle
+                    data = data.read()
+                outer.calls.append(("PUT", path, dict(kwargs, data=data)))
+                return Response("")
 
         class Endpoints:
             base_url = "/rest"
@@ -546,6 +565,258 @@ class TestPublishAndDelete(unittest.TestCase):
         self.dlg._delete_selected_coverage_stores([["sfdem", "sf", "GeoTIFF", "1"]])
         self.assertEqual(seen["kind"], "coverage store")
         self.assertIn("layers published from them", seen["cascade"])
+
+
+# ############################################################################
+# ##### Upload of a QGIS raster ##
+# ################################
+
+
+def write_raster(path, driver="GTiff", epsg=4326):
+    """A 6x4 one-band raster on disk, georeferenced unless epsg is None."""
+    from osgeo import gdal, osr
+
+    gdal.UseExceptions()
+    dataset = gdal.GetDriverByName(driver).Create(str(path), 6, 4, 1, gdal.GDT_Byte)
+    if epsg:
+        dataset.SetGeoTransform((7.0, 0.01, 0, 46.1, 0, -0.01))
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(epsg)
+        dataset.SetProjection(srs.ExportToWkt())
+    dataset.GetRasterBand(1).Fill(42)
+    dataset.FlushCache()
+    dataset = None
+    return path
+
+
+def gdal_info(path):
+    from osgeo import gdal
+
+    return gdal.Info(str(path), format="json")
+
+
+class RasterFixture(unittest.TestCase):
+    """A temp folder, and a project emptied before and after."""
+
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+
+        Recording.opened.clear()
+        self.folder = Path(tempfile.mkdtemp(prefix="gsm_test_"))
+        QgsProject.instance().removeAllMapLayers()
+
+    def tearDown(self):
+        import shutil
+
+        QgsProject.instance().removeAllMapLayers()
+        shutil.rmtree(self.folder, ignore_errors=True)
+
+    def add_layer(self, name, filename="dem.tif", driver="GTiff", epsg=4326):
+        path = write_raster(self.folder / filename, driver, epsg)
+        layer = QgsRasterLayer(str(path), name, "gdal")
+        self.assertTrue(layer.isValid(), filename)
+        QgsProject.instance().addMapLayer(layer)
+        return layer
+
+
+class TestExportToGeotiff(RasterFixture):
+    def test_a_tiled_compressed_geotiff_with_the_same_grid_and_crs(self):
+        layer = self.add_layer("dem", "dem.img", driver="HFA")
+        info = gdal_info(export_to_geotiff(layer, self.folder / "out.tif"))
+        self.assertEqual(info["size"], [6, 4])
+        self.assertEqual(info["metadata"]["IMAGE_STRUCTURE"]["COMPRESSION"], "DEFLATE")
+        self.assertEqual(info["bands"][0]["block"], [256, 256])  # tiled, not striped
+        self.assertIn("4326", info["coordinateSystem"]["wkt"])
+        self.assertEqual(info["geoTransform"][:2], [7.0, 0.01])
+
+    def test_a_crs_override_is_written_without_reprojecting(self):
+        layer = self.add_layer("dem")
+        layer.setCrs(QgsCoordinateReferenceSystem("EPSG:2056"))
+        info = gdal_info(export_to_geotiff(layer, self.folder / "out.tif"))
+        self.assertIn("2056", info["coordinateSystem"]["wkt"])
+        self.assertEqual(info["geoTransform"][:2], [7.0, 0.01])  # the pixels stayed
+
+    def test_an_unwritable_path_is_a_runtime_error_naming_the_layer(self):
+        layer = self.add_layer("dem")
+        with self.assertRaises(RuntimeError) as caught:
+            export_to_geotiff(layer, self.folder / "no" / "such" / "dir.tif")
+        self.assertIn("dem", str(caught.exception))
+
+
+class TestLocalGeotiffPath(RasterFixture):
+    def test_a_plain_local_geotiff_is_the_file_itself(self):
+        layer = self.add_layer("dem")
+        self.assertEqual(local_geotiff_path(layer), self.folder / "dem.tif")
+
+    def test_other_formats_overrides_and_remote_files_are_exported_instead(self):
+        self.assertIsNone(
+            local_geotiff_path(self.add_layer("img", "dem.img", driver="HFA"))
+        )
+        overridden = self.add_layer("over", "over.tif")
+        overridden.setCrs(QgsCoordinateReferenceSystem("EPSG:2056"))
+        self.assertIsNone(local_geotiff_path(overridden))
+
+        class Remote:
+            def providerType(inner):
+                return "gdal"
+
+            def source(inner):
+                return "/vsicurl/https://example.org/dem.tif"
+
+        class Wms:
+            def providerType(inner):
+                return "wms"
+
+        self.assertIsNone(local_geotiff_path(Remote()))
+        self.assertIsNone(local_geotiff_path(Wms()))
+
+
+class TestRasterProjectLayers(RasterFixture):
+    def test_lists_gdal_rasters_with_their_crs_sorted_and_nothing_else(self):
+        self.add_layer("zebra", "z.tif")
+        self.add_layer("Alpha", "a.tif")
+        QgsProject.instance().addMapLayer(
+            QgsVectorLayer("Point?crs=EPSG:4326", "points", "memory")
+        )
+        labels = [label for label, _layer in raster_project_layers()]
+        self.assertEqual(labels, ["Alpha  (EPSG:4326)", "zebra  (EPSG:4326)"])
+
+    def test_a_label_resolves_to_its_layer_until_it_leaves_the_project(self):
+        layer = self.add_layer("dem")
+        self.assertIs(raster_layer_by_label("dem  (EPSG:4326)"), layer)
+        QgsProject.instance().removeAllMapLayers()
+        with self.assertRaises(ValueError):
+            raster_layer_by_label("dem  (EPSG:4326)")
+
+
+class TestPublishQgisRaster(RasterFixture):
+    """The raster twin of the GeoPackage upload: one PUT, GeoServer does the rest."""
+
+    def setUp(self):
+        super().setUp()
+        self.dlg = SyncDialog()
+        self.dlg.gs = FakeGS()
+
+    def values(self, **extra):
+        return {
+            "name": "My DEM",
+            "workspace": "sf",
+            "type": tab_coveragestores.QGIS_RASTER,
+            "qgis_layer": "dem  (EPSG:4326)",
+            "replace": False,
+            **extra,
+        }
+
+    def puts(self):
+        return [call for call in self.dlg.gs.calls if call[0] == "PUT"]
+
+    def test_a_local_geotiff_is_uploaded_as_it_is_under_a_safe_name(self):
+        self.add_layer("dem")
+        self.dlg._create_coverage_store_from_values(self.values())
+        ((_verb, path, kwargs),) = self.puts()
+        self.assertEqual(path, "/rest/workspaces/sf/coveragestores/My_DEM/file.geotiff")
+        self.assertEqual(
+            kwargs["params"], {"configure": "first", "coverageName": "My_DEM"}
+        )
+        self.assertEqual(kwargs["headers"], {"Content-Type": "image/tiff"})
+        self.assertEqual(kwargs["data"], (self.folder / "dem.tif").read_bytes())
+        self.assertFalse(
+            [call for call in self.dlg.gs.calls if call[0].startswith("create")]
+        )
+
+    def test_another_format_is_re_encoded_and_the_temporary_file_removed(self):
+        import glob
+        import tempfile
+
+        self.add_layer("dem", "dem.img", driver="HFA")
+        self.dlg._create_coverage_store_from_values(self.values())
+        ((_verb, _path, kwargs),) = self.puts()
+        self.assertIn(kwargs["data"][:4], (b"II*\x00", b"MM\x00*"))  # TIFF magic
+        self.assertNotEqual(kwargs["data"], (self.folder / "dem.img").read_bytes())
+        self.assertEqual(glob.glob(f"{tempfile.gettempdir()}/gsm_publish_*"), [])
+
+    def test_an_existing_store_is_refused_unless_replace_is_ticked(self):
+        self.add_layer("dem")
+        self.dlg.gs = FakeGS(exists=True)
+        with self.assertRaises(ValueError) as caught:
+            self.dlg._create_coverage_store_from_values(self.values())
+        self.assertIn("Replace", str(caught.exception))
+        self.assertEqual(self.puts(), [])
+
+        self.dlg._create_coverage_store_from_values(self.values(replace=True))
+        self.assertEqual(len(self.puts()), 1)
+
+    def test_title_and_abstract_go_in_a_partial_coverage_put(self):
+        self.add_layer("dem")
+        self.dlg._create_coverage_store_from_values(
+            self.values(title="Elevation", abstract="Metres above the sea")
+        )
+        _upload, (_verb, path, kwargs) = self.puts()
+        self.assertEqual(
+            path, "/rest/workspaces/sf/coveragestores/My_DEM/coverages/My_DEM.json"
+        )
+        self.assertEqual(
+            kwargs["json"],
+            {"coverage": {"title": "Elevation", "abstract": "Metres above the sea"}},
+        )
+
+    def test_without_metadata_the_upload_is_the_only_request(self):
+        self.add_layer("dem")
+        self.dlg._create_coverage_store_from_values(self.values(title="", abstract=""))
+        self.assertEqual(len(self.puts()), 1)
+
+    def test_a_raster_without_a_crs_is_refused_before_anything_is_sent(self):
+        self.add_layer("dem", epsg=None)
+        with self.assertRaises(ValueError) as caught:
+            self.dlg._create_coverage_store_from_values(
+                self.values(qgis_layer="dem  (no CRS)")
+            )
+        self.assertIn("CRS", str(caught.exception))
+        self.assertEqual(self.puts(), [])
+
+    def test_the_form_shows_that_types_fields_and_prefills_a_safe_name(self):
+        self.add_layer("Rivière DEM")
+        dlg = ResourceFormDialog(
+            title="t", fields=self.dlg._coverage_store_fields(["sf"])
+        )
+        self.dlg._on_store_type_changed(dlg, GEOTIFF)
+        self.assertIn("qgis_layer", dlg._hidden_keys)
+        self.assertIn("replace", dlg._hidden_keys)
+        self.assertIn("title", dlg._hidden_keys)
+
+        self.dlg._on_store_type_changed(dlg, tab_coveragestores.QGIS_RASTER)
+        for key in ("qgis_layer", "replace", "title", "abstract"):
+            self.assertNotIn(key, dlg._hidden_keys)
+        self.assertIn("url", dlg._hidden_keys)
+        self.assertEqual(dlg.get_widget("name").text(), "Riviere_DEM")
+
+    def test_the_whole_add_flow_ends_in_a_banner_naming_the_layer(self):
+        self.add_layer("dem")
+        successes = []
+        self.dlg.show_success_message = successes.append
+        self.dlg._load_coverage_stores = lambda: None
+
+        class Accepting(ResourceFormDialog):
+            def exec(inner):
+                inner.get_widget("type").setCurrentText(tab_coveragestores.QGIS_RASTER)
+                inner.get_widget("qgis_layer").setCurrentText("dem  (EPSG:4326)")
+                return QDialog.DialogCode.Accepted
+
+        with patch.object(tab_coveragestores, "ResourceFormDialog", Accepting):
+            self.dlg._add_coverage_store()
+        self.assertEqual(len(self.puts()), 1)
+        self.assertEqual(successes, ["Raster 'dem' uploaded and published as a layer."])
+
+    def test_the_viewer_prefers_the_abstract_over_the_generated_description(self):
+        both = {"abstract": "Written by hand", "description": "Generated from GeoTIFF"}
+        self.assertEqual(
+            self.dlg._coverage_form_values(both)["abstract"], "Written by hand"
+        )
+        only = {"description": "Generated from x"}
+        self.assertEqual(
+            self.dlg._coverage_form_values(only)["abstract"], "Generated from x"
+        )
 
 
 # ############################################################################

@@ -75,6 +75,9 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 
 - [x] Publish a QGIS vector layer — written to a GeoPackage and uploaded, which
       makes GeoServer create the store and configure the layer in one request
+- [x] Publish a QGIS raster layer as a coverage store — written to a GeoTIFF
+      (or sent as it is) and uploaded; GeoServer creates the store and
+      publishes the coverage in one request
 - [ ] Batch upload multiple layers
 - [x] Upload associated SLD style with layer (and make it the layer's default)
 - [x] Overwrite existing layer option

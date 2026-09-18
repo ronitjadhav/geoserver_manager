@@ -26,6 +26,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   URL, publish the layers the remote advertises (under the remote name or
   one of your own), inspect and delete the cascaded layers, delete the
   store — the remote server is never touched.
+- **Publish a QGIS raster layer** as a coverage store: the Coverage Stores
+  tab's Add form takes a raster layer of the project, writes it to a tiled,
+  compressed GeoTIFF — or uploads the file as it is when it already is one —
+  and uploads it; GeoServer creates the store and publishes the coverage in the
+  same request. Title and abstract go on the coverage, *Replace* overwrites an
+  existing store. The coverage viewer now shows a coverage's abstract rather
+  than GeoServer's "Generated from …" note when both exist.
 - **Test connection** in Settings: tries the URL and credentials as typed,
   without saving them, and reports the outcome in the same words the main
   dialog uses. The URL placeholder is a plain `http://localhost:8080/geoserver`.
