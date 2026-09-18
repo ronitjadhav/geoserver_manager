@@ -280,18 +280,12 @@ class TestPrimaryButtons(unittest.TestCase):
         self.assertEqual(named._button_box.button(ok).text(), "Publish")
 
     def test_every_add_dialog_names_its_action_and_no_add_button_says_new(self):
+        """Driven by TABS itself, so a new tab is checked without touching this."""
+        import inspect
         from unittest.mock import patch
 
         from qgis.PyQt.QtWidgets import QDialog, QDialogButtonBox
 
-        from geoserver_manager.gui import (
-            tab_coveragestores,
-            tab_datastores,
-            tab_layergroups,
-            tab_layers,
-            tab_styles,
-            tab_workspaces,
-        )
         from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 
         opened = []
@@ -301,7 +295,42 @@ class TestPrimaryButtons(unittest.TestCase):
                 opened.append(inner)
                 return QDialog.DialogCode.Rejected
 
+        class Response:
+            status_code = 200
+            text = ""
+
+            def __init__(inner, payload):
+                inner.payload = payload
+
+            def json(inner):
+                return inner.payload
+
+        class Client:
+            def get(inner, path, **kwargs):
+                if path.startswith("/gwc/"):
+                    return Response([])  # nothing cached, no gridsets
+                if path.endswith("/layers.json"):  # one layer the cache can take
+                    return Response({"layers": {"layer": [{"name": "topp:states"}]}})
+                return Response({})
+
+        class Endpoints:
+            base_url = "/rest"
+
+            def __getattr__(inner, name):
+                return lambda *args, **kwargs: f"/rest/{name}.json"
+
+        class GwcEndpoints:
+            def __getattr__(inner, name):
+                return lambda *args, **kwargs: f"/gwc/rest/{name}.json"
+
+        class Rest:
+            rest_client = Client()
+            rest_endpoints = Endpoints()
+            gwc_endpoints = GwcEndpoints()
+
         class FakeGS:
+            rest_service = Rest()
+
             def get_workspaces(inner):
                 return ([{"name": "topp"}], 200)
 
@@ -315,38 +344,26 @@ class TestPrimaryButtons(unittest.TestCase):
         dlg.gs = FakeGS()
         dlg.show_warning_message = dlg.show_error_message = lambda text: None
         dlg._all_layer_names = lambda: []
-        modules = (
-            tab_workspaces,
-            tab_datastores,
-            tab_coveragestores,
-            tab_layers,
-            tab_layergroups,
-            tab_styles,
-        )
-        loaders = (
-            "_load_workspaces",
-            "_load_datastores",
-            "_load_coverage_stores",
-            "_load_layers",
-            "_load_layer_groups",
-            "_load_styles",
-        )
         ok = QDialogButtonBox.StandardButton.Ok
         seen = {}
-        for module, loader in zip(modules, loaders):
+        for _label, _icon, loader in type(dlg).TABS:
             getattr(dlg, loader)()
             label = dlg.btn_add.text()
             self.assertNotIn(
                 "New", label, label
             )  # "Add a Workspace", not "Add a New …"
             self.assertRegex(label, r"^(Add|Publish|Create|Upload) ", label)
+            module = inspect.getmodule(getattr(type(dlg), loader))
+            before = len(opened)
             with patch.object(module, "ResourceFormDialog", Recording):
                 dlg.btn_add.click()
+            self.assertEqual(len(opened), before + 1, f"{loader}: no dialog opened")
             form = opened[-1]
             seen[label] = form._button_box.button(ok).text()
             self.assertEqual(
                 form.windowTitle(), label
             )  # the dialog is named as the button
+        self.assertEqual(len(seen), len(type(dlg).TABS), seen)
         self.assertEqual(
             set(seen.values()), {"Create", "Publish", "Upload"}, seen
         )  # never the generic Save on a create
