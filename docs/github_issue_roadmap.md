@@ -116,7 +116,7 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
   until the next refresh, no TTL
 - [ ] Keyboard shortcuts (F5 refresh, Del delete, Ctrl+F search)
 - [ ] Dark theme support
-- [ ] i18n / translation support — scaffolded but not functional: strings in
-  the tab mixins are extracted under a context that is never used at runtime
+- [x] i18n / translation support — the tab mixins translate in their own
+  context, so extraction and lookup agree; a starter French locale ships
 - [x] Reusable resource form dialog (text, combo, checkbox, spinbox, tabs)
 - [x] Persistent UI state (dialog geometry, splitter sizes)

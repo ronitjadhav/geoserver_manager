@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Translations work.** Every string in a tab mixin is now looked up in the
+  context it is extracted under, so a translation can actually be found — until
+  now none of them could be, because `self.tr()` in a mixin resolves against
+  the host dialog's class. A starter French locale ships with the plugin
+  (terminology very much open to review); anything untranslated falls back to
+  English as usual.
 - **Shapefile, directory-of-shapefiles and GeoPackage datastores have their own
   form**, next to PostGIS: a path on the server, the attribute charset, the
   spatial-index flag, and for a GeoPackage its read-only and expose-primary-keys

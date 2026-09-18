@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
-<TS version="2.1" language="en" sourcelanguage="en">
+<TS version="2.1" language="fr" sourcelanguage="en">
 <context>
     <name>CoverageStoreTabMixin</name>
     <message>
@@ -11,7 +11,7 @@
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="544"/>
         <source>Workspace</source>
-        <translation type="unfinished"></translation>
+        <translation>Espace de travail</translation>
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="202"/>
@@ -26,7 +26,7 @@
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="86"/>
         <source>Delete</source>
-        <translation type="unfinished"></translation>
+        <translation>Supprimer</translation>
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="538"/>
@@ -36,7 +36,7 @@
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="551"/>
         <source>Type</source>
-        <translation type="unfinished"></translation>
+        <translation>Type</translation>
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="101"/>
@@ -51,12 +51,12 @@
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="354"/>
         <source>Enabled</source>
-        <translation type="unfinished"></translation>
+        <translation>Activé</translation>
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="194"/>
         <source>Description</source>
-        <translation type="unfinished"></translation>
+        <translation>Description</translation>
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="202"/>
@@ -86,7 +86,7 @@
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="475"/>
         <source>Title</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Titre</translation>
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="354"/>
@@ -111,7 +111,7 @@
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="354"/>
         <source>Keywords</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Mots-clés</translation>
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="368"/>
@@ -219,27 +219,27 @@
     <message>
         <location filename="../../gui/tab_datastores.py" line="149"/>
         <source>Workspace</source>
-        <translation type="unfinished"></translation>
+        <translation>Espace de travail</translation>
     </message>
     <message>
         <location filename="../../gui/tab_datastores.py" line="79"/>
         <source>Delete</source>
-        <translation type="unfinished"></translation>
+        <translation>Supprimer</translation>
     </message>
     <message>
         <location filename="../../gui/tab_datastores.py" line="85"/>
         <source>Datastore Name</source>
-        <translation type="unfinished"></translation>
+        <translation>Nom de l'entrepôt de données</translation>
     </message>
     <message>
         <location filename="../../gui/tab_datastores.py" line="175"/>
         <source>Type</source>
-        <translation type="unfinished"></translation>
+        <translation>Type</translation>
     </message>
     <message>
         <location filename="../../gui/tab_datastores.py" line="85"/>
         <source>Enabled</source>
-        <translation type="unfinished"></translation>
+        <translation>Activé</translation>
     </message>
     <message>
         <location filename="../../gui/tab_datastores.py" line="94"/>
@@ -254,7 +254,7 @@
     <message>
         <location filename="../../gui/tab_datastores.py" line="160"/>
         <source>Name</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Nom</translation>
     </message>
     <message>
         <location filename="../../gui/tab_datastores.py" line="167"/>
@@ -264,7 +264,7 @@
     <message>
         <location filename="../../gui/tab_datastores.py" line="183"/>
         <source>Description</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Description</translation>
     </message>
     <message>
         <location filename="../../gui/tab_datastores.py" line="185"/>
@@ -274,7 +274,7 @@
     <message>
         <location filename="../../gui/tab_datastores.py" line="190"/>
         <source>Host</source>
-        <translation type="unfinished"></translation>
+        <translation>Hôte</translation>
     </message>
     <message>
         <location filename="../../gui/tab_datastores.py" line="359"/>
@@ -284,22 +284,22 @@
     <message>
         <location filename="../../gui/tab_datastores.py" line="198"/>
         <source>Port</source>
-        <translation type="unfinished"></translation>
+        <translation>Port</translation>
     </message>
     <message>
         <location filename="../../gui/tab_datastores.py" line="207"/>
         <source>Database</source>
-        <translation type="unfinished"></translation>
+        <translation>Base de données</translation>
     </message>
     <message>
         <location filename="../../gui/tab_datastores.py" line="214"/>
         <source>User</source>
-        <translation type="unfinished"></translation>
+        <translation>Utilisateur</translation>
     </message>
     <message>
         <location filename="../../gui/tab_datastores.py" line="221"/>
         <source>Password</source>
-        <translation type="unfinished"></translation>
+        <translation>Mot de passe</translation>
     </message>
     <message>
         <location filename="../../gui/tab_datastores.py" line="226"/>
@@ -309,7 +309,7 @@
     <message>
         <location filename="../../gui/tab_datastores.py" line="236"/>
         <source>Schema</source>
-        <translation type="unfinished"></translation>
+        <translation>Schéma</translation>
     </message>
     <message>
         <location filename="../../gui/tab_datastores.py" line="244"/>
@@ -479,17 +479,17 @@
     <message>
         <location filename="../../gui/dlg_main.py" line="202"/>
         <source>Success</source>
-        <translation type="unfinished"></translation>
+        <translation>Succès</translation>
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="207"/>
         <source>Error</source>
-        <translation type="unfinished"></translation>
+        <translation>Erreur</translation>
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="212"/>
         <source>Warning</source>
-        <translation type="unfinished"></translation>
+        <translation>Avertissement</translation>
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="237"/>
@@ -599,12 +599,12 @@
     <message>
         <location filename="../../gui/dlg_main.py" line="477"/>
         <source>Cancel</source>
-        <translation type="unfinished"></translation>
+        <translation>Annuler</translation>
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="477"/>
         <source>Refresh</source>
-        <translation type="unfinished"></translation>
+        <translation>Rafraîchir</translation>
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="478"/>
@@ -614,17 +614,17 @@
     <message>
         <location filename="../../gui/dlg_main.py" line="484"/>
         <source>Loading…</source>
-        <translation type="unfinished"></translation>
+        <translation>Chargement…</translation>
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="708"/>
         <source>No results</source>
-        <translation type="unfinished"></translation>
+        <translation>Aucun résultat</translation>
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="625"/>
         <source>Actions</source>
-        <translation type="unfinished"></translation>
+        <translation>Actions</translation>
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="697"/>
@@ -740,7 +740,7 @@
     <message>
         <location filename="../../gui/dlg_main.ui" line="322"/>
         <source>Refresh</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Rafraîchir</translation>
     </message>
     <message>
         <location filename="../../gui/dlg_main.ui" line="329"/>
@@ -786,32 +786,32 @@
     <message>
         <location filename="../../gui/tab_layergroups.py" line="324"/>
         <source>Workspace</source>
-        <translation type="unfinished"></translation>
+        <translation>Espace de travail</translation>
     </message>
     <message>
         <location filename="../../gui/tab_layergroups.py" line="58"/>
         <source>Add to QGIS</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Ajouter à QGIS</translation>
     </message>
     <message>
         <location filename="../../gui/tab_layergroups.py" line="63"/>
         <source>Delete</source>
-        <translation type="unfinished"></translation>
+        <translation>Supprimer</translation>
     </message>
     <message>
         <location filename="../../gui/tab_layergroups.py" line="318"/>
         <source>Layer Group</source>
-        <translation type="unfinished"></translation>
+        <translation>Groupe de couches</translation>
     </message>
     <message>
         <location filename="../../gui/tab_layergroups.py" line="334"/>
         <source>Mode</source>
-        <translation type="unfinished"></translation>
+        <translation>Mode</translation>
     </message>
     <message>
         <location filename="../../gui/tab_layergroups.py" line="367"/>
         <source>Layers</source>
-        <translation type="unfinished"></translation>
+        <translation>Couches</translation>
     </message>
     <message>
         <location filename="../../gui/tab_layergroups.py" line="78"/>
@@ -821,7 +821,7 @@
     <message>
         <location filename="../../gui/tab_layergroups.py" line="346"/>
         <source>Title</source>
-        <translation type="unfinished"></translation>
+        <translation>Titre</translation>
     </message>
     <message>
         <location filename="../../gui/tab_layergroups.py" line="242"/>
@@ -919,12 +919,12 @@
     <message>
         <location filename="../../gui/tab_layers.py" line="329"/>
         <source>Workspace</source>
-        <translation type="unfinished"></translation>
+        <translation>Espace de travail</translation>
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="59"/>
         <source>Add to QGIS</source>
-        <translation type="unfinished"></translation>
+        <translation>Ajouter à QGIS</translation>
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="64"/>
@@ -939,17 +939,17 @@
     <message>
         <location filename="../../gui/tab_layers.py" line="74"/>
         <source>Delete</source>
-        <translation type="unfinished"></translation>
+        <translation>Supprimer</translation>
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="223"/>
         <source>Layer Name</source>
-        <translation type="unfinished"></translation>
+        <translation>Nom de la couche</translation>
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="336"/>
         <source>Datastore</source>
-        <translation type="unfinished"></translation>
+        <translation>Entrepôt de données</translation>
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="227"/>
@@ -959,7 +959,7 @@
     <message>
         <location filename="../../gui/tab_layers.py" line="240"/>
         <source>Enabled</source>
-        <translation type="unfinished"></translation>
+        <translation>Activé</translation>
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="90"/>
@@ -979,7 +979,7 @@
     <message>
         <location filename="../../gui/tab_layers.py" line="372"/>
         <source>Title</source>
-        <translation type="unfinished"></translation>
+        <translation>Titre</translation>
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="379"/>
@@ -989,7 +989,7 @@
     <message>
         <location filename="../../gui/tab_layers.py" line="386"/>
         <source>Keywords</source>
-        <translation type="unfinished"></translation>
+        <translation>Mots-clés</translation>
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="246"/>
@@ -1240,7 +1240,7 @@
     <message>
         <location filename="../../gui/tab_styles.py" line="323"/>
         <source>Workspace</source>
-        <translation type="unfinished"></translation>
+        <translation>Espace de travail</translation>
     </message>
     <message>
         <location filename="../../gui/tab_styles.py" line="68"/>
@@ -1255,12 +1255,12 @@
     <message>
         <location filename="../../gui/tab_styles.py" line="78"/>
         <source>Delete</source>
-        <translation type="unfinished"></translation>
+        <translation>Supprimer</translation>
     </message>
     <message>
         <location filename="../../gui/tab_styles.py" line="317"/>
         <source>Style Name</source>
-        <translation type="unfinished"></translation>
+        <translation>Nom du style</translation>
     </message>
     <message>
         <location filename="../../gui/tab_styles.py" line="91"/>
@@ -1270,7 +1270,7 @@
     <message>
         <location filename="../../gui/tab_styles.py" line="206"/>
         <source>Format</source>
-        <translation type="unfinished"></translation>
+        <translation>Format</translation>
     </message>
     <message>
         <location filename="../../gui/tab_styles.py" line="212"/>
@@ -1280,7 +1280,7 @@
     <message>
         <location filename="../../gui/tab_styles.py" line="349"/>
         <source>File</source>
-        <translation type="unfinished"></translation>
+        <translation>Fichier</translation>
     </message>
     <message>
         <location filename="../../gui/tab_styles.py" line="236"/>
@@ -1433,17 +1433,17 @@
     <message>
         <location filename="../../gui/tab_workspaces.py" line="43"/>
         <source>Delete</source>
-        <translation type="unfinished"></translation>
+        <translation>Supprimer</translation>
     </message>
     <message>
         <location filename="../../gui/tab_workspaces.py" line="49"/>
         <source>Workspace Name</source>
-        <translation type="unfinished"></translation>
+        <translation>Nom de l'espace de travail</translation>
     </message>
     <message>
         <location filename="../../gui/tab_workspaces.py" line="49"/>
         <source>Default</source>
-        <translation type="unfinished"></translation>
+        <translation>Par défaut</translation>
     </message>
     <message>
         <location filename="../../gui/tab_workspaces.py" line="56"/>
@@ -1458,7 +1458,7 @@
     <message>
         <location filename="../../gui/tab_workspaces.py" line="85"/>
         <source>Name</source>
-        <translation type="unfinished"></translation>
+        <translation>Nom</translation>
     </message>
     <message>
         <location filename="../../gui/tab_workspaces.py" line="91"/>
@@ -1493,7 +1493,7 @@
     <message>
         <location filename="../../gui/tab_workspaces.py" line="150"/>
         <source>Title</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Titre</translation>
     </message>
     <message>
         <location filename="../../gui/tab_workspaces.py" line="156"/>
@@ -1503,7 +1503,7 @@
     <message>
         <location filename="../../gui/tab_workspaces.py" line="162"/>
         <source>Keywords</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Mots-clés</translation>
     </message>
     <message>
         <location filename="../../gui/tab_workspaces.py" line="165"/>
@@ -1626,7 +1626,7 @@
     <message>
         <location filename="../../gui/dlg_settings.ui" line="96"/>
         <source>Password</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Mot de passe</translation>
     </message>
     <message>
         <location filename="../../gui/dlg_settings.ui" line="110"/>

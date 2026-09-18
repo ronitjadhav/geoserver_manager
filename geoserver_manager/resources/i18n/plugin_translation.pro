@@ -7,12 +7,19 @@ FORMS =	../../gui/dlg_main.ui \
 SOURCES =	../../gui/dlg_main.py \
 	../../gui/dlg_resource_form.py \
 	../../gui/dlg_settings.py \
+	../../gui/tab_coveragestores.py \
 	../../gui/tab_datastores.py \
+	../../gui/tab_layergroups.py \
+	../../gui/tab_layers.py \
+	../../gui/tab_styles.py \
 	../../gui/tab_workspaces.py \
 	../../plugin_main.py \
 	../../toolbelt/dependencies.py \
 	../../toolbelt/env_var_parser.py \
 	../../toolbelt/log_handler.py \
-	../../toolbelt/preferences.py
+	../../toolbelt/preferences.py \
+	../../toolbelt/qgis_export.py \
+	../../toolbelt/sld.py
 
-TRANSLATIONS =	geoserver_manager_en.ts
+TRANSLATIONS =	geoserver_manager_en.ts \
+	geoserver_manager_fr.ts

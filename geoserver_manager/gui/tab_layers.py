@@ -7,6 +7,7 @@ Used as a mixin for GeoServerMainDialog.
 """
 
 from qgis.core import Qgis, QgsDataSourceUri, QgsProject, QgsRasterLayer, QgsVectorLayer
+from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
@@ -30,58 +31,65 @@ _SOURCE_FIELDS = {
 _WMTS_TILE_MATRIX_SET = "EPSG:900913"
 
 
-class LayerTabMixin:
-    """Mixin that adds feature-type methods to the main dialog.
+# Every user-visible string in this file goes through translate() with this
+# file's own class as the context. self.tr() cannot: pylupdate extracts it
+# under LayerTabMixin, but at runtime self.tr is QObject.tr with the context of the
+# *instance's* class, GeoServerMainDialog — QDialog precedes the mixins in the
+# MRO — so every lookup would miss. A wrapper function would not be extracted
+# at all (pylupdate only understands a literal context), hence the repetition.
+translate = QCoreApplication.translate
 
-    ponytail: same translation caveat as WorkspaceTabMixin — self.tr() here is
-    extracted under this class but resolved against the host dialog's context.
-    """
+
+class LayerTabMixin:
+    """Mixin that adds feature-type methods to the main dialog."""
 
     def _load_layers(self):
         """Arm the Layers tab, then fetch its rows in the background."""
         self._setup_add_button(
-            self.tr("Publish a Table"),
-            self.tr("Publish a table of a datastore as a new layer"),
+            translate("LayerTabMixin", "Publish a Table"),
+            translate("LayerTabMixin", "Publish a table of a datastore as a new layer"),
             self._publish_layer,
         )
         self._setup_delete_selected_button(self._delete_selected_layers)
         self._name_click_callback = self._show_layer_info
         self._extra_click_callbacks = {
-            self.tr("Workspace"): self._open_workspace_from_row
+            translate("LayerTabMixin", "Workspace"): self._open_workspace_from_row
         }
         self._row_actions = [
             (
                 "mActionAddLayer.svg",
-                self.tr("Add to QGIS"),
+                translate("LayerTabMixin", "Add to QGIS"),
                 self._add_layer_to_qgis,
             ),
             (
                 "mActionStyleManager.svg",
-                self.tr("Set style"),
+                translate("LayerTabMixin", "Set style"),
                 self._set_layer_style,
             ),
             (
                 "mActionSharingExport.svg",
-                self.tr("Style from QGIS"),
+                translate("LayerTabMixin", "Style from QGIS"),
                 self._style_from_qgis,
             ),
             (
                 "mActionDeleteSelected.svg",
-                self.tr("Delete"),
+                translate("LayerTabMixin", "Delete"),
                 self._delete_layer,
             ),
         ]
         self._setup_table(
             [
-                self.tr("Layer Name"),
-                self.tr("Workspace"),
-                self.tr("Datastore"),
-                self.tr("SRS"),
-                self.tr("Enabled"),
-                self.tr("Actions"),
+                translate("LayerTabMixin", "Layer Name"),
+                translate("LayerTabMixin", "Workspace"),
+                translate("LayerTabMixin", "Datastore"),
+                translate("LayerTabMixin", "SRS"),
+                translate("LayerTabMixin", "Enabled"),
+                self.actions_column_label(),
             ]
         )
-        self._start_load(self.tr("Failed to load layers"), self._fetch_layer_rows)
+        self._start_load(
+            translate("LayerTabMixin", "Failed to load layers"), self._fetch_layer_rows
+        )
 
     def _fetch_layer_rows(self, task=None):
         """(rows, failures) for the Layers table. Runs in a worker thread.
@@ -212,15 +220,15 @@ class LayerTabMixin:
     def _layer_fields(self):
         """Field definitions for the feature-type detail view (all read-only)."""
         text = [
-            ("name", self.tr("Layer Name")),
-            ("native_name", self.tr("Native Name")),
-            ("workspace", self.tr("Workspace")),
-            ("datastore", self.tr("Datastore")),
-            ("srs", self.tr("SRS")),
-            ("projection_policy", self.tr("Projection Policy")),
-            ("title", self.tr("Title")),
-            ("abstract", self.tr("Abstract")),
-            ("keywords", self.tr("Keywords")),
+            ("name", translate("LayerTabMixin", "Layer Name")),
+            ("native_name", translate("LayerTabMixin", "Native Name")),
+            ("workspace", translate("LayerTabMixin", "Workspace")),
+            ("datastore", translate("LayerTabMixin", "Datastore")),
+            ("srs", translate("LayerTabMixin", "SRS")),
+            ("projection_policy", translate("LayerTabMixin", "Projection Policy")),
+            ("title", translate("LayerTabMixin", "Title")),
+            ("abstract", translate("LayerTabMixin", "Abstract")),
+            ("keywords", translate("LayerTabMixin", "Keywords")),
         ]
         fields = [
             {"key": key, "label": label, "type": "text", "read_only": True}
@@ -229,29 +237,29 @@ class LayerTabMixin:
         fields += [
             {
                 "key": "enabled",
-                "label": self.tr("Enabled"),
+                "label": translate("LayerTabMixin", "Enabled"),
                 "type": "checkbox",
                 "read_only": True,
             },
             {
                 "key": "advertised",
-                "label": self.tr("Advertised"),
+                "label": translate("LayerTabMixin", "Advertised"),
                 "type": "checkbox",
                 "read_only": True,
             },
             {
                 "key": "bbox",
-                "label": self.tr("Native Bounding Box"),
+                "label": translate("LayerTabMixin", "Native Bounding Box"),
                 "type": "text",
                 "read_only": True,
-                "group": self.tr("Data"),
+                "group": translate("LayerTabMixin", "Data"),
             },
             {
                 "key": "attributes",
-                "label": self.tr("Attributes"),
+                "label": translate("LayerTabMixin", "Attributes"),
                 "type": "textarea",
                 "read_only": True,
-                "group": self.tr("Data"),
+                "group": translate("LayerTabMixin", "Data"),
             },
         ]
         return fields
@@ -269,16 +277,17 @@ class LayerTabMixin:
             lambda: self._check(
                 self.gs.get_feature_type(row_data[1], row_data[2], row_data[0])
             ),
-            self.tr("Failed to load layer details"),
+            translate("LayerTabMixin", "Failed to load layer details"),
         )
         if detail is None:
             return
 
         dlg = ResourceFormDialog(
-            title=self.tr("Layer '{}'").format(row_data[0]),
-            description=self.tr(
+            title=translate("LayerTabMixin", "Layer '{}'").format(row_data[0]),
+            description=translate(
+                "LayerTabMixin",
                 "Published from {ws}/{ds}. Read-only here — GeoServer's web UI can "
-                "change it."
+                "change it.",
             ).format(ws=row_data[1], ds=row_data[2]),
             fields=self._layer_fields(),
             values=self._layer_form_values(row_data, detail),
@@ -311,103 +320,111 @@ class LayerTabMixin:
         return [
             {
                 "key": "source",
-                "label": self.tr("Source"),
+                "label": translate("LayerTabMixin", "Source"),
                 "type": "combo",
                 "options": [_SOURCE_TABLE, _SOURCE_QGIS],
             },
             {
                 "key": "workspace",
-                "label": self.tr("Workspace"),
+                "label": translate("LayerTabMixin", "Workspace"),
                 "type": "combo",
                 "options": workspace_names,
                 "required": True,
             },
             {
                 "key": "datastore",
-                "label": self.tr("Datastore"),
+                "label": translate("LayerTabMixin", "Datastore"),
                 "type": "combo",
                 "options": [],
                 "required": True,
-                "help": self.tr("Datastores of the selected workspace"),
+                "help": translate(
+                    "LayerTabMixin", "Datastores of the selected workspace"
+                ),
             },
             {
                 "key": "table",
-                "label": self.tr("Table"),
+                "label": translate("LayerTabMixin", "Table"),
                 "type": "combo",
                 "options": [],
                 "required": True,
-                "help": self.tr(
+                "help": translate(
+                    "LayerTabMixin",
                     "Tables in the datastore that are not published yet. The layer "
-                    "takes the table's name."
+                    "takes the table's name.",
                 ),
             },
             {
                 "key": "epsg",
-                "label": self.tr("Declared SRS (EPSG)"),
+                "label": translate("LayerTabMixin", "Declared SRS (EPSG)"),
                 "type": "spinbox",
                 "default": 4326,
                 "min": 1,
                 "max": 999999,
-                "group": self.tr("Metadata"),
-                "help": self.tr(
+                "group": translate("LayerTabMixin", "Metadata"),
+                "help": translate(
+                    "LayerTabMixin",
                     "The SRS GeoServer declares for the layer. Use the table's own "
-                    "SRS — a wrong value misplaces the data."
+                    "SRS — a wrong value misplaces the data.",
                 ),
             },
             {
                 "key": "title",
-                "label": self.tr("Title"),
+                "label": translate("LayerTabMixin", "Title"),
                 "type": "text",
-                "group": self.tr("Metadata"),
-                "placeholder": self.tr("Optional"),
+                "group": translate("LayerTabMixin", "Metadata"),
+                "placeholder": translate("LayerTabMixin", "Optional"),
             },
             {
                 "key": "abstract",
-                "label": self.tr("Abstract"),
+                "label": translate("LayerTabMixin", "Abstract"),
                 "type": "textarea",
-                "group": self.tr("Metadata"),
-                "placeholder": self.tr("Optional"),
+                "group": translate("LayerTabMixin", "Metadata"),
+                "placeholder": translate("LayerTabMixin", "Optional"),
             },
             {
                 "key": "keywords",
-                "label": self.tr("Keywords"),
+                "label": translate("LayerTabMixin", "Keywords"),
                 "type": "text",
-                "group": self.tr("Metadata"),
-                "placeholder": self.tr("Optional, comma-separated"),
+                "group": translate("LayerTabMixin", "Metadata"),
+                "placeholder": translate("LayerTabMixin", "Optional, comma-separated"),
             },
             {
                 "key": "qgis_layer",
-                "label": self.tr("QGIS layer"),
+                "label": translate("LayerTabMixin", "QGIS layer"),
                 "type": "combo",
                 "options": [label for label, _layer in styleable_project_layers()],
                 "required": True,
                 "visible": False,
-                "help": self.tr(
+                "help": translate(
+                    "LayerTabMixin",
                     "The layer is written to a GeoPackage and uploaded, so the "
-                    "data is copied to the server, not linked."
+                    "data is copied to the server, not linked.",
                 ),
             },
             {
                 "key": "name",
-                "label": self.tr("Layer name"),
+                "label": translate("LayerTabMixin", "Layer name"),
                 "type": "text",
                 "required": True,
                 "visible": False,
-                "help": self.tr(
+                "help": translate(
+                    "LayerTabMixin",
                     "Also the name of the datastore and of the table inside it. "
-                    "Anything a WFS type name cannot carry is replaced."
+                    "Anything a WFS type name cannot carry is replaced.",
                 ),
             },
             {
                 "key": "replace",
-                "label": self.tr("Replace it if it already exists"),
+                "label": translate("LayerTabMixin", "Replace it if it already exists"),
                 "type": "checkbox",
                 "default": False,
                 "visible": False,
             },
             {
                 "key": "with_style",
-                "label": self.tr("Upload its symbology as the layer's style"),
+                "label": translate(
+                    "LayerTabMixin", "Upload its symbology as the layer's style"
+                ),
                 "type": "checkbox",
                 "default": True,
                 "visible": False,
@@ -470,15 +487,19 @@ class LayerTabMixin:
         workspace_names = self._get_workspace_names()
         if not workspace_names:
             self.show_warning_message(
-                self.tr("No workspaces available. Create a workspace first.")
+                translate(
+                    "LayerTabMixin",
+                    "No workspaces available. Create a workspace first.",
+                )
             )
             return
 
         dlg = ResourceFormDialog(
-            title=self.tr("Publish a Layer"),
-            description=self.tr(
+            title=translate("LayerTabMixin", "Publish a Layer"),
+            description=translate(
+                "LayerTabMixin",
                 "Publish a table of a datastore, or a layer of this QGIS "
-                "project — that one is uploaded to the server as a GeoPackage."
+                "project — that one is uploaded to the server as a GeoPackage.",
             ),
             fields=self._publish_fields(workspace_names),
             parent=self,
@@ -508,10 +529,10 @@ class LayerTabMixin:
         )
         if self._run_action(
             lambda: self._publish_layer_from_values(values),
-            self.tr("Failed to publish '{}'").format(published),
+            translate("LayerTabMixin", "Failed to publish '{}'").format(published),
         ):
             self.show_success_message(
-                self.tr("Layer '{}' published.").format(published)
+                translate("LayerTabMixin", "Layer '{}' published.").format(published)
             )
             self._load_layers()
 
@@ -544,20 +565,22 @@ class LayerTabMixin:
             for exists, message in (
                 (
                     self._resource_exists(self.gs.get_datastore, ws_name, name),
-                    self.tr("Datastore '{}' already exists in '{}'."),
+                    translate(
+                        "LayerTabMixin", "Datastore '{}' already exists in '{}'."
+                    ),
                 ),
                 (
                     self._resource_exists(
                         self.gs.get_feature_type, ws_name, name, name
                     ),
-                    self.tr("Layer '{}' already exists in '{}'."),
+                    translate("LayerTabMixin", "Layer '{}' already exists in '{}'."),
                 ),
             ):
                 if exists:
                     raise ValueError(
                         message.format(name, ws_name)
                         + " "
-                        + self.tr("Tick Replace to overwrite it.")
+                        + translate("LayerTabMixin", "Tick Replace to overwrite it.")
                     )
 
         # The export reads a live QGIS layer, so it happens here, before any
@@ -655,9 +678,9 @@ class LayerTabMixin:
         # create_feature_type upserts, so an existing layer would be overwritten
         if self._resource_exists(self.gs.get_feature_type, ws_name, ds_name, table):
             raise ValueError(
-                self.tr("Layer '{}' already exists in {}/{}.").format(
-                    table, ws_name, ds_name
-                )
+                translate(
+                    "LayerTabMixin", "Layer '{}' already exists in {}/{}."
+                ).format(table, ws_name, ds_name)
             )
         keywords = [k.strip() for k in (values.get("keywords") or "").split(",")]
         self._check(
@@ -707,7 +730,7 @@ class LayerTabMixin:
                 self._style_choices(ws_name),
                 self._layer_default_style(ws_name, name),
             ),
-            self.tr("Failed to load styles for '{}'").format(name),
+            translate("LayerTabMixin", "Failed to load styles for '{}'").format(name),
         )
         if fetched is None:
             return
@@ -716,15 +739,16 @@ class LayerTabMixin:
             choices.insert(0, current)
 
         dlg = ResourceFormDialog(
-            title=self.tr("Default style for '{}'").format(name),
-            description=self.tr(
+            title=translate("LayerTabMixin", "Default style for '{}'").format(name),
+            description=translate(
+                "LayerTabMixin",
                 "Global styles and the styles of workspace '{}'. Other styles the "
-                "layer may use stay as they are."
+                "layer may use stay as they are.",
             ).format(ws_name),
             fields=[
                 {
                     "key": "style",
-                    "label": self.tr("Default style"),
+                    "label": translate("LayerTabMixin", "Default style"),
                     "type": "combo",
                     "options": choices,
                     "default": current,
@@ -740,10 +764,12 @@ class LayerTabMixin:
             return
         if self._run_action(
             lambda: self._check(self.gs.set_default_layer_style(name, ws_name, style)),
-            self.tr("Failed to set the style of '{}'").format(name),
+            translate("LayerTabMixin", "Failed to set the style of '{}'").format(name),
         ):
             self.show_success_message(
-                self.tr("'{}' now uses style '{}'.").format(name, style)
+                translate("LayerTabMixin", "'{}' now uses style '{}'.").format(
+                    name, style
+                )
             )
 
     # -- Style from QGIS -------------------------------------------------------
@@ -768,24 +794,26 @@ class LayerTabMixin:
         layers = styleable_project_layers()
         if not layers:
             self.show_warning_message(
-                self.tr(
-                    "This QGIS project has no vector or raster layer to take a style from."
+                translate(
+                    "LayerTabMixin",
+                    "This QGIS project has no vector or raster layer to take a style from.",
                 )
             )
             return
         match = self._matching_project_layer(name, layers)
 
         dlg = ResourceFormDialog(
-            title=self.tr("Style '{}' from QGIS").format(name),
-            description=self.tr(
+            title=translate("LayerTabMixin", "Style '{}' from QGIS").format(name),
+            description=translate(
+                "LayerTabMixin",
                 "The layer's symbology is exported as SLD and uploaded to "
                 "workspace '{}'. A style of that name there is replaced — that "
-                "is how you push a change you just made in QGIS."
+                "is how you push a change you just made in QGIS.",
             ).format(ws_name),
             fields=[
                 {
                     "key": "qgis_layer",
-                    "label": self.tr("QGIS layer"),
+                    "label": translate("LayerTabMixin", "QGIS layer"),
                     "type": "combo",
                     "options": [label for label, _layer in layers],
                     "default": match,
@@ -793,21 +821,23 @@ class LayerTabMixin:
                     "help": (
                         None
                         if match
-                        else self.tr("No project layer matches '{}' by name.").format(
-                            name
-                        )
+                        else translate(
+                            "LayerTabMixin", "No project layer matches '{}' by name."
+                        ).format(name)
                     ),
                 },
                 {
                     "key": "style",
-                    "label": self.tr("Style name"),
+                    "label": translate("LayerTabMixin", "Style name"),
                     "type": "text",
                     "default": geoserver_name(name),
                     "required": True,
                 },
                 {
                     "key": "set_default",
-                    "label": self.tr("Make it the layer's default style"),
+                    "label": translate(
+                        "LayerTabMixin", "Make it the layer's default style"
+                    ),
                     "type": "checkbox",
                     "default": True,
                 },
@@ -823,7 +853,9 @@ class LayerTabMixin:
         layer = self._picked_layer(values)
         sld = self._fetch(
             lambda: layer_to_sld(layer),
-            self.tr("Could not export the symbology of '{}'").format(layer.name()),
+            translate("LayerTabMixin", "Could not export the symbology of '{}'").format(
+                layer.name()
+            ),
         )
         if sld is None:
             return
@@ -833,12 +865,18 @@ class LayerTabMixin:
             lambda: self._push_qgis_style(
                 style_name, ws_name, sld, name, values["set_default"]
             ),
-            self.tr("Failed to upload the style of '{}'").format(layer.name()),
+            translate("LayerTabMixin", "Failed to upload the style of '{}'").format(
+                layer.name()
+            ),
         ):
             self.show_success_message(
-                self.tr("'{}' styled from '{}'.").format(name, layer.name())
+                translate("LayerTabMixin", "'{}' styled from '{}'.").format(
+                    name, layer.name()
+                )
                 if values["set_default"]
-                else self.tr("Style '{}' uploaded to '{}'.").format(style_name, ws_name)
+                else translate("LayerTabMixin", "Style '{}' uploaded to '{}'.").format(
+                    style_name, ws_name
+                )
             )
             self._reload_current_tab()
 
@@ -905,16 +943,17 @@ class LayerTabMixin:
         """Ask which protocol, then add the layer to the current QGIS project."""
         name, ws_name = row_data[0], row_data[1]
         dlg = ResourceFormDialog(
-            title=self.tr("Add '{}' to QGIS").format(name),
-            description=self.tr(
+            title=translate("LayerTabMixin", "Add '{}' to QGIS").format(name),
+            description=translate(
+                "LayerTabMixin",
                 "WFS loads the features themselves (editable, styled in QGIS); WMS "
                 "and WMTS load rendered images. Credentials come from the plugin's "
-                "saved connection, not from the layer."
+                "saved connection, not from the layer.",
             ),
             fields=[
                 {
                     "key": "protocol",
-                    "label": self.tr("Load as"),
+                    "label": translate("LayerTabMixin", "Load as"),
                     "type": "combo",
                     "options": list(PROTOCOLS),
                     "default": "WMS",
@@ -941,13 +980,18 @@ class LayerTabMixin:
                 # Build first and check, instead of iface.addRasterLayer(), so an
                 # unreachable layer becomes our banner rather than QGIS's modal.
                 raise RuntimeError(
-                    layer.error().message() or self.tr("layer is not valid")
+                    layer.error().message()
+                    or translate("LayerTabMixin", "layer is not valid")
                 )
             QgsProject.instance().addMapLayer(layer)
 
-        if self._run_action(add, self.tr("Could not add '{}' to QGIS").format(name)):
+        if self._run_action(
+            add, translate("LayerTabMixin", "Could not add '{}' to QGIS").format(name)
+        ):
             self.show_success_message(
-                self.tr("'{}' added to the project as {}.").format(name, protocol)
+                translate("LayerTabMixin", "'{}' added to the project as {}.").format(
+                    name, protocol
+                )
             )
 
     def _delete_layer(self, row_data):
@@ -957,7 +1001,7 @@ class LayerTabMixin:
     def _delete_selected_layers(self, selected_rows):
         """Delete one or more feature types after confirmation."""
         self._delete_many(
-            self.tr("layer"),
+            translate("LayerTabMixin", "layer"),
             [
                 (
                     f"{row[1]}/{row[2]}/{row[0]}",
@@ -971,9 +1015,10 @@ class LayerTabMixin:
             # delete_feature_type sends recurse=true, which removes the
             # published layer — but GeoServer refuses outright while a layer
             # group still references it (verified against 2.28.5).
-            cascade=self.tr(
+            cascade=translate(
+                "LayerTabMixin",
                 "The published layer goes too; the table or file behind it is not "
                 "touched. GeoServer refuses if a layer group still uses the "
-                "layer — remove it from the group first.\n\n"
+                "layer — remove it from the group first.\n\n",
             ),
         )

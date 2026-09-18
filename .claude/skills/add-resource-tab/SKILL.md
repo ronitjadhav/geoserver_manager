@@ -31,18 +31,37 @@ Copy the shape of `tab_workspaces.py` (simplest) or `tab_datastores.py` (typed
 form, nested listing, parallel fetch). Skeleton:
 
 ```python
+from qgis.PyQt.QtCore import QCoreApplication
+
+# Strings are looked up in this file's own context: self.tr() would resolve
+# against GeoServerMainDialog instead (see CLAUDE.md).
+translate = QCoreApplication.translate
+
+
 class StyleTabMixin:
     """Mixin that adds style CRUD methods to the main dialog."""
 
     def _load_styles(self):
         """Arm the tab, then fetch its rows in the background."""
-        self._setup_add_button(self.tr("Add a New Style"), self.tr("Create a style"), self._add_style)
+        self._setup_add_button(
+            translate("StyleTabMixin", "Add a New Style"),
+            translate("StyleTabMixin", "Create a style"),
+            self._add_style,
+        )
         self._setup_delete_selected_button(self._delete_selected_styles)
         self._name_click_callback = self._show_style_info
-        self._extra_click_callbacks = {self.tr("Workspace"): self._open_workspace_from_row}
-        self._row_actions = [("mActionDeleteSelected.svg", self.tr("Delete"), self._delete_style)]
-        self._setup_table([self.tr("Style Name"), self.tr("Workspace"), self.tr("Actions")])
-        self._start_load(self.tr("Failed to load styles"), self._fetch_style_rows)
+        self._extra_click_callbacks = {
+            translate("StyleTabMixin", "Workspace"): self._open_workspace_from_row
+        }
+        self._row_actions = [
+            ("mActionDeleteSelected.svg", translate("StyleTabMixin", "Delete"), self._delete_style)
+        ]
+        self._setup_table([
+            translate("StyleTabMixin", "Style Name"),
+            translate("StyleTabMixin", "Workspace"),
+            self.actions_column_label(),          # never translate "Actions" here
+        ])
+        self._start_load(translate("StyleTabMixin", "Failed to load styles"), self._fetch_style_rows)
 
     def _fetch_style_rows(self, task=None):
         """(rows, failures) for the table. Runs in a worker thread."""
@@ -52,6 +71,11 @@ class StyleTabMixin:
 
 Rules for the mixin:
 
+- **Translate in your own context.** `translate("<YourMixin>", "…")` with the alias at the
+  top of the file — never `self.tr()`, which resolves against `GeoServerMainDialog` and so can
+  never find your strings. The row-actions column is the one exception: take its label from
+  `self.actions_column_label()`, because `_setup_table` compares it. `tests/qgis/test_i18n.py`
+  checks both, and knows the list of `tab_*.py` files — add yours to `CONTEXTS` there.
 - **Column 0 is the resource name.** Row lists are display strings; keep the
   order stable because callbacks index into them (`row[0]`, `row[1]`, …).
 - **The loader only arms the GUI.** Buttons, callbacks and `_setup_table` on the GUI
@@ -62,7 +86,7 @@ Rules for the mixin:
 - **All server calls through the dialog helpers** (`_run_action`, `_fetch`,
   `_check`, `_fetch_list`, `_resource_exists`, `_raw_rest`). Never write a
   `try/except … setCursor` block yourself.
-- **Add** pre-checks existence and raises `ValueError(self.tr("… already exists"))`
+- **Add** pre-checks existence and raises `ValueError(translate("StyleTabMixin", "… already exists"))`
   inside the action; `_run_action` turns that into the banner.
 - **Edit** fetches the current object with `_fetch`, prefills from *that* (a pure
   `_<resource>_form_values(...)` staticmethod — unit-testable), and saves by

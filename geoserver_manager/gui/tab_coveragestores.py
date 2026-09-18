@@ -14,6 +14,7 @@ from a directory, which auto-discovers its coverages), so a new store starts
 with zero coverages and the *Publish* row action turns one into a layer.
 """
 
+from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
@@ -40,55 +41,66 @@ _TYPE_FIELDS = {
 }
 
 
-class CoverageStoreTabMixin:
-    """Mixin that adds coverage-store methods to the main dialog.
+# Every user-visible string in this file goes through translate() with this
+# file's own class as the context. self.tr() cannot: pylupdate extracts it
+# under CoverageStoreTabMixin, but at runtime self.tr is QObject.tr with the context of the
+# *instance's* class, GeoServerMainDialog — QDialog precedes the mixins in the
+# MRO — so every lookup would miss. A wrapper function would not be extracted
+# at all (pylupdate only understands a literal context), hence the repetition.
+translate = QCoreApplication.translate
 
-    ponytail: same translation caveat as the other tab mixins — self.tr() here
-    is extracted under this class but resolved against the host dialog.
-    """
+
+class CoverageStoreTabMixin:
+    """Mixin that adds coverage-store methods to the main dialog."""
 
     # -- Listing ---------------------------------------------------------------
 
     def _load_coverage_stores(self):
         """Arm the Coverage Stores tab, then fetch its rows in the background."""
         self._setup_add_button(
-            self.tr("Add a Coverage Store"),
-            self.tr("Create a raster store from a GeoTIFF, a COG or an ImageMosaic"),
+            translate("CoverageStoreTabMixin", "Add a Coverage Store"),
+            translate(
+                "CoverageStoreTabMixin",
+                "Create a raster store from a GeoTIFF, a COG or an ImageMosaic",
+            ),
             self._add_coverage_store,
         )
         self._setup_delete_selected_button(self._delete_selected_coverage_stores)
         self._name_click_callback = self._show_coverage_store_info
         self._extra_click_callbacks = {
-            self.tr("Workspace"): self._open_workspace_from_row
+            translate(
+                "CoverageStoreTabMixin", "Workspace"
+            ): self._open_workspace_from_row
         }
         self._row_actions = [
             (
                 "mIconRaster.svg",
-                self.tr("Coverages"),
+                translate("CoverageStoreTabMixin", "Coverages"),
                 self._show_coverages,
             ),
             (
                 "mActionAddRasterLayer.svg",
-                self.tr("Publish a coverage"),
+                translate("CoverageStoreTabMixin", "Publish a coverage"),
                 self._publish_coverage,
             ),
             (
                 "mActionDeleteSelected.svg",
-                self.tr("Delete"),
+                translate("CoverageStoreTabMixin", "Delete"),
                 self._delete_coverage_store,
             ),
         ]
         self._setup_table(
             [
-                self.tr("Coverage Store"),
-                self.tr("Workspace"),
-                self.tr("Type"),
-                self.tr("Coverages"),
-                self.tr("Actions"),
+                translate("CoverageStoreTabMixin", "Coverage Store"),
+                translate("CoverageStoreTabMixin", "Workspace"),
+                translate("CoverageStoreTabMixin", "Type"),
+                translate("CoverageStoreTabMixin", "Coverages"),
+                self.actions_column_label(),
             ]
         )
         self._start_load(
-            self.tr("Failed to load coverage stores"), self._fetch_coverage_store_rows
+            translate("CoverageStoreTabMixin", "Failed to load coverage stores"),
+            self._fetch_coverage_store_rows,
         )
 
     def _fetch_coverage_store_rows(self, task=None):
@@ -172,17 +184,17 @@ class CoverageStoreTabMixin:
         fields = [
             {"key": key, "label": label, "type": "text", "read_only": True}
             for key, label in (
-                ("name", self.tr("Coverage Store")),
-                ("workspace", self.tr("Workspace")),
-                ("type", self.tr("Type")),
-                ("url", self.tr("URL")),
-                ("enabled", self.tr("Enabled")),
+                ("name", translate("CoverageStoreTabMixin", "Coverage Store")),
+                ("workspace", translate("CoverageStoreTabMixin", "Workspace")),
+                ("type", translate("CoverageStoreTabMixin", "Type")),
+                ("url", translate("CoverageStoreTabMixin", "URL")),
+                ("enabled", translate("CoverageStoreTabMixin", "Enabled")),
             )
         ]
         fields.append(
             {
                 "key": "description",
-                "label": self.tr("Description"),
+                "label": translate("CoverageStoreTabMixin", "Description"),
                 "type": "textarea",
                 "read_only": True,
             }
@@ -190,12 +202,13 @@ class CoverageStoreTabMixin:
         fields.append(
             {
                 "key": "coverages",
-                "label": self.tr("Published coverages"),
+                "label": translate("CoverageStoreTabMixin", "Published coverages"),
                 "type": "textarea",
                 "read_only": True,
-                "group": self.tr("Coverages"),
-                "help": self.tr(
-                    "Open the Coverages action for one coverage's details."
+                "group": translate("CoverageStoreTabMixin", "Coverages"),
+                "help": translate(
+                    "CoverageStoreTabMixin",
+                    "Open the Coverages action for one coverage's details.",
                 ),
             }
         )
@@ -222,17 +235,22 @@ class CoverageStoreTabMixin:
                 self._coverage_store_detail(ws_name, name),
                 self._published_coverage_names(ws_name, name),
             ),
-            self.tr("Failed to load coverage store '{}'").format(name),
+            translate(
+                "CoverageStoreTabMixin", "Failed to load coverage store '{}'"
+            ).format(name),
         )
         if fetched is None:
             return
         detail, published = fetched
 
         dlg = ResourceFormDialog(
-            title=self.tr("Coverage Store '{}'").format(name),
-            description=self.tr(
+            title=translate("CoverageStoreTabMixin", "Coverage Store '{}'").format(
+                name
+            ),
+            description=translate(
+                "CoverageStoreTabMixin",
                 "Read-only: GeoServer's REST API has no update for a coverage "
-                "store, so a change means creating it again."
+                "store, so a change means creating it again.",
             ),
             fields=self._coverage_store_info_fields(),
             values=self._coverage_store_form_values(detail, published),
@@ -326,7 +344,7 @@ class CoverageStoreTabMixin:
         fields = [
             {
                 "key": "coverage",
-                "label": self.tr("Coverage"),
+                "label": translate("CoverageStoreTabMixin", "Coverage"),
                 "type": "combo",
                 "options": list(names),
             }
@@ -334,29 +352,29 @@ class CoverageStoreTabMixin:
         fields += [
             {"key": key, "label": label, "type": "text", "read_only": True}
             for key, label in (
-                ("native_name", self.tr("Native name")),
-                ("title", self.tr("Title")),
-                ("srs", self.tr("SRS")),
-                ("native_format", self.tr("Native format")),
-                ("enabled", self.tr("Enabled")),
-                ("size", self.tr("Size in pixels")),
-                ("bounds", self.tr("Bounds")),
-                ("keywords", self.tr("Keywords")),
+                ("native_name", translate("CoverageStoreTabMixin", "Native name")),
+                ("title", translate("CoverageStoreTabMixin", "Title")),
+                ("srs", translate("CoverageStoreTabMixin", "SRS")),
+                ("native_format", translate("CoverageStoreTabMixin", "Native format")),
+                ("enabled", translate("CoverageStoreTabMixin", "Enabled")),
+                ("size", translate("CoverageStoreTabMixin", "Size in pixels")),
+                ("bounds", translate("CoverageStoreTabMixin", "Bounds")),
+                ("keywords", translate("CoverageStoreTabMixin", "Keywords")),
             )
         ]
         fields += [
             {
                 "key": "abstract",
-                "label": self.tr("Abstract"),
+                "label": translate("CoverageStoreTabMixin", "Abstract"),
                 "type": "textarea",
                 "read_only": True,
             },
             {
                 "key": "bands",
-                "label": self.tr("Bands"),
+                "label": translate("CoverageStoreTabMixin", "Bands"),
                 "type": "textarea",
                 "read_only": True,
-                "group": self.tr("Bands"),
+                "group": translate("CoverageStoreTabMixin", "Bands"),
             },
         ]
         return fields
@@ -367,7 +385,9 @@ class CoverageStoreTabMixin:
             return
         detail = self._fetch(
             lambda: self._coverage_detail(workspace_name, store_name, name),
-            self.tr("Failed to load coverage '{}'").format(name),
+            translate("CoverageStoreTabMixin", "Failed to load coverage '{}'").format(
+                name
+            ),
         )
         values = self._coverage_form_values(detail or {})
         for key, value in values.items():
@@ -382,21 +402,28 @@ class CoverageStoreTabMixin:
         store_name, ws_name = row_data[0], row_data[1]
         published = self._fetch(
             lambda: self._published_coverage_names(ws_name, store_name),
-            self.tr("Failed to load the coverages of '{}'").format(store_name),
+            translate(
+                "CoverageStoreTabMixin", "Failed to load the coverages of '{}'"
+            ).format(store_name),
         )
         if published is None:
             return
         if not published:
             self.show_warning_message(
-                self.tr(
-                    "'{}' has no published coverage yet — use Publish a coverage."
+                translate(
+                    "CoverageStoreTabMixin",
+                    "'{}' has no published coverage yet — use Publish a coverage.",
                 ).format(store_name)
             )
             return
 
         dlg = ResourceFormDialog(
-            title=self.tr("Coverages of '{}'").format(store_name),
-            description=self.tr("Read-only view of what this store publishes."),
+            title=translate("CoverageStoreTabMixin", "Coverages of '{}'").format(
+                store_name
+            ),
+            description=translate(
+                "CoverageStoreTabMixin", "Read-only view of what this store publishes."
+            ),
             fields=self._coverage_fields(published),
             parent=self,
         )
@@ -430,34 +457,48 @@ class CoverageStoreTabMixin:
         store_name, ws_name = row_data[0], row_data[1]
         candidates = self._fetch(
             lambda: self._publishable_coverages(ws_name, store_name),
-            self.tr("Failed to list the coverages of '{}'").format(store_name),
+            translate(
+                "CoverageStoreTabMixin", "Failed to list the coverages of '{}'"
+            ).format(store_name),
         )
         if candidates is None:
             return
         if not candidates:
             self.show_warning_message(
-                self.tr("Every coverage of '{}' is already published.").format(
-                    store_name
-                )
+                translate(
+                    "CoverageStoreTabMixin",
+                    "Every coverage of '{}' is already published.",
+                ).format(store_name)
             )
             return
 
         dlg = ResourceFormDialog(
-            title=self.tr("Publish a coverage of '{}'").format(store_name),
-            description=self.tr(
+            title=translate(
+                "CoverageStoreTabMixin", "Publish a coverage of '{}'"
+            ).format(store_name),
+            description=translate(
+                "CoverageStoreTabMixin",
                 "Publishing a coverage makes it a layer. Leave the layer name "
-                "empty to reuse the coverage's own name."
+                "empty to reuse the coverage's own name.",
             ),
             fields=[
                 {
                     "key": "native_name",
-                    "label": self.tr("Coverage"),
+                    "label": translate("CoverageStoreTabMixin", "Coverage"),
                     "type": "combo",
                     "options": candidates,
                     "required": True,
                 },
-                {"key": "name", "label": self.tr("Layer name"), "type": "text"},
-                {"key": "title", "label": self.tr("Title"), "type": "text"},
+                {
+                    "key": "name",
+                    "label": translate("CoverageStoreTabMixin", "Layer name"),
+                    "type": "text",
+                },
+                {
+                    "key": "title",
+                    "label": translate("CoverageStoreTabMixin", "Title"),
+                    "type": "text",
+                },
             ],
             parent=self,
         )
@@ -476,10 +517,14 @@ class CoverageStoreTabMixin:
                     native_name=values["native_name"],
                 )
             ),
-            self.tr("Failed to publish '{}'").format(values["native_name"]),
+            translate("CoverageStoreTabMixin", "Failed to publish '{}'").format(
+                values["native_name"]
+            ),
         ):
             self.show_success_message(
-                self.tr("'{}' published as a layer.").format(published_name)
+                translate("CoverageStoreTabMixin", "'{}' published as a layer.").format(
+                    published_name
+                )
             )
             self._load_coverage_stores()
 
@@ -490,64 +535,67 @@ class CoverageStoreTabMixin:
         return [
             {
                 "key": "name",
-                "label": self.tr("Coverage Store"),
+                "label": translate("CoverageStoreTabMixin", "Coverage Store"),
                 "type": "text",
                 "required": True,
             },
             {
                 "key": "workspace",
-                "label": self.tr("Workspace"),
+                "label": translate("CoverageStoreTabMixin", "Workspace"),
                 "type": "combo",
                 "options": list(workspace_names),
                 "required": True,
             },
             {
                 "key": "type",
-                "label": self.tr("Type"),
+                "label": translate("CoverageStoreTabMixin", "Type"),
                 "type": "combo",
                 "options": list(STORE_TYPES),
                 "default": GEOTIFF,
             },
             {
                 "key": "url",
-                "label": self.tr("URL"),
+                "label": translate("CoverageStoreTabMixin", "URL"),
                 "type": "text",
                 "required": True,
-                "group": self.tr("Source"),
+                "group": translate("CoverageStoreTabMixin", "Source"),
                 "placeholder": "file:data/sf/sfdem.tif",
-                "help": self.tr(
+                "help": translate(
+                    "CoverageStoreTabMixin",
                     "A path on the GeoServer machine (file:…) or, for a COG, an "
                     "http(s):// or s3:// URL. Paths are resolved by the server, "
-                    "not by QGIS."
+                    "not by QGIS.",
                 ),
             },
             {
                 "key": "directory",
-                "label": self.tr("Directory"),
+                "label": translate("CoverageStoreTabMixin", "Directory"),
                 "type": "text",
                 "required": True,
                 "visible": False,
-                "group": self.tr("Source"),
+                "group": translate("CoverageStoreTabMixin", "Source"),
                 "placeholder": "/opt/geoserver_data/coverages/my_mosaic",
-                "help": self.tr(
+                "help": translate(
+                    "CoverageStoreTabMixin",
                     "A directory on the GeoServer machine holding the granules. "
-                    "Its coverages are discovered and published automatically."
+                    "Its coverages are discovered and published automatically.",
                 ),
             },
             {
                 "key": "zip",
-                "label": self.tr("Properties ZIP"),
+                "label": translate("CoverageStoreTabMixin", "Properties ZIP"),
                 "type": "file",
                 "required": True,
                 "visible": False,
-                "group": self.tr("Source"),
+                "group": translate("CoverageStoreTabMixin", "Source"),
                 "filter": "ZIP (*.zip);;All files (*)",
-                "help": self.tr(
+                "help": translate(
+                    "CoverageStoreTabMixin",
                     "A ZIP holding indexer.properties, datastore.properties and at "
                     "least one granule — GeoServer refuses a properties-only "
                     "archive. Nothing is published yet. Give the indexer a Name "
                     "nobody used before: deleting a mosaic store leaves its "
-                    "granule index table behind, and a re-used name picks it up."
+                    "granule index table behind, and a re-used name picks it up.",
                 ),
             },
         ]
@@ -561,17 +609,19 @@ class CoverageStoreTabMixin:
     def _add_coverage_store(self):
         """Create a coverage store."""
         workspace_names = self._fetch(
-            self._get_workspace_names, self.tr("Failed to load the workspaces")
+            self._get_workspace_names,
+            translate("CoverageStoreTabMixin", "Failed to load the workspaces"),
         )
         if workspace_names is None:
             return
 
         dlg = ResourceFormDialog(
-            title=self.tr("Add a Coverage Store"),
-            description=self.tr(
+            title=translate("CoverageStoreTabMixin", "Add a Coverage Store"),
+            description=translate(
+                "CoverageStoreTabMixin",
                 "A coverage store is a source of rasters. Creating it does not "
                 "publish anything — except an ImageMosaic from a directory, "
-                "which discovers its coverages itself."
+                "which discovers its coverages itself.",
             ),
             fields=self._coverage_store_fields(workspace_names),
             parent=self,
@@ -586,10 +636,14 @@ class CoverageStoreTabMixin:
         values = dlg.get_values()
         if self._run_action(
             lambda: self._create_coverage_store_from_values(values),
-            self.tr("Failed to create coverage store '{}'").format(values["name"]),
+            translate(
+                "CoverageStoreTabMixin", "Failed to create coverage store '{}'"
+            ).format(values["name"]),
         ):
             self.show_success_message(
-                self.tr("Coverage store '{}' created.").format(values["name"])
+                translate(
+                    "CoverageStoreTabMixin", "Coverage store '{}' created."
+                ).format(values["name"])
             )
             self._warn_if_cog_settings_dropped(values)
             self._load_coverage_stores()
@@ -611,10 +665,11 @@ class CoverageStoreTabMixin:
             return
         if not (detail.get("metadata") or {}):
             self.show_warning_message(
-                self.tr(
+                translate(
+                    "CoverageStoreTabMixin",
                     "'{}' was created, but GeoServer dropped the COG settings — it "
                     "will read whole files instead of ranges. Is the COG extension "
-                    "installed on the server?"
+                    "installed on the server?",
                 ).format(values["name"])
             )
 
@@ -626,9 +681,10 @@ class CoverageStoreTabMixin:
         # mosaic calls are PUTs, which would overwrite the store instead.
         if self._resource_exists(self.gs.get_coverage_store, ws_name, name):
             raise ValueError(
-                self.tr("Coverage store '{}' already exists in '{}'.").format(
-                    name, ws_name
-                )
+                translate(
+                    "CoverageStoreTabMixin",
+                    "Coverage store '{}' already exists in '{}'.",
+                ).format(name, ws_name)
             )
 
         if store_type == MOSAIC_DIRECTORY:
@@ -664,7 +720,7 @@ class CoverageStoreTabMixin:
     def _delete_selected_coverage_stores(self, selected_rows):
         """Delete one or more coverage stores after confirmation."""
         self._delete_many(
-            self.tr("coverage store"),
+            translate("CoverageStoreTabMixin", "coverage store"),
             [
                 (
                     f"{row[1]}/{row[0]}",
@@ -675,9 +731,10 @@ class CoverageStoreTabMixin:
                 for row in selected_rows
             ],
             self._load_coverage_stores,
-            cascade=self.tr(
+            cascade=translate(
+                "CoverageStoreTabMixin",
                 "The delete recurses: the store, its coverages and the layers "
                 "published from them all go. The raster files themselves stay "
-                "on the server.\n\n"
+                "on the server.\n\n",
             ),
         )

@@ -606,11 +606,23 @@ class GeoServerMainDialog(
         self.resultsTable.setHorizontalHeaderLabels(columns)
         self.resultsTable.setRowCount(0)
         header = self.resultsTable.horizontalHeader()
+        actions = self.actions_column_label()
         for i in range(len(columns)):
-            if columns[i] == self.tr("Actions"):
+            if columns[i] == actions:
                 header.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
             else:
                 header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
+
+    def actions_column_label(self):
+        """The header text of the row-actions column.
+
+        Every tab's last column is this one, and _setup_table recognises it by
+        its text to size it to its buttons. The mixins take the label from
+        here rather than translating "Actions" in their own context, so the
+        two sides of that comparison cannot drift apart once a translation is
+        installed (see invariant 10 in CLAUDE.md).
+        """
+        return self.tr("Actions")
 
     def _on_selection_changed(self):
         """Enable or disable the Delete Selected button based on selection."""

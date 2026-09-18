@@ -213,10 +213,16 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   rejected as premature — don't build it until a non-GUI caller needs the API.
 - Deliberate shortcuts carry a `ponytail:` comment naming the ceiling and the upgrade path; library gaps
   carry `TODO(#50)` (see the first convention). Leave both in place until the condition they name is met.
-- `self.tr()` inside the mixins **cannot** resolve translations: strings are extracted under the mixin's
-  class name but looked up under `GeoServerMainDialog` (QDialog precedes the mixins in the MRO, so an
-  override of `tr()` there is dead code). When the first real translation lands, switch those sites to
-  `QCoreApplication.translate("<MixinClass>", …)`.
+- **Strings in a tab mixin use `translate("<MixinClass>", "…")`**, never `self.tr()`: `self.tr` in a mixin
+  is `QObject.tr` with the *instance's* context, `GeoServerMainDialog`, while `pylupdate` extracts under the
+  mixin's own class — so every lookup missed. Each mixin file aliases `translate = QCoreApplication.translate`
+  and repeats its context at the call site, because `pylupdate` only understands a literal context (a wrapper
+  function is not extracted at all — measured, not assumed). `GeoServerMainDialog`, `ResourceFormDialog` and
+  the settings page are real QObject subclasses and keep `self.tr()`. A string that is *compared* rather than
+  only displayed must come from one place: the row-actions column label is `self.actions_column_label()` on
+  the dialog, so `_setup_table`'s comparison cannot drift from the header once a locale is installed.
+  `tests/qgis/test_i18n.py` fails if a mixin goes back to `self.tr()`, if a `translate()` call names another
+  file's context, or if a new `tab_*.py` appears without being covered.
 - Messages: user-facing outcomes go to the dialog's message bar (`show_*_message`); details go to the QGIS
   log (`self.log(..., log_level=Qgis.MessageLevel.Critical)`). `_run_action` does both.
 - Qt6-compatible enums only: `Qt.CursorShape.WaitCursor`, `QDialog.DialogCode.Accepted`,

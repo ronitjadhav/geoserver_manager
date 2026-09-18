@@ -8,6 +8,7 @@ Used as a mixin for GeoServerMainDialog.
 
 from pathlib import Path
 
+from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog, QFileDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
@@ -34,12 +35,17 @@ _SOURCE_FILE = "From file"
 _SOURCE_QGIS = "From a QGIS layer"
 
 
-class StyleTabMixin:
-    """Mixin that adds style methods to the main dialog.
+# Every user-visible string in this file goes through translate() with this
+# file's own class as the context. self.tr() cannot: pylupdate extracts it
+# under StyleTabMixin, but at runtime self.tr is QObject.tr with the context of the
+# *instance's* class, GeoServerMainDialog — QDialog precedes the mixins in the
+# MRO — so every lookup would miss. A wrapper function would not be extracted
+# at all (pylupdate only understands a literal context), hence the repetition.
+translate = QCoreApplication.translate
 
-    ponytail: same translation caveat as WorkspaceTabMixin — self.tr() here is
-    extracted under this class but resolved against the host dialog's context.
-    """
+
+class StyleTabMixin:
+    """Mixin that adds style methods to the main dialog."""
 
     @staticmethod
     def _scope(workspace_label):
@@ -49,32 +55,42 @@ class StyleTabMixin:
     def _load_styles(self):
         """Arm the Styles tab, then fetch its rows in the background."""
         self._setup_add_button(
-            self.tr("Upload a Style"),
-            self.tr("Upload a style from an SLD file or pasted SLD"),
+            translate("StyleTabMixin", "Upload a Style"),
+            translate("StyleTabMixin", "Upload a style from an SLD file or pasted SLD"),
             self._add_style,
         )
         self._setup_delete_selected_button(self._delete_selected_styles)
         self._name_click_callback = self._show_style_info
         self._extra_click_callbacks = {
-            self.tr("Workspace"): self._open_workspace_from_style_row
+            translate("StyleTabMixin", "Workspace"): self._open_workspace_from_style_row
         }
         self._row_actions = [
             (
                 "mActionSharingImport.svg",
-                self.tr("Apply to a QGIS layer"),
+                translate("StyleTabMixin", "Apply to a QGIS layer"),
                 self._apply_style_to_qgis,
             ),
             (
                 "mActionFileSaveAs.svg",
-                self.tr("Save as SLD"),
+                translate("StyleTabMixin", "Save as SLD"),
                 self._save_style_to_disk,
             ),
-            ("mActionDeleteSelected.svg", self.tr("Delete"), self._delete_style),
+            (
+                "mActionDeleteSelected.svg",
+                translate("StyleTabMixin", "Delete"),
+                self._delete_style,
+            ),
         ]
         self._setup_table(
-            [self.tr("Style Name"), self.tr("Workspace"), self.tr("Actions")]
+            [
+                translate("StyleTabMixin", "Style Name"),
+                translate("StyleTabMixin", "Workspace"),
+                self.actions_column_label(),
+            ]
         )
-        self._start_load(self.tr("Failed to load styles"), self._fetch_style_rows)
+        self._start_load(
+            translate("StyleTabMixin", "Failed to load styles"), self._fetch_style_rows
+        )
 
     def _fetch_style_rows(self, task=None):
         """(rows, failures) for the Styles table. Runs in a worker thread."""
@@ -175,34 +191,35 @@ class StyleTabMixin:
         return [
             {
                 "key": "name",
-                "label": self.tr("Style Name"),
+                "label": translate("StyleTabMixin", "Style Name"),
                 "type": "text",
                 "read_only": True,
             },
             {
                 "key": "workspace",
-                "label": self.tr("Workspace"),
+                "label": translate("StyleTabMixin", "Workspace"),
                 "type": "text",
                 "read_only": True,
             },
             {
                 "key": "format",
-                "label": self.tr("Format"),
+                "label": translate("StyleTabMixin", "Format"),
                 "type": "text",
                 "read_only": True,
             },
             {
                 "key": "version",
-                "label": self.tr("SLD version"),
+                "label": translate("StyleTabMixin", "SLD version"),
                 "type": "text",
                 "read_only": True,
                 "help": (
                     # GeoServer keeps the 1.1 document but serves .sld as its
                     # 1.0 rendition, so the body below is not the stored bytes.
-                    self.tr(
+                    translate(
+                        "StyleTabMixin",
                         "Stored as SLD 1.1 (Symbology Encoding) — what QGIS "
                         "exports. GeoServer serves it here as its SLD 1.0 "
-                        "rendition, and saving stores that rendition instead."
+                        "rendition, and saving stores that rendition instead.",
                     )
                     if language_version.startswith("1.1")
                     else None
@@ -210,22 +227,26 @@ class StyleTabMixin:
             },
             {
                 "key": "filename",
-                "label": self.tr("File"),
+                "label": translate("StyleTabMixin", "File"),
                 "type": "text",
                 "read_only": True,
             },
             {
                 "key": "body",
-                "label": self.tr("Definition"),
+                "label": translate("StyleTabMixin", "Definition"),
                 "type": "textarea",
                 "read_only": not editable,
                 "required": editable,
-                "group": self.tr("Style"),
+                "group": translate("StyleTabMixin", "Style"),
                 "help": (
-                    self.tr("Edit and Save to replace the style on the server.")
+                    translate(
+                        "StyleTabMixin",
+                        "Edit and Save to replace the style on the server.",
+                    )
                     if editable
-                    else self.tr(
-                        "Read-only: only SLD and MBStyle bodies can be saved here."
+                    else translate(
+                        "StyleTabMixin",
+                        "Read-only: only SLD and MBStyle bodies can be saved here.",
                     )
                 ),
             },
@@ -245,7 +266,9 @@ class StyleTabMixin:
                 self._style_body(name, workspace_name, style_format),
             )
 
-        fetched = self._fetch(fetch, self.tr("Failed to load style '{}'").format(name))
+        fetched = self._fetch(
+            fetch, translate("StyleTabMixin", "Failed to load style '{}'").format(name)
+        )
         if fetched is None:
             return
         definition, style_format, body = fetched
@@ -253,8 +276,10 @@ class StyleTabMixin:
         language_version = self._language_version(definition)
 
         dlg = ResourceFormDialog(
-            title=self.tr("Style '{}'").format(name),
-            description=self.tr("Modify the style") if editable else None,
+            title=translate("StyleTabMixin", "Style '{}'").format(name),
+            description=(
+                translate("StyleTabMixin", "Modify the style") if editable else None
+            ),
             fields=self._style_fields(editable, language_version),
             values={
                 "name": name,
@@ -277,9 +302,11 @@ class StyleTabMixin:
             return
         if self._run_action(
             lambda: self._save_style_body(name, workspace_name, style_format, new_body),
-            self.tr("Failed to save style '{}'").format(name),
+            translate("StyleTabMixin", "Failed to save style '{}'").format(name),
         ):
-            self.show_success_message(self.tr("Style '{}' saved.").format(name))
+            self.show_success_message(
+                translate("StyleTabMixin", "Style '{}' saved.").format(name)
+            )
 
     # -- Upload ----------------------------------------------------------------
 
@@ -287,56 +314,61 @@ class StyleTabMixin:
         return [
             {
                 "key": "name",
-                "label": self.tr("Style Name"),
+                "label": translate("StyleTabMixin", "Style Name"),
                 "type": "text",
                 "required": True,
             },
             {
                 "key": "workspace",
-                "label": self.tr("Workspace"),
+                "label": translate("StyleTabMixin", "Workspace"),
                 "type": "combo",
                 "options": [GLOBAL] + list(workspace_names),
-                "help": self.tr(
-                    "Global styles can be used by layers of every workspace"
+                "help": translate(
+                    "StyleTabMixin",
+                    "Global styles can be used by layers of every workspace",
                 ),
             },
             {
                 "key": "source",
-                "label": self.tr("Source"),
+                "label": translate("StyleTabMixin", "Source"),
                 "type": "combo",
                 "options": [_SOURCE_PASTE, _SOURCE_FILE, _SOURCE_QGIS],
             },
             {
                 "key": "sld",
-                "label": self.tr("SLD"),
+                "label": translate("StyleTabMixin", "SLD"),
                 "type": "textarea",
                 "required": True,
-                "group": self.tr("Style"),
-                "placeholder": self.tr("Paste the SLD document here"),
+                "group": translate("StyleTabMixin", "Style"),
+                "placeholder": translate(
+                    "StyleTabMixin", "Paste the SLD document here"
+                ),
             },
             {
                 "key": "file",
-                "label": self.tr("File"),
+                "label": translate("StyleTabMixin", "File"),
                 "type": "file",
                 "required": True,
                 "visible": False,
-                "group": self.tr("Style"),
+                "group": translate("StyleTabMixin", "Style"),
                 "filter": "Styles (*.sld *.zip *.mbstyle);;All files (*)",
-                "help": self.tr(
-                    ".sld, a .zip with an SLD and its resources, or .mbstyle"
+                "help": translate(
+                    "StyleTabMixin",
+                    ".sld, a .zip with an SLD and its resources, or .mbstyle",
                 ),
             },
             {
                 "key": "qgis_layer",
-                "label": self.tr("QGIS layer"),
+                "label": translate("StyleTabMixin", "QGIS layer"),
                 "type": "combo",
                 "options": [label for label, _layer in styleable_project_layers()],
                 "required": True,
                 "visible": False,
-                "group": self.tr("Style"),
-                "help": self.tr(
+                "group": translate("StyleTabMixin", "Style"),
+                "help": translate(
+                    "StyleTabMixin",
                     "The layer's symbology is exported as SLD and uploaded. QGIS "
-                    "writes SLD 1.1, which GeoServer stores as such."
+                    "writes SLD 1.1, which GeoServer stores as such.",
                 ),
             },
         ]
@@ -349,10 +381,11 @@ class StyleTabMixin:
     def _add_style(self):
         """Upload a style from pasted SLD or from a file."""
         dlg = ResourceFormDialog(
-            title=self.tr("Upload a Style"),
-            description=self.tr(
+            title=translate("StyleTabMixin", "Upload a Style"),
+            description=translate(
+                "StyleTabMixin",
                 "Create a style from an SLD you paste, a file you pick, or the "
-                "symbology of a layer in this QGIS project."
+                "symbology of a layer in this QGIS project.",
             ),
             fields=self._upload_fields(self._get_workspace_names()),
             parent=self,
@@ -366,10 +399,14 @@ class StyleTabMixin:
         values = dlg.get_values()
         if self._run_action(
             lambda: self._create_style_from_values(values),
-            self.tr("Failed to upload style '{}'").format(values["name"]),
+            translate("StyleTabMixin", "Failed to upload style '{}'").format(
+                values["name"]
+            ),
         ):
             self.show_success_message(
-                self.tr("Style '{}' uploaded.").format(values["name"])
+                translate("StyleTabMixin", "Style '{}' uploaded.").format(
+                    values["name"]
+                )
             )
             self._load_styles()
 
@@ -379,7 +416,7 @@ class StyleTabMixin:
         # create_style_* upsert (and rewrite the definition's filename)
         if self._resource_exists(self.gs.get_style_definition, name, workspace_name):
             raise ValueError(
-                self.tr("Style '{}' already exists in {}.").format(
+                translate("StyleTabMixin", "Style '{}' already exists in {}.").format(
                     name, values["workspace"] or GLOBAL
                 )
             )
@@ -428,21 +465,21 @@ class StyleTabMixin:
         name, workspace_name = row_data[0], self._scope(row_data[1])
         fetched = self._fetch(
             lambda: self._check(self.gs.get_style_definition(name, workspace_name)),
-            self.tr("Failed to load style '{}'").format(name),
+            translate("StyleTabMixin", "Failed to load style '{}'").format(name),
         )
         if fetched is None:
             return None
         style_format = str((fetched or {}).get("format") or "sld").lower()
         if style_format != "sld":
             self.show_warning_message(
-                self.tr("'{}' is a {} style — QGIS can only read SLD.").format(
-                    name, style_format.upper()
-                )
+                translate(
+                    "StyleTabMixin", "'{}' is a {} style — QGIS can only read SLD."
+                ).format(name, style_format.upper())
             )
             return None
         return self._fetch(
             lambda: self._style_body(name, workspace_name, "sld"),
-            self.tr("Failed to load the SLD of '{}'").format(name),
+            translate("StyleTabMixin", "Failed to load the SLD of '{}'").format(name),
         )
 
     def _apply_style_to_qgis(self, row_data):
@@ -451,7 +488,10 @@ class StyleTabMixin:
         layers = styleable_project_layers()
         if not layers:
             self.show_warning_message(
-                self.tr("This QGIS project has no vector or raster layer to style.")
+                translate(
+                    "StyleTabMixin",
+                    "This QGIS project has no vector or raster layer to style.",
+                )
             )
             return
         sld = self._sld_for_qgis(row_data)
@@ -459,15 +499,16 @@ class StyleTabMixin:
             return
 
         dlg = ResourceFormDialog(
-            title=self.tr("Apply '{}' to a QGIS layer").format(name),
-            description=self.tr(
+            title=translate("StyleTabMixin", "Apply '{}' to a QGIS layer").format(name),
+            description=translate(
+                "StyleTabMixin",
                 "The style is applied to the layer in this project only — the "
-                "server is not touched."
+                "server is not touched.",
             ),
             fields=[
                 {
                     "key": "qgis_layer",
-                    "label": self.tr("QGIS layer"),
+                    "label": translate("StyleTabMixin", "QGIS layer"),
                     "type": "combo",
                     "options": [label for label, _layer in layers],
                     "required": True,
@@ -482,20 +523,24 @@ class StyleTabMixin:
         outcome = []
         if not self._run_action(
             lambda: outcome.extend(apply_sld_to_layer(layer, sld)),
-            self.tr("Failed to apply '{}' to '{}'").format(name, layer.name()),
+            translate("StyleTabMixin", "Failed to apply '{}' to '{}'").format(
+                name, layer.name()
+            ),
         ):
             return
         ok, message = outcome[0], outcome[1]
         if ok:
             self.show_success_message(
-                self.tr("'{}' now uses the style '{}'.").format(layer.name(), name)
+                translate("StyleTabMixin", "'{}' now uses the style '{}'.").format(
+                    layer.name(), name
+                )
             )
         else:
             # QGIS reads less SLD than it writes; say what it could not take.
             self.show_warning_message(
-                self.tr("QGIS could not read all of '{}': {}").format(
-                    name, message or self.tr("no detail given")
-                )
+                translate(
+                    "StyleTabMixin", "QGIS could not read all of '{}': {}"
+                ).format(name, message or translate("StyleTabMixin", "no detail given"))
             )
 
     def _save_style_to_disk(self, row_data):
@@ -503,14 +548,14 @@ class StyleTabMixin:
         name, workspace_name = row_data[0], self._scope(row_data[1])
         definition = self._fetch(
             lambda: self._check(self.gs.get_style_definition(name, workspace_name)),
-            self.tr("Failed to load style '{}'").format(name),
+            translate("StyleTabMixin", "Failed to load style '{}'").format(name),
         )
         if definition is None:
             return
         style_format = str((definition or {}).get("format") or "sld").lower()
         body = self._fetch(
             lambda: self._style_body(name, workspace_name, style_format),
-            self.tr("Failed to load the body of '{}'").format(name),
+            translate("StyleTabMixin", "Failed to load the body of '{}'").format(name),
         )
         if body is None:
             return
@@ -518,7 +563,7 @@ class StyleTabMixin:
         suggested = (definition or {}).get("filename") or f"{name}.{style_format}"
         path, _selected = QFileDialog.getSaveFileName(
             self,
-            self.tr("Save style '{}'").format(name),
+            translate("StyleTabMixin", "Save style '{}'").format(name),
             suggested,
             f"{style_format.upper()} (*.{style_format});;All files (*)",
         )
@@ -526,14 +571,16 @@ class StyleTabMixin:
             return
         if self._run_action(
             lambda: Path(path).write_text(body, encoding="utf-8"),
-            self.tr("Failed to save '{}'").format(name),
+            translate("StyleTabMixin", "Failed to save '{}'").format(name),
         ):
             self.show_success_message(
-                self.tr("Style '{}' saved as {} ({}).").format(
+                translate("StyleTabMixin", "Style '{}' saved as {} ({}).").format(
                     name, Path(path).name, sld_version(body)
                 )
                 if style_format == "sld"
-                else self.tr("Style '{}' saved as {}.").format(name, Path(path).name)
+                else translate("StyleTabMixin", "Style '{}' saved as {}.").format(
+                    name, Path(path).name
+                )
             )
 
     # -- Delete ----------------------------------------------------------------
@@ -545,7 +592,7 @@ class StyleTabMixin:
     def _delete_selected_styles(self, selected_rows):
         """Delete one or more styles after confirmation."""
         self._delete_many(
-            self.tr("style"),
+            translate("StyleTabMixin", "style"),
             [
                 (
                     f"{row[1]}/{row[0]}",
@@ -556,9 +603,10 @@ class StyleTabMixin:
                 for row in selected_rows
             ],
             self._load_styles,
-            cascade=self.tr(
+            cascade=translate(
+                "StyleTabMixin",
                 "The style file is removed from the server too, and layers that used "
-                "it fall back to GeoServer's default style.\n\n"
+                "it fall back to GeoServer's default style.\n\n",
             ),
         )
 

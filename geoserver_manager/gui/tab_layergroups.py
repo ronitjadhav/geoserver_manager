@@ -9,6 +9,7 @@ the same global-or-workspace scope as styles) and `_layer_uri()` (LayerTabMixin)
 """
 
 from qgis.core import QgsProject, QgsRasterLayer
+from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
@@ -25,50 +26,58 @@ MODES = ("SINGLE", "OPAQUE_CONTAINER", "NAMED", "CONTAINER", "EO")
 _PICK = "— pick a layer —"
 
 
-class LayerGroupTabMixin:
-    """Mixin that adds layer-group methods to the main dialog.
+# Every user-visible string in this file goes through translate() with this
+# file's own class as the context. self.tr() cannot: pylupdate extracts it
+# under LayerGroupTabMixin, but at runtime self.tr is QObject.tr with the context of the
+# *instance's* class, GeoServerMainDialog — QDialog precedes the mixins in the
+# MRO — so every lookup would miss. A wrapper function would not be extracted
+# at all (pylupdate only understands a literal context), hence the repetition.
+translate = QCoreApplication.translate
 
-    ponytail: same translation caveat as the other tab mixins — self.tr() here
-    is extracted under this class but resolved against the host dialog.
-    """
+
+class LayerGroupTabMixin:
+    """Mixin that adds layer-group methods to the main dialog."""
 
     # -- Listing ---------------------------------------------------------------
 
     def _load_layer_groups(self):
         """Arm the Layer Groups tab, then fetch its rows in the background."""
         self._setup_add_button(
-            self.tr("Create a Layer Group"),
-            self.tr("Publish several layers as one"),
+            translate("LayerGroupTabMixin", "Create a Layer Group"),
+            translate("LayerGroupTabMixin", "Publish several layers as one"),
             self._add_layer_group,
         )
         self._setup_delete_selected_button(self._delete_selected_layer_groups)
         self._name_click_callback = self._show_layer_group_info
         self._extra_click_callbacks = {
-            self.tr("Workspace"): self._open_workspace_from_group_row
+            translate(
+                "LayerGroupTabMixin", "Workspace"
+            ): self._open_workspace_from_group_row
         }
         self._row_actions = [
             (
                 "mActionAddLayer.svg",
-                self.tr("Add to QGIS"),
+                translate("LayerGroupTabMixin", "Add to QGIS"),
                 self._add_group_to_qgis,
             ),
             (
                 "mActionDeleteSelected.svg",
-                self.tr("Delete"),
+                translate("LayerGroupTabMixin", "Delete"),
                 self._delete_layer_group,
             ),
         ]
         self._setup_table(
             [
-                self.tr("Layer Group"),
-                self.tr("Workspace"),
-                self.tr("Mode"),
-                self.tr("Layers"),
-                self.tr("Actions"),
+                translate("LayerGroupTabMixin", "Layer Group"),
+                translate("LayerGroupTabMixin", "Workspace"),
+                translate("LayerGroupTabMixin", "Mode"),
+                translate("LayerGroupTabMixin", "Layers"),
+                self.actions_column_label(),
             ]
         )
         self._start_load(
-            self.tr("Failed to load layer groups"), self._fetch_layer_group_rows
+            translate("LayerGroupTabMixin", "Failed to load layer groups"),
+            self._fetch_layer_group_rows,
         )
 
     def _fetch_layer_group_rows(self, task=None):
@@ -226,11 +235,11 @@ class LayerGroupTabMixin:
     def _group_info_fields(self):
         """Field definitions for the read-only detail dialog."""
         read_only_text = [
-            ("name", self.tr("Layer Group")),
-            ("workspace", self.tr("Workspace")),
-            ("mode", self.tr("Mode")),
-            ("title", self.tr("Title")),
-            ("bounds", self.tr("Bounds")),
+            ("name", translate("LayerGroupTabMixin", "Layer Group")),
+            ("workspace", translate("LayerGroupTabMixin", "Workspace")),
+            ("mode", translate("LayerGroupTabMixin", "Mode")),
+            ("title", translate("LayerGroupTabMixin", "Title")),
+            ("bounds", translate("LayerGroupTabMixin", "Bounds")),
         ]
         fields = [
             {"key": key, "label": label, "type": "text", "read_only": True}
@@ -239,7 +248,7 @@ class LayerGroupTabMixin:
         fields.append(
             {
                 "key": "abstract",
-                "label": self.tr("Abstract"),
+                "label": translate("LayerGroupTabMixin", "Abstract"),
                 "type": "textarea",
                 "read_only": True,
             }
@@ -247,11 +256,14 @@ class LayerGroupTabMixin:
         fields.append(
             {
                 "key": "layers",
-                "label": self.tr("Layers"),
+                "label": translate("LayerGroupTabMixin", "Layers"),
                 "type": "textarea",
                 "read_only": True,
-                "group": self.tr("Layers"),
-                "help": self.tr("In drawing order: the first line is at the bottom."),
+                "group": translate("LayerGroupTabMixin", "Layers"),
+                "help": translate(
+                    "LayerGroupTabMixin",
+                    "In drawing order: the first line is at the bottom.",
+                ),
             }
         )
         return fields
@@ -261,15 +273,18 @@ class LayerGroupTabMixin:
         name, workspace_label = row_data[0], row_data[1]
         detail = self._fetch(
             lambda: self._group_detail(name, self._scope(workspace_label)),
-            self.tr("Failed to load layer group '{}'").format(name),
+            translate("LayerGroupTabMixin", "Failed to load layer group '{}'").format(
+                name
+            ),
         )
         if detail is None:
             return
 
         dlg = ResourceFormDialog(
-            title=self.tr("Layer Group '{}'").format(name),
-            description=self.tr(
-                "Read-only: to change a group, create it again or delete it."
+            title=translate("LayerGroupTabMixin", "Layer Group '{}'").format(name),
+            description=translate(
+                "LayerGroupTabMixin",
+                "Read-only: to change a group, create it again or delete it.",
             ),
             fields=self._group_info_fields(),
             values=self._group_form_values(detail, name, workspace_label),
@@ -300,54 +315,65 @@ class LayerGroupTabMixin:
         return [
             {
                 "key": "name",
-                "label": self.tr("Layer Group"),
+                "label": translate("LayerGroupTabMixin", "Layer Group"),
                 "type": "text",
                 "required": True,
             },
             {
                 "key": "workspace",
-                "label": self.tr("Workspace"),
+                "label": translate("LayerGroupTabMixin", "Workspace"),
                 "type": "combo",
                 "options": [GLOBAL] + list(workspace_names),
-                "help": self.tr(
-                    "A global group can mix layers from several workspaces"
+                "help": translate(
+                    "LayerGroupTabMixin",
+                    "A global group can mix layers from several workspaces",
                 ),
             },
             {
                 "key": "mode",
-                "label": self.tr("Mode"),
+                "label": translate("LayerGroupTabMixin", "Mode"),
                 "type": "combo",
                 "options": list(MODES),
                 "default": "SINGLE",
-                "help": self.tr(
+                "help": translate(
+                    "LayerGroupTabMixin",
                     "SINGLE publishes the group as one layer; NAMED also keeps "
-                    "its layers addressable; CONTAINER and EO only group them"
+                    "its layers addressable; CONTAINER and EO only group them",
                 ),
             },
-            {"key": "title", "label": self.tr("Title"), "type": "text"},
-            {"key": "abstract", "label": self.tr("Abstract"), "type": "textarea"},
+            {
+                "key": "title",
+                "label": translate("LayerGroupTabMixin", "Title"),
+                "type": "text",
+            },
+            {
+                "key": "abstract",
+                "label": translate("LayerGroupTabMixin", "Abstract"),
+                "type": "textarea",
+            },
             {
                 "key": "pick",
-                "label": self.tr("Add a layer"),
+                "label": translate("LayerGroupTabMixin", "Add a layer"),
                 "type": "combo",
                 "options": [_PICK] + list(layer_names),
-                "group": self.tr("Layers"),
-                "help": self.tr("Appends to the list below"),
+                "group": translate("LayerGroupTabMixin", "Layers"),
+                "help": translate("LayerGroupTabMixin", "Appends to the list below"),
             },
             {
                 "key": "layers",
-                "label": self.tr("Layers"),
+                "label": translate("LayerGroupTabMixin", "Layers"),
                 "type": "textarea",
                 "required": True,
-                "group": self.tr("Layers"),
+                "group": translate("LayerGroupTabMixin", "Layers"),
                 "placeholder": (
                     "topp:tasmania_state_boundaries\ntopp:tasmania_roads = simple_roads"
                 ),
-                "help": self.tr(
+                "help": translate(
+                    "LayerGroupTabMixin",
                     "One layer per line, in drawing order — the first line is "
                     "drawn first, at the bottom. Reorder by editing the text. "
                     'Add "= style" to a line to publish that layer with a '
-                    "style other than its own default."
+                    "style other than its own default.",
                 ),
             },
         ]
@@ -363,17 +389,18 @@ class LayerGroupTabMixin:
         """Create a layer group from picked or pasted layer names."""
         fetched = self._fetch(
             lambda: (self._get_workspace_names(), self._all_layer_names()),
-            self.tr("Failed to load the workspaces and layers"),
+            translate("LayerGroupTabMixin", "Failed to load the workspaces and layers"),
         )
         if fetched is None:
             return
         workspace_names, layer_names = fetched
 
         dlg = ResourceFormDialog(
-            title=self.tr("Create a Layer Group"),
-            description=self.tr(
+            title=translate("LayerGroupTabMixin", "Create a Layer Group"),
+            description=translate(
+                "LayerGroupTabMixin",
                 "Publish several layers as one. GeoServer computes the group's "
-                "bounds from the layers it contains."
+                "bounds from the layers it contains.",
             ),
             fields=self._group_fields(workspace_names, layer_names),
             parent=self,
@@ -387,10 +414,14 @@ class LayerGroupTabMixin:
         values = dlg.get_values()
         if self._run_action(
             lambda: self._create_layer_group_from_values(values),
-            self.tr("Failed to create layer group '{}'").format(values["name"]),
+            translate("LayerGroupTabMixin", "Failed to create layer group '{}'").format(
+                values["name"]
+            ),
         ):
             self.show_success_message(
-                self.tr("Layer group '{}' created.").format(values["name"])
+                translate("LayerGroupTabMixin", "Layer group '{}' created.").format(
+                    values["name"]
+                )
             )
             self._load_layer_groups()
 
@@ -428,7 +459,9 @@ class LayerGroupTabMixin:
                 self.gs.get_style_definition, name, workspace_name or None
             ):
                 raise ValueError(
-                    self.tr("No style '{}' on the server.").format(reference)
+                    translate(
+                        "LayerGroupTabMixin", "No style '{}' on the server."
+                    ).format(reference)
                 )
 
     def _create_layer_group_from_values(self, values):
@@ -445,13 +478,15 @@ class LayerGroupTabMixin:
         workspace_name = self._scope(values["workspace"])
         layers, styles = self._parse_group_layers(values["layers"], workspace_name)
         if not layers:
-            raise ValueError(self.tr("List at least one layer."))
+            raise ValueError(
+                translate("LayerGroupTabMixin", "List at least one layer.")
+            )
         self._check_styles_exist(styles)
         if self.gs.rest_service.resource_exists(self._group_path(name, workspace_name)):
             raise ValueError(
-                self.tr("Layer group '{}' already exists in {}.").format(
-                    name, values["workspace"] or GLOBAL
-                )
+                translate(
+                    "LayerGroupTabMixin", "Layer group '{}' already exists in {}."
+                ).format(name, values["workspace"] or GLOBAL)
             )
 
         group = {
@@ -499,13 +534,19 @@ class LayerGroupTabMixin:
             layer = QgsRasterLayer(uri, name, provider)
             if not layer.isValid():
                 raise RuntimeError(
-                    layer.error().message() or self.tr("layer is not valid")
+                    layer.error().message()
+                    or translate("LayerGroupTabMixin", "layer is not valid")
                 )
             QgsProject.instance().addMapLayer(layer)
 
-        if self._run_action(add, self.tr("Could not add '{}' to QGIS").format(name)):
+        if self._run_action(
+            add,
+            translate("LayerGroupTabMixin", "Could not add '{}' to QGIS").format(name),
+        ):
             self.show_success_message(
-                self.tr("'{}' added to the project as WMS.").format(name)
+                translate(
+                    "LayerGroupTabMixin", "'{}' added to the project as WMS."
+                ).format(name)
             )
 
     # -- Delete ----------------------------------------------------------------
@@ -517,7 +558,7 @@ class LayerGroupTabMixin:
     def _delete_selected_layer_groups(self, selected_rows):
         """Delete one or more layer groups after confirmation."""
         self._delete_many(
-            self.tr("layer group"),
+            translate("LayerGroupTabMixin", "layer group"),
             [
                 (
                     f"{row[1]}/{row[0]}",
@@ -528,9 +569,10 @@ class LayerGroupTabMixin:
                 for row in selected_rows
             ],
             self._load_layer_groups,
-            cascade=self.tr(
+            cascade=translate(
+                "LayerGroupTabMixin",
                 "Only the group goes away — the layers it published stay. "
-                "GeoServer refuses if another layer group contains this one.\n\n"
+                "GeoServer refuses if another layer group contains this one.\n\n",
             ),
         )
 

@@ -7,6 +7,7 @@ Used as a mixin for GeoServerMainDialog.
 """
 
 from qgis.core import Qgis
+from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
@@ -16,22 +17,23 @@ from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 _ABSTRACT = "abstrct"
 
 
-class WorkspaceTabMixin:
-    """Mixin that adds workspace CRUD methods to the main dialog.
+# Every user-visible string in this file goes through translate() with this
+# file's own class as the context. self.tr() cannot: pylupdate extracts it
+# under WorkspaceTabMixin, but at runtime self.tr is QObject.tr with the context of the
+# *instance's* class, GeoServerMainDialog — QDialog precedes the mixins in the
+# MRO — so every lookup would miss. A wrapper function would not be extracted
+# at all (pylupdate only understands a literal context), hence the repetition.
+translate = QCoreApplication.translate
 
-    ponytail: the self.tr() calls below cannot resolve translations. They are
-    extracted under this class name, but at runtime resolve to QObject.tr,
-    whose context is the host dialog (QDialog precedes the mixins in the MRO,
-    so overriding tr() here would be dead code). When the first translation
-    lands, switch these sites to an explicit
-    QCoreApplication.translate("WorkspaceTabMixin", ...).
-    """
+
+class WorkspaceTabMixin:
+    """Mixin that adds workspace CRUD methods to the main dialog."""
 
     def _load_workspaces(self):
         """Arm the Workspaces tab, then fetch its rows in the background."""
         self._setup_add_button(
-            self.tr("Add a New Workspace"),
-            self.tr("Create a new workspace"),
+            translate("WorkspaceTabMixin", "Add a New Workspace"),
+            translate("WorkspaceTabMixin", "Create a new workspace"),
             self._add_workspace,
         )
         self._setup_delete_selected_button(self._delete_selected_workspaces)
@@ -40,19 +42,20 @@ class WorkspaceTabMixin:
         self._row_actions = [
             (
                 "mActionDeleteSelected.svg",
-                self.tr("Delete"),
+                translate("WorkspaceTabMixin", "Delete"),
                 self._delete_workspace,
             ),
         ]
         self._setup_table(
             [
-                self.tr("Workspace Name"),
-                self.tr("Default"),
-                self.tr("Actions"),
+                translate("WorkspaceTabMixin", "Workspace Name"),
+                translate("WorkspaceTabMixin", "Default"),
+                self.actions_column_label(),
             ]
         )
         self._start_load(
-            self.tr("Failed to load workspaces"), self._fetch_workspace_rows
+            translate("WorkspaceTabMixin", "Failed to load workspaces"),
+            self._fetch_workspace_rows,
         )
 
     def _fetch_workspace_rows(self, task=None):
@@ -62,7 +65,7 @@ class WorkspaceTabMixin:
         # GeoServer always has exactly one default and it cannot be unset.
         default = self._default_workspace_name()
         rows = [
-            [name, self.tr("default") if name == default else ""]
+            [name, translate("WorkspaceTabMixin", "default") if name == default else ""]
             for name in (self._name_of(ws) for ws in workspaces)
         ]
         return rows, []
@@ -77,31 +80,39 @@ class WorkspaceTabMixin:
             workspace: its settings can only be PUT once it exists.
         """
         fields = [
-            {"key": "name", "label": self.tr("Name"), "type": "text", "required": True},
+            {
+                "key": "name",
+                "label": translate("WorkspaceTabMixin", "Name"),
+                "type": "text",
+                "required": True,
+            },
             {
                 "key": "isolated",
-                "label": self.tr("Isolated Workspace"),
+                "label": translate("WorkspaceTabMixin", "Isolated Workspace"),
                 "type": "checkbox",
                 "default": False,
-                "help": self.tr(
-                    "Allow objects with the same name to coexist in this workspace"
+                "help": translate(
+                    "WorkspaceTabMixin",
+                    "Allow objects with the same name to coexist in this workspace",
                 ),
             },
             {
                 "key": "set_default",
-                "label": self.tr("Default Workspace"),
+                "label": translate("WorkspaceTabMixin", "Default Workspace"),
                 "type": "checkbox",
                 "default": False,
                 "read_only": is_default,
                 "help": (
-                    self.tr(
+                    translate(
+                        "WorkspaceTabMixin",
                         "This is GeoServer's default workspace. There is always "
                         "exactly one and it cannot be unset — to change it, tick "
-                        "Default on another workspace."
+                        "Default on another workspace.",
                     )
                     if is_default
-                    else self.tr(
-                        "Make this GeoServer's default workspace (replaces the current one)"
+                    else translate(
+                        "WorkspaceTabMixin",
+                        "Make this GeoServer's default workspace (replaces the current one)",
                     )
                 ),
             },
@@ -112,79 +123,84 @@ class WorkspaceTabMixin:
 
     def _wms_fields(self):
         """The WMS group: one workspace's own WMS service settings."""
-        group = self.tr("WMS")
+        group = translate("WorkspaceTabMixin", "WMS")
         return [
             {
                 "key": "wms_own",
-                "label": self.tr("Own WMS settings"),
+                "label": translate("WorkspaceTabMixin", "Own WMS settings"),
                 "type": "checkbox",
                 "group": group,
-                "help": self.tr(
+                "help": translate(
+                    "WorkspaceTabMixin",
                     "Untick to fall back to GeoServer's global WMS settings — the "
-                    "workspace's own are then removed."
+                    "workspace's own are then removed.",
                 ),
             },
             {
                 "key": "wms_enabled",
-                "label": self.tr("Service enabled"),
+                "label": translate("WorkspaceTabMixin", "Service enabled"),
                 "type": "checkbox",
                 "group": group,
-                "help": self.tr("Serve WMS for this workspace at all"),
+                "help": translate(
+                    "WorkspaceTabMixin", "Serve WMS for this workspace at all"
+                ),
             },
             {
                 "key": "wms_title",
-                "label": self.tr("Title"),
+                "label": translate("WorkspaceTabMixin", "Title"),
                 "type": "text",
                 "group": group,
             },
             {
                 "key": "wms_abstract",
-                "label": self.tr("Abstract"),
+                "label": translate("WorkspaceTabMixin", "Abstract"),
                 "type": "textarea",
                 "group": group,
             },
             {
                 "key": "wms_keywords",
-                "label": self.tr("Keywords"),
+                "label": translate("WorkspaceTabMixin", "Keywords"),
                 "type": "text",
                 "group": group,
-                "help": self.tr("Comma separated"),
+                "help": translate("WorkspaceTabMixin", "Comma separated"),
             },
             {
                 "key": "wms_srs",
-                "label": self.tr("SRS list"),
+                "label": translate("WorkspaceTabMixin", "SRS list"),
                 "type": "text",
                 "group": group,
-                "help": self.tr(
+                "help": translate(
+                    "WorkspaceTabMixin",
                     "EPSG codes without the prefix, comma separated (4326, 3857). "
-                    "Empty advertises every SRS GeoServer knows."
+                    "Empty advertises every SRS GeoServer knows.",
                 ),
             },
             {
                 "key": "wms_max_rendering_time",
-                "label": self.tr("Max rendering time (s)"),
+                "label": translate("WorkspaceTabMixin", "Max rendering time (s)"),
                 "type": "spinbox",
                 "min": 0,
                 "max": 86400,
                 "group": group,
-                "help": self.tr("0 means no limit"),
+                "help": translate("WorkspaceTabMixin", "0 means no limit"),
             },
             {
                 "key": "wms_max_rendering_errors",
-                "label": self.tr("Max rendering errors"),
+                "label": translate("WorkspaceTabMixin", "Max rendering errors"),
                 "type": "spinbox",
                 "min": 0,
                 "max": 1000000,
                 "group": group,
-                "help": self.tr("0 means no limit"),
+                "help": translate("WorkspaceTabMixin", "0 means no limit"),
             },
             {
                 "key": "wms_default_locale",
-                "label": self.tr("Default locale"),
+                "label": translate("WorkspaceTabMixin", "Default locale"),
                 "type": "text",
                 "group": group,
-                "help": self.tr(
-                    "Language of the internationalised title and abstract, e.g. en"
+                "help": translate(
+                    "WorkspaceTabMixin",
+                    "Language of the internationalised title and abstract, e.g. en",
                 ),
             },
         ]
@@ -319,7 +335,11 @@ class WorkspaceTabMixin:
             # create_workspace upserts, so an existing name would silently
             # reconfigure the live workspace and report it as created
             if self._resource_exists(self.gs.get_workspace, name):
-                raise ValueError(self.tr("Workspace '{}' already exists.").format(name))
+                raise ValueError(
+                    translate(
+                        "WorkspaceTabMixin", "Workspace '{}' already exists."
+                    ).format(name)
+                )
             self._check(self.gs.create_workspace(name, isolated=values["isolated"]))
         elif name != old_name:
             self._rename_workspace(old_name, name, values["isolated"])
@@ -332,8 +352,9 @@ class WorkspaceTabMixin:
                 self._set_default_workspace(name)
             except Exception as e:
                 self.show_warning_message(
-                    self.tr(
-                        "Workspace '{}' saved, but it could not be made the default: {}"
+                    translate(
+                        "WorkspaceTabMixin",
+                        "Workspace '{}' saved, but it could not be made the default: {}",
                     ).format(name, e)
                 )
                 self.log(f"Set default workspace error: {e}", Qgis.MessageLevel.Warning)
@@ -341,8 +362,8 @@ class WorkspaceTabMixin:
     def _add_workspace(self):
         """Open a form dialog to create a new workspace."""
         dlg = ResourceFormDialog(
-            title=self.tr("New Workspace"),
-            description=self.tr("Configure a new workspace"),
+            title=translate("WorkspaceTabMixin", "New Workspace"),
+            description=translate("WorkspaceTabMixin", "Configure a new workspace"),
             fields=self._workspace_fields(),
             parent=self,
         )
@@ -352,10 +373,14 @@ class WorkspaceTabMixin:
         values = dlg.get_values()
         if self._run_action(
             lambda: self._save_workspace(values),
-            self.tr("Failed to create workspace '{}'").format(values["name"]),
+            translate("WorkspaceTabMixin", "Failed to create workspace '{}'").format(
+                values["name"]
+            ),
         ):
             self.show_success_message(
-                self.tr("Workspace '{}' created.").format(values["name"])
+                translate("WorkspaceTabMixin", "Workspace '{}' created.").format(
+                    values["name"]
+                )
             )
             self._load_workspaces()
 
@@ -367,7 +392,7 @@ class WorkspaceTabMixin:
                 self._check(self.gs.get_workspace(old_name)),
                 self._wms_settings(old_name),
             ),
-            self.tr("Failed to load workspace details"),
+            translate("WorkspaceTabMixin", "Failed to load workspace details"),
         )
         if fetched is None:
             return
@@ -385,8 +410,10 @@ class WorkspaceTabMixin:
         }
         values.update(self._wms_form_values(wms_settings))
         dlg = ResourceFormDialog(
-            title=self.tr("Edit Workspace '{}'").format(old_name),
-            description=self.tr("Modify workspace settings"),
+            title=translate("WorkspaceTabMixin", "Edit Workspace '{}'").format(
+                old_name
+            ),
+            description=translate("WorkspaceTabMixin", "Modify workspace settings"),
             fields=self._workspace_fields(is_default=is_default, with_wms=True),
             values=values,
             parent=self,
@@ -401,10 +428,14 @@ class WorkspaceTabMixin:
         had_wms = wms_settings is not None
         if self._run_action(
             lambda: self._save_workspace_and_wms(values, old_name, had_wms),
-            self.tr("Failed to update workspace '{}'").format(values["name"]),
+            translate("WorkspaceTabMixin", "Failed to update workspace '{}'").format(
+                values["name"]
+            ),
         ):
             self.show_success_message(
-                self.tr("Workspace '{}' updated.").format(values["name"])
+                translate("WorkspaceTabMixin", "Workspace '{}' updated.").format(
+                    values["name"]
+                )
             )
             # Reachable from the datastore tab, so reload whatever is on screen
             self._reload_current_tab()
@@ -425,15 +456,16 @@ class WorkspaceTabMixin:
     def _delete_selected_workspaces(self, selected_rows):
         """Delete one or more workspaces after confirmation."""
         self._delete_many(
-            self.tr("workspace"),
+            translate("WorkspaceTabMixin", "workspace"),
             [
                 (row[0], lambda n=row[0]: self._check(self.gs.delete_workspace(n)))
                 for row in selected_rows
             ],
             self._load_workspaces,
             # delete_workspace() sends recurse=true
-            cascade=self.tr(
+            cascade=translate(
+                "WorkspaceTabMixin",
                 "Everything it contains is deleted too: datastores, layers, "
-                "styles and layer groups.\n\n"
+                "styles and layer groups.\n\n",
             ),
         )

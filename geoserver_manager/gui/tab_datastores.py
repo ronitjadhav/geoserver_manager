@@ -6,6 +6,7 @@ Datastore tab — load, create, edit, delete datastores.
 Used as a mixin for GeoServerMainDialog.
 """
 
+from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
@@ -50,43 +51,49 @@ _TYPE_SPECIFIC_FIELDS = (
 )
 
 
-class DatastoreTabMixin:
-    """Mixin that adds datastore CRUD methods to the main dialog.
+# Every user-visible string in this file goes through translate() with this
+# file's own class as the context. self.tr() cannot: pylupdate extracts it
+# under DatastoreTabMixin, but at runtime self.tr is QObject.tr with the context of the
+# *instance's* class, GeoServerMainDialog — QDialog precedes the mixins in the
+# MRO — so every lookup would miss. A wrapper function would not be extracted
+# at all (pylupdate only understands a literal context), hence the repetition.
+translate = QCoreApplication.translate
 
-    ponytail: same translation caveat as WorkspaceTabMixin — self.tr() here is
-    extracted under this class but resolved against the host dialog's context.
-    """
+
+class DatastoreTabMixin:
+    """Mixin that adds datastore CRUD methods to the main dialog."""
 
     def _load_datastores(self):
         """Arm the Datastores tab, then fetch its rows in the background."""
         self._setup_add_button(
-            self.tr("Add a New Datastore"),
-            self.tr("Create a new datastore"),
+            translate("DatastoreTabMixin", "Add a New Datastore"),
+            translate("DatastoreTabMixin", "Create a new datastore"),
             self._add_datastore,
         )
         self._setup_delete_selected_button(self._delete_selected_datastores)
         self._name_click_callback = self._show_datastore_info
         self._extra_click_callbacks = {
-            self.tr("Workspace"): self._open_workspace_from_row
+            translate("DatastoreTabMixin", "Workspace"): self._open_workspace_from_row
         }
         self._row_actions = [
             (
                 "mActionDeleteSelected.svg",
-                self.tr("Delete"),
+                translate("DatastoreTabMixin", "Delete"),
                 self._delete_datastore,
             ),
         ]
         self._setup_table(
             [
-                self.tr("Datastore Name"),
-                self.tr("Workspace"),
-                self.tr("Type"),
-                self.tr("Enabled"),
-                self.tr("Actions"),
+                translate("DatastoreTabMixin", "Datastore Name"),
+                translate("DatastoreTabMixin", "Workspace"),
+                translate("DatastoreTabMixin", "Type"),
+                translate("DatastoreTabMixin", "Enabled"),
+                self.actions_column_label(),
             ]
         )
         self._start_load(
-            self.tr("Failed to load datastores"), self._fetch_datastore_rows
+            translate("DatastoreTabMixin", "Failed to load datastores"),
+            self._fetch_datastore_rows,
         )
 
     def _fetch_datastore_rows(self, task=None):
@@ -139,16 +146,18 @@ class DatastoreTabMixin:
         return [
             {
                 "key": "workspace",
-                "label": self.tr("Workspace"),
+                "label": translate("DatastoreTabMixin", "Workspace"),
                 "type": "combo",
                 "options": workspace_names,
                 "required": True,
                 "read_only": edit_mode,
-                "help": self.tr("The workspace this datastore belongs to"),
+                "help": translate(
+                    "DatastoreTabMixin", "The workspace this datastore belongs to"
+                ),
             },
             {
                 "key": "name",
-                "label": self.tr("Name"),
+                "label": translate("DatastoreTabMixin", "Name"),
                 "type": "text",
                 "required": True,
                 # Renaming would upsert: a free name creates a second store and
@@ -156,12 +165,14 @@ class DatastoreTabMixin:
                 # real rename (#50; workspaces do it with a raw PUT).
                 "read_only": edit_mode,
                 "help": (
-                    self.tr("A datastore cannot be renamed") if edit_mode else None
+                    translate("DatastoreTabMixin", "A datastore cannot be renamed")
+                    if edit_mode
+                    else None
                 ),
             },
             {
                 "key": "type",
-                "label": self.tr("Type"),
+                "label": translate("DatastoreTabMixin", "Type"),
                 "type": "combo",
                 "options": _SUPPORTED_TYPES,
                 "required": True,
@@ -169,170 +180,187 @@ class DatastoreTabMixin:
             },
             {
                 "key": "description",
-                "label": self.tr("Description"),
+                "label": translate("DatastoreTabMixin", "Description"),
                 "type": "text",
-                "placeholder": self.tr("Optional description"),
+                "placeholder": translate("DatastoreTabMixin", "Optional description"),
             },
             # --- PostGIS fields ---
             {
                 "key": "pg_host",
-                "label": self.tr("Host"),
+                "label": translate("DatastoreTabMixin", "Host"),
                 "type": "text",
                 "required": True,
                 "placeholder": "localhost",
-                "group": self.tr("Connection"),
+                "group": translate("DatastoreTabMixin", "Connection"),
             },
             {
                 "key": "pg_port",
-                "label": self.tr("Port"),
+                "label": translate("DatastoreTabMixin", "Port"),
                 "type": "spinbox",
                 "default": 5432,
                 "min": 1,
                 "max": 65535,
-                "group": self.tr("Connection"),
+                "group": translate("DatastoreTabMixin", "Connection"),
             },
             {
                 "key": "pg_db",
-                "label": self.tr("Database"),
+                "label": translate("DatastoreTabMixin", "Database"),
                 "type": "text",
                 "required": True,
-                "group": self.tr("Connection"),
+                "group": translate("DatastoreTabMixin", "Connection"),
             },
             {
                 "key": "pg_user",
-                "label": self.tr("User"),
+                "label": translate("DatastoreTabMixin", "User"),
                 "type": "text",
                 "required": True,
-                "group": self.tr("Connection"),
+                "group": translate("DatastoreTabMixin", "Connection"),
             },
             {
                 "key": "pg_password",
-                "label": self.tr("Password"),
+                "label": translate("DatastoreTabMixin", "Password"),
                 "type": "text",
                 "required": True,
                 "echo_password": True,
-                "group": self.tr("Connection"),
+                "group": translate("DatastoreTabMixin", "Connection"),
                 "help": (
-                    self.tr("Re-enter the password to save changes")
+                    translate(
+                        "DatastoreTabMixin", "Re-enter the password to save changes"
+                    )
                     if edit_mode
                     else None
                 ),
             },
             {
                 "key": "pg_schema",
-                "label": self.tr("Schema"),
+                "label": translate("DatastoreTabMixin", "Schema"),
                 "type": "text",
                 "default": "public",
-                "group": self.tr("Connection"),
+                "group": translate("DatastoreTabMixin", "Connection"),
             },
             # --- JNDI fields ---
             {
                 "key": "jndi_reference",
-                "label": self.tr("JNDI Reference"),
+                "label": translate("DatastoreTabMixin", "JNDI Reference"),
                 "type": "text",
                 "required": True,
                 "placeholder": "java:comp/env/jdbc/mydb",
                 "visible": False,
-                "group": self.tr("Connection"),
-                "help": self.tr("JNDI name of the database connection pool"),
+                "group": translate("DatastoreTabMixin", "Connection"),
+                "help": translate(
+                    "DatastoreTabMixin", "JNDI name of the database connection pool"
+                ),
             },
             # --- any other type: shown read-only, since the form cannot edit it ---
             {
                 "key": "raw_params",
-                "label": self.tr("Connection parameters"),
+                "label": translate("DatastoreTabMixin", "Connection parameters"),
                 "type": "textarea",
                 "visible": False,
-                "group": self.tr("Connection"),
-                "help": self.tr(
+                "group": translate("DatastoreTabMixin", "Connection"),
+                "help": translate(
+                    "DatastoreTabMixin",
                     "One 'key = value' per line, exactly as GeoServer stores them. "
                     "Lines you remove are removed on the server; a masked password "
-                    "(••••) is kept as it is unless you replace it."
+                    "(••••) is kept as it is unless you replace it.",
                 ),
             },
             # --- PMTiles fields ---
             {
                 "key": "pmtiles_url",
-                "label": self.tr("PMTiles URL"),
+                "label": translate("DatastoreTabMixin", "PMTiles URL"),
                 "type": "text",
                 "required": True,
                 "placeholder": "file:///mnt/data/tiles.pmtiles",
                 "visible": False,
-                "group": self.tr("Connection"),
-                "help": self.tr(
-                    "Path or URL to the PMTiles file (file://, s3://, gs://, http(s)://)"
+                "group": translate("DatastoreTabMixin", "Connection"),
+                "help": translate(
+                    "DatastoreTabMixin",
+                    "Path or URL to the PMTiles file (file://, s3://, gs://, http(s)://)",
                 ),
             },
             # --- Shapefile / directory of shapefiles ---
             {
                 "key": "file_url",
-                "label": self.tr("File or folder"),
+                "label": translate("DatastoreTabMixin", "File or folder"),
                 "type": "text",
                 "required": True,
                 "visible": False,
                 "placeholder": "file:data/shapefiles/states.shp",
-                "group": self.tr("Connection"),
-                "help": self.tr(
+                "group": translate("DatastoreTabMixin", "Connection"),
+                "help": translate(
+                    "DatastoreTabMixin",
                     "A path on the GeoServer machine: relative to its data "
                     "directory (file:data/…) or absolute (file:///…). A single "
-                    ".shp, or the folder holding them for a directory store."
+                    ".shp, or the folder holding them for a directory store.",
                 ),
             },
             {
                 "key": "charset",
-                "label": self.tr("Attribute charset"),
+                "label": translate("DatastoreTabMixin", "Attribute charset"),
                 "type": "text",
                 "visible": False,
-                "placeholder": self.tr("Leave empty for GeoServer's default"),
-                "group": self.tr("Connection"),
-                "help": self.tr(
+                "placeholder": translate(
+                    "DatastoreTabMixin", "Leave empty for GeoServer's default"
+                ),
+                "group": translate("DatastoreTabMixin", "Connection"),
+                "help": translate(
+                    "DatastoreTabMixin",
                     "How the .dbf attribute text is encoded — UTF-8, or "
-                    "ISO-8859-1, which is what GeoServer assumes"
+                    "ISO-8859-1, which is what GeoServer assumes",
                 ),
             },
             {
                 "key": "spatial_index",
-                "label": self.tr("Create a spatial index"),
+                "label": translate("DatastoreTabMixin", "Create a spatial index"),
                 "type": "checkbox",
                 "default": True,
                 "visible": False,
-                "group": self.tr("Connection"),
-                "help": self.tr("Writes a .qix file next to the data, once"),
+                "group": translate("DatastoreTabMixin", "Connection"),
+                "help": translate(
+                    "DatastoreTabMixin", "Writes a .qix file next to the data, once"
+                ),
             },
             # --- GeoPackage ---
             {
                 "key": "gpkg_database",
-                "label": self.tr("GeoPackage file"),
+                "label": translate("DatastoreTabMixin", "GeoPackage file"),
                 "type": "text",
                 "required": True,
                 "visible": False,
                 "placeholder": "file:data/ne/natural_earth.gpkg",
-                "group": self.tr("Connection"),
-                "help": self.tr(
+                "group": translate("DatastoreTabMixin", "Connection"),
+                "help": translate(
+                    "DatastoreTabMixin",
                     "A path on the GeoServer machine. To publish a .gpkg from "
                     "this computer instead, use Publish a Layer on the Layers "
-                    "tab, which uploads it."
+                    "tab, which uploads it.",
                 ),
             },
             {
                 "key": "gpkg_read_only",
-                "label": self.tr("Read-only"),
+                "label": translate("DatastoreTabMixin", "Read-only"),
                 "type": "checkbox",
                 "default": False,
                 "visible": False,
-                "group": self.tr("Connection"),
-                "help": self.tr(
+                "group": translate("DatastoreTabMixin", "Connection"),
+                "help": translate(
+                    "DatastoreTabMixin",
                     "Recommended when nothing writes to the file: GeoServer "
-                    "then serves it without taking write locks"
+                    "then serves it without taking write locks",
                 ),
             },
             {
                 "key": "gpkg_expose_pk",
-                "label": self.tr("Expose primary keys"),
+                "label": translate("DatastoreTabMixin", "Expose primary keys"),
                 "type": "checkbox",
                 "default": False,
                 "visible": False,
-                "group": self.tr("Connection"),
-                "help": self.tr("Publish the tables' primary key as an attribute"),
+                "group": translate("DatastoreTabMixin", "Connection"),
+                "help": translate(
+                    "DatastoreTabMixin",
+                    "Publish the tables' primary key as an attribute",
+                ),
             },
         ]
 
@@ -406,13 +434,16 @@ class DatastoreTabMixin:
         workspace_names = self._get_workspace_names()
         if not workspace_names:
             self.show_warning_message(
-                self.tr("No workspaces available. Create a workspace first.")
+                translate(
+                    "DatastoreTabMixin",
+                    "No workspaces available. Create a workspace first.",
+                )
             )
             return
 
         dlg = ResourceFormDialog(
-            title=self.tr("New Datastore"),
-            description=self.tr("Configure a new datastore"),
+            title=translate("DatastoreTabMixin", "New Datastore"),
+            description=translate("DatastoreTabMixin", "Configure a new datastore"),
             fields=self._datastore_fields(workspace_names),
             parent=self,
         )
@@ -423,10 +454,14 @@ class DatastoreTabMixin:
         values = dlg.get_values()
         if self._run_action(
             lambda: self._create_datastore_from_values(values),
-            self.tr("Failed to create datastore '{}'").format(values["name"]),
+            translate("DatastoreTabMixin", "Failed to create datastore '{}'").format(
+                values["name"]
+            ),
         ):
             self.show_success_message(
-                self.tr("Datastore '{}' created.").format(values["name"])
+                translate("DatastoreTabMixin", "Datastore '{}' created.").format(
+                    values["name"]
+                )
             )
             self._load_datastores()
 
@@ -486,9 +521,10 @@ class DatastoreTabMixin:
         # create_* upserts, so an existing name would overwrite a live store
         if self._resource_exists(self.gs.get_datastore, ws, name):
             raise ValueError(
-                self.tr("Datastore '{}' already exists in workspace '{}'.").format(
-                    name, ws
-                )
+                translate(
+                    "DatastoreTabMixin",
+                    "Datastore '{}' already exists in workspace '{}'.",
+                ).format(name, ws)
             )
 
         if ds_type == "PostGIS":
@@ -665,7 +701,7 @@ class DatastoreTabMixin:
         ds_name, ws_name, ds_type = row_data[0], row_data[1], row_data[2]
         detail = self._fetch(
             lambda: self._check(self.gs.get_datastore(ws_name, ds_name)),
-            self.tr("Failed to load datastore details"),
+            translate("DatastoreTabMixin", "Failed to load datastore details"),
         )
         if detail is None:
             return
@@ -681,13 +717,14 @@ class DatastoreTabMixin:
         editable = ds_type in _SUPPORTED_TYPES
 
         dlg = ResourceFormDialog(
-            title=self.tr("Edit Datastore '{}'").format(ds_name),
+            title=translate("DatastoreTabMixin", "Edit Datastore '{}'").format(ds_name),
             description=(
-                self.tr("Modify datastore settings")
+                translate("DatastoreTabMixin", "Modify datastore settings")
                 if editable
-                else self.tr(
+                else translate(
+                    "DatastoreTabMixin",
                     "Datastore type '{}' has no dedicated form — edit its connection "
-                    "parameters directly."
+                    "parameters directly.",
                 ).format(ds_type)
             ),
             fields=self._datastore_fields(self._get_workspace_names(), edit_mode=True),
@@ -704,10 +741,14 @@ class DatastoreTabMixin:
         values = dlg.get_values()
         if self._run_action(
             lambda: self._update_datastore_from_values(values, detail, conn_params),
-            self.tr("Failed to update datastore '{}'").format(values["name"]),
+            translate("DatastoreTabMixin", "Failed to update datastore '{}'").format(
+                values["name"]
+            ),
         ):
             self.show_success_message(
-                self.tr("Datastore '{}' updated.").format(values["name"])
+                translate("DatastoreTabMixin", "Datastore '{}' updated.").format(
+                    values["name"]
+                )
             )
             self._load_datastores()
 
@@ -718,7 +759,7 @@ class DatastoreTabMixin:
     def _delete_selected_datastores(self, selected_rows):
         """Delete one or more datastores after confirmation."""
         self._delete_many(
-            self.tr("datastore"),
+            translate("DatastoreTabMixin", "datastore"),
             [
                 (
                     f"{row[1]}/{row[0]}",
@@ -728,7 +769,9 @@ class DatastoreTabMixin:
             ],
             self._load_datastores,
             # _do_delete_datastore sends recurse=true
-            cascade=self.tr("Every layer published from it is deleted too.\n\n"),
+            cascade=translate(
+                "DatastoreTabMixin", "Every layer published from it is deleted too.\n\n"
+            ),
         )
 
     def _do_delete_datastore(self, workspace_name, datastore_name):
