@@ -146,3 +146,47 @@ class TestStyleableProjectLayers(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ############################################################################
+# ##### GeoPackage export ########
+# ################################
+
+
+class TestExportToGeopackage(unittest.TestCase):
+    """The upload's payload: one table, named as the layer will be."""
+
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+
+        self.folder = Path(tempfile.mkdtemp(prefix="gsm_test_"))
+
+    def tearDown(self):
+        import shutil
+
+        shutil.rmtree(self.folder, ignore_errors=True)
+
+    def test_the_table_is_named_as_asked_and_holds_the_features(self):
+        from qgis.core import QgsVectorLayer
+
+        from geoserver_manager.toolbelt.qgis_export import export_to_geopackage
+
+        package = self.folder / "towns.gpkg"
+        export_to_geopackage(point_layer("towns  weird name"), package, "towns")
+
+        self.assertTrue(package.exists())
+        written = QgsVectorLayer(f"{package}|layername=towns", "check", "ogr")
+        self.assertTrue(written.isValid(), "the asked-for table name is not there")
+        self.assertEqual(written.featureCount(), 2)
+        self.assertEqual(written.crs().authid(), "EPSG:4326")
+        self.assertIn("kind", written.fields().names())
+
+    def test_an_unwritable_path_is_a_runtime_error_with_qgis_words(self):
+        from geoserver_manager.toolbelt.qgis_export import export_to_geopackage
+
+        with self.assertRaises(RuntimeError) as caught:
+            export_to_geopackage(
+                point_layer("towns"), self.folder / "no" / "such" / "dir.gpkg", "towns"
+            )
+        self.assertIn("towns", str(caught.exception))

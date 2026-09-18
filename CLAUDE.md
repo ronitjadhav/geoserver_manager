@@ -23,7 +23,7 @@ Skills in `.claude/skills/` hold the step-by-step procedures:
 | `geoserver_manager/gui/tab_workspaces.py`, `tab_datastores.py`, `tab_coveragestores.py`, `tab_layers.py`, `tab_layergroups.py`, `tab_styles.py` | One mixin per resource type: load / add / edit / delete (layers also: publish, add to QGIS; layer groups also: add to QGIS; coverage stores also: publish a coverage) |
 | `geoserver_manager/gui/dlg_resource_form.py` | `ResourceFormDialog` — a modal form built from a list of field dicts (see its module docstring for the field spec) |
 | `geoserver_manager/gui/dlg_settings.py` | Options page: URL + credentials (credentials go to `QgsAuthManager`, encrypted) |
-| `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser`, `sld` (QGIS ⇄ SLD, version sniffing) |
+| `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser`, `sld` (QGIS ⇄ SLD, version sniffing), `qgis_export` (GeoServer-safe names, GeoPackage export) |
 | `geoserver_manager/extras/*.whl` | Bundled `geoservercloud` (stripped, see below) and `xmltodict`, added to `sys.path` at startup |
 | `tests/unit/` | Runs without QGIS. `tests/qgis/` needs the QGIS Python (headless via `qgis.testing.start_app()`) |
 | `docs/github_issue_roadmap.md` | Feature backlog; GitHub milestones mirror it |
@@ -130,6 +130,16 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
 - **Thread safety:** the REST methods are stateless `requests.*` calls and are safe to run through
   `_fan_out` (the datastore list does this). `self.wms` / `self.wmts` on the client are shared state —
   OWS calls must not be fanned out the same way.
+- **Publishing a QGIS layer** (rows 28–29 of #50) uploads a GeoPackage: `PUT
+  .../datastores/{name}/file.gpkg?update=overwrite`. GeoServer then creates the store *and* configures one
+  feature type per table in the file, with the SRS, bounding box and attributes read from the data — so the
+  layer is published by that one request, and the table name inside the GeoPackage is the layer's name. Three
+  things follow from that: metadata is added with a **partial** feature-type PUT, which merges (a
+  `create_feature_type()` template would replace the computed values); the store is marked `read_only` by
+  merging onto its own parameters (a performance gain GeoCat Bridge documents), best-effort, because the data
+  is already published by then and a flag must not fail the publish; and deleting the store later **leaves the
+  uploaded file** in the data directory. A QGIS layer name must pass `toolbelt/qgis_export.geoserver_name()`
+  first — it becomes a WFS type name, so it has to be an XML NCName.
 - **SLD versions decide the content type** (row 27 of #50). GeoServer picks its SLD parser from the request's
   content type, not from the document: `application/vnd.ogc.sld+xml` for 1.0, `application/vnd.ogc.se+xml` for
   1.1. `rest_service.create_style()` only sends the former, so `toolbelt/sld.py` sniffs the version

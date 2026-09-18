@@ -67,6 +67,18 @@ def styleable_project_layers():
     return sorted(layers, key=lambda entry: entry[0].lower())
 
 
+def project_layer_by_label(label):
+    """The project layer a `styleable_project_layers` label points at.
+
+    Raises ValueError when it has left the project since the form was filled —
+    a dialog can sit open for a long time.
+    """
+    for candidate, layer in styleable_project_layers():
+        if candidate == label:
+            return layer
+    raise ValueError(f"Layer '{label}' is no longer in the project.")
+
+
 def layer_to_sld(layer):
     """One QGIS layer's symbology as an SLD string. GUI thread only.
 

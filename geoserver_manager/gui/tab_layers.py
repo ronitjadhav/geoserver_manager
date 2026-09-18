@@ -6,16 +6,27 @@ Layers tab — list, view and delete feature types.
 Used as a mixin for GeoServerMainDialog.
 """
 
-from qgis.core import QgsDataSourceUri, QgsProject, QgsRasterLayer, QgsVectorLayer
+from qgis.core import Qgis, QgsDataSourceUri, QgsProject, QgsRasterLayer, QgsVectorLayer
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.toolbelt.qgis_export import export_to_geopackage, geoserver_name
 from geoserver_manager.toolbelt.sld import layer_to_sld, styleable_project_layers
 
 # How a GeoServer layer can be brought into QGIS. WFS gives the actual features
 # (editable, stylable in QGIS); WMS/WMTS give rendered images. WMTS goes through
 # GeoWebCache, which caches EPSG:900913 and EPSG:4326 for every layer by default.
 PROTOCOLS = ("WMS", "WFS", "WMTS")
+
+# Where the new layer's data comes from, in the publish form.
+_SOURCE_TABLE = "A table in a datastore"
+_SOURCE_QGIS = "A layer from this QGIS project"
+
+# Fields that belong to one source only.
+_SOURCE_FIELDS = {
+    _SOURCE_TABLE: ("datastore", "table", "epsg"),
+    _SOURCE_QGIS: ("qgis_layer", "name", "replace", "with_style"),
+}
 _WMTS_TILE_MATRIX_SET = "EPSG:900913"
 
 
@@ -299,6 +310,12 @@ class LayerTabMixin:
         """Field definitions for the publish form; combos cascade at runtime."""
         return [
             {
+                "key": "source",
+                "label": self.tr("Source"),
+                "type": "combo",
+                "options": [_SOURCE_TABLE, _SOURCE_QGIS],
+            },
+            {
                 "key": "workspace",
                 "label": self.tr("Workspace"),
                 "type": "combo",
@@ -358,7 +375,67 @@ class LayerTabMixin:
                 "group": self.tr("Metadata"),
                 "placeholder": self.tr("Optional, comma-separated"),
             },
+            {
+                "key": "qgis_layer",
+                "label": self.tr("QGIS layer"),
+                "type": "combo",
+                "options": [label for label, _layer in styleable_project_layers()],
+                "required": True,
+                "visible": False,
+                "help": self.tr(
+                    "The layer is written to a GeoPackage and uploaded, so the "
+                    "data is copied to the server, not linked."
+                ),
+            },
+            {
+                "key": "name",
+                "label": self.tr("Layer name"),
+                "type": "text",
+                "required": True,
+                "visible": False,
+                "help": self.tr(
+                    "Also the name of the datastore and of the table inside it. "
+                    "Anything a WFS type name cannot carry is replaced."
+                ),
+            },
+            {
+                "key": "replace",
+                "label": self.tr("Replace it if it already exists"),
+                "type": "checkbox",
+                "default": False,
+                "visible": False,
+            },
+            {
+                "key": "with_style",
+                "label": self.tr("Upload its symbology as the layer's style"),
+                "type": "checkbox",
+                "default": True,
+                "visible": False,
+            },
         ]
+
+    def _on_publish_source_changed(self, dlg, source):
+        """Show the fields of the chosen source only."""
+        wanted = _SOURCE_FIELDS.get(source, ())
+        for key in (
+            "datastore",
+            "table",
+            "epsg",
+            "qgis_layer",
+            "name",
+            "replace",
+            "with_style",
+        ):
+            dlg.set_field_visible(key, key in wanted)
+        if source == _SOURCE_QGIS:
+            self._prefill_publish_name(dlg, dlg.get_widget("qgis_layer").currentText())
+
+    @staticmethod
+    def _prefill_publish_name(dlg, label):
+        """Suggest the GeoServer-safe form of the picked layer's name."""
+        widget = dlg.get_widget("name")
+        if label and not widget.text().strip():
+            widget.setText(geoserver_name(label.rsplit("  (", 1)[0]))
 
     def _refill_publish_combos(self, dlg, workspace=None, datastore=None):
         """Cascade: workspace -> its datastores -> the store's unpublished tables.
@@ -398,10 +475,10 @@ class LayerTabMixin:
             return
 
         dlg = ResourceFormDialog(
-            title=self.tr("Publish a Table"),
+            title=self.tr("Publish a Layer"),
             description=self.tr(
-                "Publish a database table as a new layer. Only tables not "
-                "published yet are offered."
+                "Publish a table of a datastore, or a layer of this QGIS "
+                "project — that one is uploaded to the server as a GeoPackage."
             ),
             fields=self._publish_fields(workspace_names),
             parent=self,
@@ -412,21 +489,161 @@ class LayerTabMixin:
         dlg.get_widget("datastore").currentTextChanged.connect(
             lambda ds: self._refill_publish_combos(dlg, datastore=ds)
         )
+        dlg.get_widget("source").currentTextChanged.connect(
+            lambda source: self._on_publish_source_changed(dlg, source)
+        )
+        dlg.get_widget("qgis_layer").currentTextChanged.connect(
+            lambda label: self._prefill_publish_name(dlg, label)
+        )
         self._refill_publish_combos(dlg)
+        self._on_publish_source_changed(dlg, _SOURCE_TABLE)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         values = dlg.get_values()
+        published = (
+            geoserver_name(values["name"])
+            if values.get("source") == _SOURCE_QGIS
+            else values["table"]
+        )
         if self._run_action(
             lambda: self._publish_layer_from_values(values),
-            self.tr("Failed to publish '{}'").format(values["table"]),
+            self.tr("Failed to publish '{}'").format(published),
         ):
             self.show_success_message(
-                self.tr("Layer '{}' published.").format(values["table"])
+                self.tr("Layer '{}' published.").format(published)
             )
             self._load_layers()
 
     def _publish_layer_from_values(self, values):
+        """Publish from whichever source the form was filled for."""
+        if values.get("source") == _SOURCE_QGIS:
+            return self._publish_qgis_layer(values)
+        return self._publish_table(values)
+
+    def _publish_qgis_layer(self, values):
+        """Upload a QGIS layer as a GeoPackage datastore and publish it.
+
+        One store per published layer, named after it, which is also the name
+        of the table inside the GeoPackage — GeoServer configures a feature
+        type per table when the file lands, so this publishes the layer in one
+        request. The data is copied: later edits in QGIS do not reach it, and
+        deleting the store leaves the uploaded file in the data directory.
+
+        TODO(#50): upstream as create_datastore_from_file(ws, name, path) — the
+        library can only create datastores from connection parameters, so the
+        upload is a raw PUT of .../datastores/{name}/file.gpkg.
+        """
+        import tempfile
+        from pathlib import Path
+
+        ws_name = values["workspace"]
+        name = geoserver_name(values["name"])
+        layer = self._picked_layer(values)
+        if not values.get("replace"):
+            for exists, message in (
+                (
+                    self._resource_exists(self.gs.get_datastore, ws_name, name),
+                    self.tr("Datastore '{}' already exists in '{}'."),
+                ),
+                (
+                    self._resource_exists(
+                        self.gs.get_feature_type, ws_name, name, name
+                    ),
+                    self.tr("Layer '{}' already exists in '{}'."),
+                ),
+            ):
+                if exists:
+                    raise ValueError(
+                        message.format(name, ws_name)
+                        + " "
+                        + self.tr("Tick Replace to overwrite it.")
+                    )
+
+        # The export reads a live QGIS layer, so it happens here, before any
+        # request: this action runs on the GUI thread (invariant 9).
+        folder = Path(tempfile.mkdtemp(prefix="gsm_publish_"))
+        package = folder / f"{name}.gpkg"
+        try:
+            export_to_geopackage(layer, package, name)
+            path = (
+                f"{self.gs.rest_service.rest_endpoints.base_url}"
+                f"/workspaces/{ws_name}/datastores/{name}/file.gpkg"
+            )
+            self._raw_rest(
+                "put",
+                path,
+                params={"update": "overwrite"},
+                data=package.read_bytes(),
+                headers={"Content-Type": "application/x-sqlite3"},
+            )
+        finally:
+            if package.exists():
+                package.unlink()
+            folder.rmdir()
+
+        # Best effort: the data is published at this point, so a failure to set
+        # a performance flag belongs in the log, not in the user's face.
+        try:
+            self._make_datastore_read_only(ws_name, name)
+        except Exception as error:
+            self.log(
+                f"Could not mark '{ws_name}:{name}' read-only: {error}",
+                log_level=Qgis.MessageLevel.Warning,
+            )
+        self._set_feature_type_metadata(ws_name, name, values)
+        if values.get("with_style"):
+            self._push_qgis_style(name, ws_name, layer_to_sld(layer), name, True)
+
+    def _make_datastore_read_only(self, workspace_name, name):
+        """Mark an uploaded GeoPackage store read-only.
+
+        GeoCat Bridge reports a large performance gain from this, and nothing
+        writes to a store the plugin has just uploaded. Merged onto the
+        server's own parameters, never sent as a template (invariant 3).
+        """
+        detail = self._check(self.gs.get_datastore(workspace_name, name))
+        params = dict(self._connection_params(detail))
+        if params.get("read_only") == "true":
+            return
+        params["read_only"] = "true"
+        self._check(
+            self.gs.create_datastore(
+                workspace_name=workspace_name,
+                datastore_name=name,
+                datastore_type=detail.get("type") or "GeoPackage",
+                connection_parameters=params,
+                enabled=bool(detail.get("enabled", True)),
+            )
+        )
+
+    def _set_feature_type_metadata(self, workspace_name, name, values):
+        """Add the form's title, abstract and keywords to a published layer.
+
+        A partial feature-type PUT merges (verified on GeoServer 2.28.5), so
+        the SRS, bounding box and attributes GeoServer computed from the upload
+        survive — which create_feature_type() would overwrite with a template.
+        """
+        keywords = [
+            keyword.strip()
+            for keyword in (values.get("keywords") or "").split(",")
+            if keyword.strip()
+        ]
+        metadata = {}
+        if values.get("title"):
+            metadata["title"] = values["title"]
+        if values.get("abstract"):
+            metadata["abstract"] = values["abstract"]
+        if keywords:
+            metadata["keywords"] = {"string": keywords}
+        if not metadata:
+            return
+        path = self.gs.rest_service.rest_endpoints.featuretype(
+            workspace_name, name, name
+        )
+        self._raw_rest("put", path, json={"featureType": metadata})
+
+    def _publish_table(self, values):
         """Publish one table as a feature type through the library."""
         ws_name, ds_name, table = (
             values["workspace"],
@@ -583,7 +800,7 @@ class LayerTabMixin:
                     "key": "style",
                     "label": self.tr("Style name"),
                     "type": "text",
-                    "default": name,
+                    "default": geoserver_name(name),
                     "required": True,
                 },
                 {
@@ -609,7 +826,7 @@ class LayerTabMixin:
         if sld is None:
             return
 
-        style_name = values["style"]
+        style_name = geoserver_name(values["style"])
         if self._run_action(
             lambda: self._push_qgis_style(
                 style_name, ws_name, sld, name, values["set_default"]

@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Publish a QGIS layer to GeoServer.** The publish dialog on the Layers tab
+  gained a source: a layer of the current project is written to a GeoPackage
+  and uploaded, which makes GeoServer create the datastore and configure the
+  layer — with its SRS, bounding box and attributes — in one request. Its
+  symbology can travel with it as the layer's default style, the title,
+  abstract and keywords are merged onto what GeoServer computed, and an
+  existing layer of that name is only replaced when asked. The uploaded store
+  is marked read-only, which GeoCat Bridge reports as a large performance gain
+  for file-based stores.
+- A QGIS layer name is not a GeoServer layer name: "Rivière (2024)" is
+  published as `Riviere_2024`. Accents are folded rather than replaced, a
+  leading digit keeps its digit, and the suggested name stays editable. Style
+  names pushed from QGIS go through the same rule.
 - **Styles now travel both ways between QGIS and GeoServer.** Upload a style
   from the symbology of a layer in the current project (a third source in the
   upload dialog), or push it in one step from the Layers tab with *Style from

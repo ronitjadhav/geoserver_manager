@@ -736,6 +736,275 @@ class TestStyleFromQgis(unittest.TestCase):
 
 
 # ############################################################################
+# ##### Publish from QGIS ########
+# ################################
+
+
+class GpkgPublishFakeGS(StyleFakeGS):
+    """Adds what the GeoPackage publish path touches."""
+
+    def __init__(self, datastore_exists=False, layer_exists=False):
+        super().__init__()
+        self.datastore_exists = datastore_exists
+        self.layer_exists = layer_exists
+        outer = self
+
+        class Response:
+            status_code = 200
+            text = ""
+
+            def json(inner):
+                return {}
+
+        class Client:
+            def put(inner, path, **kwargs):
+                outer.style_calls.append(("PUT", path, kwargs))
+                if path.endswith("file.gpkg"):
+                    # GeoServer creates the datastore from the uploaded file
+                    outer.datastore_exists = True
+                return Response()
+
+        class Endpoints:
+            base_url = "/rest"
+
+            def style(inner, style_name, workspace_name=None, format="json"):
+                base = (
+                    f"/rest/workspaces/{workspace_name}/styles/{style_name}"
+                    if workspace_name
+                    else f"/rest/styles/{style_name}"
+                )
+                return f"{base}.{format}"
+
+            def featuretype(inner, workspace_name, datastore_name, name):
+                return (
+                    f"/rest/workspaces/{workspace_name}/datastores/"
+                    f"{datastore_name}/featuretypes/{name}.json"
+                )
+
+        class Rest:
+            rest_client = Client()
+            rest_endpoints = Endpoints()
+
+        self.rest_service = Rest()
+
+    def get_datastore(self, workspace_name, name):
+        if not self.datastore_exists:
+            return ("not found", 404)
+        return (
+            {
+                "name": name,
+                "type": "GeoPackage",
+                "enabled": True,
+                "connectionParameters": {
+                    "entry": {"database": f"/data/{name}.gpkg", "dbtype": "geopkg"}
+                },
+            },
+            200,
+        )
+
+    def get_feature_type(self, workspace_name, datastore_name, name):
+        return ({"name": name}, 200 if self.layer_exists else 404)
+
+    def create_datastore(self, **kwargs):
+        self.style_calls.append(("create_datastore", kwargs))
+        return ("", 200)
+
+
+class TestPublishQgisLayer(unittest.TestCase):
+    """Uploading a project layer as a GeoPackage datastore."""
+
+    def setUp(self):
+        from qgis.core import QgsProject
+
+        self.project = QgsProject.instance()
+        self.project.removeAllMapLayers()
+        self.dlg = SyncDialog()
+        self.dlg.gs = GpkgPublishFakeGS()
+        self.dlg.show_error_message = lambda text: self.fail(f"unexpected: {text}")
+        self.dlg.show_success_message = lambda text: None
+        self.dlg.show_warning_message = lambda text: None
+
+    def tearDown(self):
+        self.project.removeAllMapLayers()
+
+    def add_layer(self, name="Roads (2024)", colour="#ff0000"):
+        from tests.qgis.test_sld import point_layer
+
+        layer = point_layer(name, colour=colour)
+        self.project.addMapLayer(layer)
+        return layer
+
+    def values(self, **overrides):
+        base = {
+            "source": "A layer from this QGIS project",
+            "workspace": "topp",
+            "qgis_layer": "Roads (2024)  (vector)",
+            "name": "Roads (2024)",
+            "replace": False,
+            "with_style": False,
+            "title": "",
+            "abstract": "",
+            "keywords": "",
+        }
+        base.update(overrides)
+        return base
+
+    def sent(self, verb):
+        return [call for call in self.dlg.gs.style_calls if call[0] == verb]
+
+    def test_the_geopackage_is_put_under_the_normalised_name(self):
+        self.add_layer()
+        self.dlg._publish_layer_from_values(self.values())
+
+        verb, path, kwargs = self.sent("PUT")[0]
+        # "Roads (2024)" is not a WFS type name; "Roads_2024" is
+        self.assertEqual(path, "/rest/workspaces/topp/datastores/Roads_2024/file.gpkg")
+        self.assertEqual(kwargs["params"], {"update": "overwrite"})
+        self.assertEqual(kwargs["headers"]["Content-Type"], "application/x-sqlite3")
+        self.assertTrue(kwargs["data"].startswith(b"SQLite format 3"))
+
+    def test_the_uploaded_store_is_made_read_only_by_merging(self):
+        self.add_layer()
+        self.dlg._publish_layer_from_values(self.values())
+
+        # the store exists because the upload created it
+        kwargs = self.sent("create_datastore")[0][1]
+        params = kwargs["connection_parameters"]
+        self.assertEqual(params["read_only"], "true")
+        # the server's own parameters are kept, not replaced by a template
+        self.assertEqual(params["dbtype"], "geopkg")
+        self.assertEqual(params["database"], "/data/Roads_2024.gpkg")
+        self.assertEqual(kwargs["datastore_type"], "GeoPackage")
+
+    def test_metadata_is_merged_onto_what_geoserver_computed(self):
+        self.add_layer()
+        self.dlg._publish_layer_from_values(
+            self.values(title="Roads", abstract="Main roads", keywords="roads, 2024")
+        )
+        feature_type_puts = [
+            call for call in self.sent("PUT") if "featuretypes" in call[1]
+        ]
+        _verb, path, kwargs = feature_type_puts[0]
+        self.assertIn("/datastores/Roads_2024/featuretypes/Roads_2024.json", path)
+        payload = kwargs["json"]["featureType"]
+        self.assertEqual(payload["title"], "Roads")
+        self.assertEqual(payload["abstract"], "Main roads")
+        self.assertEqual(payload["keywords"], {"string": ["roads", "2024"]})
+        # a partial PUT merges, so nothing else may be sent
+        self.assertEqual(set(payload), {"title", "abstract", "keywords"})
+
+    def test_no_metadata_means_no_extra_request(self):
+        self.add_layer()
+        self.dlg._publish_layer_from_values(self.values())
+        self.assertEqual(
+            [call for call in self.sent("PUT") if "featuretypes" in call[1]], []
+        )
+
+    def test_the_symbology_can_travel_with_the_data(self):
+        self.add_layer(colour="#00aa44")
+        self.dlg._publish_layer_from_values(self.values(with_style=True))
+        style_puts = [call for call in self.sent("PUT") if "/styles/" in call[1]]
+        self.assertEqual(
+            style_puts[0][1], "/rest/workspaces/topp/styles/Roads_2024.sld"
+        )
+        self.assertIn(b"00aa44", style_puts[0][2]["data"].lower())
+        self.assertIn(
+            ("set_default", "Roads_2024", "topp", "topp:Roads_2024"),
+            self.dlg.gs.style_calls,
+        )
+
+    def test_an_existing_datastore_is_refused_unless_replace_is_ticked(self):
+        self.add_layer()
+        self.dlg.gs = GpkgPublishFakeGS(datastore_exists=True)
+        with self.assertRaises(ValueError) as caught:
+            self.dlg._publish_layer_from_values(self.values())
+        self.assertIn("Roads_2024", str(caught.exception))
+        self.assertIn("Replace", str(caught.exception))
+        self.assertEqual(self.sent("PUT"), [])
+
+        self.dlg._publish_layer_from_values(self.values(replace=True))
+        self.assertTrue(self.sent("PUT"))
+
+    def test_an_existing_layer_is_refused_too(self):
+        self.add_layer()
+        self.dlg.gs = GpkgPublishFakeGS(layer_exists=True)
+        with self.assertRaises(ValueError):
+            self.dlg._publish_layer_from_values(self.values())
+
+    def test_nothing_is_left_in_the_temporary_folder(self):
+        import glob
+        import tempfile
+
+        self.add_layer()
+        self.dlg._publish_layer_from_values(self.values())
+        self.assertEqual(glob.glob(f"{tempfile.gettempdir()}/gsm_publish_*"), [])
+
+    def test_a_table_source_still_goes_the_old_way(self):
+        # the dispatch must not disturb the datastore-table path
+        self.dlg.gs = PublishFakeGS()
+        self.dlg._publish_layer_from_values(
+            {
+                "source": "A table in a datastore",
+                "workspace": "topp",
+                "datastore": "taz_shapes",
+                "table": "plugin_demo",  # the fake's unpublished table
+                "epsg": 4326,
+                "title": "",
+                "abstract": "",
+                "keywords": "",
+            }
+        )
+        self.assertEqual(self.dlg.gs.created[-1]["layer_name"], "plugin_demo")
+
+
+class TestPublishForm(unittest.TestCase):
+    """The publish dialog only shows the fields of the chosen source."""
+
+    def setUp(self):
+        from qgis.core import QgsProject
+
+        QgsProject.instance().removeAllMapLayers()
+        from tests.qgis.test_sld import point_layer
+
+        QgsProject.instance().addMapLayer(point_layer("Roads (2024)"))
+        self.dlg = SyncDialog()
+        self.dlg.gs = GpkgPublishFakeGS()
+
+    def tearDown(self):
+        from qgis.core import QgsProject
+
+        QgsProject.instance().removeAllMapLayers()
+
+    def form(self):
+        return ResourceFormDialog(title="t", fields=self.dlg._publish_fields(["topp"]))
+
+    def test_the_table_source_hides_the_qgis_fields(self):
+        form = self.form()
+        self.dlg._on_publish_source_changed(form, "A table in a datastore")
+        for key in ("datastore", "table", "epsg"):
+            self.assertNotIn(key, form._hidden_keys)
+        for key in ("qgis_layer", "name", "replace", "with_style"):
+            self.assertIn(key, form._hidden_keys)
+
+    def test_the_qgis_source_hides_the_table_fields_and_suggests_a_name(self):
+        form = self.form()
+        self.dlg._on_publish_source_changed(form, "A layer from this QGIS project")
+        for key in ("datastore", "table", "epsg"):
+            self.assertIn(key, form._hidden_keys)
+        for key in ("qgis_layer", "name", "replace", "with_style"):
+            self.assertNotIn(key, form._hidden_keys)
+        # the name is filled in already, normalised, and still editable
+        self.assertEqual(form.get_widget("name").text(), "Roads_2024")
+        self.assertTrue(form.get_widget("name").isEnabled())
+
+    def test_a_name_the_user_typed_is_not_overwritten(self):
+        form = self.form()
+        form.get_widget("name").setText("my_choice")
+        self.dlg._prefill_publish_name(form, "Roads (2024)  (vector)")
+        self.assertEqual(form.get_widget("name").text(), "my_choice")
+
+
+# ############################################################################
 # ####### Stand-alone run ########
 # ################################
 if __name__ == "__main__":

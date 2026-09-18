@@ -15,6 +15,7 @@ from geoserver_manager.toolbelt.sld import (
     SLD_1_0,
     apply_sld_to_layer,
     layer_to_sld,
+    project_layer_by_label,
     sld_content_type,
     sld_version,
     styleable_project_layers,
@@ -414,11 +415,7 @@ class StyleTabMixin:
     @staticmethod
     def _picked_layer(values):
         """The project layer the form's QGIS-layer combo points at."""
-        label = values["qgis_layer"]
-        for candidate, layer in styleable_project_layers():
-            if candidate == label:
-                return layer
-        raise ValueError(f"Layer '{label}' is no longer in the project.")
+        return project_layer_by_label(values["qgis_layer"])
 
     # -- QGIS <-> GeoServer ----------------------------------------------------
 

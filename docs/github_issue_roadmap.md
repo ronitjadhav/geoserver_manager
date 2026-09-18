@@ -71,10 +71,11 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 
 ## Layer Upload (QGIS → GeoServer)
 
-- [ ] Publish selected QGIS vector layer (auto-detect format)
+- [x] Publish a QGIS vector layer — written to a GeoPackage and uploaded, which
+      makes GeoServer create the store and configure the layer in one request
 - [ ] Batch upload multiple layers
-- [ ] Upload associated SLD style with layer
-- [ ] Overwrite existing layer option
+- [x] Upload associated SLD style with layer (and make it the layer's default)
+- [x] Overwrite existing layer option
 - [ ] CRS validation & auto-reprojection
 - [ ] Progress bar during upload
 
