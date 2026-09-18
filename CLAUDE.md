@@ -20,7 +20,7 @@ Skills in `.claude/skills/` hold the step-by-step procedures:
 |---|---|
 | `geoserver_manager/plugin_main.py` | QGIS entry point: `initGui` / `unload` / `run`. Shows the dialog, then connects. |
 | `geoserver_manager/gui/dlg_main.py` | `GeoServerMainDialog(QDialog, <one mixin per tab>)` — nav list, results table, search, pagination, and every helper the tabs share |
-| `geoserver_manager/gui/tab_workspaces.py`, `tab_datastores.py`, `tab_layers.py`, `tab_layergroups.py`, `tab_styles.py` | One mixin per resource type: load / add / edit / delete (layers also: publish, add to QGIS; layer groups also: add to QGIS) |
+| `geoserver_manager/gui/tab_workspaces.py`, `tab_datastores.py`, `tab_coveragestores.py`, `tab_layers.py`, `tab_layergroups.py`, `tab_styles.py` | One mixin per resource type: load / add / edit / delete (layers also: publish, add to QGIS; layer groups also: add to QGIS; coverage stores also: publish a coverage) |
 | `geoserver_manager/gui/dlg_resource_form.py` | `ResourceFormDialog` — a modal form built from a list of field dicts (see its module docstring for the field spec) |
 | `geoserver_manager/gui/dlg_settings.py` | Options page: URL + credentials (credentials go to `QgsAuthManager`, encrypted) |
 | `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser` |
@@ -130,6 +130,13 @@ The `Inspiration/` folder is untracked reference code from another plugin. Never
 - **Thread safety:** the REST methods are stateless `requests.*` calls and are safe to run through
   `_fan_out` (the datastore list does this). `self.wms` / `self.wmts` on the client are shared state —
   OWS calls must not be fanned out the same way.
+- **Coverages** (rows 21–24 of #50): there is no `get_coverage_stores(ws)` at all; `get_coverages` hardcodes
+  `list=all`, so "what is published" needs its own call (`list=configured`) — the difference is what the
+  *Publish* action offers; `CoverageStore` drops the store's description and its `put_payload()` raises
+  `NotImplementedError` (no store edit anywhere); `Coverage.asdict()` drops the bounding boxes and keywords.
+  Two GeoServer facts the tab depends on: a grid range's `high` is the **exclusive** bound (size = high − low,
+  checked against gdalinfo), and store metadata GeoServer does not understand — `CogSettings.Key` without the
+  COG extension — is dropped silently, so the create warns when it comes back missing.
 - **Layer groups** are the biggest library gap so far (rows 16–19 of #50): every layer-group call requires a
   `workspace_name`, so the *global* groups are unreachable; `create_layer_group` re-qualifies every layer with
   the group's own workspace (no cross-workspace and no nested group), always sends a world bbox from a

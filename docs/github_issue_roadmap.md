@@ -39,10 +39,10 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 
 ## Coverage Stores & Coverages
 
-- [ ] List coverage stores across workspaces
-- [ ] Create coverage store (ImageMosaic, GeoTIFF/COG)
-- [ ] Delete coverage store
-- [ ] List and view coverages within a store
+- [x] List coverage stores across workspaces
+- [x] Create coverage store (ImageMosaic, GeoTIFF/COG)
+- [x] Delete coverage store
+- [x] List and view coverages within a store
 
 ## Styles
 

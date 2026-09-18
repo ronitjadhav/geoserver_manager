@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Coverage Stores tab**: every raster store across the workspaces with its
+  type and how many coverages it publishes; open one for its URL, description
+  and published coverages, or the *Coverages* action to read one coverage's
+  SRS, native format, pixel size, bounds, keywords and bands. Create a store
+  from a GeoTIFF, a COG URL, an ImageMosaic directory on the server or an
+  ImageMosaic properties ZIP; *Publish a coverage* turns one into a layer;
+  delete (single and bulk, recursing into the layers it published). A server
+  that quietly drops the COG settings — no COG extension installed — now says
+  so instead of leaving a store that reads whole files.
 - **Loading no longer freezes QGIS.** Every tab load and the connection probe
   run in a `QgsTask`: the dialog paints and stays usable while requests are in
   flight, QGIS's task bar shows progress, and *Refresh* becomes *Cancel* for as
