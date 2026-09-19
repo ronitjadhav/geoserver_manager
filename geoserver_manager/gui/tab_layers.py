@@ -78,20 +78,17 @@ class LayerTabMixin:
         self._extra_click_callbacks = {
             translate("LayerTabMixin", "Workspace"): self._open_workspace_from_row
         }
+        # Icon-only buttons: the tooltip is all the user reads, so each says
+        # what it does and how it differs from its neighbour.
         self._row_actions = [
             (
                 "mActionAddLayer.svg",
                 translate("LayerTabMixin", "Add to QGIS"),
                 self._add_layer_to_qgis,
-            ),
-            (
-                "mIconWms.svg",
-                translate("LayerTabMixin", "Preview in a browser"),
-                self._preview_layer_in_browser,
                 translate(
                     "LayerTabMixin",
-                    "Preview in a browser — GeoServer's own OpenLayers page. A "
-                    "secured server will ask the browser to log in.",
+                    "Add to QGIS — load the layer into this project as WFS, WMS or "
+                    "WMTS (asks which).",
                 ),
             ),
             (
@@ -105,24 +102,48 @@ class LayerTabMixin:
                 ),
             ),
             (
+                "mIconWms.svg",
+                translate("LayerTabMixin", "Preview in a browser"),
+                self._preview_layer_in_browser,
+                translate(
+                    "LayerTabMixin",
+                    "Preview in a browser — GeoServer's own OpenLayers page. A "
+                    "secured server will ask the browser to log in.",
+                ),
+            ),
+            (
                 "mActionStyleManager.svg",
                 translate("LayerTabMixin", "Set style"),
                 self._set_layer_style,
+                translate(
+                    "LayerTabMixin",
+                    "Set style — pick one of the server's existing styles as this "
+                    "layer's default.",
+                ),
             ),
             (
                 "mActionSharingExport.svg",
-                translate("LayerTabMixin", "Style from QGIS"),
+                translate("LayerTabMixin", "Push style from QGIS"),
                 self._style_from_qgis,
+                translate(
+                    "LayerTabMixin",
+                    "Push style from QGIS — upload a project layer's symbology as "
+                    "a new server style and make it this layer's default.",
+                ),
             ),
             (
                 "mActionDeleteSelected.svg",
                 translate("LayerTabMixin", "Delete"),
                 self._delete_layer,
+                translate(
+                    "LayerTabMixin",
+                    "Delete — remove the layer from GeoServer (asks first).",
+                ),
             ),
         ]
         self._setup_table(
             [
-                translate("LayerTabMixin", "Layer Name"),
+                translate("LayerTabMixin", "Name"),
                 translate("LayerTabMixin", "Workspace"),
                 translate("LayerTabMixin", "Type"),
                 translate("LayerTabMixin", "Store"),
@@ -455,16 +476,17 @@ class LayerTabMixin:
             },
             {
                 "key": "epsg",
-                "label": translate("LayerTabMixin", "Declared SRS (EPSG)"),
-                "type": "spinbox",
-                "default": 4326,
-                "min": 1,
-                "max": 999999,
+                "label": translate("LayerTabMixin", "Declared SRS (EPSG code)"),
+                "type": "text",
+                "required": True,
+                "placeholder": translate("LayerTabMixin", "e.g. 3857"),
                 "group": translate("LayerTabMixin", "Metadata"),
                 "help": translate(
                     "LayerTabMixin",
-                    "The SRS GeoServer declares for the layer. Use the table's own "
-                    "SRS — a wrong value misplaces the data.",
+                    "The SRS GeoServer declares for the layer: the table's own, as "
+                    "a bare EPSG number. A wrong value misplaces the data. Look it "
+                    "up in the table's geometry column; GeoServer's web UI can "
+                    "compute it.",
                 ),
             },
             {
@@ -854,6 +876,14 @@ class LayerTabMixin:
                     "LayerTabMixin", "Layer '{}' already exists in {}/{}."
                 ).format(table, ws_name, ds_name)
             )
+        epsg = str(values.get("epsg") or "").strip().upper().removeprefix("EPSG:")
+        if not epsg.isdigit():
+            raise ValueError(
+                translate(
+                    "LayerTabMixin",
+                    "The SRS must be an EPSG code number, such as 3857 or 4326.",
+                )
+            )
         keywords = [k.strip() for k in (values.get("keywords") or "").split(",")]
         self._check(
             self.gs.create_feature_type(
@@ -862,7 +892,7 @@ class LayerTabMixin:
                 datastore_name=ds_name,
                 title=values.get("title") or None,
                 abstract=values.get("abstract") or None,
-                epsg=int(values.get("epsg") or 4326),
+                epsg=int(epsg),
                 keywords=[k for k in keywords if k],
             )
         )
@@ -1139,8 +1169,11 @@ class LayerTabMixin:
                 "wms",
             )
         if protocol == "WMTS":
+            # No crs= here: the tile matrix set fixes it (EPSG:900913), and a
+            # crs=EPSG:4326 alongside made QGIS accept the layer and reproject
+            # every tile on the fly — measured on 2.28.5 / QGIS 3.44.
             return (
-                f"crs=EPSG:4326&format=image/png&layers={qualified_name}&styles="
+                f"format=image/png&layers={qualified_name}&styles="
                 f"&tileMatrixSet={_WMTS_TILE_MATRIX_SET}"
                 f"&url={base}/gwc/service/wmts?REQUEST=GetCapabilities{auth}",
                 "wms",
@@ -1312,7 +1345,8 @@ class LayerTabMixin:
                     "label": translate("LayerTabMixin", "Load as"),
                     "type": "combo",
                     "options": protocols,
-                    "default": "WMS",
+                    # The features themselves for a vector; images otherwise.
+                    "default": "WFS" if kind == VECTOR else "WMS",
                     "required": True,
                 }
             ],

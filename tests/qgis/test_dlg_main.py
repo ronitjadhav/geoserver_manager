@@ -1406,7 +1406,7 @@ class TestConnectionGuard(unittest.TestCase):
 
         widget = self.dlg._make_action_widget(["tasmania_roads", "topp", "taz_shapes"])
         button = widget.findChildren(QPushButton)[0]
-        self.assertEqual(button.toolTip(), "Add to QGIS")  # the first row action
+        self.assertTrue(button.toolTip().startswith("Add to QGIS"))  # the first action
         with patch.object(tab_layers, "ResourceFormDialog", Rejecting):
             button.click()
         self.assertEqual(len(self.warnings), 1)

@@ -100,21 +100,35 @@ class CoverageStoreTabMixin:
                 "mIconRaster.svg",
                 translate("CoverageStoreTabMixin", "Coverages"),
                 self._show_coverages,
+                translate(
+                    "CoverageStoreTabMixin",
+                    "Coverages — the rasters this store holds, published or not, "
+                    "with their details.",
+                ),
             ),
             (
                 "mActionAddRasterLayer.svg",
                 translate("CoverageStoreTabMixin", "Publish a coverage"),
                 self._publish_coverage,
+                translate(
+                    "CoverageStoreTabMixin",
+                    "Publish a coverage — make one of the store's rasters a layer.",
+                ),
             ),
             (
                 "mActionDeleteSelected.svg",
                 translate("CoverageStoreTabMixin", "Delete"),
                 self._delete_coverage_store,
+                translate(
+                    "CoverageStoreTabMixin",
+                    "Delete — remove the store, its coverages and their layers "
+                    "(asks first).",
+                ),
             ),
         ]
         self._setup_table(
             [
-                translate("CoverageStoreTabMixin", "Coverage Store"),
+                translate("CoverageStoreTabMixin", "Name"),
                 translate("CoverageStoreTabMixin", "Workspace"),
                 translate("CoverageStoreTabMixin", "Type"),
                 translate("CoverageStoreTabMixin", "Coverages"),
@@ -272,11 +286,13 @@ class CoverageStoreTabMixin:
             ),
             description=translate(
                 "CoverageStoreTabMixin",
-                "Read-only: GeoServer's REST API has no update for a coverage "
-                "store, so a change means creating it again.",
+                "Read-only in this version — edit it in GeoServer's web UI.",
             ),
             fields=self._coverage_store_info_fields(),
-            values=self._coverage_store_form_values(detail, published),
+            values=dict(
+                self._coverage_store_form_values(detail, published),
+                enabled=self._yes_no(detail.get("enabled", True)),
+            ),
             parent=self,
         )
         dlg.hide_save_button()
@@ -416,6 +432,7 @@ class CoverageStoreTabMixin:
             ),
         )
         values = self._coverage_form_values(detail or {})
+        values["enabled"] = self._yes_no((detail or {}).get("enabled", True))
         for key, value in values.items():
             widget = dlg.get_widget(key)
             if hasattr(widget, "setPlainText"):

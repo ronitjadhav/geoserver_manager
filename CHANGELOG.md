@@ -81,6 +81,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   its format, not only SLD) and a tooltip on *Apply to a QGIS layer* that
   names the layer tree's *Apply style from GeoServer* as the same thing from
   the other end. The style editor's description says what Save does.
+- Layers tab: the row actions read *Add to QGIS · Preview · Preview in a
+  browser · Set style · Push style from QGIS · Delete* — the in-QGIS preview
+  before the browser one, "Push style from QGIS" instead of "Style from QGIS"
+  (the same word the layer tree uses) — and every icon-only button has a
+  tooltip saying what it does and how it differs from its neighbour; the
+  Coverage Stores tab likewise. The first column is "Name" on both tabs.
+- *Add to QGIS* proposes WFS for a vector layer (the features themselves) and
+  WMS for the rest; the WMTS URI no longer carries a `crs=EPSG:4326` that made
+  QGIS reproject every EPSG:900913 tile on the fly (measured).
+- *Publish a table*: the declared SRS has no default any more — 4326 was
+  usually wrong for a projected table — and must be an EPSG number; the help
+  says where to look it up.
+- A coverage store's *Enabled* reads Yes / No instead of True / False; its
+  read-only note no longer blames GeoServer's REST API (which does update
+  stores) for what is a library gap: "Read-only in this version — edit it in
+  GeoServer's web UI."
 - Editing a PostGIS store no longer demands the password again: leave the
   field empty to keep the stored one, type to replace it. GeoServer accepts
   its own encrypted value back — measured, a store still connected after the

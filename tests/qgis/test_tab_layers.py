@@ -281,7 +281,7 @@ class TestLayersTab(unittest.TestCase):
         ]
         self.assertEqual(
             headers,
-            ["Layer Name", "Workspace", "Type", "Store", "Default style", "Actions"],
+            ["Name", "Workspace", "Type", "Store", "Default style", "Actions"],
         )
         self.assertEqual(self.warnings, [])
         # one request for the list, one per layer; the datastores are not walked
@@ -444,6 +444,13 @@ class TestEveryLayerType(unittest.TestCase):
                 [combo.itemText(i) for i in range(combo.count())], expected, name
             )
 
+    def test_add_to_qgis_defaults_to_wfs_for_a_vector_and_wms_otherwise(self):
+        for name, expected in (("tasmania_roads", "WFS"), ("sfdem", "WMS")):
+            combo = self.opened(
+                self.dlg._add_layer_to_qgis, self.rows[name]
+            ).get_widget("protocol")
+            self.assertEqual(combo.currentText(), expected, name)
+
     def test_the_browser_preview_frames_any_type_on_its_extent(self):
         opened = []
         with patch.object(
@@ -594,6 +601,8 @@ class TestAddToQgis(unittest.TestCase):
         self.assertIn("gwc/service/wmts", uri)
         self.assertIn("tileMatrixSet=EPSG:900913", uri)
         self.assertIn("authcfg=abc123", uri)
+        # a crs= of its own made QGIS reproject every 900913 tile (measured)
+        self.assertNotIn("crs=", uri)
 
     def test_wfs_uri_uses_the_datasource_uri_and_no_password(self):
         uri, provider = GeoServerMainDialog._layer_uri(
@@ -713,6 +722,39 @@ class TestPublish(unittest.TestCase):
 
             self.dlg.gs.rest_service.rest_client.get = lambda *a, **k: R()
             self.assertEqual(self.dlg._available_tables("w", "d"), expected)
+
+    def test_the_srs_must_be_an_epsg_number_and_has_no_default(self):
+        """4326 as a default was usually wrong for a projected table."""
+        field = next(
+            f for f in self.dlg._publish_fields(["topp"]) if f["key"] == "epsg"
+        )
+        self.assertTrue(field["required"])
+        self.assertNotIn("default", field)
+        for bad in ("", "abc", "EPSG:"):
+            with self.assertRaises(ValueError, msg=bad):
+                self.dlg._publish_layer_from_values(
+                    {
+                        "workspace": "topp",
+                        "datastore": "pg",
+                        "table": "plugin_demo",
+                        "epsg": bad,
+                        "title": "",
+                        "abstract": "",
+                        "keywords": "",
+                    }
+                )
+        self.dlg._publish_layer_from_values(
+            {
+                "workspace": "topp",
+                "datastore": "pg",
+                "table": "plugin_demo",
+                "epsg": "EPSG:3857",  # tolerated, the number is what counts
+                "title": "",
+                "abstract": "",
+                "keywords": "",
+            }
+        )
+        self.assertEqual(self.dlg.gs.created[-1]["epsg"], 3857)
 
     def test_publish_sends_what_the_form_collected(self):
         self.dlg._publish_layer_from_values(
@@ -876,13 +918,17 @@ class TestSetLayerStyle(unittest.TestCase):
             [action[1] for action in self.dlg._row_actions],
             [
                 "Add to QGIS",
-                "Preview in a browser",
                 "Preview",
+                "Preview in a browser",
                 "Set style",
-                "Style from QGIS",
+                "Push style from QGIS",
                 "Delete",
             ],
         )
+        # icon-only buttons: every one says what it does
+        for action in self.dlg._row_actions:
+            self.assertEqual(len(action), 4, action[1])
+            self.assertGreater(len(action[3]), len(action[1]), action[1])
 
 
 # ############################################################################
@@ -1625,5 +1671,6 @@ class TestPreviewInBrowser(unittest.TestCase):
         dlg.show_warning_message = lambda t: None
         dlg._load_layers()
         labels = [action[1] for action in dlg._row_actions]
-        self.assertEqual(labels[:2], ["Add to QGIS", "Preview in a browser"])
-        self.assertIn("log in", dlg._row_actions[1][3])
+        # the in-QGIS preview first, the browser one right after it
+        self.assertEqual(labels[:3], ["Add to QGIS", "Preview", "Preview in a browser"])
+        self.assertIn("log in", dlg._row_actions[2][3])
