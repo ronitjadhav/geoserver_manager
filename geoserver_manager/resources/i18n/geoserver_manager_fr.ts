@@ -995,42 +995,42 @@
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_datastores.py" line="907" />
+        <location filename="../../gui/tab_datastores.py" line="909" />
         <source>Failed to load datastore details</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_datastores.py" line="923" />
+        <location filename="../../gui/tab_datastores.py" line="925" />
         <source>Edit Datastore '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_datastores.py" line="925" />
+        <location filename="../../gui/tab_datastores.py" line="927" />
         <source>Change the connection or the description; Save keeps every parameter this form does not show.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_datastores.py" line="931" />
+        <location filename="../../gui/tab_datastores.py" line="933" />
         <source>Datastore type '{}' has no dedicated form — edit its connection parameters directly.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_datastores.py" line="952" />
+        <location filename="../../gui/tab_datastores.py" line="954" />
         <source>Failed to update datastore '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_datastores.py" line="957" />
+        <location filename="../../gui/tab_datastores.py" line="959" />
         <source>Datastore '{}' updated.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_datastores.py" line="970" />
+        <location filename="../../gui/tab_datastores.py" line="972" />
         <source>datastore</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_datastores.py" line="980" />
+        <location filename="../../gui/tab_datastores.py" line="982" />
         <source>Every layer published from it is deleted too.</source>
         <translation type="unfinished" />
     </message>
