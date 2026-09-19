@@ -102,7 +102,9 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
 3. **Edits merge onto what the server has.** GeoServer applies a datastore PUT by *replacing* the whole
    `connectionParameters` map. Never route an edit through the typed `create_*` helpers — use
    `_update_datastore_from_values`, which overlays only the form's own keys onto the fetched params and
-   keeps the server's `type` and `enabled`.
+   keeps the server's `type`; `enabled` is the edit form's checkbox when it has one, else the server's.
+   GeoServer ignores `enabled: false` on a POST (the store is created enabled, measured on 2.28.5) — only a
+   PUT disables one, which is why the checkbox exists in edit mode only.
 4. **Add refuses an existing name.** `create_workspace` / `create_datastore` are upserts (POST, then PUT
    on 409). Check `_resource_exists` first or a live resource is silently reconfigured and reported "created".
 5. **Never show a password.** GeoServer returns `passwd` and `WFSDataStoreFactory:PASSWORD` encrypted (`crypt1:…`) or
@@ -286,6 +288,9 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   `GwcEndpoints.layers(ws)` ignores its argument. Gridsets: the list is a JSON array of names; a JSON PUT
   fails the same way ("Duplicate field coords"), an XML PUT creates one (201), DELETE removes it, and
   deleting a gridset in use answers 500 with an empty body.
+- **Layer-group modes** are shown as GeoServer's web admin names them (`tab_layergroups._mode_label`: Single,
+  Opaque Container, Named Tree, Container Tree, Earth Observation Tree) and mapped back to the enum for the
+  payload; `MODES` still holds the enum, which `test_tab_layergroups` checks against the library's model.
 - **Layer groups** are the biggest library gap so far (rows 16–19 of #50): every layer-group call requires a
   `workspace_name`, so the *global* groups are unreachable; `create_layer_group` re-qualifies every layer with
   the group's own workspace (no cross-workspace and no nested group), always sends a world bbox from a

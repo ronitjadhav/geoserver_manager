@@ -196,9 +196,10 @@ class TestLayerGroupsTab(unittest.TestCase):
         self.assertEqual(
             self.dlg._all_rows,
             [
-                ["solo", GLOBAL, "NAMED", "1"],
-                ["tasmania", GLOBAL, "SINGLE", "2"],
-                ["roads_group", "topp", "CONTAINER", "1"],
+                # GeoServer's own words for the modes, not the enum
+                ["solo", GLOBAL, "Named Tree", "1"],
+                ["tasmania", GLOBAL, "Single", "2"],
+                ["roads_group", "topp", "Container Tree", "1"],
             ],
         )
         self.assertEqual(self.warnings, [])
@@ -222,7 +223,7 @@ class TestGroupDetail(unittest.TestCase):
             values["abstract"], "Tasmania from the Digital Chart of the World."
         )
         self.assertEqual(values["title"], "Tasmania")
-        self.assertEqual(values["mode"], "SINGLE")
+        self.assertEqual(values["mode"], "Single")
         self.assertEqual(values["workspace"], GLOBAL)
         self.assertEqual(
             values["layers"].splitlines(),

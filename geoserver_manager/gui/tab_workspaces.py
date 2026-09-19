@@ -51,7 +51,7 @@ class WorkspaceTabMixin:
         ]
         self._setup_table(
             [
-                translate("WorkspaceTabMixin", "Workspace Name"),
+                translate("WorkspaceTabMixin", "Name"),
                 translate("WorkspaceTabMixin", "Default"),
                 self.actions_column_label(),
             ]
@@ -96,7 +96,8 @@ class WorkspaceTabMixin:
                 "default": False,
                 "help": translate(
                     "WorkspaceTabMixin",
-                    "Allow objects with the same name to coexist in this workspace",
+                    "Its layers are served only under the workspace's own URLs "
+                    "(…/{name}/wms), so another workspace may share its namespace URI",
                 ),
             },
             {
@@ -320,11 +321,13 @@ class WorkspaceTabMixin:
         path = f"{self.gs.rest_service.rest_endpoints.base_url}/workspaces/default.json"
         self._raw_rest("put", path, json={"workspace": {"name": name}})
 
-    def _rename_workspace(self, old_name, new_name, isolated):
-        """Rename a workspace in place.
+    def _put_workspace(self, old_name, new_name, isolated):
+        """Update a workspace in place — a rename when the names differ.
 
-        TODO(#50): upstream as update_workspace(name, new_name=...) — the library
-        has no rename. Workaround: PUT the new name to /rest/workspaces/{old_name}.
+        TODO(#50): upstream as update_workspace(name, new_name=..., isolated=...)
+        — the library has no update and no rename, and create_workspace() on an
+        existing name costs a POST that answers 409 before it PUTs. Workaround:
+        one PUT to /rest/workspaces/{old_name}.
         """
         from geoservercloud.models.workspace import Workspace
 
@@ -334,6 +337,9 @@ class WorkspaceTabMixin:
     def _save_workspace(self, values, old_name=None):
         """Create (old_name None) or update a workspace from form values."""
         name = values["name"]
+        if old_name is None or name != old_name:
+            # A new name goes into a REST path: refuse what a URL would eat.
+            self._require_safe_name(name)
         if old_name is None:
             # create_workspace upserts, so an existing name would silently
             # reconfigure the live workspace and report it as created
@@ -344,10 +350,10 @@ class WorkspaceTabMixin:
                     ).format(name)
                 )
             self._check(self.gs.create_workspace(name, isolated=values["isolated"]))
-        elif name != old_name:
-            self._rename_workspace(old_name, name, values["isolated"])
         else:
-            self._check(self.gs.create_workspace(name, isolated=values["isolated"]))
+            # One PUT, rename or not (create_workspace would POST, get a 409,
+            # then PUT).
+            self._put_workspace(old_name, name, values["isolated"])
         if values["set_default"]:
             # Separate from the save: a 403 here must not report the (already
             # successful) create or rename as failed, nor skip the reload.
@@ -421,7 +427,11 @@ class WorkspaceTabMixin:
             title=translate("WorkspaceTabMixin", "Edit Workspace '{}'").format(
                 old_name
             ),
-            description=translate("WorkspaceTabMixin", "Modify workspace settings"),
+            description=translate(
+                "WorkspaceTabMixin",
+                "Rename it, toggle isolation, make it the default, or give it its "
+                "own WMS settings — Save applies all of it at once.",
+            ),
             fields=self._workspace_fields(is_default=is_default, with_wms=True),
             values=values,
             parent=self,
@@ -473,7 +483,7 @@ class WorkspaceTabMixin:
             # delete_workspace() sends recurse=true
             cascade=translate(
                 "WorkspaceTabMixin",
-                "Everything it contains is deleted too: datastores, layers, "
-                "styles and layer groups.\n\n",
+                "Everything it contains is deleted too: datastores, coverage "
+                "stores, cascaded stores, layers, layer groups and styles.",
             ),
         )

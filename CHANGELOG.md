@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- A workspace, datastore or layer-group name with `/`, `?`, `#` or `%` is
+  refused before any request: `requests` would have sent
+  `datastores/a#b.json` as `datastores/a` — another store's path — and a
+  global layer group's raw path is URL-quoted.
+- The *Isolated Workspace* help described something else; it says what
+  isolation does (layers served only under the workspace's own URLs, so
+  another workspace may share the namespace URI). The workspace delete
+  confirmation lists coverage stores and cascaded stores among what goes.
+- A layer-group line naming a layer the server does not have is refused
+  with that name, instead of coming back as GeoServer's HTTP error.
+- Editing a workspace without renaming it is one PUT; it used to POST,
+  collect a 409 and PUT.
 - The Layers tab listed only the feature types it found by walking the
   datastores, so a raster layer — including one just published from QGIS —
   and a cascaded WMS or WMTS layer never appeared there. It now shows
@@ -30,6 +42,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- Layer-group modes read as GeoServer's web admin names them — Single,
+  Opaque Container, Named Tree, Container Tree, Earth Observation Tree —
+  in the table, the detail and the create form, which also explains what
+  an Opaque Container is. The first column of the Workspaces, Datastores
+  and Layer Groups tables is *Name*; the datastore form lists Name,
+  Workspace, Type like every other form; Enabled cells read Yes / No.
 - Editing a PostGIS store no longer demands the password again: leave the
   field empty to keep the stored one, type to replace it. GeoServer accepts
   its own encrypted value back — measured, a store still connected after the
@@ -37,6 +55,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Enable or disable a datastore** from its edit form. GeoServer disables
+  a store itself when its connection fails at startup; this is the switch
+  back (measured: a disabled PostGIS store re-enabled through the form and
+  listed its tables again, every other parameter kept).
 - **Web Feature Server (NG) datastores** — a remote WFS cascaded as a
   datastore — get a form of their own: capabilities URL, optional
   credentials, timeout, max features, lenient parsing. Its feature types then

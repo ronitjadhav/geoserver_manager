@@ -192,7 +192,7 @@ class TestRuntimeContext(unittest.TestCase):
 
         self.dlg.gs = FakeGS()
         self.dlg._load_workspaces()
-        self.assertIn("[WorkspaceTabMixin] Workspace Name", self.headers())
+        self.assertIn("[WorkspaceTabMixin] Name", self.headers())
         self.dlg._load_styles()
         self.assertIn("[StyleTabMixin] Style Name", self.headers())
 

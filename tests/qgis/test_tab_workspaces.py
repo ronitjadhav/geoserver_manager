@@ -245,7 +245,7 @@ class TestApplyWmsSettings(unittest.TestCase):
 
     def test_a_rename_moves_the_settings_to_the_new_name(self):
         values = self.base_values(name="ne_renamed", isolated=False, set_default=False)
-        with patch.object(type(self.dlg), "_rename_workspace", lambda *a: None):
+        with patch.object(type(self.dlg), "_put_workspace", lambda *a: None):
             self.dlg._save_workspace_and_wms(values, old_name="ne", had_wms=True)
         _verb, path, _kwargs = self.sent("PUT")[-1]
         self.assertIn("/workspaces/ne_renamed/settings.json", path)

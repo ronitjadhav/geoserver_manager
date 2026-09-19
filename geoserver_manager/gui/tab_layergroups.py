@@ -7,12 +7,15 @@ Used as a mixin for GeoServerMainDialog. `_layer_uri()` comes from LayerTabMixin
 through the shared dialog class; the global-or-workspace scope is `gui.scope`.
 """
 
+from urllib.parse import quote
+
 from qgis.core import QgsProject, QgsRasterLayer
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.scope import GLOBAL, scope
+from geoserver_manager.toolbelt.payload import bbox_text, unwrap
 
 # GeoServer's LayerGroupInfo.Mode enum. Spelled out rather than imported from
 # geoservercloud.models: the bundled wheels only reach sys.path once the plugin
@@ -32,6 +35,26 @@ _PICK = "— pick a layer —"
 # MRO — so every lookup would miss. A wrapper function would not be extracted
 # at all (pylupdate only understands a literal context), hence the repetition.
 translate = QCoreApplication.translate
+
+
+def _mode_label(mode):
+    """GeoServer's web-admin words for a LayerGroupInfo.Mode; the enum when unknown."""
+    labels = {
+        "SINGLE": translate("LayerGroupTabMixin", "Single"),
+        "OPAQUE_CONTAINER": translate("LayerGroupTabMixin", "Opaque Container"),
+        "NAMED": translate("LayerGroupTabMixin", "Named Tree"),
+        "CONTAINER": translate("LayerGroupTabMixin", "Container Tree"),
+        "EO": translate("LayerGroupTabMixin", "Earth Observation Tree"),
+    }
+    return labels.get(mode, mode)
+
+
+def _mode_from_label(label):
+    """The enum behind a label — or the value itself when it already is one."""
+    for mode in MODES:
+        if label in (mode, _mode_label(mode)):
+            return mode
+    return label
 
 
 class LayerGroupTabMixin:
@@ -75,7 +98,7 @@ class LayerGroupTabMixin:
         ]
         self._setup_table(
             [
-                translate("LayerGroupTabMixin", "Layer Group"),
+                translate("LayerGroupTabMixin", "Name"),
                 translate("LayerGroupTabMixin", "Workspace"),
                 translate("LayerGroupTabMixin", "Mode"),
                 translate("LayerGroupTabMixin", "Layers"),
@@ -134,7 +157,7 @@ class LayerGroupTabMixin:
     def _group_summary(self, name, workspace_label):
         """(mode, number of layers) for the list view. Raises on HTTP errors."""
         detail = self._group_detail(name, scope(workspace_label))
-        return detail.get("mode", ""), len(self._group_layers(detail))
+        return _mode_label(detail.get("mode", "")), len(self._group_layers(detail))
 
     # -- One group -------------------------------------------------------------
 
@@ -161,32 +184,22 @@ class LayerGroupTabMixin:
         endpoints = self.gs.rest_service.rest_endpoints
         if workspace_name:
             return endpoints.layergroup(workspace_name, name)
-        return f"{endpoints.base_url}/layergroups/{name}.json"
-
-    @staticmethod
-    def _unwrap(payload, list_key, item_key):
-        """Entries of a GeoServer collection payload, always as a list.
-
-        An empty collection comes back as `{"layerGroups": ""}` and a
-        single-entry one wraps a bare object instead of a one-item list.
-        """
-        container = payload.get(list_key) or {}
-        items = container.get(item_key) or [] if isinstance(container, dict) else []
-        return [items] if isinstance(items, dict) else items
+        # quote(): a "/" or "?" in a name would otherwise change the path
+        return f"{endpoints.base_url}/layergroups/{quote(name, safe='')}.json"
 
     @classmethod
     def _group_layers(cls, detail):
         """The group's publishables in drawing order, as (name, @type) pairs."""
         return [
             (item.get("name", ""), item.get("@type", "layer"))
-            for item in cls._unwrap(detail, "publishables", "published")
+            for item in unwrap(detail, "publishables", "published")
             if isinstance(item, dict)
         ]
 
     @classmethod
     def _group_styles(cls, detail):
         """The style of each publishable; "" where the layer's default is used."""
-        styles = cls._unwrap(detail, "styles", "style")
+        styles = unwrap(detail, "styles", "style")
         return [
             style.get("name", "") if isinstance(style, dict) else (style or "")
             for style in styles
@@ -213,16 +226,10 @@ class LayerGroupTabMixin:
                 notes.append(f"style {style}")
             lines.append(layer_name + (f"  ({', '.join(notes)})" if notes else ""))
 
-        bounds = detail.get("bounds") or {}
-        bounds_text = (
-            "{minx}, {miny} → {maxx}, {maxy}  ({crs})".format(**bounds)
-            if {"minx", "miny", "maxx", "maxy", "crs"} <= set(bounds)
-            else ""
-        )
         return {
             "name": name,
             "workspace": workspace_label,
-            "mode": detail.get("mode", ""),
+            "mode": _mode_label(detail.get("mode", "")),
             "title": cls._as_text(
                 detail.get("internationalTitle") or detail.get("title")
             ),
@@ -231,13 +238,13 @@ class LayerGroupTabMixin:
                 detail.get("internationalAbstract") or detail.get("abstractTxt")
             ),
             "layers": "\n".join(lines),
-            "bounds": bounds_text,
+            "bounds": bbox_text(detail.get("bounds")),
         }
 
     def _group_info_fields(self):
         """Field definitions for the read-only detail dialog."""
         read_only_text = [
-            ("name", translate("LayerGroupTabMixin", "Layer Group")),
+            ("name", translate("LayerGroupTabMixin", "Name")),
             ("workspace", translate("LayerGroupTabMixin", "Workspace")),
             ("mode", translate("LayerGroupTabMixin", "Mode")),
             ("title", translate("LayerGroupTabMixin", "Title")),
@@ -298,26 +305,12 @@ class LayerGroupTabMixin:
 
     # -- Create ----------------------------------------------------------------
 
-    def _all_layer_names(self):
-        """Every published layer on the server, qualified as "workspace:layer".
-
-        TODO(#50): upstream as get_layers() — the library lists feature types
-        per datastore and coverages per coverage store, so the one call that
-        lists everything publishable, rasters included, is missing. Workaround:
-        GET /rest/layers.json.
-        """
-        path = f"{self.gs.rest_service.rest_endpoints.base_url}/layers.json"
-        payload = self._raw_rest("get", path).json()
-        return sorted(
-            self._name_of(layer) for layer in self._unwrap(payload, "layers", "layer")
-        )
-
     def _group_fields(self, workspace_names, layer_names):
         """Field definitions for the create dialog."""
         return [
             {
                 "key": "name",
-                "label": translate("LayerGroupTabMixin", "Layer Group"),
+                "label": translate("LayerGroupTabMixin", "Name"),
                 "type": "text",
                 "required": True,
             },
@@ -335,12 +328,14 @@ class LayerGroupTabMixin:
                 "key": "mode",
                 "label": translate("LayerGroupTabMixin", "Mode"),
                 "type": "combo",
-                "options": list(MODES),
-                "default": "SINGLE",
+                "options": [_mode_label(mode) for mode in MODES],
+                "default": _mode_label("SINGLE"),
                 "help": translate(
                     "LayerGroupTabMixin",
-                    "SINGLE publishes the group as one layer; NAMED also keeps "
-                    "its layers addressable; CONTAINER and EO only group them",
+                    "Single publishes the group as one layer; Opaque Container is "
+                    "the same but hides its layers from the capabilities; Named "
+                    "Tree also keeps the layers addressable on their own; Container "
+                    "Tree and Earth Observation Tree only group them",
                 ),
             },
             {
@@ -416,7 +411,7 @@ class LayerGroupTabMixin:
 
         values = dlg.get_values()
         if self._run_action(
-            lambda: self._create_layer_group_from_values(values),
+            lambda: self._create_layer_group_from_values(values, layer_names),
             translate("LayerGroupTabMixin", "Failed to create layer group '{}'").format(
                 values["name"]
             ),
@@ -467,8 +462,12 @@ class LayerGroupTabMixin:
                     ).format(reference)
                 )
 
-    def _create_layer_group_from_values(self, values):
+    def _create_layer_group_from_values(self, values, known_layers=None):
         """POST a new layer group, refusing to overwrite an existing one.
+
+        :param known_layers: the server's layer names, as the form's picker
+            listed them; a typed line naming none of them is refused here,
+            by line, instead of coming back as GeoServer's HTTP error.
 
         TODO(#50): upstream — create_layer_group() cannot express any of this:
         it has no global scope, it qualifies every layer with the group's own
@@ -478,12 +477,23 @@ class LayerGroupTabMixin:
         "abstract", which GeoServer silently drops.
         """
         name = values["name"]
+        self._require_safe_name(name)
         workspace_name = scope(values["workspace"])
         layers, styles = self._parse_group_layers(values["layers"], workspace_name)
         if not layers:
             raise ValueError(
                 translate("LayerGroupTabMixin", "List at least one layer.")
             )
+        if known_layers is not None:
+            unknown = [layer for layer in layers if layer not in known_layers]
+            if unknown:
+                raise ValueError(
+                    translate(
+                        "LayerGroupTabMixin",
+                        "No layer named '{}' on the server — pick it from the list, "
+                        "or qualify it as workspace:layer.",
+                    ).format(unknown[0])
+                )
         self._check_styles_exist(styles)
         if self.gs.rest_service.resource_exists(self._group_path(name, workspace_name)):
             raise ValueError(
@@ -494,7 +504,7 @@ class LayerGroupTabMixin:
 
         group = {
             "name": name,
-            "mode": values["mode"],
+            "mode": _mode_from_label(values["mode"]),
             "publishables": {
                 "published": [{"@type": "layer", "name": layer} for layer in layers]
             },
@@ -603,7 +613,7 @@ class LayerGroupTabMixin:
             cascade=translate(
                 "LayerGroupTabMixin",
                 "Only the group goes away — the layers it published stay. "
-                "GeoServer refuses if another layer group contains this one.\n\n",
+                "GeoServer refuses if another layer group contains this one.",
             ),
         )
 

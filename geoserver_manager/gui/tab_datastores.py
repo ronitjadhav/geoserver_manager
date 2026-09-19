@@ -77,8 +77,9 @@ translate = QCoreApplication.translate
 
 
 def _is_secret(key):
-    """A parameter GeoServer stores encrypted: `passwd`, `WFSDataStoreFactory:PASSWORD`, …"""
-    return key.lower().endswith(("passwd", "password"))
+    """A parameter to mask: `passwd`, `WFSDataStoreFactory:PASSWORD`, a `…secret`
+    or `…token` — not `key`, which would hide "Expose primary keys"."""
+    return key.lower().endswith(("passwd", "password", "secret", "token"))
 
 
 def _as_int(value, default):
@@ -115,7 +116,7 @@ class DatastoreTabMixin:
         ]
         self._setup_table(
             [
-                translate("DatastoreTabMixin", "Datastore Name"),
+                translate("DatastoreTabMixin", "Name"),
                 translate("DatastoreTabMixin", "Workspace"),
                 translate("DatastoreTabMixin", "Type"),
                 translate("DatastoreTabMixin", "Enabled"),
@@ -164,7 +165,7 @@ class DatastoreTabMixin:
         detail = self._check(self.gs.get_datastore(workspace_name, datastore_name))
         if not isinstance(detail, dict):
             return ("—", "—")
-        return (detail.get("type", "—"), str(detail.get("enabled", True)))
+        return (detail.get("type", "—"), self._yes_no(detail.get("enabled", True)))
 
     def _datastore_fields(self, workspace_names, on_type_changed=None, edit_mode=False):
         """Return datastore form field definitions with type-specific params.
@@ -174,18 +175,7 @@ class DatastoreTabMixin:
         :param edit_mode: editing an existing datastore — the workspace is
             fixed and the password has to be re-entered.
         """
-        return [
-            {
-                "key": "workspace",
-                "label": translate("DatastoreTabMixin", "Workspace"),
-                "type": "combo",
-                "options": workspace_names,
-                "required": True,
-                "read_only": edit_mode,
-                "help": translate(
-                    "DatastoreTabMixin", "The workspace this datastore belongs to"
-                ),
-            },
+        fields = [
             {
                 "key": "name",
                 "label": translate("DatastoreTabMixin", "Name"),
@@ -199,6 +189,17 @@ class DatastoreTabMixin:
                     translate("DatastoreTabMixin", "A datastore cannot be renamed")
                     if edit_mode
                     else None
+                ),
+            },
+            {
+                "key": "workspace",
+                "label": translate("DatastoreTabMixin", "Workspace"),
+                "type": "combo",
+                "options": workspace_names,
+                "required": True,
+                "read_only": edit_mode,
+                "help": translate(
+                    "DatastoreTabMixin", "The workspace this datastore belongs to"
                 ),
             },
             {
@@ -468,6 +469,24 @@ class DatastoreTabMixin:
                 ),
             },
         ]
+        if edit_mode:
+            # GeoServer disables a store whose connection failed at startup;
+            # this is the switch back. Creating one always enables it.
+            fields.insert(
+                4,
+                {
+                    "key": "enabled",
+                    "label": translate("DatastoreTabMixin", "Enabled"),
+                    "type": "checkbox",
+                    "default": True,
+                    "help": translate(
+                        "DatastoreTabMixin",
+                        "A disabled store serves none of its layers. GeoServer "
+                        "disables one itself when its connection fails at startup.",
+                    ),
+                },
+            )
+        return fields
 
     @staticmethod
     def _wfs_params(values, stored=None):
@@ -665,6 +684,8 @@ class DatastoreTabMixin:
         name = values["name"]
         ds_type = values["type"]
         description = values.get("description") or None
+        # The name goes into a REST path: refuse what a URL would eat.
+        self._require_safe_name(name)
 
         # create_* upserts, so an existing name would overwrite a live store
         if self._resource_exists(self.gs.get_datastore, ws, name):
@@ -790,7 +811,11 @@ class DatastoreTabMixin:
                 for key, value in edited.items()
             }
 
-        enabled = detail.get("enabled", True)
+        # The form's own checkbox wins; without one (older callers, tests) the
+        # server's flag is kept.
+        enabled = (
+            values["enabled"] if "enabled" in values else detail.get("enabled", True)
+        )
         if isinstance(enabled, str):  # .json gives a bool, but do not assume
             enabled = enabled.strip().lower() == "true"
 
@@ -826,6 +851,11 @@ class DatastoreTabMixin:
             "type": ds_type,
             "description": (
                 detail.get("description", "") if isinstance(detail, dict) else ""
+            ),
+            "enabled": (
+                str(detail.get("enabled", True)).strip().lower() == "true"
+                if isinstance(detail, dict)
+                else True
             ),
             # PostGIS
             "pg_host": conn_params.get("host", ""),
@@ -894,7 +924,11 @@ class DatastoreTabMixin:
         dlg = ResourceFormDialog(
             title=translate("DatastoreTabMixin", "Edit Datastore '{}'").format(ds_name),
             description=(
-                translate("DatastoreTabMixin", "Modify datastore settings")
+                translate(
+                    "DatastoreTabMixin",
+                    "Change the connection or the description; Save keeps every "
+                    "parameter this form does not show.",
+                )
                 if editable
                 else translate(
                     "DatastoreTabMixin",
@@ -946,7 +980,7 @@ class DatastoreTabMixin:
             self._load_datastores,
             # _do_delete_datastore sends recurse=true
             cascade=translate(
-                "DatastoreTabMixin", "Every layer published from it is deleted too.\n\n"
+                "DatastoreTabMixin", "Every layer published from it is deleted too."
             ),
         )
 
