@@ -20,6 +20,7 @@ from qgis.PyQt.QtWidgets import QApplication, QDialog, QMessageBox
 
 from geoserver_manager.gui.dlg_preview import LayerPreviewDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.toolbelt.payload import bbox_text
 from geoserver_manager.toolbelt.qgis_export import (
     export_to_geopackage,
     geoserver_name,
@@ -260,15 +261,7 @@ class LayerTabMixin:
         if isinstance(keywords, str):
             keywords = [keywords]
 
-        bbox = detail.get("nativeBoundingBox") or {}
-        bbox_text = (
-            ", ".join(
-                f"{key} {bbox[key]}"
-                for key in ("minx", "miny", "maxx", "maxy", "crs")
-                if key in bbox
-            )
-            or "—"
-        )
+        bounds = bbox_text(detail.get("nativeBoundingBox")) or "—"
 
         attributes = detail.get("attributes") or []
         if isinstance(attributes, dict):
@@ -304,7 +297,7 @@ class LayerTabMixin:
             "title": as_text(detail.get("title")),
             "abstract": as_text(detail.get("abstract")),
             "keywords": ", ".join(str(k) for k in keywords),
-            "bbox": bbox_text,
+            "bbox": bounds,
             "attributes": attribute_text,
         }
 
@@ -1220,7 +1213,9 @@ class LayerTabMixin:
         Preview page computes them.
         """
         base = base_url.rstrip("/")
-        service = f"{base}/{workspace}/wms" if workspace else f"{base}/wms"
+        service = (
+            f"{base}/{quote(workspace, safe='')}/wms" if workspace else f"{base}/wms"
+        )
         if not bbox or bbox[2] <= bbox[0] or bbox[3] <= bbox[1]:
             bbox, srs = (-180.0, -90.0, 180.0, 90.0), "EPSG:4326"
         width = height = _PREVIEW_SIZE

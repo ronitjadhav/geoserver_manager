@@ -59,12 +59,14 @@ def styleable_project_layers():
         QgsMapLayer.LayerType.VectorLayer: "vector",
         QgsMapLayer.LayerType.RasterLayer: "raster",
     }
+    from geoserver_manager.toolbelt.qgis_export import unique_labels
+
     layers = []
     for layer in QgsProject.instance().mapLayers().values():
         kind = kinds.get(layer.type())
         if kind:
             layers.append((f"{layer.name()}  ({kind})", layer))
-    return sorted(layers, key=lambda entry: entry[0].lower())
+    return unique_labels(layers)
 
 
 def project_layer_by_label(label):

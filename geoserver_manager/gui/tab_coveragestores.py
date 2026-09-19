@@ -24,6 +24,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.toolbelt.payload import bbox_text
 from geoserver_manager.toolbelt.qgis_export import (
     export_to_geotiff,
     geoserver_name,
@@ -313,25 +314,10 @@ class CoverageStoreTabMixin:
         payload = self._raw_rest("get", path).json()
         return payload.get("coverage") or {}
 
-    @staticmethod
-    def _crs_text(value):
-        """A CRS, which GeoServer gives either as a string or as {"$": …}."""
-        if isinstance(value, dict):
-            return str(value.get("$", ""))
-        return "" if value is None else str(value)
-
     @classmethod
     def _coverage_form_values(cls, detail):
         """Prefill for the coverage viewer. Pure, so it is unit-testable."""
-        bbox = detail.get("nativeBoundingBox") or {}
-        bounds = (
-            "{minx}, {miny} → {maxx}, {maxy}  ({crs})".format(
-                crs=cls._crs_text(bbox.get("crs")),
-                **{key: bbox[key] for key in ("minx", "miny", "maxx", "maxy")},
-            )
-            if {"minx", "miny", "maxx", "maxy"} <= set(bbox)
-            else ""
-        )
+        bounds = bbox_text(detail.get("nativeBoundingBox"))
 
         # GeoServer writes the grid range's "high" as the exclusive upper bound,
         # so the size is high - low: sfdem reports "0 0" / "634 477" and gdalinfo
@@ -551,8 +537,10 @@ class CoverageStoreTabMixin:
 
         values = dlg.get_values()
         published_name = values["name"] or values["native_name"]
-        if self._run_action(
-            lambda: self._check(
+
+        def publish():
+            self._require_safe_name(published_name)
+            self._check(
                 self.gs.create_coverage(
                     ws_name,
                     store_name,
@@ -560,7 +548,10 @@ class CoverageStoreTabMixin:
                     title=values["title"] or None,
                     native_name=values["native_name"],
                 )
-            ),
+            )
+
+        if self._run_action(
+            publish,
             translate("CoverageStoreTabMixin", "Failed to publish '{}'").format(
                 values["native_name"]
             ),
@@ -786,6 +777,7 @@ class CoverageStoreTabMixin:
         _publish_qgis_raster.
         """
         name, ws_name, store_type = values["name"], values["workspace"], values["type"]
+        self._require_safe_name(name)
         # create_coverage_store POSTs to the collection, and GeoServer answers
         # 409 for a name in use — but the message is clearer from here, and the
         # mosaic calls are PUTs, which overwrite the store instead.

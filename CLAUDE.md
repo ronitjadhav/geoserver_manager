@@ -209,6 +209,19 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   GeoServer adds `namespace` itself. A PUT without a key drops it (the map is replaced, invariant 3), and
   `featuretypes.json?list=available` lists the remote's feature types, so *Publish a Layer → a table in a
   datastore* cascades them. The typed creators stop before it; the form goes through the generic `create_datastore`.
+- **Add to QGIS as WMTS**: the URI names the tile matrix set (`EPSG:900913`) and *no* `crs=`. With
+  `crs=EPSG:4326` beside it QGIS accepted the layer, reported it as 4326 and reprojected every tile on the
+  fly (measured against the sandbox); without it the layer takes the tile matrix's own CRS.
+- **A pushed style is confirmed before it replaces one.** `create_style_definition()` upserts and a style is
+  shared by every layer that references it, so `_push_qgis_style` checks `get_style_definition()` first and
+  asks; it returns False when the user keeps the existing style, and its callers (the Layers row action, the
+  publish, the layer-tree menu) say "left as it is" rather than claiming an upload. The Styles tab, by
+  contrast, refuses an existing name — there a new name is the point.
+- **One publish entry point for both kinds.** *Publish a Layer → A layer from this QGIS project* offers
+  vectors and rasters; a `QgsRasterLayer` is handed to `_publish_qgis_raster(values, layer=…)` on the shared
+  dialog class, so the Coverage Stores tab's Add form and the Layers tab's publish are the same path.
+  Every upload goes through `_upload_file`; every create path calls `_require_safe_name()` on a typed name
+  before its first request.
 - **Publishing a QGIS layer** (rows 28–29 of #50) uploads a GeoPackage: `PUT
   .../datastores/{name}/file.gpkg?update=overwrite`. GeoServer then creates the store *and* configures one
   feature type per table in the file, with the SRS, bounding box and attributes read from the data — so the

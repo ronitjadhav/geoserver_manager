@@ -502,8 +502,8 @@ class TestLayerDetailPrefill(unittest.TestCase):
         self.assertEqual(values["native_name"], "tasmania_roads")
         self.assertEqual(values["projection_policy"], "FORCE_DECLARED")
         self.assertEqual(values["keywords"], "Roads, Tasmania")
-        self.assertIn("minx 145.19", values["bbox"])
-        self.assertIn("crs EPSG:4326", values["bbox"])
+        self.assertIn("145.19", values["bbox"])
+        self.assertIn("(EPSG:4326)", values["bbox"])  # one format on every tab
         self.assertIn("the_geom : MultiLineString", values["attributes"])
         self.assertIn("TYPE : String", values["attributes"])
         self.assertIs(values["enabled"], True)

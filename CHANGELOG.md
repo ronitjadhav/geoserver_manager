@@ -27,6 +27,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - The cascaded-layers dialog was a viewer whose primary button — Enter —
   deleted the selected layer. It is a viewer; a cascaded layer is deleted
   from the Layers tab, like any other.
+- A coverage store or a published coverage could be given a name with `/`,
+  `?`, `#` or `%`, which `requests` then read as part of the URL — the request
+  went to a *different* resource. Such names are refused before any request,
+  and a workspace name is quoted in the browser preview's URL.
+- Two project layers with the same name and kind showed as one entry in the
+  pickers, and the second always resolved to the first — the wrong layer's
+  data or symbology went up. Duplicates carry the tail of their layer id.
 - *Push style from QGIS* (Layers tab and layer tree) and a publish with its
   style replaced an existing server style without a word — and every layer
   sharing that style changed. It asks first: "Style 'x' already exists in
