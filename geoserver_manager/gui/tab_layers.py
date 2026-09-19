@@ -585,7 +585,12 @@ class LayerTabMixin:
 
     def _publish_layer(self):
         """Open the publish form: pick workspace, datastore and table."""
-        workspace_names = self._get_workspace_names()
+        workspace_names = self._fetch(
+            self._get_workspace_names,
+            translate("LayerTabMixin", "Failed to load the workspaces"),
+        )
+        if workspace_names is None:
+            return
         if not workspace_names:
             self.show_warning_message(
                 translate(

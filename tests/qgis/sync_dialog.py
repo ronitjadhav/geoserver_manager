@@ -19,7 +19,14 @@ class SyncDialog(GeoServerMainDialog):
     """Loads tabs — and uploads — synchronously, reporting failures the way the real one does."""
 
     def _launch_task(
-        self, slot, failure_message, work, on_success, on_cancel, busy_text=None
+        self,
+        slot,
+        failure_message,
+        work,
+        on_success,
+        on_cancel,
+        busy_text=None,
+        quiet=False,
     ):
         # No task, so nothing to cancel and no progress to report: work() gets
         # None where the real dialog passes the running task. Both _run_in_task

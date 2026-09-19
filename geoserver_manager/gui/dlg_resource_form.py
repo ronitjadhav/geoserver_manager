@@ -163,6 +163,15 @@ class ResourceFormDialog(QDialog):
         )
         self._button_box.accepted.connect(self._on_accept)
         self._button_box.rejected.connect(self.reject)
+        # Why the form did not accept: a red border alone says nothing when
+        # the field is an empty combo with nothing to pick.
+        self._validation_label = QLabel()
+        self._validation_label.setWordWrap(True)
+        self._validation_label.setStyleSheet(
+            f"color: {invalid_field_colour(self.palette())};"
+        )
+        self._validation_label.hide()
+        layout.addWidget(self._validation_label)
         layout.addWidget(self._button_box)
 
     @staticmethod
@@ -245,7 +254,9 @@ class ResourceFormDialog(QDialog):
             if placeholder:
                 w.setPlaceholderText(placeholder)
             if read_only:
-                w.setEnabled(False)
+                # Not setEnabled(False): a greyed field cannot be selected or
+                # copied, and detail views are made of these (bounds, URLs).
+                w.setReadOnly(True)
             return w
 
         if ftype == "checkbox":
@@ -393,11 +404,6 @@ class ResourceFormDialog(QDialog):
         """
         return self._widgets.get(key)
 
-    def set_all_fields_enabled(self, enabled):
-        """Enable or disable all field widgets."""
-        for widget in self._widgets.values():
-            widget.setEnabled(enabled)
-
     def hide_save_button(self):
         """Hide the Save button, leaving only Cancel (for view-only dialogs)."""
         self._button_box.button(QDialogButtonBox.StandardButton.Ok).setVisible(False)
@@ -407,6 +413,7 @@ class ResourceFormDialog(QDialog):
 
     def _on_accept(self):
         """Validate required fields before accepting."""
+        self._validation_label.hide()
         # Reset styles
         for field in self._fields:
             widget = self._widgets[field["key"]]
@@ -430,6 +437,14 @@ class ResourceFormDialog(QDialog):
                 widget.setStyleSheet(
                     f"border: 1px solid {invalid_field_colour(self.palette())};"
                 )
+                if field.get("type") == "combo" and widget.count() == 0:
+                    reason = self.tr("'{}' has nothing to choose from.")
+                else:
+                    reason = self.tr("'{}' is required.")
+                self._validation_label.setText(
+                    field.get("required_message") or reason.format(field["label"])
+                )
+                self._validation_label.show()
                 return
 
         self.accept()

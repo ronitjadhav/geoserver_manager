@@ -508,7 +508,12 @@ class CascadedStoreTabMixin:
 
     def _add_cascaded_store(self):
         """Open a form dialog to create a cascaded store."""
-        workspace_names = self._get_workspace_names()
+        workspace_names = self._fetch(
+            self._get_workspace_names,
+            translate("CascadedStoreTabMixin", "Failed to load the workspaces"),
+        )
+        if workspace_names is None:
+            return
         if not workspace_names:
             self.show_warning_message(
                 translate(

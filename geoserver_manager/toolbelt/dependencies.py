@@ -11,6 +11,7 @@ files in extras/ and add them to sys.path at plugin startup.
 
 # standard
 import importlib
+import logging
 import sys
 
 # PyQGIS
@@ -112,6 +113,11 @@ def ensure_dependencies() -> bool:
 
     :return: True if dependency is available, False otherwise.
     """
+    # The library logs every request payload at DEBUG — a PostGIS or WFS
+    # store create with its plaintext password included. A DEBUG root handler
+    # set up by anything else in QGIS would then write it to disk.
+    logging.getLogger("geoservercloud").setLevel(logging.INFO)
+
     logger = PlgLogger().log
 
     # 1. Already importable? (an install in the QGIS profile wins over the

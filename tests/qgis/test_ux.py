@@ -372,6 +372,7 @@ class TestPrimaryButtons(unittest.TestCase):
 class TestEmptyStates(unittest.TestCase):
     def setUp(self):
         self.dlg = SyncDialog()
+        self.dlg.gs = object()  # connected: the empty state is about the tab
         self.dlg._setup_table(["Name", self.dlg.actions_column_label()])
 
     def test_an_empty_tab_points_at_its_add_button(self):

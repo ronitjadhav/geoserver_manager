@@ -133,7 +133,19 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
 
         # geoserver URL (not sensitive — stored in QgsSettings)
         url = self.txt_gs_url.text().strip()
-        if url and not url.startswith(("http://", "https://")):
+        parsed = urlparse(url)
+        if url and (parsed.username or parsed.password):
+            # user:pass@host would surface in the window title, the status
+            # line, every error banner and the persistent QGIS log.
+            self.log(
+                message=self.tr(
+                    "The URL must not carry a user name or password — the fields "
+                    "below do. URL not saved."
+                ),
+                log_level=Qgis.MessageLevel.Warning,
+                push=True,
+            )
+        elif url and not url.startswith(("http://", "https://")):
             # apply() cannot stop the options dialog from closing, so keep the
             # previous URL and warn — dropping out here would also discard the
             # credentials the user just typed.
@@ -150,6 +162,11 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         # credentials (sensitive — stored encrypted in QgsAuthManager)
         username = self.txt_gs_username.text()
         password = self.txt_gs_password.text()
+        if not (username or password) and settings.geoserver_auth_cfg_id:
+            # Both blanked on purpose: forget the stored credentials rather
+            # than keep them behind empty fields.
+            settings.remove_credentials()
+            settings.geoserver_auth_cfg_id = ""
         if username or password:
             auth_cfg_id = settings.save_credentials(username, password)
             if auth_cfg_id:
@@ -202,6 +219,16 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         if not url.startswith(("http://", "https://")):
             self._show_test_result(
                 self.tr("Enter a URL starting with http:// or https:// first."),
+                "error",
+            )
+            return
+        parsed = urlparse(url)
+        if parsed.username or parsed.password:
+            self._show_test_result(
+                self.tr(
+                    "Take the user name and password out of the URL — the fields "
+                    "below carry them."
+                ),
                 "error",
             )
             return

@@ -253,7 +253,7 @@ class TestGroupDetail(unittest.TestCase):
             dlg._show_layer_group_info(["tasmania", GLOBAL])
         form = Recording.opened[-1]
         self.assertTrue(form.get_widget("layers").isReadOnly())
-        self.assertFalse(form.get_widget("name").isEnabled())
+        self.assertTrue(form.get_widget("name").isReadOnly())  # copyable, not greyed
 
 
 class TestCreateLayerGroup(unittest.TestCase):
@@ -405,7 +405,7 @@ class TestDeleteAndAddToQgis(unittest.TestCase):
     def setUp(self):
         self.dlg = SyncDialog()
         self.dlg.gs = FakeGS()
-        self.dlg._confirm_delete = lambda kind, labels, cascade="": True
+        self.dlg._confirm_delete = lambda kind, labels, cascade="", **kwargs: True
         self.dlg.show_success_message = lambda text: None
         self.dlg.show_error_message = lambda text: self.fail(f"unexpected: {text}")
         self.dlg._load_layer_groups = lambda: None

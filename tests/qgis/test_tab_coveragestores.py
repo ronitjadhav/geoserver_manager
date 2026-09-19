@@ -332,7 +332,7 @@ class TestStoreAndCoverageDetail(unittest.TestCase):
         with patch.object(tab_coveragestores, "ResourceFormDialog", Recording):
             dlg._show_coverage_store_info(["sfdem", "sf"])
         form = Recording.opened[-1]
-        self.assertFalse(form.get_widget("url").isEnabled())
+        self.assertTrue(form.get_widget("url").isReadOnly())  # copyable, not greyed
         self.assertTrue(form.get_widget("description").isReadOnly())
 
     def test_the_coverage_viewer_fills_itself_from_the_picked_coverage(self):
@@ -504,7 +504,7 @@ class TestPublishAndDelete(unittest.TestCase):
         Recording.opened.clear()  # class-level: order must not matter
         self.dlg = SyncDialog()
         self.dlg.gs = FakeGS()
-        self.dlg._confirm_delete = lambda kind, labels, cascade="": True
+        self.dlg._confirm_delete = lambda kind, labels, cascade="", **kwargs: True
         self.dlg._load_coverage_stores = lambda: None
         self.dlg.show_success_message = lambda text: None
         self.dlg.show_warning_message = lambda text: None
@@ -559,7 +559,7 @@ class TestPublishAndDelete(unittest.TestCase):
     def test_the_delete_confirmation_names_the_cascade(self):
         seen = {}
 
-        def confirm(kind, labels, cascade=""):
+        def confirm(kind, labels, cascade="", **kwargs):
             seen.update(kind=kind, cascade=cascade)
             return False
 

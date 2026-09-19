@@ -4,9 +4,8 @@
 Coverage Stores tab — list and create raster stores, view and publish their
 coverages, delete a store.
 
-Used as a mixin for GeoServerMainDialog. Two helpers come from its siblings on
-that class: `_open_workspace_from_row` (DatastoreTabMixin) and `_unwrap`, which
-flattens GeoServer's collection payloads (LayerGroupTabMixin).
+Used as a mixin for GeoServerMainDialog, which provides `_open_workspace_from_row`
+and `_unwrap` (toolbelt/payload.py) to every tab.
 
 A coverage store is to rasters what a datastore is to tables, with one twist:
 creating the store does not publish anything (except for an ImageMosaic built

@@ -334,7 +334,7 @@ class TestLayersTab(unittest.TestCase):
         self.dlg._load_layers()
         confirmed = {}
         self.dlg._confirm_delete = (
-            lambda kind, labels, cascade="": confirmed.update(
+            lambda kind, labels, cascade="", **kwargs: confirmed.update(
                 kind=kind, labels=labels, cascade=cascade
             )
             or True

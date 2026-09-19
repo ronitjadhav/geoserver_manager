@@ -221,7 +221,7 @@ class Recording(ResourceFormDialog):
         return QDialog.DialogCode.Rejected
 
 
-def confirm_yes(kind, labels, cascade=""):
+def confirm_yes(kind, labels, cascade="", **kwargs):
     return True
 
 
@@ -407,7 +407,7 @@ class TestActions(unittest.TestCase):
         self.assertEqual(self.puts(), [])
 
     def test_truncate_asks_first_then_mass_truncates(self):
-        self.dlg._confirm_delete = lambda kind, labels, cascade="": False
+        self.dlg._confirm_delete = lambda kind, labels, cascade="", **kwargs: False
         self.dlg._truncate_gwc_layer(STATES_ROW)
         self.assertEqual([c for c in self.gs.calls if c[0] == "POST"], [])
 
@@ -425,7 +425,7 @@ class TestActions(unittest.TestCase):
     def test_remove_uses_the_library_for_a_workspace_layer_and_raw_for_a_group(self):
         cascades = []
 
-        def confirm(kind, labels, cascade=""):
+        def confirm(kind, labels, cascade="", **kwargs):
             cascades.append((kind, labels, cascade))
             return True
 

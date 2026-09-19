@@ -8,6 +8,27 @@ that reports its progress and stops when asked.
 No QGIS import: the unit suite runs this on a plain Python.
 """
 
+import re
+
+
+def summarise_body(text, limit=300):
+    """One line of a response body, for a banner and a log line.
+
+    GeoServer puts the reason in the body ("Unable to delete layer referenced
+    by layer group …"), so the first line is kept, cut at `limit`. A Tomcat
+    error page or a proxy's login page is markup that explains nothing: an
+    HTML or XML body is reduced to its <title> when it has one, else to its
+    text.
+    """
+    text = (text or "").strip()
+    if not text:
+        return ""
+    if text.startswith("<"):
+        title = re.search(r"<title>(.*?)</title>", text, re.I | re.S)
+        text = title.group(1) if title else re.sub(r"<[^>]+>", " ", text)
+        text = " ".join(text.split())
+    return text.splitlines()[0][:limit] if text else ""
+
 
 def raw_rest(client, method, path, **kwargs):
     """Call the library's REST client directly, for what it has no method for.
@@ -20,7 +41,9 @@ def raw_rest(client, method, path, **kwargs):
     """
     response = getattr(client, method)(path, **kwargs)
     if response.status_code >= 400:
-        raise RuntimeError(f"HTTP {response.status_code}: {response.text}")
+        raise RuntimeError(
+            f"HTTP {response.status_code}: {summarise_body(response.text)}"
+        )
     return response
 
 
@@ -51,6 +74,18 @@ class ProgressReader:
 
     def __len__(self):
         return self._total
+
+    def tell(self):
+        return self.sent
+
+    def seek(self, offset, whence=0):
+        """Rewind, which is all `requests` needs: a redirect (an http:// URL the
+        server sends to https://) makes it resend the body from the start."""
+        if offset != 0 or whence != 0:
+            raise OSError("an upload body can only be rewound to its start")
+        self._handle.seek(0)
+        self.sent = 0
+        self._reported = None
 
     def read(self, size=-1):
         if self._is_cancelled is not None and self._is_cancelled():

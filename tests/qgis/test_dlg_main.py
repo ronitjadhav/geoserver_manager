@@ -695,7 +695,7 @@ class TestErrorText(unittest.TestCase):
         dlg = SyncDialog()
         errors = []
         dlg.show_error_message = errors.append
-        dlg._confirm_delete = lambda kind, labels, cascade="": True
+        dlg._confirm_delete = lambda kind, labels, cascade="", **kwargs: True
 
         def boom():
             raise self._http_error(
@@ -825,7 +825,8 @@ class TestBackgroundLoading(unittest.TestCase):
         self.assertEqual(self.dlg._all_rows, [])
         self.assertEqual(len(self.errors), 1)
         self.assertIn("boom", self.errors[0])
-        self.assertEqual(self.dlg.lbl_page_info.text(), "No results")
+        # the empty state explains itself now: nothing loaded, here is Add
+        self.assertIn("Nothing here yet", self.dlg.lbl_page_info.text())
 
     def test_a_load_that_lands_after_close_touches_nothing(self):
         """The task outlives the dialog; its callback must stay away."""
@@ -1384,7 +1385,7 @@ class TestConnectionGuard(unittest.TestCase):
         self.dlg.show_success_message = lambda text: None
         # If the guard ever breaks, a row action would reach the modal delete
         # confirmation and hang the suite instead of failing it.
-        self.dlg._confirm_delete = lambda kind, labels, cascade="": False
+        self.dlg._confirm_delete = lambda kind, labels, cascade="", **kwargs: False
         self.dlg._load_layers()  # arms the buttons, as a loaded tab does
         self.dlg.gs = None  # what refresh_ui() does while it re-probes
 

@@ -43,14 +43,16 @@ from geoserver_manager.gui.tab_styles import StyleTabMixin
 from geoserver_manager.gui.tab_workspaces import WorkspaceTabMixin
 from geoserver_manager.gui.theme import status_colour
 from geoserver_manager.toolbelt.log_handler import PlgLogger
+from geoserver_manager.toolbelt.payload import as_list, name_of, unwrap
 from geoserver_manager.toolbelt.preferences import PlgOptionsManager
 from geoserver_manager.toolbelt.probe import probe
-from geoserver_manager.toolbelt.rest import raw_rest
+from geoserver_manager.toolbelt.rest import raw_rest, summarise_body
 
 # Listing a nested resource needs one GET per parent plus one per item. Eight
 # parallel requests keep that bearable. They run inside a _FetchTask, so they
 # never block the GUI thread.
 _MAX_PARALLEL_REQUESTS = 8
+_UNSAFE_IN_NAMES = "/?#%\\"
 
 # The connection probe is the request the user waits for before anything is on
 # screen, so it gets its own short ceiling. The library cannot do this: its
@@ -139,6 +141,7 @@ class GeoServerMainDialog(
         # Background loading state
         self._task = None  # the running _FetchTask, if any
         self._upload = None  # the running upload task, its own slot: _run_upload
+        self._side = None  # a quiet side task (a dialog's legend): _run_quietly
         self._closing = False  # set in closeEvent: a late finish must stay away
         self._announce_after_load = None  # banner to show once rows have landed
 
@@ -225,7 +228,10 @@ class GeoServerMainDialog(
             and self.btn_delete_selected.isEnabled()
             and self._delete_selected_callback is not None
         ):
-            self._delete_selected_callback(self._get_selected_rows())
+            # The fifth dispatch point (invariant 10): the button is re-enabled
+            # by a selection change even while a Refresh has no client yet.
+            if self._require_connection():
+                self._delete_selected_callback(self._get_selected_rows())
             return
         super().keyPressEvent(event)
 
@@ -238,6 +244,8 @@ class GeoServerMainDialog(
         # task is visible in QGIS's own task bar with its own Cancel.
         self._closing = True
         self._cancel_load()
+        if self._side is not None:
+            self._side.cancel()
         self._store_settings()
         super().closeEvent(event)
 
@@ -272,12 +280,12 @@ class GeoServerMainDialog(
 
     def show_error_message(self, text):
         self.message_bar.pushMessage(
-            self.tr("Error"), text, Qgis.MessageLevel.Critical, 5
+            self.tr("Error"), text, Qgis.MessageLevel.Critical, 0
         )
 
     def show_warning_message(self, text):
         self.message_bar.pushMessage(
-            self.tr("Warning"), text, Qgis.MessageLevel.Warning, 5
+            self.tr("Warning"), text, Qgis.MessageLevel.Warning, 0
         )
 
     # -- Connection --------------------------------------------------------
@@ -292,7 +300,7 @@ class GeoServerMainDialog(
         """
         content, status_code = result
         if status_code >= 400:
-            raise RuntimeError(f"HTTP {status_code}: {content}")
+            raise RuntimeError(f"HTTP {status_code}: {summarise_body(str(content))}")
         return content
 
     def _build_client(self, settings):
@@ -371,6 +379,12 @@ class GeoServerMainDialog(
         """
         self._set_status(self.tr("Connecting…"), "busy")
         self.setWindowTitle(__title__)
+        # Reopened after Close: closeEvent set _closing so a late finish would
+        # stay away from dying widgets. A new connection means we are alive
+        # again — without this the dialog worked exactly once per QGIS session.
+        self._closing = False
+        # Stop the running load *before* dropping the client its worker reads.
+        self._cancel_load()
         self.gs = None
         # The rows on screen belong to the connection just dropped; the loader
         # re-arms these once the probe lands.
@@ -418,22 +432,41 @@ class GeoServerMainDialog(
 
     # -- Background loading ------------------------------------------------
 
-    def _run_in_task(self, failure_message, work, on_success):
+    def _run_in_task(
+        self, failure_message, work, on_success, on_cancel=None, busy_text=None
+    ):
         """Run work(task) off the GUI thread, then on_success(result) here.
 
         Only stateless REST reads belong in work: the client's wms / wmts
         attributes are shared state. A failed run reports itself and calls
-        nothing; a cancelled one does neither — which is why every loader
-        resets the table *before* starting a task, so an empty table is what
-        either outcome leaves behind. A new load supersedes the running one.
+        nothing; a cancelled one calls on_cancel(task) when given, else says
+        so — which is why every loader resets the table *before* starting a
+        task, so an empty table is what either outcome leaves behind. A new
+        load supersedes the running one.
         """
         self._cancel_load()
 
         def cancelled(task):
-            if task.user_cancelled:
+            if on_cancel is not None:
+                on_cancel(task)
+            elif task.user_cancelled:
                 self.show_warning_message(self.tr("Loading cancelled."))
 
-        self._launch_task("_task", failure_message, work, on_success, cancelled)
+        self._launch_task(
+            "_task", failure_message, work, on_success, cancelled, busy_text=busy_text
+        )
+
+    def _run_quietly(self, failure_message, work, on_success):
+        """Run work(task) in a slot of its own, without the table's loading state.
+
+        For a side fetch — a dialog's legend — that must neither supersede a
+        running load nor turn Refresh into Cancel. A failure is still reported.
+        """
+        if self._side is not None:
+            self._side.cancel()
+        self._launch_task(
+            "_side", failure_message, work, on_success, lambda task: None, quiet=True
+        )
 
     def _run_upload(self, failure_message, work, on_success, on_cancel):
         """Stream a long PUT off the GUI thread, with progress and Cancel.
@@ -468,7 +501,14 @@ class GeoServerMainDialog(
         return True
 
     def _launch_task(
-        self, slot, failure_message, work, on_success, on_cancel, busy_text=None
+        self,
+        slot,
+        failure_message,
+        work,
+        on_success,
+        on_cancel,
+        busy_text=None,
+        quiet=False,
     ):
         """Park a _FetchTask in `slot` ("_task" or "_upload") and start it.
 
@@ -479,17 +519,27 @@ class GeoServerMainDialog(
         """
 
         def finished(task, ok, result, error):
-            if self._closing or getattr(self, slot) is not task:
-                # The dialog is going away, or a newer load took over: that
-                # one owns the table and the Cancel button now.
+            if getattr(self, slot) is not task:
+                # A newer task took over the slot: that one owns the table and
+                # the Cancel button now.
                 if slot == "_upload" and error is not None:
                     self.log(
                         f"{failure_message}: {self._error_text(error)}",
                         log_level=Qgis.MessageLevel.Critical,
                     )
                 return
+            # Free the slot even when the dialog is closing — a slot left
+            # occupied is what kept a reopened dialog on "Cancel" for good.
             setattr(self, slot, None)
-            self._set_loading(self._loading())
+            if self._closing:
+                if error is not None:
+                    self.log(
+                        f"{failure_message}: {self._error_text(error)}",
+                        log_level=Qgis.MessageLevel.Critical,
+                    )
+                return
+            if not quiet:
+                self._set_loading(self._loading())
             if task.isCanceled():
                 on_cancel(task)
                 return
@@ -505,7 +555,8 @@ class GeoServerMainDialog(
 
         task = _FetchTask(failure_message, work, finished)
         setattr(self, slot, task)
-        self._set_loading(True, busy_text)
+        if not quiet:
+            self._set_loading(True, busy_text)
         QgsApplication.taskManager().addTask(task)
 
     def _start_load(self, failure_message, fetch):
@@ -548,15 +599,17 @@ class GeoServerMainDialog(
     def _set_loading(self, loading, busy_text=None):
         """Say that a task is running, and offer Cancel in place of Refresh."""
         self.btn_refresh.setText(self.tr("Cancel") if loading else self.tr("Refresh"))
-        self.btn_refresh.setToolTip(
-            self.tr("Stop loading")
-            if loading
-            else self.tr("Refresh resources from the GeoServer (F5)")
-        )
+        if not loading:
+            tooltip = self.tr("Refresh resources from the GeoServer (F5)")
+        elif self._upload is not None:
+            tooltip = self.tr("Cancel the upload")
+        else:
+            tooltip = self.tr("Stop loading")
+        self.btn_refresh.setToolTip(tooltip)
         if loading:
             self.lbl_page_info.setText(busy_text or self.tr("Loading…"))
         elif not self._all_rows:
-            self.lbl_page_info.setText(self.tr("No results"))
+            self.lbl_page_info.setText(self._empty_state_text())
         else:
             # An upload borrowed the label while the rows stayed on screen.
             self.lbl_page_info.setText(self._page_info_text())
@@ -632,7 +685,7 @@ class GeoServerMainDialog(
         self.resultsTable.clearContents()
         self.resultsTable.setRowCount(0)
         self.lbl_page_number.setText("1")
-        self.lbl_page_info.setText(self.tr("No results"))
+        self.lbl_page_info.setText(self._empty_state_text())
         for button in (
             self.btn_page_first,
             self.btn_page_prev,
@@ -643,7 +696,12 @@ class GeoServerMainDialog(
 
     def _on_nav_changed(self, index):
         """Load data for the selected navigation tab."""
-        if not self.gs or index < 0:
+        if index < 0:
+            return
+        if not self.gs:
+            # Nothing to load from; the empty table says why instead of
+            # looking like an empty server.
+            self.lbl_page_info.setText(self._empty_state_text())
             return
         self.searchBox.clear()
         self._search_timer.stop()  # clear() may have armed it
@@ -665,8 +723,13 @@ class GeoServerMainDialog(
         # Guarded: the button stays armed while a refresh re-probes the server.
         self.btn_add.clicked.connect(lambda: self._require_connection() and callback())
 
-    def _setup_delete_selected_button(self, callback):
-        """Configure the header Delete Selected button for the current tab."""
+    def _setup_delete_selected_button(self, callback, text=None):
+        """Configure the header Delete Selected button for the current tab.
+
+        :param text: the button's label when the action is not a delete
+            (the Tile Cache tab only stops caching).
+        """
+        self.btn_delete_selected.setText(text or self.tr("Delete Selected"))
         self.btn_delete_selected.setVisible(True)
         self.btn_delete_selected.setEnabled(False)
         self._delete_selected_callback = callback
@@ -860,6 +923,8 @@ class GeoServerMainDialog(
 
     def _empty_state_text(self):
         """What an empty table should say: why it is empty, and what helps."""
+        if self.gs is None:
+            return self.tr("Not connected — press Refresh (F5), or open Settings.")
         search = self.searchBox.text().strip()
         if search and self._all_rows:
             return self.tr("Nothing matches '{}' — Esc clears the filter.").format(
@@ -933,10 +998,26 @@ class GeoServerMainDialog(
         self._current_page = self._total_pages - 1
         self._show_page()
 
-    @staticmethod
-    def _name_of(item):
-        """Name of a list entry: geoservercloud returns dicts, tolerate strings."""
-        return item.get("name", str(item)) if isinstance(item, dict) else str(item)
+    # GeoServer's payload shapes, in one place (toolbelt/payload.py); the
+    # class attributes win over any copy a mixin still carries.
+    _name_of = staticmethod(name_of)
+    _unwrap = staticmethod(unwrap)
+    _as_list = staticmethod(as_list)
+
+    def _require_safe_name(self, name):
+        """Refuse a name the REST paths cannot carry, before it reaches them.
+
+        `/`, `?`, `#` and `%` change what a URL means — `requests` sends
+        `datastores/a#b.json` as `datastores/a`, a different resource — and
+        GeoServer itself does not stop them. Every Add form calls this first.
+        """
+        if not name or name != name.strip() or any(c in name for c in _UNSAFE_IN_NAMES):
+            raise ValueError(
+                self.tr(
+                    "'{}' cannot be used as a name: no slash, '?', '#', '%' or "
+                    "leading and trailing spaces."
+                ).format(name)
+            )
 
     @staticmethod
     def _error_text(error):
@@ -1095,88 +1176,125 @@ class GeoServerMainDialog(
         if len(failures) > 5:
             shown += ", …"
         self.show_warning_message(
-            self.tr("{count} item(s) could not be listed: {names}").format(
-                count=len(failures), names=shown
-            )
+            self.tr(
+                "{count} item(s) could not be listed: {names} — details in the "
+                "QGIS log (GeoServer Manager tab)."
+            ).format(count=len(failures), names=shown)
         )
 
-    def _confirm_delete(self, kind, labels, cascade=""):
-        """Ask before deleting one or more resources of one kind.
+    def _confirm_delete(self, kind, labels, cascade="", verb=None):
+        """Ask before acting on one or more resources of one kind.
 
-        :param kind: human-readable type (e.g. "workspace").
-        :param labels: names of the resources about to be deleted.
-        :param cascade: what else the deletion takes with it — both delete
+        :param kind: human-readable type (e.g. "workspace"), or "" for none.
+        :param labels: names of the resources about to be acted on.
+        :param cascade: what else the action takes with it — both delete
             paths send recurse=true, so the user has to be told.
+        :param verb: the action, "delete" by default; the Tile Cache tab
+            passes "stop caching" and "truncate".
         """
+        verb = verb or self.tr("delete")
         if len(labels) == 1:
-            question = self.tr(
-                "Are you sure you want to delete {kind} '{name}'?"
-            ).format(kind=kind, name=labels[0])
+            subject = f"{kind} '{labels[0]}'" if kind else f"'{labels[0]}'"
+            question = self.tr("Are you sure you want to {verb} {subject}?").format(
+                verb=verb, subject=subject
+            )
         else:
             question = self.tr(
-                "Are you sure you want to delete {count} {kind}(s)?\n\n{items}"
+                "Are you sure you want to {verb} {count} {kind}(s)?\n\n{items}"
             ).format(
+                verb=verb,
                 count=len(labels),
                 kind=kind,
                 items="\n".join(f"  • {label}" for label in labels),
             )
+        # The separator lives here, so a translation cannot glue the sentences.
+        parts = [question, cascade.strip(), self.tr("This action cannot be undone.")]
         reply = QMessageBox.warning(
             self,
-            self.tr("Confirm Delete"),
-            f"{question}\n\n{cascade}" + self.tr("This action cannot be undone."),
+            self.tr("Please confirm"),
+            "\n\n".join(part for part in parts if part),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
         return reply == QMessageBox.StandardButton.Yes
 
-    def _delete_many(self, kind, labeled_deletes, reload_fn, cascade=""):
-        """Confirm and run one or more deletions, then reload the table.
+    def _delete_many(
+        self, kind, labeled_deletes, reload_fn, cascade="", verb=None, done=None
+    ):
+        """Confirm and run one or more deletions in a task, then reload the table.
 
         :param kind: human-readable resource type (e.g. "workspace").
         :param labeled_deletes: list of (label, zero-arg callable) pairs.
         :param reload_fn: called afterwards to refresh the table.
         :param cascade: sentence naming what else goes, for the confirmation.
+        :param verb: the action for the confirmation ("delete" by default).
+        :param done: the past participle for the banner ("deleted" by default).
+
+        The requests run off the GUI thread with progress and Cancel: fifty
+        workspaces with recurse=true are minutes, not a wait cursor.
         """
         if not labeled_deletes:
             return
         labels = [label for label, _ in labeled_deletes]
-        if not self._confirm_delete(kind, labels, cascade):
+        if not self._confirm_delete(kind, labels, cascade, verb=verb):
             return
+        verb = verb or self.tr("delete")
+        done = done or self.tr("deleted")
 
-        errors = []
-
-        def delete_all():
-            for label, delete_fn in labeled_deletes:
+        def delete_all(task):
+            errors = []
+            for index, (label, delete_fn) in enumerate(labeled_deletes):
+                if task is not None and task.isCanceled():
+                    break
                 try:
                     delete_fn()
                 except Exception as e:
-                    detail = self._error_text(e)
-                    errors.append(f"{label}: {detail}")
-                    self.log(
-                        f"Delete {kind} error ({label}): {detail}",
-                        log_level=Qgis.MessageLevel.Critical,
-                    )
+                    errors.append((label, self._error_text(e)))
+                if task is not None:
+                    task.setProgress(100 * (index + 1) / len(labeled_deletes))
+            return errors
 
-        self._run_action(delete_all, self.tr("Delete failed"))
-        if errors:
-            self.show_error_message(
-                self.tr("Failed to delete some {kind}(s):\n{errors}").format(
-                    kind=kind, errors="\n".join(errors)
+        def report(errors):
+            for label, detail in errors:
+                self.log(
+                    f"{verb} {kind} error ({label}): {detail}",
+                    log_level=Qgis.MessageLevel.Critical,
                 )
-            )
-        elif len(labels) == 1:
-            self.show_success_message(
-                self.tr("{kind} '{name}' deleted.").format(
-                    kind=kind.capitalize(), name=labels[0]
+            if errors:
+                self.show_error_message(
+                    self.tr("Failed to {verb} some {kind}(s):\n{errors}").format(
+                        verb=verb,
+                        kind=kind,
+                        errors="\n".join(f"{label}: {d}" for label, d in errors),
+                    )
                 )
-            )
-        else:
-            self.show_success_message(
-                self.tr("{count} {kind}(s) deleted.").format(
-                    count=len(labels), kind=kind
+            elif len(labels) == 1:
+                self.show_success_message(
+                    self.tr("{kind} '{name}' {done}.").format(
+                        kind=kind.capitalize(), name=labels[0], done=done
+                    )
                 )
+            else:
+                self.show_success_message(
+                    self.tr("{count} {kind}(s) {done}.").format(
+                        count=len(labels), kind=kind, done=done
+                    )
+                )
+            reload_fn()
+
+        def cancelled(_task):
+            self.show_warning_message(
+                self.tr("Cancelled — what was already done stays done.")
             )
-        reload_fn()
+            reload_fn()
+
+        self._run_in_task(
+            self.tr("{verb} failed").format(verb=verb.capitalize()),
+            delete_all,
+            report,
+            on_cancel=cancelled,
+            busy_text=self.tr("Working…"),
+        )
 
     # -- Dialog actions ----------------------------------------------------
 

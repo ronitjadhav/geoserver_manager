@@ -14,6 +14,7 @@ document, PUT `.xml` — which round-trips byte for byte. Reads stay JSON.
 """
 
 import xml.etree.ElementTree as ElementTree
+from xml.sax.saxutils import escape
 
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
@@ -49,6 +50,14 @@ _NEW_LAYER_XML = (
 translate = QCoreApplication.translate
 
 
+def _int_or_zero(text):
+    """An integer out of a GWC document, 0 when it is not one."""
+    try:
+        return int(text or 0)
+    except ValueError:
+        return 0
+
+
 class GwcTabMixin:
     """Mixin that adds the tile-cache (GeoWebCache) methods to the main dialog."""
 
@@ -64,7 +73,10 @@ class GwcTabMixin:
             ),
             self._add_gwc_layer,
         )
-        self._setup_delete_selected_button(self._remove_selected_gwc_layers)
+        self._setup_delete_selected_button(
+            self._remove_selected_gwc_layers,
+            translate("GwcTabMixin", "Remove Selected from Cache"),
+        )
         self._name_click_callback = self._show_gwc_layer_info
         self._extra_click_callbacks = {
             translate("GwcTabMixin", "Workspace"): self._open_workspace_from_row
@@ -258,7 +270,8 @@ class GwcTabMixin:
                 return 0
 
         meta = [
-            int(element.text or 0) for element in root.findall("metaWidthHeight/int")
+            _int_or_zero(element.text)
+            for element in root.findall("metaWidthHeight/int")
         ]
         return {
             "name": root.findtext("name") or "",
@@ -368,7 +381,9 @@ class GwcTabMixin:
         # as a degraded configuration — no formats, 0×0 meta-tiles, a single
         # gridset, no STYLES filter — after a needless configuration reload.
         # Workaround: PUT the XML document GeoServer itself would write.
-        document = self._gwc_xml_with_values(_NEW_LAYER_XML.format(name=name), values)
+        document = self._gwc_xml_with_values(
+            _NEW_LAYER_XML.format(name=escape(name)), values
+        )
         self._raw_rest(
             "put",
             self._gwc_layer_path(name, "xml"),
@@ -388,7 +403,7 @@ class GwcTabMixin:
         self._raw_rest(
             "post",
             f"{self._gwc_base()}/masstruncate",
-            data=f"<truncateLayer><layerName>{name}</layerName></truncateLayer>",
+            data=f"<truncateLayer><layerName>{escape(name)}</layerName></truncateLayer>",
             headers={"Content-Type": "text/xml"},
         )
 
@@ -642,8 +657,9 @@ class GwcTabMixin:
         """Drop the layer's cached tiles after confirmation."""
         name = row_data[0]
         if not self._confirm_delete(
-            translate("GwcTabMixin", "cached tiles of"),
+            translate("GwcTabMixin", "the tiles of layer"),
             [name],
+            verb=translate("GwcTabMixin", "truncate"),
             cascade=translate(
                 "GwcTabMixin",
                 "Every tile GeoWebCache stored for this layer is deleted, in every "
@@ -669,12 +685,14 @@ class GwcTabMixin:
     def _remove_selected_gwc_layers(self, selected_rows):
         """Stop caching one or more layers after confirmation."""
         self._delete_many(
-            translate("GwcTabMixin", "cached layer"),
+            translate("GwcTabMixin", "layer"),
             [
                 (row[0], lambda name=row[0]: self._do_remove_gwc_layer(name))
                 for row in selected_rows
             ],
             self._load_gwc_layers,
+            verb=translate("GwcTabMixin", "stop caching"),
+            done=translate("GwcTabMixin", "removed from the cache"),
             cascade=translate(
                 "GwcTabMixin",
                 "The cached tiles and the cache configuration are removed; the layer "

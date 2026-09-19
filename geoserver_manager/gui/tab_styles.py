@@ -407,7 +407,7 @@ class StyleTabMixin:
                     or translate("StyleTabMixin", "GeoServer did not return an image."),
                 )
 
-        self._run_in_task(
+        self._run_quietly(
             translate("StyleTabMixin", "Failed to load the legend"), work, landed
         )
 
@@ -482,7 +482,13 @@ class StyleTabMixin:
         dlg.set_field_visible("qgis_layer", source == _SOURCE_QGIS)
 
     def _add_style(self):
-        """Upload a style from pasted SLD or from a file."""
+        """Upload a style from pasted SLD, a file, or a QGIS layer."""
+        workspace_names = self._fetch(
+            self._get_workspace_names,
+            translate("StyleTabMixin", "Failed to load the workspaces"),
+        )
+        if workspace_names is None:
+            return
         dlg = ResourceFormDialog(
             title=translate("StyleTabMixin", "Upload a Style"),
             description=translate(
@@ -490,7 +496,7 @@ class StyleTabMixin:
                 "Create a style from an SLD you paste, a file you pick, or the "
                 "symbology of a layer in this QGIS project.",
             ),
-            fields=self._upload_fields(self._get_workspace_names()),
+            fields=self._upload_fields(workspace_names),
             parent=self,
             ok_label=translate("StyleTabMixin", "Upload"),
         )

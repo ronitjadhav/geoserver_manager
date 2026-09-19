@@ -410,7 +410,7 @@ class TestDelete(unittest.TestCase):
         self.dlg.show_success_message = lambda text: None
         self.asked = []
 
-        def confirm(kind, labels, cascade=""):
+        def confirm(kind, labels, cascade="", **kwargs):
             self.asked.append((kind, labels, cascade))
             return True
 

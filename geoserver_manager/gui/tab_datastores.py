@@ -569,7 +569,12 @@ class DatastoreTabMixin:
 
     def _add_datastore(self):
         """Open a form dialog to create a new datastore."""
-        workspace_names = self._get_workspace_names()
+        workspace_names = self._fetch(
+            self._get_workspace_names,
+            translate("DatastoreTabMixin", "Failed to load the workspaces"),
+        )
+        if workspace_names is None:
+            return
         if not workspace_names:
             self.show_warning_message(
                 translate(
@@ -824,7 +829,8 @@ class DatastoreTabMixin:
             ),
             # PostGIS
             "pg_host": conn_params.get("host", ""),
-            "pg_port": int(conn_params.get("port", 5432) or 5432),
+            # GeoServer allows `${PG_PORT}` here (environment parametrisation).
+            "pg_port": _as_int(conn_params.get("port"), 5432),
             "pg_db": conn_params.get("database", ""),
             "pg_user": conn_params.get("user", ""),
             # Never prefilled: GeoServer returns it encrypted ("crypt1:…") or
@@ -896,7 +902,8 @@ class DatastoreTabMixin:
                     "parameters directly.",
                 ).format(ds_type)
             ),
-            fields=self._datastore_fields(self._get_workspace_names(), edit_mode=True),
+            # Edit mode locks the workspace, so its own name is all the combo needs.
+            fields=self._datastore_fields([ws_name], edit_mode=True),
             values=values,
             parent=self,
         )
