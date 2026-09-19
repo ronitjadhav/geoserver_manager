@@ -27,6 +27,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - The cascaded-layers dialog was a viewer whose primary button — Enter —
   deleted the selected layer. It is a viewer; a cascaded layer is deleted
   from the Layers tab, like any other.
+- *Push style from QGIS* (Layers tab and layer tree) and a publish with its
+  style replaced an existing server style without a word — and every layer
+  sharing that style changed. It asks first: "Style 'x' already exists in
+  'ws'. Replace it? Every layer that uses it will render differently." Keeping
+  it is reported as such, not as an upload.
 - *Publish a Layer → A layer from this QGIS project* listed raster layers and
   then tried to write them as a GeoPackage. A raster picked there now goes the
   way the Coverage Stores tab sends it — a GeoTIFF, uploaded and published as

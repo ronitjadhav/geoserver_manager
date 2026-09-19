@@ -130,7 +130,7 @@ def connected_dialog(layers, styles_by_layer=None, formats=None):
         return FakeResponse(content=b"<StyledLayerDescriptor/>")
 
     dlg._raw_rest = raw_rest
-    dlg._push_qgis_style = lambda *args: dlg.pushed.append(args)
+    dlg._push_qgis_style = lambda *args: dlg.pushed.append(args) or True
     return dlg
 
 
@@ -361,6 +361,15 @@ class TestPush(MenuCase):
             self.dlg.pushed[0][1:2] + self.dlg.pushed[0][3:4], ("sf", "archsites")
         )
         self.assertEqual(self.dlg.requests, [])  # no /layers.json GET
+
+    def test_a_kept_style_is_said_not_claimed_as_uploaded(self):
+        self.dlg._push_qgis_style = (
+            lambda *args: False
+        )  # the user kept the existing one
+        self.push()
+        text, level = self.iface.bar.messages[-1]
+        self.assertIn("left as it is", text)
+        self.assertEqual(level, Qgis.MessageLevel.Info)
 
     def test_a_failing_upload_lands_in_the_message_bar(self):
         def boom(*args):

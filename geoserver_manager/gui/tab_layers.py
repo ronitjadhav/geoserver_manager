@@ -14,9 +14,9 @@ from pathlib import Path
 from urllib.parse import quote, unquote, urlencode
 
 from qgis.core import Qgis, QgsDataSourceUri, QgsProject, QgsRasterLayer, QgsVectorLayer
-from qgis.PyQt.QtCore import QCoreApplication, QUrl
+from qgis.PyQt.QtCore import QCoreApplication, Qt, QUrl
 from qgis.PyQt.QtGui import QDesktopServices
-from qgis.PyQt.QtWidgets import QDialog
+from qgis.PyQt.QtWidgets import QApplication, QDialog, QMessageBox
 
 from geoserver_manager.gui.dlg_preview import LayerPreviewDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
@@ -1035,14 +1035,26 @@ class LayerTabMixin:
             return
 
         style_name = geoserver_name(values["style"])
-        if self._run_action(
-            lambda: self._push_qgis_style(
-                style_name, ws_name, sld, name, values["set_default"]
+        outcome = {}
+        if not self._run_action(
+            lambda: outcome.setdefault(
+                "pushed",
+                self._push_qgis_style(
+                    style_name, ws_name, sld, name, values["set_default"]
+                ),
             ),
             translate("LayerTabMixin", "Failed to upload the style of '{}'").format(
                 layer.name()
             ),
         ):
+            return
+        if not outcome.get("pushed"):
+            self.show_warning_message(
+                translate("LayerTabMixin", "Style '{}' left as it is.").format(
+                    style_name
+                )
+            )
+        else:
             self.show_success_message(
                 translate("LayerTabMixin", "'{}' styled from '{}'.").format(
                     name, layer.name()
@@ -1059,10 +1071,20 @@ class LayerTabMixin:
     ):
         """Create or replace the style in the layer's workspace, then assign it.
 
+        Returns False when the style exists and the user chose to keep it —
+        create_style_definition upserts, and every layer sharing that style
+        would render differently, so replacing is confirmed, never silent
+        (the Styles tab refuses an existing name outright; here replacing is
+        the stated workflow: push the change you just made in QGIS).
+
         Workspace styles are referenced by their qualified name, so the layer's
         defaultStyle gets "workspace:style" — a bare name there would resolve
         to a global style of the same name instead.
         """
+        if self._resource_exists(
+            self.gs.get_style_definition, style_name, workspace_name
+        ) and not self._confirm_replace_style(style_name, workspace_name):
+            return False
         self._check(
             self.gs.create_style_definition(
                 style_name, f"{style_name}.sld", workspace_name
@@ -1075,6 +1097,28 @@ class LayerTabMixin:
                     layer_name, workspace_name, f"{workspace_name}:{style_name}"
                 )
             )
+        return True
+
+    def _confirm_replace_style(self, style_name, workspace_name):
+        """Ask before a push overwrites a style other layers may share."""
+        QApplication.setOverrideCursor(
+            Qt.CursorShape.ArrowCursor
+        )  # a caller's wait cursor
+        try:
+            reply = QMessageBox.question(
+                self,
+                translate("LayerTabMixin", "Replace the style?"),
+                translate(
+                    "LayerTabMixin",
+                    "Style '{style}' already exists in '{workspace}'. Replace it? "
+                    "Every layer that uses it will render differently.",
+                ).format(style=style_name, workspace=workspace_name),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+        finally:
+            QApplication.restoreOverrideCursor()
+        return reply == QMessageBox.StandardButton.Yes
 
     # -- Add to QGIS ----------------------------------------------------------
 

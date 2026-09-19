@@ -259,7 +259,7 @@ class LayerTreeMenu:
         if not ok:
             return None
         style_name = geoserver_name(values["style"])
-        ok, _ = self._run(
+        ok, pushed = self._run(
             dlg,
             lambda: dlg._push_qgis_style(
                 style_name, workspace, sld, name, values["set_default"]
@@ -268,7 +268,15 @@ class LayerTreeMenu:
                 layer.name()
             ),
         )
-        if ok:
+        if ok and not pushed:
+            # The style exists and the user chose to keep it (the dialog asked).
+            self._say(
+                translate("LayerTreeMenu", "Style '{}' left as it is.").format(
+                    style_name
+                ),
+                Qgis.MessageLevel.Info,
+            )
+        elif ok:
             self._say(
                 (
                     translate(

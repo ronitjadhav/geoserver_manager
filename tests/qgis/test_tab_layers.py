@@ -927,6 +927,13 @@ class StyleFakeGS(FakeGS):
 
         self.rest_service = Rest()
 
+    existing_styles = ()  # (name, workspace) pairs the server already has
+
+    def get_style_definition(self, style_name, workspace_name=None):
+        if (style_name, workspace_name) in self.existing_styles:
+            return ({"name": style_name}, 200)
+        return ("not found", 404)
+
     def create_style_definition(self, name, filename, workspace_name=None):
         self.style_calls.append(("definition", name, filename, workspace_name))
         return ("", 201)
@@ -1018,6 +1025,39 @@ class TestStyleFromQgis(unittest.TestCase):
             self.dlg.gs.style_calls[2],
             ("set_default", "tasmania_roads", "topp", "topp:tasmania_roads"),
         )
+
+    def test_replacing_an_existing_style_is_confirmed_not_silent(self):
+        """create_style_definition upserts; other layers may share the style."""
+        from qgis.PyQt.QtWidgets import QMessageBox
+
+        self.add_layer("tasmania_roads")
+        self.dlg.gs.existing_styles = (("tasmania_roads", "topp"),)
+        warnings = []
+        self.dlg.show_warning_message = warnings.append
+        asked = []
+
+        def decline(parent, title, text, buttons, default):
+            asked.append(text)
+            return QMessageBox.StandardButton.No
+
+        with patch.object(QMessageBox, "question", staticmethod(decline)):
+            self.push(
+                ["tasmania_roads", "topp", "VECTOR", "taz_shapes", "simple_roads"]
+            )
+        self.assertEqual(self.dlg.gs.style_calls, [])  # nothing sent
+        self.assertIn("already exists in 'topp'", asked[0])
+        self.assertIn("render differently", asked[0])
+        self.assertTrue(any("left as it is" in w for w in warnings), warnings)
+
+        with patch.object(
+            QMessageBox,
+            "question",
+            staticmethod(lambda *args: QMessageBox.StandardButton.Yes),
+        ):
+            self.push(
+                ["tasmania_roads", "topp", "VECTOR", "taz_shapes", "simple_roads"]
+            )
+        self.assertEqual(self.dlg.gs.style_calls[0][0], "definition")
 
     def test_the_style_name_is_the_layers_and_can_be_changed(self):
         self.add_layer("tasmania_roads")
