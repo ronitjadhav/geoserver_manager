@@ -198,10 +198,13 @@ class GeoServerManagerPlugin:
         if not settings.has_credentials():
             QMessageBox.information(
                 self.iface.mainWindow(),
-                "GeoServer Manager - Credentials Required",
-                "Welcome to GeoServer Manager!\n\n"
-                "Please configure your GeoServer connection URL, "
-                "username, and password before using the plugin.",
+                self.tr("GeoServer Manager — first connection"),
+                self.tr(
+                    "Welcome to GeoServer Manager.\n\n"
+                    "Enter your GeoServer's URL, user name and password on the "
+                    "settings page that opens next; Test connection tells you "
+                    "whether they work before you save."
+                ),
             )
             self.iface.showOptionsDialog(currentPage=f"mOptionsPage{__title__}")
 

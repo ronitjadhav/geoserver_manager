@@ -233,6 +233,8 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
             )
             return
         auth = (self.txt_gs_username.text(), self.txt_gs_password.text())
+        self._show_test_result(self.tr("Testing…"), "busy")
+        QApplication.processEvents()  # paint the line before the blocking probe
         # ponytail: blocks the Options dialog for up to PROBE_TIMEOUT (10 s)
         # against a dead host; QgsTask.fromFunction plus a deleted-widget guard
         # if that ever hurts.
@@ -259,7 +261,6 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
 
         # global
         self.opt_debug.setChecked(settings.debug_mode)
-        self.lbl_version_saved_value.setText(settings.version)
 
         # geoserver URL
         self.txt_gs_url.setText(settings.geoserver_url)

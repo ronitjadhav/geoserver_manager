@@ -92,8 +92,16 @@ Rules for the mixin:
   label with a verb, never "New" — `test_ux.py` sweeps every tab for both.
 - **The Workspace column** links through `self._open_workspace_from_row` (on the dialog); do
   not write your own. Global-scope rows use `GLOBAL` / `scope()` from `gui/scope.py`.
-- **Add** pre-checks existence and raises `ValueError(translate("StyleTabMixin", "… already exists"))`
-  inside the action; `_run_action` turns that into the banner.
+- **Add** calls `self._require_safe_name(name)` first (a `/`, `?`, `#` or `%` in a name changes the REST
+  path), then pre-checks existence and raises `ValueError(translate("StyleTabMixin", "… already exists"))`
+  inside the action; `_run_action` turns that into the banner. Quote any name you put in a raw path yourself
+  (`urllib.parse.quote(name, safe="")`).
+- **Cells and words.** A boolean column goes through `self._yes_no(value)`; the first column is headed "Name";
+  collection payloads go through `self._unwrap` / `self._as_list` / `self._name_of` (toolbelt/payload.py) — do
+  not write a local copy. A tab whose header action is not a delete passes its own words:
+  `_setup_delete_selected_button(cb, translate(..., "Remove Selected from Cache"))` and
+  `_delete_many(..., verb="stop caching", done="removed from the cache")`. Add a one-line tooltip for the tab
+  in `GeoServerMainDialog._tab_help()`.
 - **Edit** fetches the current object with `_fetch`, prefills from *that* (a pure
   `_<resource>_form_values(...)` staticmethod — unit-testable), and saves by
   merging the form's fields onto the fetched payload. Never send a fixed template

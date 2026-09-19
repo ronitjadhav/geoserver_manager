@@ -251,6 +251,7 @@ class TestShippedFrenchLocale(unittest.TestCase):
         known = set(CONTEXTS.values()) | {
             "ConfigOptionsPage",
             "ConnectionProbe",
+            "Dependencies",
             "GeoServerMainDialog",
             "GeoServerMainDialogBase",
             "GeoServerManagerPlugin",

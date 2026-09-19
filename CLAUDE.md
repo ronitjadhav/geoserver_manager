@@ -25,7 +25,7 @@ Skills in `.claude/skills/` hold the step-by-step procedures:
 | `geoserver_manager/gui/dlg_preview.py` | `LayerPreviewDialog` — a `QgsMapCanvas` showing one WMS layer of the server, with GetFeatureInfo on click; non-modal, nothing reaches the project |
 | `geoserver_manager/gui/dlg_settings.py` | Options page: URL + credentials (credentials go to `QgsAuthManager`, encrypted) and *Test connection*, which probes the fields as typed |
 | `geoserver_manager/gui/layer_tree.py` | `LayerTreeMenu` — the *GeoServer Manager* submenu of the layer tree's context menu: push / apply the clicked layer's style through the main dialog's connection and its `_push_qgis_style` / `_style_body`; outcomes go to `iface.messageBar()` |
-| `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser`, `probe` (the bounded connection check the dialog and Settings share), `rest` (the raw REST call and the streaming upload body — no QGIS import), `sld` and `qgis_export` (QGIS ↔ GeoServer conversions, pure) |
+| `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser`, `probe` (the bounded connection check the dialog and Settings share), `rest` (the raw REST call, `summarise_body` for banners, the streaming upload body — no QGIS import), `payload` (GeoServer's collection shapes, pure), `sld` and `qgis_export` (QGIS ↔ GeoServer conversions, pure) |
 | `geoserver_manager/extras/*.whl` | Bundled `geoservercloud` (stripped, see below) and `xmltodict`, added to `sys.path` at startup |
 | `tests/unit/` | Runs without QGIS. `tests/qgis/` needs the QGIS Python (headless via `qgis.testing.start_app()`) |
 | `docs/github_issue_roadmap.md` | Feature backlog; GitHub milestones mirror it |
@@ -70,12 +70,16 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   | `_name_of(item)` | the name of a list entry (dict or str) |
   | `_get_workspace_names()` | workspace names for combos — a fresh GET every call, deliberately uncached |
   | `_start_load(failure_message, fetch)` | a tab load: runs `fetch(task)` in a `QgsTask`, renders `(rows, failures)` when it lands |
-  | `_run_in_task(failure_message, work, on_success)` | the same for anything that is not rows (the connection probe) |
+  | `_run_in_task(failure_message, work, on_success, on_cancel=…, busy_text=…)` | the same for anything that is not rows (the connection probe, the deletes) |
+  | `_run_quietly(failure_message, work, on_success)` | a side fetch (a dialog's legend) in its own slot: never supersedes a load, never turns Refresh into Cancel |
   | `_run_upload(failure_message, work, on_success, on_cancel)` | a long PUT: streams in its own task slot (`_upload`) with progress and Cancel; a load never supersedes it and it never touches the table — `on_success` reloads through `_reload_current_tab()`, `on_cancel` says what the server kept |
   | `_cancel_load(user=False)` | stop the running load; `user=True` is the Cancel button, which also explains itself in a banner |
   | `_fan_out(fn, items, task=None) -> [(result, error)]` | parallel per-item GETs; a failing item yields `(None, exc)` instead of aborting. With the task: progress per item, and a cancel stops the loop |
   | `_report_partial_failures([(label, exc)])` | one warning banner + log lines for what a listing could not fetch |
-  | `_delete_many(kind, [(label, fn)], reload_fn, cascade=…)` | confirm + run + report one or many deletions |
+  | `_delete_many(kind, [(label, fn)], reload_fn, cascade=…, verb=…, done=…)` | confirm + run in a task with progress + report one or many deletions; `verb`/`done` for a tab whose action is not a delete ("stop caching" / "removed from the cache") |
+  | `_require_safe_name(name)` | every Add form, before any request: refuses `/ ? # %` and edge spaces — `requests` sends `datastores/a#b.json` as `datastores/a` |
+  | `_yes_no(value)` | a boolean cell, translated — never Python's `True` / `False` |
+  | `_unwrap` / `_as_list` / `_name_of` | GeoServer's collection shapes, from `toolbelt/payload.py`; no tab keeps its own copy |
   | `_reload_current_tab()` | after an action reachable from another tab |
 
 - **Adding a layer to QGIS** (`LayerTabMixin._add_layer_to_qgis`): build the URI with `_layer_uri`
@@ -120,9 +124,10 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
    captured on the GUI side, and progress goes through `task.setProgress`.
 10. **A loaded table outlives its connection.** `refresh_ui()` clears `self.gs` at once and re-probes in a
    task, so for up to `PROBE_TIMEOUT` the rows on screen and their buttons belong to a client that is gone.
-   Every user-triggered action therefore passes `_require_connection()`, and that check lives at the four
-   places actions are dispatched — the Add button, Delete Selected, the row-action buttons and the link-cell
-   click — never in the twenty methods behind them, so a new tab cannot forget it. A refresh also disables the
+   Every user-triggered action therefore passes `_require_connection()`, and that check lives at the five
+   places actions are dispatched — the Add button, Delete Selected, the row-action buttons, the link-cell
+   click and the Del key (a selection change re-enables the button while the probe runs) — never in the
+   twenty methods behind them, so a new tab cannot forget it. A refresh also disables the
    header buttons immediately; the loader re-arms them. This was a reported crash:
    `AttributeError: 'NoneType' object has no attribute 'get_workspaces'` from *Publish a Layer*.
 11. **Nav labels in `TABS` are logic keys as well as text.** The `tr("Actions")` column and the
@@ -365,7 +370,16 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   run it after changing a user-visible string. Never pylupdate5: it silently skipped every `translate()`
   black wrapped onto several lines or wrote as adjacent literals — 65 of 455 strings when measured.
 - Messages: user-facing outcomes go to the dialog's message bar (`show_*_message`); details go to the QGIS
-  log (`self.log(..., log_level=Qgis.MessageLevel.Critical)`). `_run_action` does both.
+  log (`self.log(..., log_level=Qgis.MessageLevel.Critical)`). `_run_action` does both. Errors and warnings
+  **stay until closed** (duration 0) — they say what to do next and were gone in 5 s before; success fades.
+  A response body reaches a banner only through `toolbelt.rest.summarise_body` (first line, 300 chars, markup
+  reduced to its title): a Tomcat error page or a proxy login page is not an explanation.
+- **Reopening after Close must work.** `closeEvent` sets `_closing` so a late task finish stays away from dying
+  widgets; `refresh_ui()` resets it and stops the running load *before* dropping `self.gs`, and a finished task
+  frees its slot even while closing. Without that the dialog worked once per QGIS session — `test_audit_fixes.py`
+  closes and reopens.
+- **Tab labels get a tooltip** from `_tab_help()` (GeoServer's words: "WMS and WMTS stores that proxy another
+  server's layers"); the label itself stays a logic key (invariant 11).
 - Qt6-compatible enums only: `Qt.CursorShape.WaitCursor`, `QDialog.DialogCode.Accepted`,
   `QMessageBox.StandardButton.Yes` — never the unscoped PyQt5 spellings. CI runs a PyQt6 checker.
 - Every fix ships with a test that **fails without it** — run the test against the old code once to prove

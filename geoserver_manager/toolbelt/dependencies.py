@@ -16,6 +16,7 @@ import sys
 
 # PyQGIS
 from qgis.core import Qgis
+from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QMessageBox
 
 # project
@@ -143,12 +144,14 @@ def ensure_dependencies() -> bool:
         "Could not import geoservercloud even after adding WHLs.",
         log_level=Qgis.MessageLevel.Critical,
     )
-    error_msg = (
-        "<b>GeoServer Manager Plugin Error</b><br><br>"
-        "Failed to load the required 'geoservercloud' library.<br><br>"
-        "Please install it manually by running in a terminal:<br>"
+    error_msg = QCoreApplication.translate(
+        "Dependencies",
+        "<b>GeoServer Manager could not start.</b><br><br>"
+        "The bundled <code>geoservercloud</code> library did not import. "
+        "Reinstalling the plugin usually fixes it; otherwise install it into "
+        "QGIS's Python by running in a terminal:<br>"
         "<code>pip install geoservercloud</code><br><br>"
-        "The plugin will not work until this library is available."
+        "Details are in the QGIS log panel, GeoServer Manager tab.",
     )
     QMessageBox.critical(None, "GeoServer Manager - Missing Dependency", error_msg)
     return False

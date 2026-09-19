@@ -159,31 +159,6 @@
                         <bool>false</bool>
                     </property>
                     <layout class="QGridLayout" name="gridLayout">
-                        <item row="2" column="1">
-                            <widget class="QLabel" name="lbl_version_saved_value">
-                                <property name="minimumSize">
-                                    <size>
-                                        <width>0</width>
-                                        <height>25</height>
-                                    </size>
-                                </property>
-                                <property name="maximumSize">
-                                    <size>
-                                        <width>16777215</width>
-                                        <height>30</height>
-                                    </size>
-                                </property>
-                                <property name="locale">
-                                    <locale language="English" country="UnitedStates"/>
-                                </property>
-                                <property name="text">
-                                    <string notr="true">X.X.X</string>
-                                </property>
-                                <property name="textInteractionFlags">
-                                    <set>Qt::NoTextInteraction</set>
-                                </property>
-                            </widget>
-                        </item>
                         <item row="0" column="1">
                             <widget class="QPushButton" name="btn_report">
                                 <property name="minimumSize">
@@ -203,28 +178,6 @@
                                 </property>
                                 <property name="text">
                                     <string>Report an issue</string>
-                                </property>
-                            </widget>
-                        </item>
-                        <item row="2" column="0">
-                            <widget class="QLabel" name="lbl_version_saved">
-                                <property name="minimumSize">
-                                    <size>
-                                        <width>0</width>
-                                        <height>25</height>
-                                    </size>
-                                </property>
-                                <property name="maximumSize">
-                                    <size>
-                                        <width>16777215</width>
-                                        <height>30</height>
-                                    </size>
-                                </property>
-                                <property name="locale">
-                                    <locale language="English" country="UnitedStates"/>
-                                </property>
-                                <property name="text">
-                                    <string>Version used to save settings:</string>
                                 </property>
                             </widget>
                         </item>
@@ -296,7 +249,7 @@
                                     <locale language="English" country="UnitedStates"/>
                                 </property>
                                 <property name="text">
-                                    <string>Debug mode (degraded performances)</string>
+                                    <string>Verbose logging (Info messages in the QGIS log panel)</string>
                                 </property>
                                 <property name="tristate">
                                     <bool>false</bool>

@@ -375,3 +375,13 @@ class TestYesNo(unittest.TestCase):
         self.assertEqual(dlg._yes_no(False), "No")
         self.assertEqual(dlg._yes_no("False"), "No")
         self.assertEqual(dlg._yes_no(None), "No")
+
+
+class TestNavTooltips(unittest.TestCase):
+    def test_every_tab_explains_itself_on_hover(self):
+        dlg = SyncDialog()
+        labels = [label for label, _icon, _loader in dlg.TABS]
+        self.assertEqual(set(dlg._tab_help()), set(labels))
+        for row in range(dlg.navList.count()):
+            item = dlg.navList.item(row)
+            self.assertTrue(item.toolTip(), item.text())

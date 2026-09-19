@@ -319,7 +319,11 @@ class GeoServerMainDialog(
         if not username or not password:
             self._set_status(self.tr("Auth error"), "error")
             self.show_error_message(
-                self.tr("Could not read credentials from the auth store.")
+                self.tr(
+                    "Could not read the credentials from QGIS's authentication "
+                    "database — its master password was probably declined. Open "
+                    "Settings and save them again."
+                )
             )
             return None
 
@@ -636,13 +640,45 @@ class GeoServerMainDialog(
         ("Tile Cache", "mActionAddXyzLayer.svg", "_load_gwc_layers"),
     )
 
+    def _tab_help(self):
+        """One line per tab for its tooltip — GeoServer's words, not REST's.
+
+        Keyed by the TABS label, which stays untranslated (invariant 11).
+        """
+        return {
+            "Workspaces": self.tr(
+                "Namespaces that group stores, layers and styles; one is the default."
+            ),
+            "Datastores": self.tr(
+                "Vector sources — databases and files on the server — that layers "
+                "are published from."
+            ),
+            "Coverage Stores": self.tr(
+                "Raster sources: GeoTIFFs, COGs and image mosaics."
+            ),
+            "Cascaded Stores": self.tr(
+                "WMS and WMTS stores that proxy another server's layers."
+            ),
+            "Layers": self.tr(
+                "Everything published — vector, raster and cascaded — with its "
+                "store and default style."
+            ),
+            "Layer Groups": self.tr("Several layers served as one, in drawing order."),
+            "Styles": self.tr(
+                "SLD (or CSS, MBStyle) definitions, global or per workspace."
+            ),
+            "Tile Cache": self.tr(
+                "What GeoWebCache caches: tiles per layer, gridset and format."
+            ),
+        }
+
     def _setup_nav(self):
         """Build the navigation list on the left from TABS."""
         self.navList.clear()
         for label, icon, _loader in self.TABS:
-            self.navList.addItem(
-                QListWidgetItem(QIcon(QgsApplication.iconPath(icon)), label)
-            )
+            item = QListWidgetItem(QIcon(QgsApplication.iconPath(icon)), label)
+            item.setToolTip(self._tab_help().get(label, ""))
+            self.navList.addItem(item)
         if self.navList.count():
             # Reopen on the tab this profile left open, if it still exists:
             # TABS can gain and lose entries between versions.

@@ -38,7 +38,7 @@ loads in the background — QGIS stays usable, and *Cancel* stops a slow one.
 Deletes ask first and name what they cascade to. Keyboard: F5 refreshes, Ctrl+F
 jumps to the search box, Enter opens the selected row, Del deletes the
 selection, Esc clears the filter. Colours follow the QGIS theme, dark ones
-included; the interface is translatable and ships a French locale.
+included; the interface is translatable and ships a partial French locale.
 
 ## Requirements
 

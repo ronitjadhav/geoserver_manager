@@ -202,5 +202,5 @@ Outcomes appear in QGIS's own message bar.
 - The plugin's TLS setting does not reach QGIS's own WMS/WFS providers: a
   layer added to QGIS uses QGIS's certificate handling.
 - The interface follows the QGIS theme, dark ones included, and is translated
-  where a locale exists (French so far — contributions welcome, see the
+  where a locale exists (a partial French one so far — contributions welcome, see the
   translation page).
