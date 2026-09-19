@@ -1,4 +1,4 @@
-# Feature Roadmap — GeoServer Manager QGIS Plugin
+# Feature Roadmap: GeoServer Manager QGIS Plugin
 
 Track all planned features for the GeoServer Manager plugin. The authoritative, up-to-date plan is the [GitHub milestones](https://github.com/ronitjadhav/geoserver_manager/milestones) (one issue per item below, plus `tech-debt` issues from the code audit); tick items here when they ship. Every feature listed is backed by the [`python-geoservercloud`](https://github.com/camptocamp/python-geoservercloud) library (v0.8.5).
 
@@ -34,7 +34,7 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 ## Layers / Feature Types
 
 - [x] List all feature types across workspaces/datastores
-- [x] List every layer of every type — vector, raster, cascaded WMS / WMTS —
+- [x] List every layer of every type (vector, raster, cascaded WMS / WMTS),
       from GeoServer's own layer list, with type, store and default style
 - [x] View feature type details (SRS, bounding box, title, keywords)
 - [x] Publish a DB table as a new feature type
@@ -75,23 +75,23 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
       listed across workspaces)
 - [x] Create/delete cascaded WMS layers (publish what the remote
       advertises, view one, delete one)
-- [x] Create/delete WMTS stores — and their layers
+- [x] Create/delete WMTS stores, and their layers
 
 ## Layer Upload (QGIS → GeoServer)
 
-- [x] Publish a QGIS vector layer — written to a GeoPackage and uploaded, which
+- [x] Publish a QGIS vector layer: written to a GeoPackage and uploaded, which
       makes GeoServer create the store and configure the layer in one request
-- [x] Publish a QGIS raster layer as a coverage store — written to a GeoTIFF
+- [x] Publish a QGIS raster layer as a coverage store: written to a GeoTIFF
       (or sent as it is) and uploaded; GeoServer creates the store and
       publishes the coverage in one request
 - [ ] Batch upload multiple layers
 - [x] Upload associated SLD style with layer (and make it the layer's default)
 - [x] Overwrite existing layer option
-- [x] CRS validation & auto-reprojection — a layer without a CRS is refused
+- [x] CRS validation & auto-reprojection: a layer without a CRS is refused
       before anything is sent; a vector whose CRS has no EPSG code is
       reprojected to EPSG:4326 on export, a raster with one is refused (it is
       uploaded as it is)
-- [x] Progress bar during upload — both uploads stream in a QgsTask with
+- [x] Progress bar during upload: both uploads stream in a QgsTask with
       progress and Cancel (`_run_upload`); the cancel message says what
       GeoServer kept
 
@@ -103,10 +103,10 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 
 ## GeoWebCache
 
-- [x] View GWC tile cache status for a layer — the Tile Cache tab lists every
+- [x] View GWC tile cache status for a layer: the Tile Cache tab lists every
       cached layer with its gridsets, formats and enabled flag, and edits the
       configuration (meta-tiling, expiry, gutter)
-- [x] Publish / un-publish layer to GWC — add a layer to the cache, truncate
+- [x] Publish / un-publish layer to GWC: add a layer to the cache, truncate
       its tiles, stop caching it
 - [ ] Create custom gridsets (the picker lists the server's; creating one is
       an XML PUT the library's `create_gridset()` only knows for three EPSG codes)
@@ -126,20 +126,20 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 ## Layer Preview
 
 - [x] Preview a layer in a browser (GeoServer's OpenLayers page)
-- [x] Embedded map preview of a layer — a QgsMapCanvas with the WMS layer, no
+- [x] Embedded map preview of a layer: a QgsMapCanvas with the WMS layer, no
       web engine (`gui/dlg_preview.py`)
 - [x] GetFeatureInfo on click, through the provider's own identify
 
 ## UX & Infrastructure
 
-- [x] Async/threaded API calls (prevent UI freezing) — every tab load and the
+- [x] Async/threaded API calls (prevent UI freezing): every tab load and the
   connection probe run in a `QgsTask`, with progress and Cancel
-- [x] Resource list caching with TTL — decided against. Every list is fetched
+- [x] Resource list caching with TTL: decided against. Every list is fetched
   on tab switch and Refresh, and the one cache that existed (workspace names)
   was removed because it left a stale picker behind. Refresh is the TTL
 - [x] Keyboard shortcuts (F5 refresh, Del delete, Ctrl+F search, Esc clear)
-- [x] Dark theme support — status and hint colours come from the palette
-- [x] i18n / translation support — the tab mixins translate in their own
+- [x] Dark theme support: status and hint colours come from the palette
+- [x] i18n / translation support: the tab mixins translate in their own
   context, so extraction and lookup agree; a starter French locale ships
 - [x] Reusable resource form dialog (text, combo, checkbox, spinbox, tabs)
 - [x] Persistent UI state (dialog geometry, splitter sizes)

@@ -51,7 +51,7 @@ TASMANIA = {
     }
 }
 
-# The same states layer as GET .xml writes it — the form an edit round-trips
+# The same states layer as GET .xml writes it: the form an edit round-trips
 STATES_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <GeoServerLayer>
   <id>LayerInfoImpl--570ae188:124761b8d78:-7fc0</id>
@@ -210,7 +210,7 @@ STATES_ROW = [
     "image/png, image/jpeg",
 ]
 TASMANIA_ROW = ["tasmania", "(global)", "No", "EPSG:4326", "image/png"]
-BROKEN_ROW = ["broken:layer", "broken", "—", "—", "—"]
+BROKEN_ROW = ["broken:layer", "broken", "-", "-", "-"]
 
 
 class Recording(ResourceFormDialog):
@@ -256,7 +256,7 @@ class TestListing(unittest.TestCase):
         self.assertEqual(opened, [["topp"]])
 
     def test_a_layer_whose_get_failed_shows_dashes(self):
-        self.assertEqual(self.dlg._gwc_layer_summary(None), ("—", "—", "—"))
+        self.assertEqual(self.dlg._gwc_layer_summary(None), ("-", "-", "-"))
         # GWC writes an empty collection as "" and a single entry bare
         self.assertEqual(
             self.dlg._gwc_layer_summary(
@@ -266,7 +266,7 @@ class TestListing(unittest.TestCase):
                     "mimeFormats": "",
                 }
             ),
-            ("Yes", "EPSG:4326", "—"),
+            ("Yes", "EPSG:4326", "-"),
         )
 
     def test_gridsets_and_uncached_layers_come_from_the_server(self):

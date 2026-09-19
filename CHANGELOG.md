@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 - A workspace, datastore or layer-group name with `/`, `?`, `#` or `%` is
   refused before any request: `requests` would have sent
-  `datastores/a#b.json` as `datastores/a` — another store's path — and a
+  `datastores/a#b.json` as `datastores/a` (another store's path), and a
   global layer group's raw path is URL-quoted.
 - The *Isolated Workspace* help described something else; it says what
   isolation does (layers served only under the workspace's own URLs, so
@@ -20,40 +20,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   collect a 409 and PUT.
 - A style, cascaded store, cascaded layer or tile-cache name with `/`, `?`,
   `#` or `%` is refused before any request, and names the server already
-  holds are URL-quoted on their way into this plugin's REST paths —
+  holds are URL-quoted on their way into this plugin's REST paths:
   `requests` sent `styles/a#b.json` as `styles/a`, a different style.
 - The style dialog's legend picks its context layer from the style's own
   workspace listing instead of the whole server's layer list.
-- The cascaded-layers dialog was a viewer whose primary button — Enter —
+- The cascaded-layers dialog was a viewer whose primary button, Enter,
   deleted the selected layer. It is a viewer; a cascaded layer is deleted
   from the Layers tab, like any other.
 - A coverage store or a published coverage could be given a name with `/`,
-  `?`, `#` or `%`, which `requests` then read as part of the URL — the request
+  `?`, `#` or `%`, which `requests` then read as part of the URL: the request
   went to a *different* resource. Such names are refused before any request,
   and a workspace name is quoted in the browser preview's URL.
 - Two project layers with the same name and kind showed as one entry in the
-  pickers, and the second always resolved to the first — the wrong layer's
+  pickers, and the second always resolved to the first, so the wrong layer's
   data or symbology went up. Duplicates carry the tail of their layer id.
 - *Push style from QGIS* (Layers tab and layer tree) and a publish with its
-  style replaced an existing server style without a word — and every layer
+  style replaced an existing server style without a word, and every layer
   sharing that style changed. It asks first: "Style 'x' already exists in
   'ws'. Replace it? Every layer that uses it will render differently." Keeping
   it is reported as such, not as an upload.
 - *Publish a Layer → A layer from this QGIS project* listed raster layers and
   then tried to write them as a GeoPackage. A raster picked there now goes the
-  way the Coverage Stores tab sends it — a GeoTIFF, uploaded and published as
-  a coverage — with the same *Replace* rule; the form says which kind becomes
+  way the Coverage Stores tab sends it (a GeoTIFF, uploaded and published as
+  a coverage) with the same *Replace* rule; the form says which kind becomes
   what. A WMS or XYZ raster, which has no file to send, is refused in words.
 - An ImageMosaic *properties ZIP* was read into memory and sent under the
   wait cursor; it streams in a task like the other uploads, with progress and
   Cancel. All three uploads share one helper (`_upload_file`) and one cancel
   report.
-- Starting a second upload while one ran exported the layer first — minutes
-  for a big raster — then refused and left the exported file in the temp
+- Starting a second upload while one ran exported the layer first, minutes
+  for a big raster, then refused and left the exported file in the temp
   folder. It refuses before exporting.
 
 - The Layers tab listed only the feature types it found by walking the
-  datastores, so a raster layer — including one just published from QGIS —
+  datastores, so a raster layer (including one just published from QGIS)
   and a cascaded WMS or WMTS layer never appeared there. It now shows
   GeoServer's own layer list, every type included, with the type, the store
   and the default style; the detail view, *Add to QGIS* (no WFS for a raster
@@ -63,7 +63,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   refresh drops the connection immediately and re-probes in the background, so
   the rows and buttons on screen briefly belonged to a client that was gone.
   The header buttons are now disabled for that moment, and anything still
-  clickable — row actions, link cells — says "Not connected to GeoServer" and
+  clickable (row actions, link cells) says "Not connected to GeoServer" and
   does nothing.
 - The generic connection-parameter editor masked only a key *named*
   `password`, so a WFS store's `WFSDataStoreFactory:PASSWORD` showed its
@@ -76,38 +76,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
-- Layer-group modes read as GeoServer's web admin names them — Single,
-  Opaque Container, Named Tree, Container Tree, Earth Observation Tree —
+- Layer-group modes read as GeoServer's web admin names them (Single,
+  Opaque Container, Named Tree, Container Tree, Earth Observation Tree)
   in the table, the detail and the create form, which also explains what
   an Opaque Container is. The first column of the Workspaces, Datastores
   and Layer Groups tables is *Name*; the datastore form lists Name,
   Workspace, Type like every other form; Enabled cells read Yes / No.
 - Styles, Cascaded Stores and Tile Cache: the first column is *Name*, an
   *Enabled* cell reads Yes / No rather than Python's `True` / `False`, and
-  the style row actions say what they do — *Save to disk* (the body, whatever
+  the style row actions say what they do: *Save to disk* (the body, whatever
   its format, not only SLD) and a tooltip on *Apply to a QGIS layer* that
   names the layer tree's *Apply style from GeoServer* as the same thing from
   the other end. The style editor's description says what Save does.
 - Layers tab: the row actions read *Add to QGIS · Preview · Preview in a
-  browser · Set style · Push style from QGIS · Delete* — the in-QGIS preview
+  browser · Set style · Push style from QGIS · Delete*: the in-QGIS preview
   before the browser one, "Push style from QGIS" instead of "Style from QGIS"
-  (the same word the layer tree uses) — and every icon-only button has a
+  (the same word the layer tree uses), and every icon-only button has a
   tooltip saying what it does and how it differs from its neighbour; the
   Coverage Stores tab likewise. The first column is "Name" on both tabs.
 - *Add to QGIS* proposes WFS for a vector layer (the features themselves) and
   WMS for the rest; the WMTS URI no longer carries a `crs=EPSG:4326` that made
   QGIS reproject every EPSG:900913 tile on the fly (measured).
-- *Publish a table*: the declared SRS has no default any more — 4326 was
-  usually wrong for a projected table — and must be an EPSG number; the help
+- *Publish a table*: the declared SRS has no default any more (4326 was
+  usually wrong for a projected table), and must be an EPSG number; the help
   says where to look it up.
 - A coverage store's *Enabled* reads Yes / No instead of True / False; its
   read-only note no longer blames GeoServer's REST API (which does update
-  stores) for what is a library gap: "Read-only in this version — edit it in
+  stores) for what is a library gap: "Read-only in this version. Edit it in
   GeoServer's web UI."
 - Editing a PostGIS store no longer demands the password again: leave the
   field empty to keep the stored one, type to replace it. GeoServer accepts
-  its own encrypted value back — measured, a store still connected after the
-  round trip — so re-typing bought nothing but friction.
+  its own encrypted value back (measured, a store still connected after the
+  round trip), so re-typing bought nothing but friction.
 
 ### Added
 
@@ -116,9 +116,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   back (measured: a disabled PostGIS store re-enabled through the form and
   listed its tables again, every other parameter kept).
 - The Styles table shows each style's **format** (SLD, CSS, MBStyle) and
-  **SLD version** — what *Apply to a QGIS layer* can take is SLD only.
-- **Web Feature Server (NG) datastores** — a remote WFS cascaded as a
-  datastore — get a form of their own: capabilities URL, optional
+  **SLD version**: what *Apply to a QGIS layer* can take is SLD only.
+- **Web Feature Server (NG) datastores**, a remote WFS cascaded as a
+  datastore, get a form of their own: capabilities URL, optional
   credentials, timeout, max features, lenient parsing. Its feature types then
   publish like any table (*Publish a Layer → a table in a datastore*).
 - **GeoServer Manager in the layer tree's context menu**: right-click a vector
@@ -128,8 +128,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   when it has several). A layer loaded from the server is matched through its
   source; any other by name. Without a connection the entries are disabled and
   say so, next to an entry that opens the plugin.
-- **Uploads run in the background**: publishing a layer of the project —
-  vector or raster — streams the file in a QGIS task — the task bar shows the progress, the
+- **Uploads run in the background**: publishing a layer of the project
+  (vector or raster) streams the file in a QGIS task. The task bar shows the progress, the
   dialog stays usable, and *Cancel* (the Refresh button while it runs) aborts
   the transfer instead of waiting for it. The cancel message says what
   GeoServer kept: nothing for a new store; for a *Replace*, the store and its
@@ -137,10 +137,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   ends (measured on 2.28.5). A tab switch, F5 or closing the dialog let an
   upload finish.
 - **CRS checks before publishing**: a layer without a CRS is refused before
-  anything is sent; a vector whose CRS has no EPSG code — GeoServer could not
-  declare it — is reprojected to EPSG:4326 on export, a raster with one is
+  anything is sent; a vector whose CRS has no EPSG code (GeoServer could not
+  declare it) is reprojected to EPSG:4326 on export, a raster with one is
   refused, since rasters are uploaded as they are.
-- **Preview** on the Layers tab: the layer on a map of its own inside QGIS —
+- **Preview** on the Layers tab: the layer on a map of its own inside QGIS,
   a WMS layer built like *Add to QGIS* builds one, but nothing reaches the
   project. Drag to pan, wheel to zoom, click for the feature info GeoServer
   returns at that point. A layer that does not load says so in place of the
@@ -149,14 +149,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   server, listed across every workspace. Create one from a GetCapabilities
   URL, publish the layers the remote advertises (under the remote name or
   one of your own), inspect and delete the cascaded layers, delete the
-  store — the remote server is never touched.
+  store; the remote server is never touched.
 - **Tile Cache tab**: what GeoWebCache caches, with each layer's gridsets and
   formats. Edit a layer's cache configuration (enabled, gridsets, formats,
   meta-tiling, expiry), truncate its tiles, stop caching it, or add a layer
-  whose cache was removed — GeoServer caches new layers by itself.
+  whose cache was removed; GeoServer caches new layers by itself.
 - **Publish a QGIS raster layer** as a coverage store: the Coverage Stores
   tab's Add form takes a raster layer of the project, writes it to a tiled,
-  compressed GeoTIFF — or uploads the file as it is when it already is one —
+  compressed GeoTIFF (or uploads the file as it is when it already is one)
   and uploads it; GeoServer creates the store and publishes the coverage in the
   same request. Title and abstract go on the coverage, *Replace* overwrites an
   existing store. The coverage viewer now shows a coverage's abstract rather
@@ -164,7 +164,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Preview in a browser** on the Layers and Layer Groups tabs: opens
   GeoServer's own OpenLayers page for the layer, framed on its extent. It is
   the browser's session, not the plugin's, so a secured server asks it to log
-  in — the tooltip says so.
+  in; the tooltip says so.
 - **Legend in the style dialog**: the picture GeoServer renders for the style
   (GetLegendGraphic), fetched in the background while the dialog is open; a
   problem is explained in its place instead of a broken image.
@@ -177,7 +177,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   highlighted, and it survives a refresh of the same tab.
 - **Keyboard shortcuts**: F5 refreshes, Ctrl+F jumps to the search box, Esc
   clears the search (and still closes the dialog when there is nothing to
-  clear), and Del deletes the selected resources — only while the table has the
+  clear), and Del deletes the selected resources, only while the table has the
   focus, so the same key still just erases a character in the search box. The
   shortcuts are named in the tooltips.
 - **Readable on dark themes**: the connection status, the form hints and the
@@ -187,7 +187,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   both themes by the tests.
 - The dialog reopens on the tab it was closed on.
 - **Translations work.** Every string in a tab mixin is now looked up in the
-  context it is extracted under, so a translation can actually be found — until
+  context it is extracted under, so a translation can actually be found. Until
   now none of them could be, because `self.tr()` in a mixin resolves against
   the host dialog's class. A starter French locale ships with the plugin
   (terminology very much open to review); anything untranslated falls back to
@@ -200,18 +200,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   holds, so a namespace, fetch size or memory-mapping setting the form does not
   show survives it.
 - Saving credentials for a plain-HTTP server now says that the password
-  travels unencrypted, and suggests `https://`. It saves them anyway — a
-  server on a trusted network is a legitimate setup — and stays quiet for
+  travels unencrypted, and suggests `https://`. It saves them anyway (a
+  server on a trusted network is a legitimate setup) and stays quiet for
   loopback addresses, because a warning on every local sandbox is a warning
   nobody reads.
 - **Publish a QGIS layer to GeoServer.** The publish dialog on the Layers tab
   gained a source: a layer of the current project is written to a GeoPackage
   and uploaded, which makes GeoServer create the datastore and configure the
-  layer — with its SRS, bounding box and attributes — in one request. Its
+  layer, with its SRS, bounding box and attributes, in one request. Its
   symbology can travel with it as the layer's default style, the title,
   abstract and keywords are merged onto what GeoServer computed, and an
   existing layer of that name is only replaced when asked. The uploaded store
-  is marked read-only — the recommended setting for a file-based store nobody
+  is marked read-only, the recommended setting for a file-based store nobody
   writes to.
 - A QGIS layer name is not a GeoServer layer name: "Rivière (2024)" is
   published as `Riviere_2024`. Accents are folded rather than replaced, a
@@ -225,7 +225,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   server style into a project layer, and *Save as SLD* writes any style's body
   to disk.
 - Every SLD upload now carries the content type its own version needs. QGIS
-  writes SLD 1.1 (Symbology Encoding); sent as 1.0 — all the library can do —
+  writes SLD 1.1 (Symbology Encoding); sent as 1.0 (all the library can do),
   GeoServer accepts and renders it but records it as `languageVersion 1.0.0`.
   Pasted and file-based 1.1 documents were mislabelled the same way until now.
   The style dialog also shows the version GeoServer stored, and says when the
@@ -234,8 +234,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   workspace its own WMS service or send it back to the global one, and edit the
   service title, abstract, keywords, advertised SRS list, maximum rendering time
   and errors, and default locale. Only the fields shown are sent, so everything
-  else GeoServer keeps for that service — watermark, buffers, metadata links,
-  interpolation — is left exactly as it was.
+  else GeoServer keeps for that service (watermark, buffers, metadata links,
+  interpolation) is left exactly as it was.
 - **Coverage Stores tab**: every raster store across the workspaces with its
   type and how many coverages it publishes; open one for its URL, description
   and published coverages, or the *Coverages* action to read one coverage's
@@ -243,7 +243,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   from a GeoTIFF, a COG URL, an ImageMosaic directory on the server or an
   ImageMosaic properties ZIP; *Publish a coverage* turns one into a layer;
   delete (single and bulk, recursing into the layers it published). A server
-  that quietly drops the COG settings — no COG extension installed — now says
+  that quietly drops the COG settings (no COG extension installed) now says
   so instead of leaving a store that reads whole files.
 - **Loading no longer freezes QGIS.** Every tab load and the connection probe
   run in a `QgsTask`: the dialog paints and stays usable while requests are in
@@ -254,7 +254,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Layer Groups tab**: the global layer groups and every workspace's, with
   mode and size; open one to see its layers in drawing order (with their
   styles and any nested group), title, abstract and bounds; create a group
-  from an ordered list of layers — pick them from every published layer on
+  from an ordered list of layers, pick them from every published layer on
   the server, rasters included, mix workspaces in a global group, and give a
   layer a style other than its default with `layer = style`;
   **Add to QGIS** loads a group as a single WMS layer; delete (single and
@@ -300,7 +300,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   UI is a no-op there).
 - A tab load that failed mid-fetch left the previous resource type's rows in the
   table cache, reachable through search and pagination and wired to the new
-  tab's delete handler — Delete could act on the wrong resource.
+  tab's delete handler, so Delete could act on the wrong resource.
 - Editing a datastore replaced its whole connection-parameter map, discarding
   pool settings, `Loose bbox`, `preparedStatements` and the real namespace,
   resetting a PMTiles store's range-reader provider to `file`, and re-enabling

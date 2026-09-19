@@ -5,8 +5,8 @@ description: Add a new GeoServer resource type (layers, styles, layer groups, co
 
 # Add a resource-type tab
 
-A tab is one mixin file plus one line in the registry. Everything else — table,
-search, pagination, buttons, wait cursor, error reporting, delete confirmation —
+A tab is one mixin file plus one line in the registry. Everything else (table,
+search, pagination, buttons, wait cursor, error reporting, delete confirmation)
 is inherited from `GeoServerMainDialog`. Do not re-implement any of it.
 
 Read `CLAUDE.md` first; the invariants there are the acceptance criteria.
@@ -17,10 +17,10 @@ Unzip `geoserver_manager/extras/geoservercloud-*.whl` into a scratch dir and rea
 `geoservercloud/geoservercloud.py` for the resource's `get_*s`, `get_*`,
 `create_*`, `delete_*` methods. Note:
 
-- Which calls return `(content, status)` — wrap them in `self._check(...)`.
-- Whether `create_*` upserts (it usually does) — then *Add* needs `_resource_exists`.
+- Which calls return `(content, status)`: wrap them in `self._check(...)`.
+- Whether `create_*` upserts (it usually does): then *Add* needs `_resource_exists`.
 - What is **missing**. A missing call becomes a `self._raw_rest(...)` workaround
-  with a `TODO(#50)` comment, using `rest_endpoints.*` for the path — **and a new
+  with a `TODO(#50)` comment, using `rest_endpoints.*` for the path, **and a new
   row in issue #50** (call site, REST verb + path, proposed library API) so it can
   be implemented upstream in python-geoservercloud. Check the "anticipated" list
   in #50 first; your resource may already be there.
@@ -72,10 +72,10 @@ class StyleTabMixin:
 Rules for the mixin:
 
 - **Translate in your own context.** `translate("<YourMixin>", "…")` with the alias at the
-  top of the file — never `self.tr()`, which resolves against `GeoServerMainDialog` and so can
+  top of the file. Never `self.tr()`, which resolves against `GeoServerMainDialog` and so can
   never find your strings. The row-actions column is the one exception: take its label from
   `self.actions_column_label()`, because `_setup_table` compares it. `tests/qgis/test_i18n.py`
-  checks both, and knows the list of `tab_*.py` files — add yours to `CONTEXTS` there.
+  checks both, and knows the list of `tab_*.py` files; add yours to `CONTEXTS` there.
 - **Column 0 is the resource name.** Row lists are display strings; keep the
   order stable because callbacks index into them (`row[0]`, `row[1]`, …).
 - **The loader only arms the GUI.** Buttons, callbacks and `_setup_table` on the GUI
@@ -89,7 +89,7 @@ Rules for the mixin:
 - **Name the primary button.** Pass `ok_label=translate("<YourMixin>", "Create")` (or
   "Publish" / "Upload" / "Apply") to every `ResourceFormDialog` that is not an edit; an edit
   keeps the default "Save". Title the dialog with the Add button's own words, and start that
-  label with a verb, never "New" — `test_ux.py` sweeps every tab for both.
+  label with a verb, never "New"; `test_ux.py` sweeps every tab for both.
 - **The Workspace column** links through `self._open_workspace_from_row` (on the dialog); do
   not write your own. Global-scope rows use `GLOBAL` / `scope()` from `gui/scope.py`.
 - **Add** calls `self._require_safe_name(name)` first (a `/`, `?`, `#` or `%` in a name changes the REST
@@ -97,13 +97,13 @@ Rules for the mixin:
   inside the action; `_run_action` turns that into the banner. Quote any name you put in a raw path yourself
   (`urllib.parse.quote(name, safe="")`).
 - **Cells and words.** A boolean column goes through `self._yes_no(value)`; the first column is headed "Name";
-  collection payloads go through `self._unwrap` / `self._as_list` / `self._name_of` (toolbelt/payload.py) — do
+  collection payloads go through `self._unwrap` / `self._as_list` / `self._name_of` (toolbelt/payload.py); do
   not write a local copy. A tab whose header action is not a delete passes its own words:
   `_setup_delete_selected_button(cb, translate(..., "Remove Selected from Cache"))` and
   `_delete_many(..., verb="stop caching", done="removed from the cache")`. Add a one-line tooltip for the tab
   in `GeoServerMainDialog._tab_help()`.
 - **Edit** fetches the current object with `_fetch`, prefills from *that* (a pure
-  `_<resource>_form_values(...)` staticmethod — unit-testable), and saves by
+  `_<resource>_form_values(...)` staticmethod, unit-testable), and saves by
   merging the form's fields onto the fetched payload. Never send a fixed template
   over an existing object. Lock the name field in edit mode unless the library
   offers a real rename.
@@ -114,14 +114,14 @@ Rules for the mixin:
 - Forms: build the field list with `ResourceFormDialog` field dicts; put
   type-specific fields in a `group`, toggle them with `dlg.set_field_visible`,
   and if a type combo drives visibility, reuse the `_wire_type_combo` pattern.
-- Fan out per-item GETs with `self._fan_out(fn, items, task)` — **only** stateless REST
+- Fan out per-item GETs with `self._fan_out(fn, items, task)`: **only** stateless REST
   reads, never OWS calls (`self.wms`/`self.wmts` are shared state). Passing the task is
   what gives the load its progress bar and its Cancel. It returns `[(result, error)]` in
   order; return the failures as the second half of the tuple and `_render_rows` hands
   them to `_report_partial_failures`, so one broken parent costs one warning, not the
   whole table (see `_fetch_datastore_rows`).
 
-## 3. Register it — two lines in `dlg_main.py`
+## 3. Register it: two lines in `dlg_main.py`
 
 ```python
 class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin, StyleTabMixin):
@@ -133,11 +133,11 @@ class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin, StyleTa
     )
 ```
 
-Icons come from `QgsApplication.iconPath(name)` — pick an existing QGIS theme icon.
+Icons come from `QgsApplication.iconPath(name)`; pick an existing QGIS theme icon.
 Prefix the mixin's method names with the resource (`_load_styles`, `_add_style`)
 so nothing collides in the shared namespace.
 
-## 4. Tests — `tests/qgis/test_tab_<resource>.py`
+## 4. Tests: `tests/qgis/test_tab_<resource>.py`
 
 Headless, no server:
 

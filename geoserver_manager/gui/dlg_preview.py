@@ -5,7 +5,7 @@ Preview a GeoServer layer on a map inside QGIS, with the feature info on click.
 
 The map is a QgsMapCanvas showing one WMS layer built the way *Add to QGIS*
 builds it (credentials as the auth config id), but the layer lives in this
-window only — nothing reaches the project. A click asks the provider to
+window only: nothing reaches the project. A click asks the provider to
 identify the point, which for a WMS layer is a GetFeatureInfo request; QGIS
 already knows how to send it, so the plugin does not hand-roll the URL.
 """
@@ -31,7 +31,7 @@ _CLICK_TOLERANCE_PX = 3
 
 
 class _ClickOrPanTool(QgsMapTool):
-    """Drag pans, a click identifies — one tool, no mode to switch."""
+    """Drag pans, a click identifies: one tool, no mode to switch."""
 
     def __init__(self, canvas, on_click):
         super().__init__(canvas)
@@ -40,12 +40,12 @@ class _ClickOrPanTool(QgsMapTool):
         self._dragging = False
         self.setCursor(QCursor(Qt.CursorShape.CrossCursor))
 
-    def canvasPressEvent(self, event):  # noqa: N802 — Qt override
+    def canvasPressEvent(self, event):  # noqa: N802 (Qt override)
         if event.button() == Qt.MouseButton.LeftButton:
             self._pressed = event.pos()
             self._dragging = False
 
-    def canvasMoveEvent(self, event):  # noqa: N802 — Qt override
+    def canvasMoveEvent(self, event):  # noqa: N802 (Qt override)
         if self._pressed is None:
             return
         if (
@@ -55,7 +55,7 @@ class _ClickOrPanTool(QgsMapTool):
             self._dragging = True
             self.canvas().panAction(event)
 
-    def canvasReleaseEvent(self, event):  # noqa: N802 — Qt override
+    def canvasReleaseEvent(self, event):  # noqa: N802 (Qt override)
         if self._pressed is None:
             return
         self._pressed = None
@@ -68,7 +68,7 @@ class _ClickOrPanTool(QgsMapTool):
 class LayerPreviewDialog(QDialog):
     """A map of one layer and a panel for what GetFeatureInfo says at a click.
 
-    :param layer: a QgsRasterLayer, valid or not — an invalid one is reported
+    :param layer: a QgsRasterLayer, valid or not. An invalid one is reported
         in the window instead of a map.
     :param bbox: (minx, miny, maxx, maxy) in EPSG:4326 to open on, or None
         for the world.
@@ -76,7 +76,7 @@ class LayerPreviewDialog(QDialog):
 
     def __init__(self, title, layer, bbox=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(self.tr("Preview — {}").format(title))
+        self.setWindowTitle(self.tr("Preview: {}").format(title))
         # A window of its own: not modal, so the main dialog's loads and
         # tasks carry on, and gone for good once closed.
         self.setWindowFlags(Qt.WindowType.Window)
@@ -115,7 +115,7 @@ class LayerPreviewDialog(QDialog):
             self._say(
                 self.tr("The layer did not load: {}").format(
                     layer.error().message()
-                    or self.tr("the provider gave no details — is the server up?")
+                    or self.tr("the provider gave no details, is the server up?")
                 )
             )
 
@@ -193,9 +193,9 @@ class LayerPreviewDialog(QDialog):
             lines.append(
                 str(value) if isinstance(value, str) else f"Band {key}: {value}"
             )
-        return "\n".join(lines) if len(lines) > 1 else lines[0] + "\n—"
+        return "\n".join(lines) if len(lines) > 1 else lines[0] + "\n-"
 
-    def closeEvent(self, event):  # noqa: N802 — Qt override
+    def closeEvent(self, event):  # noqa: N802 (Qt override)
         # A render still running would paint into a canvas on its way out.
         self.canvas.stopRendering()
         super().closeEvent(event)

@@ -3,7 +3,7 @@
 """
 The embedded layer preview: a map of one layer, feature info on click.
 
-A file raster stands in for the WMS layer — the canvas, the click-or-pan tool
+A file raster stands in for the WMS layer: the canvas, the click-or-pan tool
 and the identify path are the same; only the provider differs, and QGIS's
 GDAL provider answers `identify` without a server.
 
@@ -112,7 +112,7 @@ class TestLayerPreview(unittest.TestCase):
         self.assertEqual(len(identified), 1)
         self.assertIsInstance(identified[0], QgsPointXY)
 
-        # press, move far, release: a pan — the map moves, nothing is identified
+        # press, move far, release: a pan. The map moves, nothing is identified
         before = canvas.extent().center()
         tool.canvasPressEvent(event(QEvent.Type.MouseButtonPress, 100, 100))
         tool.canvasMoveEvent(event(QEvent.Type.MouseMove, 160, 140))

@@ -1,9 +1,9 @@
-# GeoServer Manager — QGIS Plugin
+# GeoServer Manager: QGIS Plugin
 
 Manage a GeoServer from inside QGIS. Browse, create, edit and delete
 workspaces, datastores, coverage stores, cascaded WMS/WMTS stores, layers, layer
 groups, styles and the tile cache; publish a table, or a vector or raster layer of the open
-project; bring what the server has back into QGIS as WMS, WFS or WMTS — without
+project; bring what the server has back into QGIS as WMS, WFS or WMTS, without
 switching to the GeoServer web admin.
 
 Built on [`python-geoservercloud`](https://github.com/camptocamp/python-geoservercloud):
@@ -24,17 +24,17 @@ so that it gets added there rather than worked around here.
 | Tab | What you can do |
 | :-- | :-------------- |
 | Workspaces | list (the default workspace is marked), create, rename, toggle isolation, set as default, edit the workspace's WMS service settings (title, abstract, keywords, SRS list, …), delete |
-| Datastores | list across every workspace; create PostGIS, PostGIS (JNDI), Shapefile, directory of shapefiles, GeoPackage, PMTiles or Web Feature Server (NG) stores (a remote WFS cascaded), enable or disable one — or any other type through a `key = value` parameter editor; edit (only the fields you change are sent), delete |
-| Coverage stores | list, create from a GeoTIFF, a COG or an ImageMosaic — or from a raster layer of the open QGIS project, uploaded as a compressed GeoTIFF and published in the same request; browse the coverages of a store, publish a coverage as a layer, delete |
+| Datastores | list across every workspace; create PostGIS, PostGIS (JNDI), Shapefile, directory of shapefiles, GeoPackage, PMTiles or Web Feature Server (NG) stores (a remote WFS cascaded), enable or disable one, or any other type through a `key = value` parameter editor; edit (only the fields you change are sent), delete |
+| Coverage stores | list, create from a GeoTIFF, a COG or an ImageMosaic, or from a raster layer of the open QGIS project, uploaded as a compressed GeoTIFF and published in the same request; browse the coverages of a store, publish a coverage as a layer, delete |
 | Cascaded stores | the WMS and WMTS stores that proxy another server, listed across every workspace; create one from a GetCapabilities URL, publish the layers the remote advertises, inspect and delete them, delete the store |
-| Layers | every layer of the server whatever its type — vector, raster, cascaded WMS/WMTS — with workspace, type, store and default style; publish a table of a datastore, or a layer of the open QGIS project — uploaded as a GeoPackage together with its symbology; change the default style, including one made from a QGIS layer's symbology; add to QGIS as WMS, WMTS or, for a vector, WFS; preview on a map inside QGIS with feature info on click, or in a browser on GeoServer's own OpenLayers page; delete |
+| Layers | every layer of the server whatever its type (vector, raster, cascaded WMS/WMTS) with workspace, type, store and default style; publish a table of a datastore, or a layer of the open QGIS project, uploaded as a GeoPackage together with its symbology; change the default style, including one made from a QGIS layer's symbology; add to QGIS as WMS, WMTS or, for a vector, WFS; preview on a map inside QGIS with feature info on click, or in a browser on GeoServer's own OpenLayers page; delete |
 | Layer groups | list global and workspace groups, create (ordered layers with their styles), inspect, add to QGIS, preview in a browser, delete |
 | Styles | list global and workspace styles; create by pasting an SLD, from a file (`.sld`, a `.zip` with its resources, `.mbstyle`) or from a QGIS layer's symbology; view and edit the SLD next to the legend GeoServer renders for it; apply a server style to a QGIS layer; save it to disk; delete |
-| Tile cache | what GeoWebCache caches — every layer and layer group, by default — with each layer's gridsets and formats; edit a layer's caching (gridsets, formats, meta-tiling, expiry), truncate its tiles, remove it from the cache, add an uncached layer |
-| Layer tree | right-click a layer in QGIS for *Push style to GeoServer…* and *Apply style from GeoServer…* — a layer that came from the server is matched through its source, any other by name; the entries say when the plugin is not connected |
+| Tile cache | what GeoWebCache caches (every layer and layer group, by default) with each layer's gridsets and formats; edit a layer's caching (gridsets, formats, meta-tiling, expiry), truncate its tiles, remove it from the cache, add an uncached layer |
+| Layer tree | right-click a layer in QGIS for *Push style to GeoServer…* and *Apply style from GeoServer…*; a layer that came from the server is matched through its source, any other by name; the entries say when the plugin is not connected |
 
 Every list is searchable, sortable by column and paginated (20 per page), and
-loads in the background — QGIS stays usable, and *Cancel* stops a slow one.
+loads in the background: QGIS stays usable, and *Cancel* stops a slow one.
 Deletes ask first and name what they cascade to. Keyboard: F5 refreshes, Ctrl+F
 jumps to the search box, Enter opens the selected row, Del deletes the
 selection, Esc clears the filter. Colours follow the QGIS theme, dark ones
@@ -46,7 +46,7 @@ included; the interface is translatable and ships a partial French locale.
 - Network access to a GeoServer REST API, with an account allowed to read and
   write the resources you want to manage
 
-`geoservercloud` and `xmltodict` ship with the plugin — QGIS's Python
+`geoservercloud` and `xmltodict` ship with the plugin. QGIS's Python
 environment often cannot see system site-packages, so both are bundled as
 wheels in `geoserver_manager/extras/` and added to `sys.path` at startup.
 `owslib` and `requests` come with QGIS.
@@ -67,7 +67,7 @@ For a development install, see [Development](#development) below.
 
 | Field | Notes |
 | :---- | :---- |
-| Base URL | e.g. `https://example.com/geoserver` — must start with `http://` or `https://` |
+| Base URL | e.g. `https://example.com/geoserver`, must start with `http://` or `https://` |
 | Username / Password | stored encrypted via `QgsAuthManager`; QGIS asks for its master password |
 | Verify the server's TLS certificate | on by default; untick only for a private CA or a self-signed certificate you trust |
 | Test connection | probes the server with the fields as typed, without saving them |
@@ -76,14 +76,14 @@ Then open the plugin from the toolbar. The status line shows the connected
 server and its version; connection, authentication and HTTP problems are
 reported in the dialog's message bar and in the QGIS log panel (*GeoServer
 Manager* tab). Over plain `http://` to a remote host the password travels
-unencrypted — the plugin says so once, when saving.
+unencrypted; the plugin says so once, when saving.
 
 ## Development
 
 ### Local install (symlink)
 
 Symlink the plugin package into a QGIS profile so QGIS loads the working tree
-directly — there is no build step, the bundled wheels are committed.
+directly: there is no build step, the bundled wheels are committed.
 
 ```sh
 git clone https://github.com/ronitjadhav/geoserver_manager.git
@@ -142,7 +142,7 @@ python -m pytest tests/unit             # no QGIS needed
 python -m pytest tests/qgis             # needs a QGIS Python environment
 ```
 
-Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the
+Contributions welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) and the
 [contribution guide](docs/development/contribute.md).
 
 ## Documentation

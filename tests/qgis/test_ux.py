@@ -102,7 +102,7 @@ class TestStatusLine(unittest.TestCase):
         self.dlg = SyncDialog()
 
     def test_a_kind_becomes_a_stylesheet_colour(self):
-        self.dlg._set_status("Connected — http://gs", "ok")
+        self.dlg._set_status("Connected: http://gs", "ok")
         self.assertIn("Connected", self.dlg.lbl_status.text())
         expected = status_colour("ok", self.dlg.palette())
         self.assertIn(expected, self.dlg.lbl_status.styleSheet())
@@ -231,7 +231,7 @@ class TestRememberedTab(unittest.TestCase):
         """A dialog built the way the plugin builds it, on stubbed settings.
 
         The settings have to be in place *during* __init__, which is when the
-        navigation is built — assigning them afterwards would test nothing.
+        navigation is built; assigning them afterwards would test nothing.
         """
         with patch.object(dlg_main, "PlgOptionsManager", lambda: self.Settings(stored)):
             return SyncDialog()
@@ -380,7 +380,7 @@ class TestEmptyStates(unittest.TestCase):
         self.dlg._populate_rows([])
         self.assertEqual(
             self.dlg.lbl_page_info.text(),
-            "Nothing here yet — start with 'Add a Workspace' above.",
+            "Nothing here yet. Start with 'Add a Workspace' above.",
         )
 
     def test_a_fruitless_filter_blames_the_filter(self):
@@ -390,7 +390,7 @@ class TestEmptyStates(unittest.TestCase):
         self.dlg._apply_filter()
         self.assertEqual(
             self.dlg.lbl_page_info.text(),
-            "Nothing matches 'zzz' — Esc clears the filter.",
+            "Nothing matches 'zzz'. Esc clears the filter.",
         )
 
     def test_without_an_add_button_it_stays_plain(self):
@@ -444,7 +444,7 @@ class TestWindowTitleAndEnter(unittest.TestCase):
         self.dlg._fetch_version_label = lambda gs: ""
         self.dlg.refresh_ui()  # SyncDialog runs the probe inline
         self.assertEqual(
-            self.dlg.windowTitle(), "GeoServer Manager — maps.example.org:8443"
+            self.dlg.windowTitle(), "GeoServer Manager: maps.example.org:8443"
         )
 
         self.dlg._probe = lambda gs, url: ("Server unreachable", "gone")
@@ -592,11 +592,11 @@ class TestRowActionTooltips(unittest.TestCase):
         dlg = SyncDialog()
         dlg._row_actions = [
             ("a.svg", "Delete", lambda row: None),
-            ("b.svg", "Preview", lambda row: None, "Preview — the browser may ask"),
+            ("b.svg", "Preview", lambda row: None, "Preview: the browser may ask"),
         ]
         widget = dlg._make_action_widget(["row"])
         buttons = widget.findChildren(QPushButton)
         self.assertEqual(
             [button.toolTip() for button in buttons],
-            ["Delete", "Preview — the browser may ask"],
+            ["Delete", "Preview: the browser may ask"],
         )

@@ -50,7 +50,7 @@ Field options:
     - options (list[str]): choices for "combo"
     - min/max (int): range for "spinbox"
     - read_only (bool): disable editing
-    - group (str): optional tab group name — fields with the same group
+    - group (str): optional tab group name; fields with the same group
       appear under one tab; ungrouped fields go to the first tab
     - on_change (callable): for "combo" fields, called with (new_value)
       when the selection changes
@@ -99,7 +99,7 @@ class ResourceFormDialog(QDialog):
         :param values: dict of existing values to pre-fill (edit mode).
         :param description: optional subtitle shown below the title.
         :param parent: parent widget.
-        :param ok_label: what the primary button does — "Create", "Publish",
+        :param ok_label: what the primary button does: "Create", "Publish",
             "Upload", "Apply"… Defaults to "Save", which is right for an edit
             and wrong for everything else.
         """
@@ -138,11 +138,11 @@ class ResourceFormDialog(QDialog):
         self._field_page = {}  # key -> tab page, to reveal validation errors
 
         if len(groups) == 1:
-            # Single group — no tabs needed
+            # Single group: no tabs needed
             form = self._build_form(list(groups.values())[0], values)
             layout.addWidget(form)
         else:
-            # Multiple groups — use tabs
+            # Multiple groups: use tabs
             self._tabs = QTabWidget()
             for group_name, group_fields in groups.items():
                 page = self._build_form(group_fields, values)
@@ -382,7 +382,7 @@ class ResourceFormDialog(QDialog):
             self._hidden_keys.add(key)
 
     def set_image(self, key, pixmap, text=""):
-        """Show a picture in an "image" field — or, without one, the text that
+        """Show a picture in an "image" field, or, without one, the text that
         says why there is none. Painting a label, it is safe after close."""
         label = self._widgets[key]
         if pixmap is None or pixmap.isNull():
@@ -429,7 +429,7 @@ class ResourceFormDialog(QDialog):
                 continue
             value = values[key]
             if not value:
-                # Bring the offending field on screen — it may sit on another tab
+                # Bring the offending field on screen: it may sit on another tab
                 if self._tabs is not None and key in self._field_page:
                     self._tabs.setCurrentWidget(self._field_page[key])
                 widget = self._widgets[key]

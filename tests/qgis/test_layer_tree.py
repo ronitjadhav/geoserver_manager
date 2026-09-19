@@ -58,7 +58,7 @@ class FakeIface:
         return self.help_menu
 
     def __getattr__(self, name):
-        # registerOptionsWidgetFactory, addToolBarIcon, … — nothing to do here.
+        # registerOptionsWidgetFactory, addToolBarIcon, …: nothing to do here.
         return lambda *args, **kwargs: None
 
 
@@ -235,7 +235,7 @@ class TestNotConnected(MenuCase):
         push, pull = submenu.actions()[0], submenu.actions()[1]
         self.assertFalse(push.isEnabled())
         self.assertFalse(pull.isEnabled())
-        self.assertIn("open GeoServer Manager first", push.toolTip())
+        self.assertIn("Open GeoServer Manager first", push.toolTip())
 
     def test_an_entry_opens_the_plugin_instead(self):
         submenu = self.submenu(self.build())

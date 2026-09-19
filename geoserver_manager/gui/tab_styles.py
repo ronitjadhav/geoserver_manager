@@ -1,7 +1,7 @@
 #! python3  # noqa: E265
 
 """
-Styles tab — list, view/edit, upload and delete styles.
+Styles tab: list, view/edit, upload and delete styles.
 
 Used as a mixin for GeoServerMainDialog.
 """
@@ -42,8 +42,8 @@ _SOURCE_QGIS = "From a QGIS layer"
 # Every user-visible string in this file goes through translate() with this
 # file's own class as the context. self.tr() cannot: pylupdate extracts it
 # under StyleTabMixin, but at runtime self.tr is QObject.tr with the context of the
-# *instance's* class, GeoServerMainDialog — QDialog precedes the mixins in the
-# MRO — so every lookup would miss. A wrapper function would not be extracted
+# *instance's* class, GeoServerMainDialog. QDialog precedes the mixins in the
+# MRO, so every lookup would miss. A wrapper function would not be extracted
 # at all (pylupdate only understands a literal context), hence the repetition.
 translate = QCoreApplication.translate
 
@@ -73,7 +73,7 @@ class StyleTabMixin:
                 self._apply_style_to_qgis,
                 translate(
                     "StyleTabMixin",
-                    "Put this server style on a layer of the open project — the same "
+                    "Put this server style on a layer of the open project, the same "
                     "as the layer tree's Apply style from GeoServer, from this end",
                 ),
             ),
@@ -108,8 +108,8 @@ class StyleTabMixin:
     def _fetch_style_rows(self, task=None):
         """(rows, failures) for the Styles table. Runs in a worker thread.
 
-        The format and the SLD version come from each style's definition — one
-        GET per style, fanned out — because whether a style is SLD decides what
+        The format and the SLD version come from each style's definition. One
+        GET per style, fanned out, because whether a style is SLD decides what
         *Apply to a QGIS layer* can do with it.
         """
         pairs = [
@@ -132,7 +132,7 @@ class StyleTabMixin:
             lambda pair: self._style_summary(pair[0], scope(pair[1])), pairs, task
         )
         rows = [
-            [name, ws_label, *(summary or ("—", "—"))]
+            [name, ws_label, *(summary or ("-", "-"))]
             for (name, ws_label), (summary, _error) in zip(pairs, details)
         ]
         failures += [
@@ -146,10 +146,10 @@ class StyleTabMixin:
         """(format, SLD version) cells of one style. Raises on HTTP errors."""
         definition = self._check(self.gs.get_style_definition(name, workspace_name))
         if not isinstance(definition, dict):
-            return ("—", "—")
+            return ("-", "-")
         return (
             str(definition.get("format") or "sld").lower(),
-            self._language_version(definition) or "—",
+            self._language_version(definition) or "-",
         )
 
     # -- Body ------------------------------------------------------------------
@@ -187,8 +187,8 @@ class StyleTabMixin:
         TODO(#50): upstream as a content type chosen from the document (or a
         `content_type=` argument). rest_service.create_style() derives it from
         the *format* alone and only knows application/vnd.ogc.sld+xml, so an
-        SLD 1.1 document — which is what QgsMapLayer.saveSldStyle() writes,
-        always — is stored with languageVersion 1.0.0: accepted, rendered, and
+        SLD 1.1 document (which is what QgsMapLayer.saveSldStyle() writes,
+        always) is stored with languageVersion 1.0.0: accepted, rendered, and
         mislabelled. Sending application/vnd.ogc.se+xml records it as 1.1.0.
         """
         content_type = sld_content_type(sld)
@@ -210,7 +210,7 @@ class StyleTabMixin:
         """The style's REST path with its segments URL-quoted.
 
         TODO(#50): `RestEndpoints.style()` interpolates the names raw, and
-        `requests` sends `styles/a#b.json` as `styles/a` — a different style.
+        `requests` sends `styles/a#b.json` as `styles/a`, a different style.
         Pre-quoting the segments the builder receives is the smallest fix; it
         has to go when the library quotes them itself, or `%` doubles.
         """
@@ -261,7 +261,7 @@ class StyleTabMixin:
                     # 1.0 rendition, so the body below is not the stored bytes.
                     translate(
                         "StyleTabMixin",
-                        "Stored as SLD 1.1 (Symbology Encoding) — what QGIS "
+                        "Stored as SLD 1.1 (Symbology Encoding), what QGIS "
                         "exports. GeoServer serves it here as its SLD 1.0 "
                         "rendition, and saving stores that rendition instead.",
                     )
@@ -346,7 +346,7 @@ class StyleTabMixin:
                 "name": name,
                 "workspace": row_data[1],
                 "format": style_format,
-                "version": language_version or "—",
+                "version": language_version or "-",
                 "filename": definition.get("filename", ""),
                 "body": body,
             },
@@ -380,7 +380,7 @@ class StyleTabMixin:
         the style's own workspace is preferred. TODO(#50): the facade has no
         get_layers() and RestEndpoints has no path for GeoServer's layer list
         (its layers() / layer() are GeoWebCache's), so this GETs
-        /rest/layers.json — the global list, qualified names included.
+        /rest/layers.json: the global list, qualified names included.
         """
         base = self.gs.rest_service.rest_endpoints.base_url
         if workspace_name:
@@ -399,8 +399,8 @@ class StyleTabMixin:
     def _legend_png(self, layer, name, workspace_name):
         """The legend GeoServer renders for the style, as PNG bytes.
 
-        TODO(#50): get_legend_graphic() is a plain GET through the REST client —
-        stateless, so fine in a worker — but it hands back the raw Response, an
+        TODO(#50): get_legend_graphic() is a plain GET through the REST client
+        (stateless, so fine in a worker), but it hands back the raw Response, an
         OGC exception is HTTP 200 with an XML body, and it runs with the
         client's 120 s timeout.
         """
@@ -425,7 +425,7 @@ class StyleTabMixin:
     def _load_legend(self, dlg, name, workspace_name):
         """Fetch the legend into the dialog's image field, off the GUI thread.
 
-        The dialog is modal and may be closed — even gone — before the picture
+        The dialog is modal and may be closed, even gone, before the picture
         lands, so the landing looks before it paints. Failures land in the
         field too: a banner would sit behind the modal.
         """
@@ -438,7 +438,7 @@ class StyleTabMixin:
                 if layer is None:
                     return None, translate(
                         "StyleTabMixin",
-                        "No published layer to draw the legend with — "
+                        "No published layer to draw the legend with. "
                         "GetLegendGraphic needs one.",
                     )
                 return self._legend_png(layer, name, workspace_name), None
@@ -609,7 +609,7 @@ class StyleTabMixin:
     def _create_sld_style(self, name, workspace_name, sld):
         """Create the style definition, then upload the body as its version."""
         # create_style_from_string would do both, but always with the SLD 1.0
-        # content type — see _put_sld_body.
+        # content type; see _put_sld_body.
         self._check(
             self.gs.create_style_definition(name, f"{name}.sld", workspace_name)
         )
@@ -639,7 +639,7 @@ class StyleTabMixin:
         if style_format != "sld":
             self.show_warning_message(
                 translate(
-                    "StyleTabMixin", "'{}' is a {} style — QGIS can only read SLD."
+                    "StyleTabMixin", "'{}' is a {} style. QGIS can only read SLD."
                 ).format(name, style_format.upper())
             )
             return None
@@ -668,7 +668,7 @@ class StyleTabMixin:
             title=translate("StyleTabMixin", "Apply '{}' to a QGIS layer").format(name),
             description=translate(
                 "StyleTabMixin",
-                "The style is applied to the layer in this project only — the "
+                "The style is applied to the layer in this project only. The "
                 "server is not touched.",
             ),
             fields=[
@@ -780,7 +780,7 @@ class StyleTabMixin:
     def _do_delete_style(self, name, workspace_name):
         """DELETE a style, its file (purge) and its references (recurse).
 
-        TODO(#50): upstream as delete_style(name, ws, purge=True, recurse=True) —
+        TODO(#50): upstream as delete_style(name, ws, purge=True, recurse=True):
         the library has no delete for styles. Workaround: DELETE the style path
         with purge=true&recurse=true.
         """

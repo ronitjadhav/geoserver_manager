@@ -123,7 +123,7 @@
     </message>
     <message>
         <location filename="../../gui/tab_cascaded.py" line="352" />
-        <source>'{}' publishes no layer yet — use Publish a layer.</source>
+        <source>'{}' publishes no layer yet. Use Publish a layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -143,7 +143,7 @@
     </message>
     <message>
         <location filename="../../gui/tab_cascaded.py" line="395" />
-        <source>The remote server behind '{}' advertises no layer — check its capabilities URL.</source>
+        <source>The remote server behind '{}' advertises no layer. Check its capabilities URL.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -188,7 +188,7 @@
     </message>
     <message>
         <location filename="../../gui/tab_cascaded.py" line="484" />
-        <source>As GeoServer reaches it — from its own machine, not from yours.</source>
+        <source>As GeoServer reaches it, from its own machine, not from yours.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -270,12 +270,12 @@
     <name>ConfigOptionsPage</name>
     <message>
         <location filename="../../gui/dlg_settings.py" line="141" />
-        <source>The URL must not carry a user name or password — the fields below do. URL not saved.</source>
+        <source>The URL must not carry a user name or password. The fields below do. URL not saved.</source>
         <translation type="unfinished" />
     </message>
     <message>
         <location filename="../../gui/dlg_settings.py" line="153" />
-        <source>GeoServer URL must start with http:// or https:// — URL not saved.</source>
+        <source>GeoServer URL must start with http:// or https://. URL not saved.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -295,7 +295,7 @@
     </message>
     <message>
         <location filename="../../gui/dlg_settings.py" line="228" />
-        <source>Take the user name and password out of the URL — the fields below carry them.</source>
+        <source>Take the user name and password out of the URL. The fields below carry them.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -305,7 +305,7 @@
     </message>
     <message>
         <location filename="../../gui/dlg_settings.py" line="247" />
-        <source>Connected — GeoServer answered.</source>
+        <source>Connected. GeoServer answered.</source>
         <translation type="unfinished" />
     </message>
 </context><context>
@@ -318,7 +318,7 @@
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="85" />
-        <source>Create a raster store from a GeoTIFF, a COG, an ImageMosaic — or a raster layer of this project, uploaded and published</source>
+        <source>Create a raster store from a GeoTIFF, a COG, an ImageMosaic, or a raster layer of this project, uploaded and published</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -338,7 +338,7 @@
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="104" />
-        <source>Coverages — the rasters this store holds, published or not, with their details.</source>
+        <source>Coverages: the rasters this store holds, published or not, with their details.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -348,7 +348,7 @@
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="114" />
-        <source>Publish a coverage — make one of the store's rasters a layer.</source>
+        <source>Publish a coverage: make one of the store's rasters a layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -358,7 +358,7 @@
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="123" />
-        <source>Delete — remove the store, its coverages and their layers (asks first).</source>
+        <source>Delete: remove the store, its coverages and their layers (asks first).</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -423,7 +423,7 @@
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="288" />
-        <source>Read-only in this version — edit it in GeoServer's web UI.</source>
+        <source>Read-only in this version. Edit it in GeoServer's web UI.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -493,7 +493,7 @@
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="442" />
-        <source>'{}' has no published coverage yet — use Publish a coverage.</source>
+        <source>'{}' has no published coverage yet. Use Publish a coverage.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -577,7 +577,7 @@
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="627" />
-        <source>A ZIP holding indexer.properties, datastore.properties and at least one granule — GeoServer refuses a properties-only archive. Nothing is published yet. Give the indexer a Name nobody used before: deleting a mosaic store leaves its granule index table behind, and a re-used name picks it up.</source>
+        <source>A ZIP holding indexer.properties, datastore.properties and at least one granule. GeoServer refuses a properties-only archive. Nothing is published yet. Give the indexer a Name nobody used before: deleting a mosaic store leaves its granule index table behind, and a re-used name picks it up.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -587,7 +587,7 @@
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="644" />
-        <source>File-based rasters of this project. The layer is written to a GeoTIFF and uploaded — a copy, not a link — and GeoServer publishes it under the store's name. The export to GeoTIFF runs before the upload and may take a moment; the upload itself runs in the background.</source>
+        <source>File-based rasters of this project. The layer is written to a GeoTIFF and uploaded (a copy, not a link), and GeoServer publishes it under the store's name. The export to GeoTIFF runs before the upload and may take a moment; the upload itself runs in the background.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -608,7 +608,7 @@
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="705" />
-        <source>A coverage store is a source of rasters. Creating it does not publish anything — except an ImageMosaic from a directory, which discovers its coverages itself, and a raster uploaded from this project, which GeoServer publishes as a layer on arrival.</source>
+        <source>A coverage store is a source of rasters. Creating it does not publish anything, except an ImageMosaic from a directory, which discovers its coverages itself, and a raster uploaded from this project, which GeoServer publishes as a layer on arrival.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -630,7 +630,7 @@
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="765" />
-        <source>'{}' was created, but GeoServer dropped the COG settings — it will read whole files instead of ranges. Is the COG extension installed on the server?</source>
+        <source>'{}' was created, but GeoServer dropped the COG settings. It will read whole files instead of ranges. Is the COG extension installed on the server?</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -665,12 +665,12 @@
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="967" />
-        <source>'{}' has no file to upload — a WMS, XYZ or other remote raster cannot be published this way.</source>
+        <source>'{}' has no file to upload. A WMS, XYZ or other remote raster cannot be published this way.</source>
         <translation type="unfinished" />
     </message>
     <message>
         <location filename="../../gui/tab_coveragestores.py" line="976" />
-        <source>'{}' uses a CRS without an EPSG code, which GeoServer cannot declare. Reproject the raster in QGIS first — rasters are uploaded as they are.</source>
+        <source>'{}' uses a CRS without an EPSG code, which GeoServer cannot declare. Reproject the raster in QGIS first, rasters are uploaded as they are.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -868,7 +868,7 @@
     </message>
     <message>
         <location filename="../../gui/tab_datastores.py" line="339" />
-        <source>How the .dbf attribute text is encoded — UTF-8, or ISO-8859-1, which is what GeoServer assumes</source>
+        <source>How the .dbf attribute text is encoded: UTF-8, or ISO-8859-1, which is what GeoServer assumes</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1008,7 +1008,7 @@
     </message>
     <message>
         <location filename="../../gui/tab_datastores.py" line="933" />
-        <source>Datastore type '{}' has no dedicated form — edit its connection parameters directly.</source>
+        <source>Datastore type '{}' has no dedicated form. Edit its connection parameters directly.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1113,7 +1113,7 @@
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="314" />
-        <source>GeoServer not configured — open Settings to add credentials.</source>
+        <source>GeoServer not configured. Open Settings to add credentials.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1123,7 +1123,7 @@
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="322" />
-        <source>Could not read the credentials from QGIS's authentication database — its master password was probably declined. Open Settings and save them again.</source>
+        <source>Could not read the credentials from QGIS's authentication database. Its master password was probably declined. Open Settings and save them again.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1133,7 +1133,7 @@
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="425" />
-        <source>Connected — {}</source>
+        <source>Connected: {}</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1154,7 +1154,7 @@
     <message>
         <location filename="../../gui/dlg_main.py" line="1362" />
         <location filename="../../gui/dlg_main.py" line="494" />
-        <source>An upload is already running — wait for it or cancel it.</source>
+        <source>An upload is already running. Wait for it or cancel it.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1194,7 +1194,7 @@
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="652" />
-        <source>Vector sources — databases and files on the server — that layers are published from.</source>
+        <source>Vector sources: databases and files on the server that layers are published from.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1209,7 +1209,7 @@
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="662" />
-        <source>Everything published — vector, raster and cascaded — with its store and default style.</source>
+        <source>Everything published (vector, raster and cascaded), with its store and default style.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1249,18 +1249,18 @@
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="963" />
-        <source>Not connected — press Refresh (F5), or open Settings.</source>
+        <source>Not connected. Press Refresh (F5), or open Settings.</source>
         <translation type="unfinished" />
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="966" />
-        <source>Nothing matches '{}' — Esc clears the filter.</source>
-        <translation>Rien ne correspond à '{}' — Échap efface le filtre.</translation>
+        <source>Nothing matches '{}'. Esc clears the filter.</source>
+        <translation type="unfinished" />
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="972" />
-        <source>Nothing here yet — start with '{}' above.</source>
-        <translation>Rien ici pour l'instant — commencez par '{}' ci-dessus.</translation>
+        <source>Nothing here yet. Start with '{}' above.</source>
+        <translation type="unfinished" />
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="975" />
@@ -1284,12 +1284,12 @@
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="1095" />
-        <source>Not connected to GeoServer — press Refresh (F5) to connect.</source>
+        <source>Not connected to GeoServer. Press Refresh (F5) to connect.</source>
         <translation type="unfinished" />
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="1221" />
-        <source>{count} item(s) could not be listed: {names} — details in the QGIS log (GeoServer Manager tab).</source>
+        <source>{count} item(s) could not be listed: {names}. Details in the QGIS log (GeoServer Manager tab).</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1343,7 +1343,7 @@
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="1329" />
-        <source>Cancelled — what was already done stays done.</source>
+        <source>Cancelled. What was already done stays done.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1358,17 +1358,17 @@
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="1436" />
-        <source>Upload of '{name}' cancelled. GeoServer kept the {kind} and its layer but had already removed their data file — upload it again with Replace ticked, or delete the {kind}.</source>
+        <source>Upload of '{name}' cancelled. GeoServer kept the {kind} and its layer but had already removed their data file. Upload it again with Replace ticked, or delete the {kind}.</source>
         <translation type="unfinished" />
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="1442" />
-        <source>Upload of '{name}' cancelled — check the {tab} tab for what was left.</source>
+        <source>Upload of '{name}' cancelled. Check the {tab} tab for what was left.</source>
         <translation type="unfinished" />
     </message>
     <message>
         <location filename="../../gui/dlg_main.py" line="1446" />
-        <source>Upload of '{name}' cancelled — nothing was left on the server.</source>
+        <source>Upload of '{name}' cancelled. Nothing was left on the server.</source>
         <translation type="unfinished" />
     </message>
 </context><context>
@@ -1457,7 +1457,7 @@
     </message>
     <message>
         <location filename="../../plugin_main.py" line="201" />
-        <source>GeoServer Manager — first connection</source>
+        <source>GeoServer Manager: first connection</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1677,7 +1677,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_gwc.py" line="608" />
-        <source>Every published layer is cached already — GeoServer caches new layers by itself.</source>
+        <source>Every published layer is cached already. GeoServer caches new layers by itself.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1803,7 +1803,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layergroups.py" line="87" />
-        <source>Preview in a browser — GeoServer's own OpenLayers page. A secured server will ask the browser to log in.</source>
+        <source>Preview in a browser: GeoServer's own OpenLayers page. A secured server will ask the browser to log in.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1900,7 +1900,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layergroups.py" line="368" />
-        <source>One layer per line, in drawing order — the first line is drawn first, at the bottom. Reorder by editing the text. Add "= style" to a line to publish that layer with a style other than its own default.</source>
+        <source>One layer per line, in drawing order: the first line is drawn first, at the bottom. Reorder by editing the text. Add "= style" to a line to publish that layer with a style other than its own default.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1940,7 +1940,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layergroups.py" line="491" />
-        <source>No layer named '{}' on the server — pick it from the list, or qualify it as workspace:layer.</source>
+        <source>No layer named '{}' on the server. Pick it from the list, or qualify it as workspace:layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1970,14 +1970,14 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layergroups.py" line="613" />
-        <source>Only the group goes away — the layers it published stay. GeoServer refuses if another layer group contains this one.</source>
+        <source>Only the group goes away. The layers it published stay. GeoServer refuses if another layer group contains this one.</source>
         <translation type="unfinished" />
     </message>
 </context><context>
     <name>LayerPreviewDialog</name>
     <message>
         <location filename="../../gui/dlg_preview.py" line="79" />
-        <source>Preview — {}</source>
+        <source>Preview: {}</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1992,7 +1992,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/dlg_preview.py" line="118" />
-        <source>the provider gave no details — is the server up?</source>
+        <source>the provider gave no details, is the server up?</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2028,7 +2028,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="89" />
-        <source>Add to QGIS — load the layer into this project as WFS, WMS or WMTS (asks which).</source>
+        <source>Add to QGIS: load the layer into this project as WFS, WMS or WMTS (asks which).</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2038,7 +2038,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="99" />
-        <source>Preview on a map inside QGIS — click the map for the feature info at that point. Nothing is added to the project.</source>
+        <source>Preview on a map inside QGIS: click the map for the feature info at that point. Nothing is added to the project.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2048,7 +2048,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="109" />
-        <source>Preview in a browser — GeoServer's own OpenLayers page. A secured server will ask the browser to log in.</source>
+        <source>Preview in a browser: GeoServer's own OpenLayers page. A secured server will ask the browser to log in.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2059,7 +2059,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="119" />
-        <source>Set style — pick one of the server's existing styles as this layer's default.</source>
+        <source>Set style: pick one of the server's existing styles as this layer's default.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2069,7 +2069,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="129" />
-        <source>Push style from QGIS — upload a project layer's symbology as a new server style and make it this layer's default.</source>
+        <source>Push style from QGIS: upload a project layer's symbology as a new server style and make it this layer's default.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2079,7 +2079,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="139" />
-        <source>Delete — remove the layer from GeoServer (asks first).</source>
+        <source>Delete: remove the layer from GeoServer (asks first).</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2213,7 +2213,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="403" />
-        <source>Read-only here — GeoServer's web UI can change it.</source>
+        <source>Read-only here. GeoServer's web UI can change it.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2303,7 +2303,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="547" />
-        <source>Vector layers only — a raster's symbology is not uploaded.</source>
+        <source>Vector layers only. A raster's symbology is not uploaded.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2318,7 +2318,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="624" />
-        <source>Publish a table of a datastore, or a layer of this QGIS project — uploaded as a GeoPackage (a vector becomes a datastore) or as a GeoTIFF (a raster becomes a coverage store).</source>
+        <source>Publish a table of a datastore, or a layer of this QGIS project, uploaded as a GeoPackage (a vector becomes a datastore) or as a GeoTIFF (a raster becomes a coverage store).</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2356,7 +2356,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="761" />
-        <source>Layer '{}' uploaded — reconnect to finish its metadata and style.</source>
+        <source>Layer '{}' uploaded. Reconnect to finish its metadata and style.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2416,7 +2416,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="1003" />
-        <source>The layer's symbology is exported as SLD and uploaded to workspace '{}'. A style of that name there is replaced — that is how you push a change you just made in QGIS.</source>
+        <source>The layer's symbology is exported as SLD and uploaded to workspace '{}'. A style of that name there is replaced, that is how you push a change you just made in QGIS.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2491,7 +2491,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="1328" />
-        <source>WMS and WMTS load rendered images — this layer has no features to serve over WFS. Credentials come from the plugin's saved connection, not from the layer.</source>
+        <source>WMS and WMTS load rendered images. This layer has no features to serve over WFS. Credentials come from the plugin's saved connection, not from the layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2531,7 +2531,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_layers.py" line="1423" />
-        <source>The published layer goes too; the table, file or remote layer behind it is not touched. GeoServer refuses if a layer group still uses the layer — remove it from the group first.
+        <source>The published layer goes too; the table, file or remote layer behind it is not touched. GeoServer refuses if a layer group still uses the layer, remove it from the group first.
 
 </source>
         <translation type="unfinished" />
@@ -2550,7 +2550,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/layer_tree.py" line="81" />
-        <source>Not connected — open GeoServer Manager first</source>
+        <source>Not connected. Open GeoServer Manager first</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2565,7 +2565,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/layer_tree.py" line="173" />
-        <source>No layer on the server is named like '{}' — publish it first, from the Layers tab.</source>
+        <source>No layer on the server is named like '{}'. Publish it first, from the Layers tab.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2590,7 +2590,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/layer_tree.py" line="221" />
-        <source>The symbology of '{}' is exported as SLD and uploaded to workspace '{}' as the style of layer '{}'. A style of that name there is replaced — that is how you push a change you just made in QGIS.</source>
+        <source>The symbology of '{}' is exported as SLD and uploaded to workspace '{}' as the style of layer '{}'. A style of that name there is replaced, which is how you push a change you just made in QGIS.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2635,7 +2635,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/layer_tree.py" line="326" />
-        <source>'{}' is a {} style — QGIS can only read SLD.</source>
+        <source>'{}' is a {} style. QGIS can only read SLD.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2695,14 +2695,14 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/layer_tree.py" line="451" />
-        <source>Not connected to GeoServer — open GeoServer Manager and connect first.</source>
+        <source>Not connected to GeoServer. Open GeoServer Manager and connect first.</source>
         <translation type="unfinished" />
     </message>
 </context><context>
     <name>QgisExport</name>
     <message>
         <location filename="../../toolbelt/qgis_export.py" line="59" />
-        <source>'{}' has no CRS — set one in its layer properties first.</source>
+        <source>'{}' has no CRS. Set one in its layer properties first.</source>
         <translation type="unfinished" />
     </message>
 </context><context>
@@ -2760,7 +2760,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_styles.py" line="74" />
-        <source>Put this server style on a layer of the open project — the same as the layer tree's Apply style from GeoServer, from this end</source>
+        <source>Put this server style on a layer of the open project, the same as the layer tree's Apply style from GeoServer, from this end</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2812,7 +2812,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_styles.py" line="262" />
-        <source>Stored as SLD 1.1 (Symbology Encoding) — what QGIS exports. GeoServer serves it here as its SLD 1.0 rendition, and saving stores that rendition instead.</source>
+        <source>Stored as SLD 1.1 (Symbology Encoding), what QGIS exports. GeoServer serves it here as its SLD 1.0 rendition, and saving stores that rendition instead.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2888,7 +2888,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_styles.py" line="439" />
-        <source>No published layer to draw the legend with — GetLegendGraphic needs one.</source>
+        <source>No published layer to draw the legend with. GetLegendGraphic needs one.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2974,7 +2974,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_styles.py" line="641" />
-        <source>'{}' is a {} style — QGIS can only read SLD.</source>
+        <source>'{}' is a {} style. QGIS can only read SLD.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -2994,7 +2994,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_styles.py" line="669" />
-        <source>The style is applied to the layer in this project only — the server is not touched.</source>
+        <source>The style is applied to the layer in this project only. The server is not touched.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -3113,7 +3113,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_workspaces.py" line="110" />
-        <source>This is GeoServer's default workspace. There is always exactly one and it cannot be unset — to change it, tick Default on another workspace.</source>
+        <source>This is GeoServer's default workspace. There is always exactly one and it cannot be unset. To change it, tick Default on another workspace.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -3133,7 +3133,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_workspaces.py" line="137" />
-        <source>Untick to fall back to GeoServer's global WMS settings — the workspace's own are then removed.</source>
+        <source>Untick to fall back to GeoServer's global WMS settings. The workspace's own are then removed.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -3244,7 +3244,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
     </message>
     <message>
         <location filename="../../gui/tab_workspaces.py" line="430" />
-        <source>Rename it, toggle isolation, make it the default, or give it its own WMS settings — Save applies all of it at once.</source>
+        <source>Rename it, toggle isolation, make it the default, or give it its own WMS settings. Save applies all of it at once.</source>
         <translation type="unfinished" />
     </message>
     <message>

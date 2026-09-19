@@ -62,7 +62,7 @@ class Spy(QTranslator):
             return f"[{context}] {source}"
         return source
 
-    def isEmpty(self):  # noqa: N802 — Qt asks before consulting translate()
+    def isEmpty(self):  # noqa: N802 (Qt asks before consulting translate())
         return False
 
 
@@ -106,7 +106,7 @@ class TestExtractionContextMatchesTheCode(unittest.TestCase):
         """A string the extractor missed is a string nobody can translate.
 
         pylupdate5 silently skipped a translate() call that black had wrapped
-        onto several lines, or whose text is written as adjacent literals —
+        onto several lines, or whose text is written as adjacent literals:
         65 of 455 strings when measured. When this fails, regenerate the .ts
         with `python scripts/update_translations.py`.
         """

@@ -6,7 +6,7 @@ which content type GeoServer wants for it, and how to move a style between a
 QGIS layer and an SLD string.
 
 Nothing here imports `qgis` at module level, so `sld_version` and
-`sld_content_type` — the part with the rules worth pinning — are testable in an
+`sld_content_type` (the part with the rules worth pinning) are testable in an
 interpreter without QGIS, like the CI unit job. The functions that do touch a
 QGIS layer import it when called, and must run on the GUI thread: they read and
 write live layer objects (see invariant 9 in CLAUDE.md).
@@ -33,7 +33,7 @@ def sld_version(sld):
     """The SLD version of a document: "1.1.0" or "1.0.0".
 
     Reads the version attribute, and falls back to the Symbology Encoding
-    namespace for documents that leave it out — an SE document is 1.1 whatever
+    namespace for documents that leave it out: an SE document is 1.1 whatever
     the root element says.
     """
     match = _VERSION.search(sld or "")
@@ -72,7 +72,7 @@ def styleable_project_layers():
 def project_layer_by_label(label):
     """The project layer a `styleable_project_layers` label points at.
 
-    Raises ValueError when it has left the project since the form was filled —
+    Raises ValueError when it has left the project since the form was filled;
     a dialog can sit open for a long time.
     """
     for candidate, layer in styleable_project_layers():
@@ -99,7 +99,7 @@ def layer_to_sld(layer):
         path.parent.rmdir()
     if not sld.strip():
         raise RuntimeError(
-            f"QGIS exported no SLD for '{layer.name()}' — its symbology may have "
+            f"QGIS exported no SLD for '{layer.name()}'. Its symbology may have "
             "no SLD equivalent."
         )
     return sld
@@ -121,7 +121,7 @@ def apply_sld_to_layer(layer, sld):
             path.unlink()
         path.parent.rmdir()
 
-    # loadSldStyle answers (bool, str) — order and arity have moved between
+    # loadSldStyle answers (bool, str). Order and arity have moved between
     # QGIS releases, so accept whichever way round it comes.
     ok, message = True, ""
     if isinstance(result, tuple):

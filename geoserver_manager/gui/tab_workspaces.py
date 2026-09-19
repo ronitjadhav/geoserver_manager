@@ -1,7 +1,7 @@
 #! python3  # noqa: E265
 
 """
-Workspace tab — load, create, edit, delete workspaces.
+Workspace tab: load, create, edit, delete workspaces.
 
 Used as a mixin for GeoServerMainDialog.
 """
@@ -12,7 +12,7 @@ from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 
-# GeoServer spells the WMS abstract "abstrct" in its JSON — a typo old enough to
+# GeoServer spells the WMS abstract "abstrct" in its JSON, a typo old enough to
 # be API. Keywords and the SRS list arrive wrapped as {"string": [...]}.
 _ABSTRACT = "abstrct"
 
@@ -20,8 +20,8 @@ _ABSTRACT = "abstrct"
 # Every user-visible string in this file goes through translate() with this
 # file's own class as the context. self.tr() cannot: pylupdate extracts it
 # under WorkspaceTabMixin, but at runtime self.tr is QObject.tr with the context of the
-# *instance's* class, GeoServerMainDialog — QDialog precedes the mixins in the
-# MRO — so every lookup would miss. A wrapper function would not be extracted
+# *instance's* class, GeoServerMainDialog. QDialog precedes the mixins in the
+# MRO, so every lookup would miss. A wrapper function would not be extracted
 # at all (pylupdate only understands a literal context), hence the repetition.
 translate = QCoreApplication.translate
 
@@ -110,7 +110,7 @@ class WorkspaceTabMixin:
                     translate(
                         "WorkspaceTabMixin",
                         "This is GeoServer's default workspace. There is always "
-                        "exactly one and it cannot be unset — to change it, tick "
+                        "exactly one and it cannot be unset. To change it, tick "
                         "Default on another workspace.",
                     )
                     if is_default
@@ -136,7 +136,7 @@ class WorkspaceTabMixin:
                 "group": group,
                 "help": translate(
                     "WorkspaceTabMixin",
-                    "Untick to fall back to GeoServer's global WMS settings — the "
+                    "Untick to fall back to GeoServer's global WMS settings. The "
                     "workspace's own are then removed.",
                 ),
             },
@@ -217,7 +217,7 @@ class WorkspaceTabMixin:
     def _wms_settings(self, workspace_name):
         """One workspace's WMS settings, or None when it has none of its own.
 
-        TODO(#50): upstream — WmsSettings models neither the title, the
+        TODO(#50): upstream: WmsSettings models neither the title, the
         abstract, the keywords nor the SRS list, so
         get_workspace_wms_settings() cannot show what this form is for. The
         facade call is still what answers "does this workspace have its own
@@ -267,7 +267,7 @@ class WorkspaceTabMixin:
     def _apply_wms_settings(self, workspace_name, values, existed):
         """Create, update or remove one workspace's own WMS settings.
 
-        TODO(#50): see _wms_settings — put_workspace_wms_settings() cannot
+        TODO(#50): see _wms_settings; put_workspace_wms_settings() cannot
         carry the title, abstract, keywords or SRS list, so this PUTs the
         settings path itself.
         """
@@ -278,7 +278,7 @@ class WorkspaceTabMixin:
             return
 
         # A partial PUT merges: GeoServer keeps every field this form does not
-        # model (watermark, buffers, metadata links, …) — verified on 2.28.5 —
+        # model (watermark, buffers, metadata links, …), verified on 2.28.5,
         # and the same PUT creates the settings when the workspace has none
         # (a POST there answers 405).
         settings = {
@@ -301,7 +301,7 @@ class WorkspaceTabMixin:
     def _default_workspace_name(self):
         """Name of GeoServer's default workspace, or None if it cannot be read.
 
-        TODO(#50): upstream as get_default_workspace() — no getter exists.
+        TODO(#50): upstream as get_default_workspace(); no getter exists.
         """
         try:
             base = self.gs.rest_service.rest_endpoints.base_url
@@ -322,10 +322,10 @@ class WorkspaceTabMixin:
         self._raw_rest("put", path, json={"workspace": {"name": name}})
 
     def _put_workspace(self, old_name, new_name, isolated):
-        """Update a workspace in place — a rename when the names differ.
+        """Update a workspace in place, a rename when the names differ.
 
-        TODO(#50): upstream as update_workspace(name, new_name=..., isolated=...)
-        — the library has no update and no rename, and create_workspace() on an
+        TODO(#50): upstream as update_workspace(name, new_name=..., isolated=...).
+        The library has no update and no rename, and create_workspace() on an
         existing name costs a POST that answers 409 before it PUTs. Workaround:
         one PUT to /rest/workspaces/{old_name}.
         """
@@ -430,7 +430,7 @@ class WorkspaceTabMixin:
             description=translate(
                 "WorkspaceTabMixin",
                 "Rename it, toggle isolation, make it the default, or give it its "
-                "own WMS settings — Save applies all of it at once.",
+                "own WMS settings. Save applies all of it at once.",
             ),
             fields=self._workspace_fields(is_default=is_default, with_wms=True),
             values=values,
@@ -459,7 +459,7 @@ class WorkspaceTabMixin:
             self._reload_current_tab()
 
     def _save_workspace_and_wms(self, values, old_name, had_wms):
-        """Save the workspace, then its WMS settings — in that order.
+        """Save the workspace, then its WMS settings, in that order.
 
         A rename has to land first: the settings live under the workspace's
         (new) name.

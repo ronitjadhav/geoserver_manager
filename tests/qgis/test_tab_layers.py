@@ -124,7 +124,7 @@ CASCADED = {
 
 
 class FakeGS:
-    """GeoServer as /rest/layers shows it — five layers of four types — plus
+    """GeoServer as /rest/layers shows it: five layers of four types, plus
     the library calls the tab still makes for vectors, publishing and styles."""
 
     def __init__(self, broken_detail=None, broken_list=False):
@@ -268,7 +268,7 @@ class TestLayersTab(unittest.TestCase):
         self.assertEqual(
             self.dlg._all_rows,
             [
-                ["roads_cascade", "sf", "WMS", "remote_wms", "—"],
+                ["roads_cascade", "sf", "WMS", "remote_wms", "-"],
                 ["sfdem", "sf", "RASTER", "sfdem", "dem"],
                 ["tiles", "sf", "WMTS", "remote_wmts", "raster"],
                 ["tasmania_cities", "topp", "VECTOR", "taz_shapes", "capitals"],
@@ -316,7 +316,7 @@ class TestLayersTab(unittest.TestCase):
         self.dlg._load_layers()
 
         rows = {row[0]: row for row in self.dlg._all_rows}
-        self.assertEqual(rows["tasmania_cities"][2:], ["—", "—", "—"])  # placeholders
+        self.assertEqual(rows["tasmania_cities"][2:], ["-", "-", "-"])  # placeholders
         self.assertEqual(rows["tasmania_roads"][2], "VECTOR")
         self.assertEqual(len(self.warnings), 1)
         self.assertIn("topp:tasmania_cities", self.warnings[0])
@@ -514,8 +514,8 @@ class TestLayerDetailPrefill(unittest.TestCase):
         )
 
         self.assertEqual(values["name"], "l")
-        self.assertEqual(values["bbox"], "—")
-        self.assertEqual(values["attributes"], "—")
+        self.assertEqual(values["bbox"], "-")
+        self.assertEqual(values["attributes"], "-")
         self.assertEqual(values["keywords"], "")
 
     def test_handles_translated_title_and_single_attribute(self):

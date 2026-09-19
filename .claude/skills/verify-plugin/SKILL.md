@@ -1,14 +1,14 @@
 ---
 name: verify-plugin
-description: Run the full verification for the GeoServer Manager QGIS plugin — lint/format as pre-commit does, unit and headless QGIS tests, an end-to-end smoke against a fake GeoServer, the release zip build, and (optionally) a real QGIS load through the profile symlink. Use before every commit and whenever asked whether "everything works".
+description: Run the full verification for the GeoServer Manager QGIS plugin: lint/format as pre-commit does, unit and headless QGIS tests, an end-to-end smoke against a fake GeoServer, the release zip build, and (optionally) a real QGIS load through the profile symlink. Use before every commit and whenever asked whether "everything works".
 ---
 
 # Verify the plugin
 
-Work from the repo root. Report what actually ran and what it printed — never
+Work from the repo root. Report what actually ran and what it printed; never
 summarise a step you skipped as passing.
 
-## 1. Lint and format — exactly what pre-commit will enforce
+## 1. Lint and format: exactly what pre-commit will enforce
 
 ```sh
 pre-commit run -a
@@ -27,7 +27,7 @@ flake8 geoserver_manager --config=setup.cfg --select=E9,F63,F7,F82,QGS101,QGS102
 
 Stage new files first (`git add`): `pre-commit run -a` only sees tracked files, so
 an untracked module passes here and then gets reformatted by the commit hook,
-which aborts the commit — re-add and commit again.
+which aborts the commit; re-add and commit again.
 
 Known gotcha: ruff-format and black occasionally disagree on one construct; a
 commit then fails with "files were modified by this hook". Re-add and commit again.
@@ -42,23 +42,23 @@ QT_QPA_PLATFORM=offscreen PYTHONPATH=. python3 -m unittest discover -s tests/qgi
 ```
 
 Changed a user-visible string? Re-extract first, or `test_i18n` fails on the
-string the `.ts` lacks (`pylupdate6`, from `pip install PyQt6` — never `pylupdate5`,
+string the `.ts` lacks (`pylupdate6`, from `pip install PyQt6`; never `pylupdate5`,
 which drops the calls black wraps):
 
 ```sh
 python scripts/update_translations.py
 ```
 
-Expect every test green — and when the suite and the commit run in one shell
+Expect every test green, and when the suite and the commit run in one shell
 command, join them with `&&`, never `;`: a red suite must abort the commit (a red
 commit was pushed once because a `;` let `git commit` run anyway).
 
-Expect every test green. A new fix must come with a test that fails without it —
+Expect every test green. A new fix must come with a test that fails without it;
 verify that claim by temporarily reverting the fix once, not by reading the test.
 
 **CI runs the suite with pytest, which executes test classes in file order, while
-`unittest discover` sorts them alphabetically.** Any state shared between classes —
-a `Recording.opened` list, a module-level counter — can therefore pass locally and
+`unittest discover` sorts them alphabetically.** Any state shared between classes
+(a `Recording.opened` list, a module-level counter) can therefore pass locally and
 fail on CI. Without pytest, re-run the file with its classes named in file order:
 
 ```sh
@@ -71,7 +71,7 @@ Anything that asserts "no dialog was opened" must clear that shared list in its 
 
 **Run `tests/unit` in an interpreter that has no `qgis`** (a plain venv), because
 that is what the CI unit job is. Your system Python probably has QGIS installed, so
-it will happily pass a test whose import chain pulls in `qgis.core` — CI won't. The
+it will happily pass a test whose import chain pulls in `qgis.core`; CI won't. The
 `toolbelt` package init is kept empty for exactly this reason; do not add re-exports
 to it.
 
@@ -120,12 +120,12 @@ Check, at minimum:
 
 | Path | Expected |
 |---|---|
-| 401 | status *Authentication failed* — not "unreachable" |
+| 401 | status *Authentication failed*, not "unreachable" |
 | connection refused | *Server unreachable* |
-| 404 | *HTTP error 404* — never "Connected" |
-| 200 with HTML body | *Not a GeoServer REST endpoint* — a proxy login page is not "Connected" |
+| 404 | *HTTP error 404*, never "Connected" |
+| 200 with HTML body | *Not a GeoServer REST endpoint*, a proxy login page is not "Connected" |
 | one workspace's `get_datastores` raises | rows for the others still render, exactly one warning names it |
-| healthy | *Connected — <url>* |
+| healthy | *Connected: <url>* |
 | loader raises after `_setup_table` | `dlg._all_rows == []`, table empty, cursor restored |
 | delete of N rows | N server calls, one success banner |
 | Add with an existing name | no create call, "already exists" banner |
@@ -144,7 +144,7 @@ the datastore merge. What it proves that a fake cannot:
 
 | Check | Expected on a real server |
 |---|---|
-| create a PostGIS store (host `postgis`, db/user/password `geoserver`), then GET it | `passwd` comes back as `crypt1:…`, never the plaintext — this is why the form never prefills it |
+| create a PostGIS store (host `postgis`, db/user/password `geoserver`), then GET it | `passwd` comes back as `crypt1:…`, never the plaintext; this is why the form never prefills it |
 | add a parameter the form does not model (`max connections`), then edit only the description through `_update_datastore_from_values` | the parameter is still there afterwards |
 | set `enabled: false`, then edit through the plugin | still disabled |
 | `_do_delete_datastore`, then `delete_workspace` | both succeed, no error banner |
@@ -160,12 +160,12 @@ rm geoserver_manager.0.1.0.zip
 ```
 
 If the zip is suddenly megabytes, someone re-downloaded the upstream
-`geoservercloud` wheel without stripping it — see the `release-plugin` skill.
+`geoservercloud` wheel without stripping it; see the `release-plugin` skill.
 
 ## 5. Real QGIS (when a GUI change is involved)
 
-Symlink `geoserver_manager/` into `~/.local/share/QGIS/QGIS3/profiles/<profile>/python/plugins/`
-— **the profile QGIS actually launches**: read `profiles.ini` → `lastProfile`, or
+Symlink `geoserver_manager/` into `~/.local/share/QGIS/QGIS3/profiles/<profile>/python/plugins/`,
+**the profile QGIS actually launches**: read `profiles.ini` → `lastProfile`, or
 `lsof -p <qgis pid> | grep profiles/`. Then in QGIS: Plugin Manager → Settings →
 *Show also experimental plugins* → enable *GeoServer Manager*. Reload with
 `plugin_reloader` after edits. If QGIS is running, do not edit its `QGIS3.ini`;

@@ -1,7 +1,7 @@
 #! python3  # noqa: E265
 
 """
-Main plugin dialog — GeoServer resource browser.
+Main plugin dialog: a GeoServer resource browser.
 
 Left panel: navigation tabs, one per resource type (see TABS).
 Right panel: search bar + results table for the selected tab.
@@ -56,15 +56,15 @@ _UNSAFE_IN_NAMES = "/?#%\\"
 
 # The connection probe is the request the user waits for before anything is on
 # screen, so it gets its own short ceiling. The library cannot do this: its
-# RestClient hardcodes timeout=TIMEOUT (120 s) — see _probe and issue #50.
+# RestClient hardcodes timeout=TIMEOUT (120 s); see _probe and issue #50.
 
 
 class _FetchTask(QgsTask):
     """Runs one dialog fetch off the GUI thread.
 
     QgsTask brings QGIS's own progress bar and Cancel button, and calls
-    finished() back on the GUI thread — the only thread allowed to touch a
-    widget. Whatever run() collects is handed to the callback untouched.
+    finished() back on the GUI thread (the only thread allowed to touch a
+    widget). Whatever run() collects is handed to the callback untouched.
     """
 
     def __init__(self, description, work, on_finished):
@@ -102,7 +102,7 @@ class GeoServerMainDialog(
     StyleTabMixin,
     GwcTabMixin,
 ):
-    """Main dialog — GeoServer resource browser."""
+    """Main dialog: a GeoServer resource browser."""
 
     def __init__(self, parent=None, iface=None):
         super().__init__(parent)
@@ -192,7 +192,7 @@ class GeoServerMainDialog(
 
     # -- Keyboard -----------------------------------------------------------
 
-    def keyPressEvent(self, event):  # noqa: N802 — Qt's own spelling
+    def keyPressEvent(self, event):  # noqa: N802 (Qt's own spelling)
         """F5 refresh, Ctrl+F search, Esc clear, Enter open, Del delete.
 
         Handled here rather than with QShortcut so each key can look at where
@@ -311,7 +311,7 @@ class GeoServerMainDialog(
         if not settings.has_credentials():
             self._set_status(self.tr("Not configured"), "error")
             self.show_warning_message(
-                self.tr("GeoServer not configured — open Settings to add credentials.")
+                self.tr("GeoServer not configured. Open Settings to add credentials.")
             )
             return None
 
@@ -321,7 +321,7 @@ class GeoServerMainDialog(
             self.show_error_message(
                 self.tr(
                     "Could not read the credentials from QGIS's authentication "
-                    "database — its master password was probably declined. Open "
+                    "database. Its master password was probably declined. Open "
                     "Settings and save them again."
                 )
             )
@@ -348,7 +348,7 @@ class GeoServerMainDialog(
     def _fetch_version_label(self, gs):
         """Best-effort 'GeoServer x.y.z' string for the status bar.
 
-        Not required for a successful connection — if it fails, we still
+        Not required for a successful connection. If it fails, we still
         show "Connected" without the version suffix.
         """
         try:
@@ -366,7 +366,7 @@ class GeoServerMainDialog(
     def _set_status(self, text, kind="neutral"):
         """Show the connection state, in a colour this theme can carry.
 
-        :param kind: "ok", "error", "busy" or "neutral" — never a literal
+        :param kind: "ok", "error", "busy" or "neutral", never a literal
             colour: `red` on a dark theme is what this replaces.
         """
         self.lbl_status.setText(text)
@@ -385,7 +385,7 @@ class GeoServerMainDialog(
         self.setWindowTitle(__title__)
         # Reopened after Close: closeEvent set _closing so a late finish would
         # stay away from dying widgets. A new connection means we are alive
-        # again — without this the dialog worked exactly once per QGIS session.
+        # again. Without this the dialog worked exactly once per QGIS session.
         self._closing = False
         # Stop the running load *before* dropping the client its worker reads.
         self._cancel_load()
@@ -421,8 +421,8 @@ class GeoServerMainDialog(
                 self._reset_table_state()
                 return
             self.gs = gs
-            self.setWindowTitle(f"{__title__} — {urlparse(url).netloc or url}")
-            status = self.tr("Connected — {}").format(url)
+            self.setWindowTitle(f"{__title__}: {urlparse(url).netloc or url}")
+            status = self.tr("Connected: {}").format(url)
             if version:
                 status += f" ({version})"
             self._set_status(status, "ok")
@@ -444,7 +444,7 @@ class GeoServerMainDialog(
         Only stateless REST reads belong in work: the client's wms / wmts
         attributes are shared state. A failed run reports itself and calls
         nothing; a cancelled one calls on_cancel(task) when given, else says
-        so — which is why every loader resets the table *before* starting a
+        so. This is why every loader resets the table *before* starting a
         task, so an empty table is what either outcome leaves behind. A new
         load supersedes the running one.
         """
@@ -463,7 +463,7 @@ class GeoServerMainDialog(
     def _run_quietly(self, failure_message, work, on_success):
         """Run work(task) in a slot of its own, without the table's loading state.
 
-        For a side fetch — a dialog's legend — that must neither supersede a
+        For a side fetch (a dialog's legend) that must neither supersede a
         running load nor turn Refresh into Cancel. A failure is still reported.
         """
         if self._side is not None:
@@ -476,12 +476,12 @@ class GeoServerMainDialog(
         """Stream a long PUT off the GUI thread, with progress and Cancel.
 
         `work(task)` runs in a worker: give it everything it needs as
-        arguments — the REST client above all, because a Refresh clears
-        `self.gs` while it runs — and hand `task.setProgress` /
+        arguments: the REST client above all, because a Refresh clears
+        `self.gs` while it runs. Hand `task.setProgress` /
         `task.isCanceled` to a `toolbelt.rest.ProgressReader` so the task bar
         moves and Cancel aborts the transfer instead of waiting for it. Unlike
         a load it is not superseded: a tab switch or F5 cancels `_task` only,
-        and it does not touch the table — `on_success` reloads through
+        and it does not touch the table. `on_success` reloads through
         `_reload_current_tab()` if it wants to, because the user may be on
         another tab by then. `on_cancel(task)` is where the caller says what
         the server was left with; measured for the raster upload, that is
@@ -491,7 +491,7 @@ class GeoServerMainDialog(
         """
         if self._upload is not None:
             self.show_warning_message(
-                self.tr("An upload is already running — wait for it or cancel it.")
+                self.tr("An upload is already running. Wait for it or cancel it.")
             )
             return False
         self._launch_task(
@@ -517,8 +517,8 @@ class GeoServerMainDialog(
         """Park a _FetchTask in `slot` ("_task" or "_upload") and start it.
 
         The two slots never cancel each other. `finished` comes back on the
-        GUI thread: a cancel — the user's, a superseding load's, or our own
-        abort raised inside the worker — goes to on_cancel, an exception is
+        GUI thread: a cancel (the user's, a superseding load's, or our own
+        abort raised inside the worker) goes to on_cancel, an exception is
         reported, anything else is on_success(result).
         """
 
@@ -532,7 +532,7 @@ class GeoServerMainDialog(
                         log_level=Qgis.MessageLevel.Critical,
                     )
                 return
-            # Free the slot even when the dialog is closing — a slot left
+            # Free the slot even when the dialog is closing. A slot left
             # occupied is what kept a reopened dialog on "Cancel" for good.
             setattr(self, slot, None)
             if self._closing:
@@ -584,8 +584,8 @@ class GeoServerMainDialog(
     def _cancel_load(self, user=False):
         """Cancel the running load, if any. `user` marks the Cancel button.
 
-        The button stops a running upload first — that is the transfer the
-        user sees a bar for — and only a user does: a superseding load
+        The button stops a running upload first (that is the transfer the
+        user sees a bar for), and only a user does: a superseding load
         (`user=False`) never touches an upload.
         """
         if user and self._upload is not None:
@@ -641,7 +641,7 @@ class GeoServerMainDialog(
     )
 
     def _tab_help(self):
-        """One line per tab for its tooltip — GeoServer's words, not REST's.
+        """One line per tab for its tooltip: GeoServer's words, not REST's.
 
         Keyed by the TABS label, which stays untranslated (invariant 11).
         """
@@ -650,7 +650,7 @@ class GeoServerMainDialog(
                 "Namespaces that group stores, layers and styles; one is the default."
             ),
             "Datastores": self.tr(
-                "Vector sources — databases and files on the server — that layers "
+                "Vector sources: databases and files on the server that layers "
                 "are published from."
             ),
             "Coverage Stores": self.tr(
@@ -660,7 +660,7 @@ class GeoServerMainDialog(
                 "WMS and WMTS stores that proxy another server's layers."
             ),
             "Layers": self.tr(
-                "Everything published — vector, raster and cascaded — with its "
+                "Everything published (vector, raster and cascaded), with its "
                 "store and default style."
             ),
             "Layer Groups": self.tr("Several layers served as one, in drawing order."),
@@ -706,7 +706,7 @@ class GeoServerMainDialog(
         Loaders arm the callbacks and headers before they fetch, so a fetch that
         raises would otherwise leave the previous resource type's rows in the
         cache, reachable through the search box and the pagination buttons and
-        wired to the new tab's row actions — i.e. Delete aimed at the wrong
+        wired to the new tab's row actions, i.e. Delete aimed at the wrong
         resource. Resetting both halves together is what keeps that impossible.
         """
         self.btn_add.setVisible(False)
@@ -781,7 +781,7 @@ class GeoServerMainDialog(
         """Reset the table with the given column headers."""
         # Qt's own sorting stays off: it would reorder the items but not
         # _filtered_rows, which every index-based lookup (selection, Enter, link
-        # clicks) reads — Delete would act on a different resource than the one
+        # clicks) reads. Delete would act on a different resource than the one
         # highlighted. A header click sorts the rows themselves instead.
         self.resultsTable.setSortingEnabled(False)
         if list(columns) != self._columns:
@@ -828,7 +828,7 @@ class GeoServerMainDialog(
     def _get_selected_rows(self):
         """Return the row data for all currently selected table rows.
 
-        Assumes the table renders _filtered_rows in order — see _setup_table.
+        Assumes the table renders _filtered_rows in order; see _setup_table.
         """
         selected = []
         start = self._current_page * self._page_size
@@ -911,7 +911,7 @@ class GeoServerMainDialog(
         self.resultsTable.setRowCount(len(page_rows))
         for row_idx, values in enumerate(page_rows):
             for col, val in enumerate(values):
-                item = QTableWidgetItem("—" if val is None else str(val))
+                item = QTableWidgetItem("-" if val is None else str(val))
                 if self._cell_click_callback(col) is not None:
                     # Styled as a link; the click itself is handled by
                     # _on_cell_clicked. A real item (not a QPushButton) keeps
@@ -939,7 +939,7 @@ class GeoServerMainDialog(
         self.btn_page_last.setEnabled(self._current_page + 1 < self._total_pages)
 
     def _open_workspace_from_row(self, row_data):
-        """The Workspace column links to the workspace — column 1 on every tab.
+        """The Workspace column links to the workspace: column 1 on every tab.
 
         Styles and layer groups can live in the global scope, whose label is
         not a workspace, so that one is a dead link rather than an error.
@@ -960,16 +960,16 @@ class GeoServerMainDialog(
     def _empty_state_text(self):
         """What an empty table should say: why it is empty, and what helps."""
         if self.gs is None:
-            return self.tr("Not connected — press Refresh (F5), or open Settings.")
+            return self.tr("Not connected. Press Refresh (F5), or open Settings.")
         search = self.searchBox.text().strip()
         if search and self._all_rows:
-            return self.tr("Nothing matches '{}' — Esc clears the filter.").format(
+            return self.tr("Nothing matches '{}'. Esc clears the filter.").format(
                 search
             )
         # isHidden(), not isVisible(): the latter is false for every widget of
         # a window that is not showing yet (invariant 8).
         if not self.btn_add.isHidden() and self.btn_add.text():
-            return self.tr("Nothing here yet — start with '{}' above.").format(
+            return self.tr("Nothing here yet. Start with '{}' above.").format(
                 self.btn_add.text()
             )
         return self.tr("No results")
@@ -998,7 +998,7 @@ class GeoServerMainDialog(
         layout.setSpacing(4)
         for action in self._row_actions:
             icon_name, label, callback = action[:3]
-            # An optional fourth element says more than the label can — the
+            # An optional fourth element says more than the label can. The
             # button is icon-only, so the tooltip is all the user reads.
             tooltip = action[3] if len(action) > 3 else label
             btn = QPushButton()
@@ -1041,7 +1041,7 @@ class GeoServerMainDialog(
     _as_list = staticmethod(as_list)
 
     def _yes_no(self, value):
-        """A boolean cell: Yes / No, translated — never Python's True / False."""
+        """A boolean cell: Yes / No, translated, never Python's True / False."""
         if isinstance(value, str):
             value = value.strip().lower() == "true"
         return self.tr("Yes") if value else self.tr("No")
@@ -1049,8 +1049,8 @@ class GeoServerMainDialog(
     def _require_safe_name(self, name):
         """Refuse a name the REST paths cannot carry, before it reaches them.
 
-        `/`, `?`, `#` and `%` change what a URL means — `requests` sends
-        `datastores/a#b.json` as `datastores/a`, a different resource — and
+        `/`, `?`, `#` and `%` change what a URL means. `requests` sends
+        `datastores/a#b.json` as `datastores/a`, a different resource, and
         GeoServer itself does not stop them. Every Add form calls this first.
         """
         if not name or name != name.strip() or any(c in name for c in _UNSAFE_IN_NAMES):
@@ -1066,7 +1066,7 @@ class GeoServerMainDialog(
         """One line for the user, including GeoServer's own explanation.
 
         The library calls raise_for_status(), and HTTPError stringifies to
-        "500 Server Error:  for url: …" — dropping the body, which is exactly
+        "500 Server Error:  for url: …", dropping the body, which is exactly
         where GeoServer puts the reason ("Unable to delete layer referenced by
         layer group 'tasmania'"). TODO(#50): a library that raised with the
         body would make this unnecessary.
@@ -1083,8 +1083,8 @@ class GeoServerMainDialog(
 
         A loaded table outlives the connection it came from: refresh_ui()
         clears self.gs the moment it starts and the probe that sets it again
-        runs in a QgsTask, so for that window — up to the probe's 10 s timeout against a
-        server that has gone away — the rows and their buttons are still on
+        runs in a QgsTask, so for that window (up to the probe's 10 s timeout against a
+        server that has gone away) the rows and their buttons are still on
         screen and clickable. Every user-triggered action passes through here,
         which is why the check lives at the four places actions are dispatched
         rather than in each of the twenty methods behind them.
@@ -1092,7 +1092,7 @@ class GeoServerMainDialog(
         if self.gs is not None:
             return True
         self.show_warning_message(
-            self.tr("Not connected to GeoServer — press Refresh (F5) to connect.")
+            self.tr("Not connected to GeoServer. Press Refresh (F5) to connect.")
         )
         return False
 
@@ -1139,7 +1139,7 @@ class GeoServerMainDialog(
         """True when a GET for the resource returns 200, False on 404.
 
         The library's create_* calls are upserts (POST, then PUT on conflict),
-        so an "Add" form has to refuse a name that is already taken — otherwise
+        so an "Add" form has to refuse a name that is already taken, otherwise
         it silently overwrites a live resource and reports success. TODO(#50):
         an exist_ok=False option upstream would make this unnecessary.
         """
@@ -1149,7 +1149,7 @@ class GeoServerMainDialog(
     def _fetch_list(self, api_method, *args):
         """Call a geoservercloud list endpoint and return the list.
 
-        Raises on HTTP errors and on a payload that is not a list — a proxy
+        Raises on HTTP errors and on a payload that is not a list. A proxy
         login page or an error document must surface, not render as an empty
         table.
         """
@@ -1161,7 +1161,7 @@ class GeoServerMainDialog(
         return result
 
     def _get_workspace_names(self):
-        """Workspace names for combo boxes — fetched from the server every time.
+        """Workspace names for combo boxes, fetched from the server every time.
 
         Deliberately not cached: a cache here survived a Refresh on the
         Workspaces tab, so a workspace created in the web UI showed in the list
@@ -1181,7 +1181,7 @@ class GeoServerMainDialog(
 
         Given the running task, each finished item reports progress and a
         cancel stops the loop. ponytail: the requests already in flight (up to
-        _MAX_PARALLEL_REQUESTS) still run to the end — cancelling means "stop
+        _MAX_PARALLEL_REQUESTS) still run to the end. Cancelling means "stop
         after this round", not "abort the sockets".
         """
 
@@ -1219,7 +1219,7 @@ class GeoServerMainDialog(
             shown += ", …"
         self.show_warning_message(
             self.tr(
-                "{count} item(s) could not be listed: {names} — details in the "
+                "{count} item(s) could not be listed: {names}. Details in the "
                 "QGIS log (GeoServer Manager tab)."
             ).format(count=len(failures), names=shown)
         )
@@ -1229,7 +1229,7 @@ class GeoServerMainDialog(
 
         :param kind: human-readable type (e.g. "workspace"), or "" for none.
         :param labels: names of the resources about to be acted on.
-        :param cascade: what else the action takes with it — both delete
+        :param cascade: what else the action takes with it. Both delete
             paths send recurse=true, so the user has to be told.
         :param verb: the action, "delete" by default; the Tile Cache tab
             passes "stop caching" and "truncate".
@@ -1326,7 +1326,7 @@ class GeoServerMainDialog(
 
         def cancelled(_task):
             self.show_warning_message(
-                self.tr("Cancelled — what was already done stays done.")
+                self.tr("Cancelled. What was already done stays done.")
             )
             reload_fn()
 
@@ -1359,7 +1359,7 @@ class GeoServerMainDialog(
         if self._upload is None:
             return True
         self.show_warning_message(
-            self.tr("An upload is already running — wait for it or cancel it.")
+            self.tr("An upload is already running. Wait for it or cancel it.")
         )
         return False
 
@@ -1381,7 +1381,7 @@ class GeoServerMainDialog(
         Everything a worker needs is an argument (invariant 9): the client
         held now, the URL, the path of the file. `folder`, when given, is the
         temporary folder holding `source` and is removed however the upload
-        ends — including a refusal because another upload runs. `after(client)`
+        ends, including a refusal because another upload runs. `after(client)`
         runs in the worker once the PUT succeeded (a metadata PUT). Returns
         False when nothing was started.
         """
@@ -1415,12 +1415,12 @@ class GeoServerMainDialog(
         return self._run_upload(failure_message, work, on_success, on_cancel)
 
     def _report_cancelled_upload(self, kind, tab, exists, name):
-        """Say what a cancelled upload left behind — measured on 2.28.5.
+        """Say what a cancelled upload left behind, measured on 2.28.5.
 
         An aborted first upload leaves nothing: no store, no file, whatever
         was already sent. An aborted *Replace* keeps the store, its layer and
         its configuration, but GeoServer has already deleted the previous
-        file — a layer with no data behind it — so that one is a warning with
+        file (a layer with no data behind it), so that one is a warning with
         the way out.
 
         :param kind: "datastore" / "coverage store", translated by the caller.
@@ -1435,15 +1435,15 @@ class GeoServerMainDialog(
         if kept:
             message = self.tr(
                 "Upload of '{name}' cancelled. GeoServer kept the {kind} and its "
-                "layer but had already removed their data file — upload it again "
+                "layer but had already removed their data file. Upload it again "
                 "with Replace ticked, or delete the {kind}."
             )
         elif kept is None:
             message = self.tr(
-                "Upload of '{name}' cancelled — check the {tab} tab for what was left."
+                "Upload of '{name}' cancelled. Check the {tab} tab for what was left."
             )
         else:
             message = self.tr(
-                "Upload of '{name}' cancelled — nothing was left on the server."
+                "Upload of '{name}' cancelled. Nothing was left on the server."
             )
         self.show_warning_message(message.format(name=name, kind=kind, tab=tab))

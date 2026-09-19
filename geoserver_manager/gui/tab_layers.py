@@ -1,7 +1,7 @@
 #! python3  # noqa: E265
 
 """
-Layers tab — every published layer, whatever its type: list, inspect,
+Layers tab: every published layer, whatever its type: list, inspect,
 preview, style, add to QGIS, delete.
 
 Used as a mixin for GeoServerMainDialog.
@@ -55,8 +55,8 @@ VECTOR, RASTER, WMS, WMTS = "VECTOR", "RASTER", "WMS", "WMTS"
 # Every user-visible string in this file goes through translate() with this
 # file's own class as the context. self.tr() cannot: pylupdate extracts it
 # under LayerTabMixin, but at runtime self.tr is QObject.tr with the context of the
-# *instance's* class, GeoServerMainDialog — QDialog precedes the mixins in the
-# MRO — so every lookup would miss. A wrapper function would not be extracted
+# *instance's* class, GeoServerMainDialog. QDialog precedes the mixins in the
+# MRO, so every lookup would miss. A wrapper function would not be extracted
 # at all (pylupdate only understands a literal context), hence the repetition.
 translate = QCoreApplication.translate
 
@@ -88,7 +88,7 @@ class LayerTabMixin:
                 self._add_layer_to_qgis,
                 translate(
                     "LayerTabMixin",
-                    "Add to QGIS — load the layer into this project as WFS, WMS or "
+                    "Add to QGIS: load the layer into this project as WFS, WMS or "
                     "WMTS (asks which).",
                 ),
             ),
@@ -98,7 +98,7 @@ class LayerTabMixin:
                 self._preview_layer,
                 translate(
                     "LayerTabMixin",
-                    "Preview on a map inside QGIS — click the map for the feature "
+                    "Preview on a map inside QGIS: click the map for the feature "
                     "info at that point. Nothing is added to the project.",
                 ),
             ),
@@ -108,7 +108,7 @@ class LayerTabMixin:
                 self._preview_layer_in_browser,
                 translate(
                     "LayerTabMixin",
-                    "Preview in a browser — GeoServer's own OpenLayers page. A "
+                    "Preview in a browser: GeoServer's own OpenLayers page. A "
                     "secured server will ask the browser to log in.",
                 ),
             ),
@@ -118,7 +118,7 @@ class LayerTabMixin:
                 self._set_layer_style,
                 translate(
                     "LayerTabMixin",
-                    "Set style — pick one of the server's existing styles as this "
+                    "Set style: pick one of the server's existing styles as this "
                     "layer's default.",
                 ),
             ),
@@ -128,7 +128,7 @@ class LayerTabMixin:
                 self._style_from_qgis,
                 translate(
                     "LayerTabMixin",
-                    "Push style from QGIS — upload a project layer's symbology as "
+                    "Push style from QGIS: upload a project layer's symbology as "
                     "a new server style and make it this layer's default.",
                 ),
             ),
@@ -138,7 +138,7 @@ class LayerTabMixin:
                 self._delete_layer,
                 translate(
                     "LayerTabMixin",
-                    "Delete — remove the layer from GeoServer (asks first).",
+                    "Delete: remove the layer from GeoServer (asks first).",
                 ),
             ),
         ]
@@ -159,8 +159,8 @@ class LayerTabMixin:
     def _fetch_layer_rows(self, task=None):
         """(rows, failures) for the Layers table. Runs in a worker thread.
 
-        GeoServer's own layer list first — every published layer, whatever its
-        type: vector, raster, cascaded WMS or WMTS — then one GET per layer,
+        GeoServer's own layer list first: every published layer, whatever its
+        type (vector, raster, cascaded WMS or WMTS), then one GET per layer,
         fanned out, for the type, the store and the default style. A layer
         whose detail cannot be read still gets a row, with placeholders, and
         a warning names it.
@@ -173,7 +173,7 @@ class LayerTabMixin:
             workspace, _, name = qualified.rpartition(":")
             if error:
                 failures.append((qualified, error))
-            kind, store, style = summary or ("—", "—", "—")
+            kind, store, style = summary or ("-", "-", "-")
             rows.append([name, workspace, kind, store, style])
         return rows, failures
 
@@ -188,7 +188,7 @@ class LayerTabMixin:
         """Every layer's qualified name ("workspace:layer"), from GeoServer's
         own list. Raises on HTTP errors.
 
-        TODO(#50): row 39 — the facade has no get_layers(). Walking the
+        TODO(#50): row 39: the facade has no get_layers(). Walking the
         datastores instead, as this tab did, misses every raster and cascaded
         layer; the workspace-less list is the one place they all appear.
         """
@@ -203,26 +203,26 @@ class LayerTabMixin:
         """(type, store, default style) of one layer. Raises on HTTP errors.
 
         TODO(#50): rest_service.get_layer() exists, but its Layer model keeps
-        only the resource's *name* — not its class or href, which is where the
-        store comes from — so this reads GeoServer's payload itself.
+        only the resource's *name*, not its class or href, which is where the
+        store comes from, so this reads GeoServer's payload itself.
         """
         payload = self._raw_rest("get", self._layers_url(qualified_name)).json()
         layer = payload.get("layer") if isinstance(payload, dict) else None
         layer = layer if isinstance(layer, dict) else {}
-        kind = layer.get("type") or "—"
+        kind = layer.get("type") or "-"
         store = self._store_from_href((layer.get("resource") or {}).get("href"))
         if store is None and kind == WMTS:
             # GeoServer 2.28.5 writes no href for a wmtsLayer resource, so the
             # store has to be found among the workspace's WMTS stores.
             workspace, _, name = qualified_name.rpartition(":")
             store = self._wmts_store_of(workspace, name)
-        style = (layer.get("defaultStyle") or {}).get("name") or "—"
-        return kind, store or "—", style
+        style = (layer.get("defaultStyle") or {}).get("name") or "-"
+        return kind, store or "-", style
 
     @staticmethod
     def _store_from_href(href):
-        """The store in a resource href — .../workspaces/{ws}/{kind}stores/
-        {store}/... — whatever host GeoServer wrote it with (behind a proxy it
+        """The store in a resource href: .../workspaces/{ws}/{kind}stores/
+        {store}/..., whatever host GeoServer wrote it with (behind a proxy it
         is not the one the plugin talks to, which is why the href is parsed
         and never followed). None when there is no such segment."""
         match = re.search(
@@ -254,14 +254,14 @@ class LayerTabMixin:
 
         # The library's FeatureType.asdict() normalises keywords to a list and
         # attributes to a list; raw REST wraps them ({"string": […]},
-        # {"attribute": […]}). Accept both — a live server showed the difference.
+        # {"attribute": […]}). Accept both: a live server showed the difference.
         keywords = detail.get("keywords") or []
         if isinstance(keywords, dict):
             keywords = keywords.get("string") or []
         if isinstance(keywords, str):
             keywords = [keywords]
 
-        bounds = bbox_text(detail.get("nativeBoundingBox")) or "—"
+        bounds = bbox_text(detail.get("nativeBoundingBox")) or "-"
 
         attributes = detail.get("attributes") or []
         if isinstance(attributes, dict):
@@ -276,7 +276,7 @@ class LayerTabMixin:
                 for a in attributes
                 if isinstance(a, dict)
             )
-            or "—"
+            or "-"
         )
 
         def as_text(value):
@@ -350,7 +350,7 @@ class LayerTabMixin:
 
     def _layer_resource(self, row_data):
         """The resource behind a layer row, as GeoServer stores it: a feature
-        type, a coverage or a cascaded layer — by the row's type and store."""
+        type, a coverage or a cascaded layer, by the row's type and store."""
         name, ws_name, kind, store = row_data[0], row_data[1], row_data[2], row_data[3]
         if kind == VECTOR:
             return self._check(self.gs.get_feature_type(ws_name, store, name))
@@ -369,7 +369,7 @@ class LayerTabMixin:
         views are borrowed from the Coverage Stores and Cascaded Stores tabs,
         minus their picker. View-only on purpose: the library's create_*
         helpers upsert from a handful of arguments, so saving through them
-        would drop everything the form does not model — exactly the
+        would drop everything the form does not model, exactly the
         destruction the datastore merge exists to avoid. Editing needs an
         update that merges; tracked in #50.
         """
@@ -401,7 +401,7 @@ class LayerTabMixin:
             description=origin.format(ws=ws_name, store=store, type=kind)
             + " "
             + translate(
-                "LayerTabMixin", "Read-only here — GeoServer's web UI can change it."
+                "LayerTabMixin", "Read-only here. GeoServer's web UI can change it."
             ),
             fields=fields,
             values=values,
@@ -415,7 +415,7 @@ class LayerTabMixin:
     def _available_tables(self, workspace_name, datastore_name):
         """Tables of a datastore that are not published as layers yet.
 
-        TODO(#50): upstream as get_available_feature_types(ws, ds) — the
+        TODO(#50): upstream as get_available_feature_types(ws, ds); the
         library has no call for GeoServer's ?list=available. Workaround: GET
         the featuretypes path with that query.
         """
@@ -546,7 +546,7 @@ class LayerTabMixin:
                 "visible": False,
                 "help": translate(
                     "LayerTabMixin",
-                    "Vector layers only — a raster's symbology is not uploaded.",
+                    "Vector layers only. A raster's symbology is not uploaded.",
                 ),
             },
         ]
@@ -624,7 +624,7 @@ class LayerTabMixin:
             description=translate(
                 "LayerTabMixin",
                 "Publish a table of a datastore, or a layer of this QGIS "
-                "project — uploaded as a GeoPackage (a vector becomes a datastore) "
+                "project, uploaded as a GeoPackage (a vector becomes a datastore) "
                 "or as a GeoTIFF (a raster becomes a coverage store).",
             ),
             fields=self._publish_fields(workspace_names),
@@ -680,19 +680,19 @@ class LayerTabMixin:
         vector, a GeoTIFF coverage store for a raster.
 
         One store per published layer, named after it, which is also the name
-        of the table inside the GeoPackage — GeoServer configures a feature
+        of the table inside the GeoPackage. GeoServer configures a feature
         type per table when the file lands, so this publishes the layer in one
         request. The data is copied: later edits in QGIS do not reach it, and
         deleting the store leaves the uploaded file in the data directory.
 
         The layer, its CRS, the name check, the export and the SLD happen here
-        on the GUI thread — a live QGIS layer, invariant 9 — and raise into the
+        on the GUI thread (a live QGIS layer, invariant 9), and raise into the
         caller's _run_action; the PUT then streams in a task through
         _upload_file, with progress and Cancel, and the metadata and the style
         follow on the GUI thread once it lands. A raster goes down the Coverage
         Stores tab's path (_publish_qgis_raster), the same Replace semantics.
 
-        TODO(#50): upstream as create_datastore_from_file(ws, name, path) — the
+        TODO(#50): upstream as create_datastore_from_file(ws, name, path); the
         library can only create datastores from connection parameters, so the
         upload is a raw PUT of .../datastores/{name}/file.gpkg (row 28).
         """
@@ -760,7 +760,7 @@ class LayerTabMixin:
                 self.show_warning_message(
                     translate(
                         "LayerTabMixin",
-                        "Layer '{}' uploaded — reconnect to finish its metadata "
+                        "Layer '{}' uploaded. Reconnect to finish its metadata "
                         "and style.",
                     ).format(name)
                 )
@@ -809,7 +809,7 @@ class LayerTabMixin:
         """Mark an uploaded GeoPackage store read-only.
 
         Nothing writes to a GeoPackage the plugin has just uploaded, and a
-        read-only file store is the recommended setting for that case — it
+        read-only file store is the recommended setting for that case; it
         lets GeoServer serve it without taking write locks (not measured
         here). Merged onto the server's own parameters, never sent as a
         template (invariant 3).
@@ -834,7 +834,7 @@ class LayerTabMixin:
 
         A partial feature-type PUT merges (verified on GeoServer 2.28.5), so
         the SRS, bounding box and attributes GeoServer computed from the upload
-        survive — which create_feature_type() would overwrite with a template.
+        survive, which create_feature_type() would overwrite with a template.
         """
         keywords = [
             keyword.strip()
@@ -895,7 +895,7 @@ class LayerTabMixin:
     def _layer_default_style(self, workspace_name, name):
         """The layer's current default style name, or None if unreadable.
 
-        TODO(#50): upstream — the facade has set_default_layer_style() but no
+        TODO(#50): upstream: the facade has set_default_layer_style() but no
         get_layer(); rest_service.get_layer() exists and is used here directly.
         """
         try:
@@ -1003,7 +1003,7 @@ class LayerTabMixin:
             description=translate(
                 "LayerTabMixin",
                 "The layer's symbology is exported as SLD and uploaded to "
-                "workspace '{}'. A style of that name there is replaced — that "
+                "workspace '{}'. A style of that name there is replaced, that "
                 "is how you push a change you just made in QGIS.",
             ).format(ws_name),
             fields=[
@@ -1094,14 +1094,14 @@ class LayerTabMixin:
     ):
         """Create or replace the style in the layer's workspace, then assign it.
 
-        Returns False when the style exists and the user chose to keep it —
+        Returns False when the style exists and the user chose to keep it:
         create_style_definition upserts, and every layer sharing that style
         would render differently, so replacing is confirmed, never silent
         (the Styles tab refuses an existing name outright; here replacing is
         the stated workflow: push the change you just made in QGIS).
 
         Workspace styles are referenced by their qualified name, so the layer's
-        defaultStyle gets "workspace:style" — a bare name there would resolve
+        defaultStyle gets "workspace:style"; a bare name there would resolve
         to a global style of the same name instead.
         """
         if self._resource_exists(
@@ -1151,7 +1151,7 @@ class LayerTabMixin:
 
         Credentials never go in the URI: `authcfg` is the id of the QGIS
         authentication config the plugin already stores, and the providers
-        resolve it themselves — so a saved project holds no password.
+        resolve it themselves, so a saved project holds no password.
         """
         base = base_url.rstrip("/")
         auth = f"&authcfg={authcfg}" if authcfg else ""
@@ -1164,7 +1164,7 @@ class LayerTabMixin:
         if protocol == "WMTS":
             # No crs= here: the tile matrix set fixes it (EPSG:900913), and a
             # crs=EPSG:4326 alongside made QGIS accept the layer and reproject
-            # every tile on the fly — measured on 2.28.5 / QGIS 3.44.
+            # every tile on the fly (measured on 2.28.5 / QGIS 3.44).
             return (
                 f"format=image/png&layers={qualified_name}&styles="
                 f"&tileMatrixSet={_WMTS_TILE_MATRIX_SET}"
@@ -1206,7 +1206,7 @@ class LayerTabMixin:
     def _preview_url(base_url, qualified_name, bbox=None, srs=None, workspace=None):
         """GeoServer's own OpenLayers preview page for a layer or a layer group.
 
-        A URL for the browser, not a request from the plugin — the browser's
+        A URL for the browser, not a request from the plugin: the browser's
         session is not the plugin's, so a secured server asks it to log in.
         Without a usable bbox the map opens on the world. 768 px on the long
         side and the other from the bbox's aspect, as GeoServer's own Layer
@@ -1276,8 +1276,8 @@ class LayerTabMixin:
     def _preview_layer(self, row_data):
         """Show the layer on a map of its own, with the feature info on click.
 
-        The map layer is built like *Add to QGIS* builds one — credentials as
-        the auth config id — but it lives in the preview window only: nothing
+        The map layer is built like *Add to QGIS* builds one (credentials as
+        the auth config id), but it lives in the preview window only: nothing
         reaches the project.
         """
         name, ws_name = row_data[0], row_data[1]
@@ -1327,7 +1327,7 @@ class LayerTabMixin:
             protocols = [protocol for protocol in PROTOCOLS if protocol != "WFS"]
             description = translate(
                 "LayerTabMixin",
-                "WMS and WMTS load rendered images — this layer has no features to "
+                "WMS and WMTS load rendered images. This layer has no features to "
                 "serve over WFS. Credentials come from the plugin's saved "
                 "connection, not from the layer.",
             )
@@ -1385,7 +1385,7 @@ class LayerTabMixin:
         self._delete_selected_layers([row_data])
 
     def _delete_layer_resource(self, workspace_name, kind, store, name):
-        """Remove the resource behind a layer — the published layer goes with it."""
+        """Remove the resource behind a layer: the published layer goes with it."""
         if kind == VECTOR:
             self._check(self.gs.delete_feature_type(workspace_name, store, name))
         elif kind == RASTER:
@@ -1418,12 +1418,12 @@ class LayerTabMixin:
             ],
             self._load_layers,
             # Every resource delete sends recurse=true, which removes the
-            # published layer — but GeoServer refuses outright while a layer
+            # published layer, but GeoServer refuses outright while a layer
             # group still references it (verified against 2.28.5).
             cascade=translate(
                 "LayerTabMixin",
                 "The published layer goes too; the table, file or remote layer "
                 "behind it is not touched. GeoServer refuses if a layer group "
-                "still uses the layer — remove it from the group first.\n\n",
+                "still uses the layer, remove it from the group first.\n\n",
             ),
         )

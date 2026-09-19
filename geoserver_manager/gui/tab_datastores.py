@@ -1,7 +1,7 @@
 #! python3  # noqa: E265
 
 """
-Datastore tab — load, create, edit, delete datastores.
+Datastore tab: load, create, edit, delete datastores.
 
 Used as a mixin for GeoServerMainDialog.
 """
@@ -70,15 +70,15 @@ _TYPE_SPECIFIC_FIELDS = (
 # Every user-visible string in this file goes through translate() with this
 # file's own class as the context. self.tr() cannot: pylupdate extracts it
 # under DatastoreTabMixin, but at runtime self.tr is QObject.tr with the context of the
-# *instance's* class, GeoServerMainDialog — QDialog precedes the mixins in the
-# MRO — so every lookup would miss. A wrapper function would not be extracted
+# *instance's* class, GeoServerMainDialog. QDialog precedes the mixins in the
+# MRO, so every lookup would miss. A wrapper function would not be extracted
 # at all (pylupdate only understands a literal context), hence the repetition.
 translate = QCoreApplication.translate
 
 
 def _is_secret(key):
     """A parameter to mask: `passwd`, `WFSDataStoreFactory:PASSWORD`, a `…secret`
-    or `…token` — not `key`, which would hide "Expose primary keys"."""
+    or `…token`, not `key`, which would hide "Expose primary keys"."""
     return key.lower().endswith(("passwd", "password", "secret", "token"))
 
 
@@ -142,7 +142,7 @@ class DatastoreTabMixin:
             lambda pair: self._datastore_summary(*pair), pairs, task
         )
         rows = [
-            [ds_name, ws_name, *(summary or ("—", "—"))]
+            [ds_name, ws_name, *(summary or ("-", "-"))]
             for (ws_name, ds_name), (summary, _error) in zip(pairs, details)
         ]
         failures = [(ws, err) for ws, (_names, err) in zip(ws_names, listed) if err]
@@ -164,15 +164,15 @@ class DatastoreTabMixin:
         """(type, enabled) for the list view. Raises on HTTP errors."""
         detail = self._check(self.gs.get_datastore(workspace_name, datastore_name))
         if not isinstance(detail, dict):
-            return ("—", "—")
-        return (detail.get("type", "—"), self._yes_no(detail.get("enabled", True)))
+            return ("-", "-")
+        return (detail.get("type", "-"), self._yes_no(detail.get("enabled", True)))
 
     def _datastore_fields(self, workspace_names, on_type_changed=None, edit_mode=False):
         """Return datastore form field definitions with type-specific params.
 
         :param workspace_names: list of workspace names for the combo box.
         :param on_type_changed: callback(new_type) when the type combo changes.
-        :param edit_mode: editing an existing datastore — the workspace is
+        :param edit_mode: editing an existing datastore. The workspace is
             fixed and the password has to be re-entered.
         """
         fields = [
@@ -338,7 +338,7 @@ class DatastoreTabMixin:
                 "group": translate("DatastoreTabMixin", "Connection"),
                 "help": translate(
                     "DatastoreTabMixin",
-                    "How the .dbf attribute text is encoded — UTF-8, or "
+                    "How the .dbf attribute text is encoded: UTF-8, or "
                     "ISO-8859-1, which is what GeoServer assumes",
                 ),
             },
@@ -493,8 +493,8 @@ class DatastoreTabMixin:
         """Connection parameters for a cascaded WFS store, from the typed fields.
 
         `stored` is the server's current map on an edit: a blank password keeps
-        the stored one — GeoServer accepts its own `crypt1:` value back
-        (measured on 2.28.5: a store still connected after the round trip) —
+        the stored one. GeoServer accepts its own `crypt1:` value back
+        (measured on 2.28.5: a store still connected after the round trip),
         and a blank user means no credentials at all.
 
         TODO(#50): upstream as create_wfs_datastore(ws, name, capabilities_url,
@@ -524,7 +524,7 @@ class DatastoreTabMixin:
         `namespace` or `fetch size` survives an edit.
 
         TODO(#50): upstream as create_shapefile_datastore() /
-        create_geopackage_datastore(), next to create_pg_datastore() — the
+        create_geopackage_datastore(), next to create_pg_datastore(). The
         library has typed creators for PostGIS, JNDI and PMTiles only, so
         these go through the generic create_datastore().
         """
@@ -911,7 +911,7 @@ class DatastoreTabMixin:
         if detail is None:
             return
 
-        # The row's Type cell can be "—" after a transient GET failure at list
+        # The row's Type cell can be "-" after a transient GET failure at list
         # time; the detail we just fetched is authoritative.
         if isinstance(detail, dict) and detail.get("type"):
             ds_type = detail["type"]
@@ -932,7 +932,7 @@ class DatastoreTabMixin:
                 if editable
                 else translate(
                     "DatastoreTabMixin",
-                    "Datastore type '{}' has no dedicated form — edit its connection "
+                    "Datastore type '{}' has no dedicated form. Edit its connection "
                     "parameters directly.",
                 ).format(ds_type)
             ),
@@ -986,7 +986,7 @@ class DatastoreTabMixin:
 
     def _do_delete_datastore(self, workspace_name, datastore_name):
         """Execute the REST DELETE for a datastore (recurse=true removes feature types too)."""
-        # TODO(#50): upstream as delete_datastore(ws, ds, recurse=True) — the library
+        # TODO(#50): upstream as delete_datastore(ws, ds, recurse=True); the library
         # has none. Workaround: DELETE /workspaces/{ws}/datastores/{ds}.json?recurse=true
         path = self.gs.rest_service.rest_endpoints.datastore(
             workspace_name, datastore_name

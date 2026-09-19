@@ -1,7 +1,7 @@
 #! python3  # noqa: E265
 
 """
-Cascaded Stores tab — WMS and WMTS stores that proxy another server, and the
+Cascaded Stores tab: WMS and WMTS stores that proxy another server, and the
 remote layers published through them.
 
 Used as a mixin for GeoServerMainDialog.
@@ -28,8 +28,8 @@ _LAYER_KEYS = {WMS: ("wmsLayers", "wmsLayer"), WMTS: ("wmtsLayers", "wmtsLayer")
 # Every user-visible string in this file goes through translate() with this
 # file's own class as the context. self.tr() cannot: pylupdate extracts it
 # under CascadedStoreTabMixin, but at runtime self.tr is QObject.tr with the
-# context of the *instance's* class, GeoServerMainDialog — QDialog precedes the
-# mixins in the MRO — so every lookup would miss. A wrapper function would not
+# context of the *instance's* class, GeoServerMainDialog. QDialog precedes the
+# mixins in the MRO, so every lookup would miss. A wrapper function would not
 # be extracted at all (pylupdate only understands a literal context), hence
 # the repetition.
 translate = QCoreApplication.translate
@@ -125,16 +125,16 @@ class CascadedStoreTabMixin:
     def _cascaded_store_summary(self, detail):
         """(enabled, capabilities URL) cells; a store whose GET failed shows dashes."""
         if not isinstance(detail, dict):
-            return ("—", "—")
+            return ("-", "-")
         return (
             self._yes_no(detail.get("enabled", True)),
-            detail.get("capabilitiesURL") or "—",
+            detail.get("capabilitiesURL") or "-",
         )
 
     def _cascaded_store_names(self, workspace_name):
         """[(name, type)] of one workspace's WMS and WMTS stores. Raises on HTTP errors.
 
-        TODO(#50): upstream as get_wms_stores(ws) / get_wmts_stores(ws) — the
+        TODO(#50): upstream as get_wms_stores(ws) / get_wmts_stores(ws); the
         library gets, creates and deletes one store but never lists them.
         Workaround: GET the two collections.
         """
@@ -176,12 +176,12 @@ class CascadedStoreTabMixin:
     # -- Cascaded layers ------------------------------------------------------
 
     def _cascaded_layer_names(self, workspace_name, store_name, kind, available=False):
-        """The store's cascaded layers — or, with available=True, every layer the
+        """The store's cascaded layers, or, with available=True, every layer the
         remote capabilities advertise, under their remote names. Raises on HTTP
         errors.
 
         TODO(#50): upstream as get_wms_layers(ws, store, list=…) and a WMTS
-        twin — the library's get_wms_layers() is this GeoServer's own WMS
+        twin; the library's get_wms_layers() is this GeoServer's own WMS
         capabilities, not a store's cascaded layers. Workaround: GET the
         collection; `?list=available` answers `{"list": {"string": [...]}}`.
         """
@@ -240,7 +240,7 @@ class CascadedStoreTabMixin:
             )
             return
         # TODO(#50): create_wmts_layer() fetches the remote capabilities from
-        # *this* machine — the remote may be reachable from GeoServer only —
+        # *this* machine (the remote may be reachable from GeoServer only),
         # forces the SRS to EPSG:4326 and deletes an existing layer first.
         # GeoServer needs only the two names and reads title, abstract, SRS
         # and bounds from the capabilities itself. Workaround: POST them.
@@ -270,7 +270,7 @@ class CascadedStoreTabMixin:
 
     def _cascaded_layer_form_values(self, detail):
         """Prefill for the layer viewer, from the library's dict or GeoServer's
-        raw payload — the keywords differ in shape between the two."""
+        raw payload; the keywords differ in shape between the two."""
         keywords = detail.get("keywords") or []
         if isinstance(keywords, dict):  # raw payload: {"string": [...]}
             keywords = keywords.get("string") or []
@@ -281,8 +281,8 @@ class CascadedStoreTabMixin:
             "title": str(detail.get("title") or ""),
             "srs": detail.get("srs", ""),
             "enabled": self._yes_no(detail.get("enabled", True)),
-            "bounds": bbox_text(detail.get("latLonBoundingBox")) or "—",
-            "keywords": ", ".join(keywords) or "—",
+            "bounds": bbox_text(detail.get("latLonBoundingBox")) or "-",
+            "keywords": ", ".join(keywords) or "-",
             "abstract": str(detail.get("abstract") or ""),
         }
 
@@ -351,7 +351,7 @@ class CascadedStoreTabMixin:
             self.show_warning_message(
                 translate(
                     "CascadedStoreTabMixin",
-                    "'{}' publishes no layer yet — use Publish a layer.",
+                    "'{}' publishes no layer yet. Use Publish a layer.",
                 ).format(store_name)
             )
             return
@@ -394,7 +394,7 @@ class CascadedStoreTabMixin:
             self.show_warning_message(
                 translate(
                     "CascadedStoreTabMixin",
-                    "The remote server behind '{}' advertises no layer — check its "
+                    "The remote server behind '{}' advertises no layer. Check its "
                     "capabilities URL.",
                 ).format(store_name)
             )
@@ -483,7 +483,7 @@ class CascadedStoreTabMixin:
                 "&version=1.3.0&request=GetCapabilities",
                 "help": translate(
                     "CascadedStoreTabMixin",
-                    "As GeoServer reaches it — from its own machine, not from yours.",
+                    "As GeoServer reaches it, from its own machine, not from yours.",
                 ),
             },
         ]
@@ -543,7 +543,7 @@ class CascadedStoreTabMixin:
         url = values["capabilities_url"].strip()
         if not url.startswith(("http://", "https://")):
             # GeoServer accepts any string here and only fails later, when the
-            # store's layers are listed — say it now instead.
+            # store's layers are listed. Say it now instead.
             raise ValueError(
                 translate(
                     "CascadedStoreTabMixin",
@@ -603,7 +603,7 @@ class CascadedStoreTabMixin:
             "type": detail.get("type") or kind,
             "capabilities_url": detail.get("capabilitiesURL", ""),
             "enabled": self._yes_no(detail.get("enabled", True)),
-            "layers": "\n".join(published) or "—",
+            "layers": "\n".join(published) or "-",
         }
 
     def _show_cascaded_store_info(self, row_data):

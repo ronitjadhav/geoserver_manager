@@ -4,7 +4,7 @@
 One bounded request that says whether a GeoServer REST API answers here.
 
 Used by the main dialog before its first table, and by the Settings page's
-*Test connection* button — with the fields as typed, saved or not.
+*Test connection* button, with the fields as typed, saved or not.
 
 TODO(#50): the one request in the plugin that does not go through the
 library. `RestClient` hardcodes `timeout=TIMEOUT` (120 s) and takes no
@@ -27,7 +27,7 @@ def _tr(text):
 def probe(url, auth, verify_tls):
     """Return None when GeoServer answered, else (status, message) to show.
 
-    :param auth: (username, password) — HTTP Basic, as the library sends it.
+    :param auth: (username, password), HTTP Basic, as the library sends it.
     """
     try:
         response = requests.get(
@@ -49,10 +49,10 @@ def probe(url, auth, verify_tls):
         )
     except OSError:
         # ConnectionError / Timeout: refused, unreachable, wrong host, or a
-        # host that swallows the SYN — that one gives up after PROBE_TIMEOUT.
+        # host that swallows the SYN; that one gives up after PROBE_TIMEOUT.
         return (
             _tr("Server unreachable"),
-            _tr("Cannot reach GeoServer at {url} — is the server running?").format(
+            _tr("Cannot reach GeoServer at {url}. Is the server running?").format(
                 url=url
             ),
         )
@@ -62,9 +62,7 @@ def probe(url, auth, verify_tls):
     if response.status_code in (401, 403):
         return (
             _tr("Authentication failed"),
-            _tr(
-                "Authentication failed — check your username and password in Settings."
-            ),
+            _tr("Authentication failed. Check your username and password in Settings."),
         )
     if response.status_code >= 400:
         # The URL usually points at something that is not a GeoServer REST
@@ -72,7 +70,7 @@ def probe(url, auth, verify_tls):
         return (
             _tr("HTTP error {}").format(response.status_code),
             _tr(
-                "GeoServer returned HTTP {code} for {url} — check the URL in Settings."
+                "GeoServer returned HTTP {code} for {url}. Check the URL in Settings."
             ).format(code=response.status_code, url=url),
         )
     try:
@@ -86,7 +84,7 @@ def probe(url, auth, verify_tls):
             _tr("Not a GeoServer REST endpoint"),
             _tr(
                 "{url} answered, but not with the GeoServer REST API (a login "
-                "page?) — check the URL, or the proxy in front of it."
+                "page?). Check the URL, or the proxy in front of it."
             ).format(url=url),
         )
     return None

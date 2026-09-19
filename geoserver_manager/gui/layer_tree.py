@@ -15,7 +15,7 @@ several.
 
 The hook is `QgsLayerTreeView.contextMenuAboutToShow`, connected in `initGui`
 and disconnected in `unload()`. A hook left behind survives a plugin reload and
-fires into the dead plugin — and plugin_reloader is how this repo is developed.
+fires into the dead plugin, and plugin_reloader is how this repo is developed.
 """
 
 from urllib.parse import parse_qs, urlparse
@@ -41,7 +41,7 @@ class LayerTreeMenu:
     """Adds the plugin's entries to the layer tree's context menu.
 
     :param dialog: a callable returning the main dialog, or None before the
-        plugin has been opened — the connection lives on that dialog.
+        plugin has been opened. The connection lives on that dialog.
     :param open_dialog: what the "open GeoServer Manager" entry calls.
     """
 
@@ -79,7 +79,7 @@ class LayerTreeMenu:
         )
         if self._connected_dialog() is None:
             reason = translate(
-                "LayerTreeMenu", "Not connected — open GeoServer Manager first"
+                "LayerTreeMenu", "Not connected. Open GeoServer Manager first"
             )
             for action in (push, pull):
                 action.setEnabled(False)
@@ -125,7 +125,7 @@ class LayerTreeMenu:
     def matching_server_layers(layer_name, server_layers):
         """The qualified server layers named like this project layer.
 
-        Case-insensitive, and a "workspace:" prefix on either side is ignored —
+        Case-insensitive, and a "workspace:" prefix on either side is ignored:
         the same rule as LayerTabMixin._matching_project_layer, the other way
         round. Pure.
         """
@@ -172,7 +172,7 @@ class LayerTreeMenu:
             self._say(
                 translate(
                     "LayerTreeMenu",
-                    "No layer on the server is named like '{}' — publish it "
+                    "No layer on the server is named like '{}'. Publish it "
                     "first, from the Layers tab.",
                 ).format(layer.name()),
                 Qgis.MessageLevel.Warning,
@@ -222,7 +222,7 @@ class LayerTreeMenu:
                 "LayerTreeMenu",
                 "The symbology of '{}' is exported as SLD and uploaded to workspace "
                 "'{}' as the style of layer '{}'. A style of that name there is "
-                "replaced — that is how you push a change you just made in QGIS.",
+                "replaced, which is how you push a change you just made in QGIS.",
             ).format(layer.name(), workspace, name),
             fields=[
                 {
@@ -324,7 +324,7 @@ class LayerTreeMenu:
             # QGIS reads SLD only; refuse here rather than let it fail later.
             raise ValueError(
                 translate(
-                    "LayerTreeMenu", "'{}' is a {} style — QGIS can only read SLD."
+                    "LayerTreeMenu", "'{}' is a {} style. QGIS can only read SLD."
                 ).format(style, style_format.upper())
             )
         return dlg._style_body(name, workspace, "sld")
@@ -433,7 +433,7 @@ class LayerTreeMenu:
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             return True, fn()
-        except Exception as error:  # noqa: BLE001 — anything, reported as text
+        except Exception as error:  # noqa: BLE001 (anything, reported as text)
             detail = dlg._error_text(error)
             self._say(f"{failure_message}: {detail}", Qgis.MessageLevel.Critical)
             self.log(
@@ -450,7 +450,7 @@ class LayerTreeMenu:
         self._say(
             translate(
                 "LayerTreeMenu",
-                "Not connected to GeoServer — open GeoServer Manager and connect first.",
+                "Not connected to GeoServer. Open GeoServer Manager and connect first.",
             ),
             Qgis.MessageLevel.Warning,
         )

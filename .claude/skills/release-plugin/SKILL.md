@@ -1,6 +1,6 @@
 ---
 name: release-plugin
-description: Cut a release of the GeoServer Manager QGIS plugin — bump the version, finish the changelog, re-strip the bundled geoservercloud wheel if the library was bumped, tag, and let CI publish to GitHub Releases and plugins.qgis.org. Use for any version bump or when updating the bundled geoservercloud dependency.
+description: Cut a release of the GeoServer Manager QGIS plugin, bump the version, finish the changelog, re-strip the bundled geoservercloud wheel if the library was bumped, tag, and let CI publish to GitHub Releases and plugins.qgis.org. Use for any version bump or when updating the bundled geoservercloud dependency.
 ---
 
 # Release the plugin
@@ -8,7 +8,7 @@ description: Cut a release of the GeoServer Manager QGIS plugin — bump the ver
 Releases are driven by `qgis-plugin-ci` from `.github/workflows/package_and_release.yml`:
 a push to `main` builds the zip; a **tag** creates the GitHub Release and publishes to
 plugins.qgis.org using the `OSGEO_USER` / `OSGEO_PASSWORD` repository secrets.
-No tag has been pushed yet, so the tag path has never run — the first release is a
+No tag has been pushed yet, so the tag path has never run; the first release is a
 first for the pipeline too. Watch it.
 
 ## 0. Only if `geoservercloud` is being bumped: strip the new wheel
@@ -41,7 +41,7 @@ ls -la *.whl        # expect tens of KB
 Then: copy it into `geoserver_manager/extras/`, delete the old wheel, update the
 filename in `toolbelt/dependencies.py` (`BUNDLED_WHLS`), and re-check every
 library fact in `CLAUDE.md` (`raise_for_status` per verb, which `create_*` upsert,
-which methods are still missing) against the new source — the plugin's
+which methods are still missing) against the new source; the plugin's
 `_raw_rest` workarounds ride on private attributes. Verify the import path:
 
 ```sh
@@ -54,7 +54,7 @@ python3 -c "import sys; sys.path[:0]=['geoserver_manager/extras/xmltodict-1.0.4-
 
 - `geoserver_manager/metadata.txt`: `version=X.Y.Z`. Leave `experimental=True` until the
   layers/styles tabs exist. `qgisMinimumVersion=3.40`.
-- `CHANGELOG.md`: rename `## Unreleased` to `## X.Y.Z - YYYY-MM-DD` (Keep a Changelog format —
+- `CHANGELOG.md`: rename `## Unreleased` to `## X.Y.Z - YYYY-MM-DD` (Keep a Changelog format;
   `qgis-plugin-ci` reads it for the release notes and the plugin's `changelog` field).
 - `docs/github_issue_roadmap.md`: tick what shipped.
 
@@ -86,16 +86,17 @@ creates the GitHub Release with generated notes, and runs
 ## 5. After the first publish
 
 Set the plugin ID in `docs/conf.py` (`official_repository_id`) and update
-`docs/usage/installation.md` — it currently says the plugin is not yet on
-plugins.qgis.org. Then close the `0.1.0 — first release` milestone.
+`docs/usage/installation.md`; it currently says the plugin is not yet on
+plugins.qgis.org. Then close the `0.1.0 — first release` milestone (its exact
+title on GitHub; the milestone name is not this repo's prose to rewrite).
 
 ## If it fails
 
 - **Release job fails on secrets**: `OSGEO_USER` / `OSGEO_PASSWORD` must be set in the repo.
 - **Zip is huge**: unstripped wheel, see step 0.
-- **`qgis-plugin-ci` complains about the slug**: `setup.cfg` `[qgis-plugin-ci]` — `project_slug` /
+- **`qgis-plugin-ci` complains about the slug**: `setup.cfg` `[qgis-plugin-ci]`: `project_slug` /
   `github_organization_slug` must match the repo.
 - **Translations job fails**: it uses `pyqt5-tools`, proven only on Python 3.9 (`PYTHON_VERSION`).
-- **Packaging job fails on `pip install`**: `qgis-plugin-ci >= 2.10` needs Python ≥ 3.10 — the packaging
+- **Packaging job fails on `pip install`**: `qgis-plugin-ci >= 2.10` needs Python ≥ 3.10; the packaging
   and release jobs use `PYTHON_VERSION_PACKAGING` (3.12) for that reason. A requirements bump merged by
   dependabot broke this once because the workflow does not run on PRs (issue #30).

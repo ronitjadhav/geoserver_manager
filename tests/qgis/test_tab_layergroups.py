@@ -218,7 +218,7 @@ class TestGroupDetail(unittest.TestCase):
     def test_prefill_keeps_the_abstract_the_order_and_the_styles(self):
         values = LayerGroupTabMixin._group_form_values(TASMANIA, "tasmania", GLOBAL)
         # GeoServer writes "abstractTxt"; the library's model reads "abstract"
-        # and so loses it — this would be empty if the detail came from there.
+        # and so loses it; this would be empty if the detail came from there.
         self.assertEqual(
             values["abstract"], "Tasmania from the Digital Chart of the World."
         )

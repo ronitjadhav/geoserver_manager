@@ -1,7 +1,7 @@
 #! python3  # noqa: E265
 
 """
-Layer Groups tab — list, view, create, delete layer groups.
+Layer Groups tab: list, view, create, delete layer groups.
 
 Used as a mixin for GeoServerMainDialog. `_layer_uri()` comes from LayerTabMixin
 through the shared dialog class; the global-or-workspace scope is `gui.scope`.
@@ -25,14 +25,14 @@ MODES = ("SINGLE", "OPAQUE_CONTAINER", "NAMED", "CONTAINER", "EO")
 
 # First entry of the layer picker. Picking a layer always *changes* the combo's
 # text this way, so the same layer can be appended twice in a row.
-_PICK = "— pick a layer —"
+_PICK = "(pick a layer)"
 
 
 # Every user-visible string in this file goes through translate() with this
 # file's own class as the context. self.tr() cannot: pylupdate extracts it
 # under LayerGroupTabMixin, but at runtime self.tr is QObject.tr with the context of the
-# *instance's* class, GeoServerMainDialog — QDialog precedes the mixins in the
-# MRO — so every lookup would miss. A wrapper function would not be extracted
+# *instance's* class, GeoServerMainDialog. QDialog precedes the mixins in the
+# MRO, so every lookup would miss. A wrapper function would not be extracted
 # at all (pylupdate only understands a literal context), hence the repetition.
 translate = QCoreApplication.translate
 
@@ -50,7 +50,7 @@ def _mode_label(mode):
 
 
 def _mode_from_label(label):
-    """The enum behind a label — or the value itself when it already is one."""
+    """The enum behind a label, or the value itself when it already is one."""
     for mode in MODES:
         if label in (mode, _mode_label(mode)):
             return mode
@@ -86,7 +86,7 @@ class LayerGroupTabMixin:
                 self._preview_group_in_browser,
                 translate(
                     "LayerGroupTabMixin",
-                    "Preview in a browser — GeoServer's own OpenLayers page. A "
+                    "Preview in a browser: GeoServer's own OpenLayers page. A "
                     "secured server will ask the browser to log in.",
                 ),
             ),
@@ -144,7 +144,7 @@ class LayerGroupTabMixin:
     def _global_group_names(self):
         """Names of the layer groups that live outside any workspace.
 
-        TODO(#50): upstream — every layer-group call in the library takes a
+        TODO(#50): upstream: every layer-group call in the library takes a
         workspace_name, so groups in the global scope cannot be reached at all
         (GeoServer's own demo data has three). Workaround: GET the collection.
         """
@@ -164,7 +164,7 @@ class LayerGroupTabMixin:
     def _group_detail(self, name, workspace_name):
         """One layer group, as GeoServer stores it.
 
-        TODO(#50): upstream — get_layer_group() exists, but its model drops the
+        TODO(#50): upstream: get_layer_group() exists, but its model drops the
         abstract (GeoServer writes "abstractTxt" while the model reads
         "abstract") and the "@type" that tells a nested group from a layer, and
         it has no global scope. Workaround: GET the layer-group path.
@@ -367,7 +367,7 @@ class LayerGroupTabMixin:
                 ),
                 "help": translate(
                     "LayerGroupTabMixin",
-                    "One layer per line, in drawing order — the first line is "
+                    "One layer per line, in drawing order: the first line is "
                     "drawn first, at the bottom. Reorder by editing the text. "
                     'Add "= style" to a line to publish that layer with a '
                     "style other than its own default.",
@@ -427,7 +427,7 @@ class LayerGroupTabMixin:
     def _parse_group_layers(text, workspace_name):
         """Parse the ordered layer list into (layers, styles).
 
-        One layer per line, `workspace:layer` or `workspace:layer = style` —
+        One layer per line, `workspace:layer` or `workspace:layer = style`,
         the same `key = value` shape the datastore parameter editor uses. The
         styles are parallel to the layers, "" where the layer keeps its own
         default style, and a bare layer name takes the group's workspace.
@@ -469,7 +469,7 @@ class LayerGroupTabMixin:
             listed them; a typed line naming none of them is refused here,
             by line, instead of coming back as GeoServer's HTTP error.
 
-        TODO(#50): upstream — create_layer_group() cannot express any of this:
+        TODO(#50): upstream: create_layer_group() cannot express any of this:
         it has no global scope, it qualifies every layer with the group's own
         workspace (so no group spanning workspaces, and no nested group), it
         replaces the bounds with a world bbox read from a three-entry EPSG
@@ -490,7 +490,7 @@ class LayerGroupTabMixin:
                 raise ValueError(
                     translate(
                         "LayerGroupTabMixin",
-                        "No layer named '{}' on the server — pick it from the list, "
+                        "No layer named '{}' on the server. Pick it from the list, "
                         "or qualify it as workspace:layer.",
                     ).format(unknown[0])
                 )
@@ -612,7 +612,7 @@ class LayerGroupTabMixin:
             self._load_layer_groups,
             cascade=translate(
                 "LayerGroupTabMixin",
-                "Only the group goes away — the layers it published stay. "
+                "Only the group goes away. The layers it published stay. "
                 "GeoServer refuses if another layer group contains this one.",
             ),
         )
@@ -620,7 +620,7 @@ class LayerGroupTabMixin:
     def _do_delete_group(self, name, workspace_name):
         """DELETE one layer group; the library covers the workspace scope only.
 
-        TODO(#50): see _global_group_names — delete_layer_group() requires a
+        TODO(#50): see _global_group_names; delete_layer_group() requires a
         workspace_name, so a global group needs the raw path.
         """
         if workspace_name:

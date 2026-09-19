@@ -736,7 +736,7 @@ def spin_until(predicate, timeout_ms=20000):
     """Run the event loop until predicate(); return how often a timer fired.
 
     A tick proves the GUI thread was free to process events while the load was
-    running — which is the whole point of moving loads into a QgsTask.
+    running, which is the whole point of moving loads into a QgsTask.
     """
     ticks = []
     loop = QEventLoop()

@@ -43,7 +43,7 @@ class RecordingGS:
 
 
 class TestUnsafeNamesAreRefused(unittest.TestCase):
-    """requests sends coveragestores/a#b.json as coveragestores/a — a different store."""
+    """requests sends coveragestores/a#b.json as coveragestores/a, a different store."""
 
     def setUp(self):
         self.dlg = SyncDialog()

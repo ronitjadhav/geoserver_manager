@@ -245,7 +245,7 @@ class TestListing(unittest.TestCase):
         self.assertEqual(self.dlg.btn_add.text(), "Add a Cascaded Store")
 
     def test_a_store_whose_get_fails_shows_dashes(self):
-        self.assertEqual(self.dlg._cascaded_store_summary(None), ("—", "—"))
+        self.assertEqual(self.dlg._cascaded_store_summary(None), ("-", "-"))
 
     def test_layer_names_configured_and_advertised(self):
         self.assertEqual(
@@ -437,7 +437,7 @@ class TestDelete(unittest.TestCase):
         )
         self.assertEqual(values["capabilities_url"], TILES)
         self.assertEqual(values["enabled"], "No")  # a word, not Python's repr
-        self.assertEqual(values["layers"], "—")
+        self.assertEqual(values["layers"], "-")
 
 
 if __name__ == "__main__":
@@ -476,7 +476,7 @@ class TestNamesInPaths(unittest.TestCase):
     def test_names_from_the_server_are_quoted_into_the_raw_paths(self):
         import contextlib
 
-        # the fake knows none of these, so each GET is a 404 — the path is the point
+        # the fake knows none of these, so each GET is a 404; the path is the point
         with contextlib.suppress(RuntimeError):
             self.dlg._cascaded_store_detail("my ws", "my store", WMTS)
         with contextlib.suppress(RuntimeError):

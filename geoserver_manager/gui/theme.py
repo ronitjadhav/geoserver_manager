@@ -10,7 +10,7 @@ background. Everything here derives from the widget's own palette instead, so
 a theme the plugin has never seen still gets readable text.
 
 Qt has no palette role for "this went wrong", so the semantic colours are two
-fixed pairs — one for light backgrounds, one for dark — chosen for contrast
+fixed pairs (one for light backgrounds, one for dark) chosen for contrast
 against the palette's window colour rather than for brand.
 """
 

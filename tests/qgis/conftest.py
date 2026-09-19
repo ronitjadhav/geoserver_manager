@@ -2,7 +2,7 @@
 
 Starts the QGIS application once and puts the bundled wheels on sys.path, so
 tests may import `geoservercloud` and exercise the library contract the plugin
-relies on — without a live server and without the modal error dialog that
+relies on, without a live server and without the modal error dialog that
 `ensure_dependencies()` shows when the import fails.
 """
 

@@ -23,7 +23,7 @@ from qgis.PyQt.QtWidgets import QMessageBox
 from geoserver_manager.__about__ import DIR_PLUGIN_ROOT
 from geoserver_manager.toolbelt.log_handler import PlgLogger
 
-# All bundled WHLs — order matters: deps first, then geoservercloud
+# All bundled WHLs. Order matters: deps first, then geoservercloud
 #
 # The geoservercloud wheel is the upstream one with its geoserver_acceptance_tests
 # package removed (15.3 MB of test fixtures, none of it imported): 16 MB -> 49 KB.
@@ -58,7 +58,7 @@ def _report_resolved_version(logger) -> None:
         )
     else:
         logger(
-            f"geoservercloud {version} from {origin} — the plugin is tested with "
+            f"geoservercloud {version} from {origin}. The plugin is tested with "
             f"{GSC_REQUIRED}; workspace/datastore workarounds may misbehave.",
             log_level=Qgis.MessageLevel.Warning,
             push=True,
@@ -108,13 +108,13 @@ def ensure_dependencies() -> bool:
     """Ensure geoservercloud is installed and importable.
 
     Strategy:
-    1. Direct import — already available, done.
+    1. Direct import: already available, done.
     2. Add bundled WHLs (deps + geoservercloud) to sys.path.
     3. Show error dialog and return False.
 
     :return: True if dependency is available, False otherwise.
     """
-    # The library logs every request payload at DEBUG — a PostGIS or WFS
+    # The library logs every request payload at DEBUG: a PostGIS or WFS
     # store create with its plaintext password included. A DEBUG root handler
     # set up by anything else in QGIS would then write it to disk.
     logging.getLogger("geoservercloud").setLevel(logging.INFO)
@@ -122,7 +122,7 @@ def ensure_dependencies() -> bool:
     logger = PlgLogger().log
 
     # 1. Already importable? (an install in the QGIS profile wins over the
-    #    bundled wheel — say so, and which version it is)
+    #    bundled wheel, say so, and which version it is)
     if _try_import():
         _report_resolved_version(logger)
         return True

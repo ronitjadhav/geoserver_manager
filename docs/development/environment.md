@@ -74,20 +74,20 @@ docker compose ps          # wait until gsm-geoserver is "healthy"
 
 | | |
 | :--- | :--- |
-| GeoServer | <http://localhost:8080/geoserver> — `admin` / `geoserver` |
+| GeoServer | <http://localhost:8080/geoserver>, `admin` / `geoserver` |
 | Database, as seen *from GeoServer* | host `postgis`, port `5432`, database / user / password `geoserver` |
 
 Configure the plugin with that URL and those credentials in *Settings → Options →
 GeoServer Manager*.
 
 The server comes up with GeoServer's demo data: 8 workspaces, 5 datastores, 24
-layers, 21 styles and 3 layer groups — enough for the list views, search and
+layers, 21 styles and 3 layer groups: enough for the list views, search and
 pagination to show something real, and for the upcoming Layers/Styles tabs to
 have resources to list. Note that 4 of the 5 demo datastores are Shapefile or
 GeoPackage, types the plugin cannot edit, so clicking one opens the read-only
 dialog (see issue #28).
 
-For the empty first-run state — "no workspaces yet", which the Add flows and the
+For the empty first-run state, "no workspaces yet", which the Add flows and the
 "create a workspace first" warning are about:
 
 ```sh
@@ -97,14 +97,14 @@ docker compose down -v && SKIP_DEMO_DATA=true docker compose up -d
 The `-v` matters: the demo data is unpacked only when the data-dir volume is
 created, so flipping the variable on an existing volume changes nothing.
 
-PostGIS is part of the stack on purpose — "PostGIS" is the plugin's main
+PostGIS is part of the stack on purpose: "PostGIS" is the plugin's main
 datastore type, and without a reachable database a created store looks fine but
 serves nothing, so the interesting edit behaviour cannot be exercised. Use the
 `postgis` host name, not `localhost`: GeoServer resolves it on the compose
 network, which is why the database port is not published to the host.
 
 A PMTiles datastore *config* can be created against vanilla GeoServer, but
-serving from one needs the community module — see the commented
+serving from one needs the community module; see the commented
 `COMMUNITY_EXTENSIONS` lines in `docker-compose.yml`.
 
 ```sh
@@ -114,7 +114,7 @@ docker compose down -v     # stop and discard both volumes
 ### 4. Load the plugin: symlink (alternative to `QGIS_PLUGINPATH`)
 
 Instead of the environment variable, symlink the `geoserver_manager` package
-into the profile's plugin folder — QGIS then loads the working tree directly and
+into the profile's plugin folder. QGIS then loads the working tree directly and
 only sees the plugin package, not the repo's `docs/`, `tests/` and friends:
 
 ```sh

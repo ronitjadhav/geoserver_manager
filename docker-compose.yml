@@ -7,8 +7,8 @@
 # Point the plugin at http://localhost:8080/geoserver with admin / geoserver
 # (Settings → Options → GeoServer Manager).
 #
-# The server comes up with GeoServer's demo data — five workspaces and their
-# layers, styles, coverage stores and layer groups — so the list views, search
+# The server comes up with GeoServer's demo data: five workspaces and their
+# layers, styles, coverage stores and layer groups, so the list views, search
 # and pagination have something real to show, and the upcoming tabs have
 # resources to list. For the empty first-run state instead:
 #
@@ -24,8 +24,8 @@
 #
 #     host postgis   port 5432   database/user/password  geoserver
 #
-# Those are container-to-container values — GeoServer resolves "postgis" on the
-# compose network — which is why the database port is not published to the host.
+# Those are container-to-container values: GeoServer resolves "postgis" on the
+# compose network, which is why the database port is not published to the host.
 #
 # Throwaway credentials for a local sandbox. Do not reuse them anywhere.
 
@@ -43,7 +43,7 @@ services:
       GEOSERVER_ADMIN_PASSWORD: geoserver
       SKIP_DEMO_DATA: "${SKIP_DEMO_DATA:-false}"
       # A PMTiles *datastore config* can be created on vanilla GeoServer, but
-      # serving from it needs the community module. Uncomment to install it —
+      # serving from it needs the community module. Uncomment to install it;
       # it downloads at every container start, so leave it off unless needed.
       # INSTALL_EXTENSIONS: "true"
       # COMMUNITY_EXTENSIONS: "pmtiles"

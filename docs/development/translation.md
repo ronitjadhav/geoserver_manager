@@ -8,7 +8,7 @@ sudo apt install qttools5-dev-tools  # lrelease and Qt Linguist
 ```
 
 `pylupdate5` is not an option: it silently skips a `translate()` call that black
-wrapped onto several lines, or whose text is written as adjacent string literals —
+wrapped onto several lines, or whose text is written as adjacent string literals:
 65 of the plugin's 455 strings when this was measured. `pylupdate6` parses the
 Python itself. Qt's own `lupdate` cannot read Python at all.
 
@@ -32,7 +32,7 @@ Python itself. Qt's own `lupdate` cannot read Python at all.
     linguist geoserver_manager/resources/i18n/*.ts
     ```
 
-1. Compile — CI does this when packaging, and the `.qm` files are gitignored:
+1. Compile. CI does this when packaging, and the `.qm` files are gitignored:
 
     ```bash
     lrelease geoserver_manager/resources/i18n/*.ts

@@ -1,7 +1,7 @@
 #! python3  # noqa E265
 
 """
-Audit fixes on the Workspaces, Datastores and Layer Groups tabs — each test
+Audit fixes on the Workspaces, Datastores and Layer Groups tabs: each test
 fails on the code before it.
 
 Usage from the repo root folder:
@@ -192,7 +192,7 @@ class TestDatastoreEnabled(unittest.TestCase):
         edit = {f["key"] for f in self.dlg._datastore_fields(["topp"], edit_mode=True)}
         self.assertNotIn("enabled", create)
         self.assertIn("enabled", edit)
-        # Name, Workspace, Type — the order every other form uses
+        # Name, Workspace, Type: the order every other form uses
         self.assertEqual(
             [f["key"] for f in self.dlg._datastore_fields(["topp"])][:3],
             ["name", "workspace", "type"],

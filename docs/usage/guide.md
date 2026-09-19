@@ -7,13 +7,13 @@ entry):
 
 | Field | Notes |
 | :---- | :---- |
-| Base URL | e.g. `https://example.com/geoserver` — must start with `http://` or `https://` |
+| Base URL | e.g. `https://example.com/geoserver`, must start with `http://` or `https://` |
 | Username / Password | kept encrypted in the QGIS authentication database; QGIS asks for its master password |
 | Verify the server's TLS certificate | on by default; untick only for a private CA or a self-signed certificate you trust |
 | Test connection | probes the server with the fields as typed, without saving them |
 
 Then click the toolbar icon. The dialog connects in the background and the
-status line reads *Connected — url (version)*. *Refresh* (F5) reconnects and
+status line reads *Connected: url (version)*. *Refresh* (F5) reconnects and
 reloads the open tab. When something is wrong the status line says what:
 
 | Status | Meaning | What to do |
@@ -22,7 +22,7 @@ reloads the open tab. When something is wrong the status line says what:
 | Server unreachable | nothing answers at that host and port (after 10 s at most) | check the URL, the network, that GeoServer is running |
 | Certificate not trusted | TLS certificate this machine does not trust | fix the CA, or untick the verification for a certificate you trust |
 | Authentication failed | GeoServer answered 401/403 | check username and password |
-| HTTP error *N* | the URL answers, but not with the REST API (a wrong path) | check the URL — it should end in `/geoserver` |
+| HTTP error *N* | the URL answers, but not with the REST API (a wrong path) | check the URL, it should end in `/geoserver` |
 | Not a GeoServer REST endpoint | an HTML page came back (a proxy login page, a portal) | check the URL, or the proxy in front of GeoServer |
 
 Details for every failure go to the QGIS log panel, *GeoServer Manager* tab.
@@ -42,7 +42,7 @@ The list on the left picks the resource type; the table on the right shows it.
 - **Actions**: the button above the table adds or publishes, *Delete Selected*
   removes every highlighted row (Del does the same while the table has the
   focus), and the right-hand column holds the per-row actions.
-- Lists load in the background — QGIS stays usable, the task bar shows the
+- Lists load in the background: QGIS stays usable, the task bar shows the
   progress, and *Refresh* turns into *Cancel* while a load runs.
 
 Every delete asks first and names what it cascades to; GeoServer deletes
@@ -52,8 +52,8 @@ recursively (a workspace takes its stores, layers and styles with it).
 
 *Add a Workspace*: name, optionally isolated, optionally the default. Click a
 name for *Modify workspace settings*: rename, toggle isolation, make it the
-default — GeoServer always has exactly one default workspace, so the box is
-read-only on the current one — and, under *WMS*, the workspace's own WMS
+default (GeoServer always has exactly one default workspace, so the box is
+read-only on the current one), and, under *WMS*, the workspace's own WMS
 service settings (*Own WMS settings*): title, abstract, keywords, SRS list,
 rendering limits, default locale. Unticking *Own WMS settings* removes them
 and the workspace falls back to the global WMS configuration.
@@ -62,14 +62,15 @@ and the workspace falls back to the global WMS configuration.
 
 Listed across every workspace. *Add a Datastore* offers PostGIS, PostGIS
 (JNDI), PMTiles, Shapefile, *Directory of spatial files (shapefiles)*,
-GeoPackage and *Web Feature Server (NG)* — a remote WFS cascaded as a
-datastore, whose feature types then publish like tables — with a form each; any other type gets a *Connection parameters*
+GeoPackage and *Web Feature Server (NG)* (a remote WFS cascaded as a
+datastore, whose feature types then publish like tables) with a form each;
+any other type gets a *Connection parameters*
 editor, one `key = value` per line, exactly as GeoServer stores them.
 
-Click a name to modify a store, or to enable or disable it — GeoServer
+Click a name to modify a store, or to enable or disable it. GeoServer
 disables a store itself when its connection fails at startup. A datastore
 cannot be renamed. The password is
-never shown — GeoServer only returns it encrypted — so the field is blank when
+never shown (GeoServer only returns it encrypted), so the field is blank when
 you edit: leave it empty to keep the stored password, type to replace it. Everything the
 form does not show (extra parameters, the `enabled` flag) is kept as the
 server has it.
@@ -78,8 +79,8 @@ server has it.
 
 *Add a Coverage Store* from a GeoTIFF path on the GeoServer machine, a COG URL,
 or an ImageMosaic (a server directory, or a properties ZIP to upload). The
-*Coverages* action lists the coverages of a store — native name, SRS, size in
-pixels, bounds, bands — and *Publish a coverage* makes one of them a layer,
+*Coverages* action lists the coverages of a store: native name, SRS, size in
+pixels, bounds, bands, and *Publish a coverage* makes one of them a layer,
 with a title, an abstract, keywords and the layer name.
 
 The fifth source, **A raster layer from this QGIS project**, publishes a raster
@@ -88,7 +89,7 @@ it is when the layer already is a plain local GeoTIFF) and uploaded, and
 GeoServer creates the store, the coverage and the layer in that one request.
 Tick *Replace it if it already exists* to overwrite a previous upload. The
 upload runs as a QGIS task: the task bar shows the progress, the dialog stays
-usable, and *Cancel* (the Refresh button while it runs) aborts the transfer —
+usable, and *Cancel* (the Refresh button while it runs) aborts the transfer;
 the message then says what GeoServer kept. A layer without a CRS, or with one
 that has no EPSG code, is refused before anything is sent.
 
@@ -99,24 +100,24 @@ workspace with their type and capabilities URL. *Add a Cascaded Store*: type,
 workspace, name and the remote GetCapabilities URL. Row actions: **Cascaded
 layers** (the layers already published from this store, with their details;
 delete one from the Layers tab), **Publish a layer** (pick one of the layers the remote
-advertises, under its own name or one of yours — GeoServer reads title, SRS
+advertises, under its own name or one of yours; GeoServer reads title, SRS
 and bounds from the remote capabilities), **Delete**. The remote server is
 never touched.
 
 ## Layers
 
-Every layer of the server whatever its type — vector, raster, cascaded WMS or
-WMTS — with its workspace, type, store and default style. Click a name for the
+Every layer of the server whatever its type, vector, raster, cascaded WMS or
+WMTS, with its workspace, type, store and default style. Click a name for the
 details: a vector layer's native name, projection policy, bounding box,
 attributes and metadata; a raster's coverage details; a cascaded layer's remote
 name and store.
 
 *Publish a Layer* has two sources:
 
-- **A table in a datastore** — pick workspace, datastore and table, give the
+- **A table in a datastore**: pick workspace, datastore and table, give the
   EPSG code of its SRS (look it up in the table's geometry column; GeoServer's
   web UI can compute it), add title, abstract and keywords.
-- **A layer from this QGIS project** — a vector layer is written to a GeoPackage
+- **A layer from this QGIS project**: a vector layer is written to a GeoPackage
   and uploaded; GeoServer creates a datastore of that name and publishes the
   layer in one request, and the layer's QGIS symbology is uploaded as its
   default style. A raster layer goes the way the Coverage Stores tab sends it:
@@ -125,15 +126,15 @@ name and store.
   `_`). The upload runs as a QGIS task with progress and *Cancel*; a layer
   whose CRS has no EPSG code is reprojected to EPSG:4326 on the way.
 
-Row actions: **Add to QGIS** (*Load as* WMS, WMTS or, for a vector layer, WFS — the credentials
+Row actions: **Add to QGIS** (*Load as* WMS, WMTS or, for a vector layer, WFS; the credentials
 travel as a QGIS authentication configuration, so a saved project never
 contains a password), **Set style** (pick the default style among the server's
 styles), **Push style from QGIS** (upload the matching project layer's
-symbology and make it the default — it asks before replacing a style that
-exists, since every layer using it would change), **Preview** (the layer on a map of its own inside QGIS — drag to pan,
+symbology and make it the default; it asks before replacing a style that
+exists, since every layer using it would change), **Preview** (the layer on a map of its own inside QGIS: drag to pan,
 wheel to zoom, click for the feature info GeoServer returns there; nothing
 reaches the project), **Preview in a browser** (GeoServer's own OpenLayers
-page, framed on the layer's extent — the browser's session is not the
+page, framed on the layer's extent; the browser's session is not the
 plugin's, so a secured server asks it to log in), **Delete**.
 
 ## Layer groups
@@ -151,22 +152,22 @@ it.
 Global and per-workspace styles, with their format and SLD version.
 *Upload a Style* takes its definition from three sources: **Paste SLD**,
 **From file** (`.sld`, a `.zip` with an SLD and its resources, `.mbstyle`), or
-**From a QGIS layer** — the project layer's symbology exported as SLD 1.1.
+**From a QGIS layer** (the project layer's symbology exported as SLD 1.1).
 Click a name to view and modify the definition (GeoServer shows a stored
 SLD 1.1 document in its 1.0 rendition; the editor says so), next to the legend
-GeoServer renders for the style — fetched while the dialog is open, with a
+GeoServer renders for the style, fetched while the dialog is open, with a
 problem explained in its place rather than a broken image.
 
 Row actions: **Apply to a QGIS layer** (pick a project layer and get the
 server's style on it), **Save to disk** (the definition, whatever its format),
-**Delete** — GeoServer refuses
-to delete a style that a layer still uses.
+**Delete** (GeoServer refuses
+to delete a style that a layer still uses).
 
 ## Tile cache
 
 What GeoWebCache caches: by default every layer and every layer group, listed
 with their gridsets and formats (the *Workspace* column reads `(global)` for a
-global group). Click a name to edit the caching — enabled, gridsets (*Add a
+global group). Click a name to edit the caching: enabled, gridsets (*Add a
 gridset* picks from the server's list), formats and, under *Advanced*,
 meta-tiling, gutter and expiry. Row actions: **Truncate** (deletes the cached
 tiles, after confirmation; they are rendered again on demand), **Remove from
@@ -178,10 +179,10 @@ the published layers and groups that are not cached yet.
 Right-click a vector or raster layer in QGIS's layer tree for the **GeoServer
 Manager** submenu:
 
-- **Push style to GeoServer…** — the layer's symbology becomes the matching
+- **Push style to GeoServer…**: the layer's symbology becomes the matching
   server layer's style, after a confirmation that names the target and lets you
   choose the style name and whether it becomes the layer's default.
-- **Apply style from GeoServer…** — the server layer's style on the QGIS layer,
+- **Apply style from GeoServer…**: the server layer's style on the QGIS layer,
   with a picker when it has several.
 
 A layer loaded from the server (WFS, WMS, WMTS) is matched through its source;
@@ -193,7 +194,7 @@ Outcomes appear in QGIS's own message bar.
 
 | Key | Does |
 | :-- | :--- |
-| F5 | refresh — reconnects and reloads the open tab |
+| F5 | refresh: reconnects and reloads the open tab |
 | Ctrl+F | jump to the search box |
 | Esc | clear the search; with an empty search, close the dialog |
 | Enter | open the selected row |
@@ -208,5 +209,5 @@ Outcomes appear in QGIS's own message bar.
 - The plugin's TLS setting does not reach QGIS's own WMS/WFS providers: a
   layer added to QGIS uses QGIS's certificate handling.
 - The interface follows the QGIS theme, dark ones included, and is translated
-  where a locale exists (a partial French one so far — contributions welcome, see the
+  where a locale exists (a partial French one so far, contributions welcome, see the
   translation page).

@@ -8,7 +8,7 @@ before a single row exists. Tests that care about *what* is loaded use the
 fetch seam directly (`_fetch_x_rows()` is a plain function returning
 `(rows, failures)`); tests that drive a whole loader use this subclass, which
 runs the fetch on the calling thread and renders it immediately. Tests that
-care about the threading itself use the real dialog — see
+care about the threading itself use the real dialog; see
 `tests/qgis/test_dlg_main.py::TestBackgroundLoading`.
 """
 
@@ -16,7 +16,7 @@ from geoserver_manager.gui.dlg_main import GeoServerMainDialog
 
 
 class SyncDialog(GeoServerMainDialog):
-    """Loads tabs — and uploads — synchronously, reporting failures the way the real one does."""
+    """Loads tabs, and uploads, synchronously, reporting failures the way the real one does."""
 
     def _launch_task(
         self,

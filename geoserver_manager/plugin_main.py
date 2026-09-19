@@ -198,7 +198,7 @@ class GeoServerManagerPlugin:
         if not settings.has_credentials():
             QMessageBox.information(
                 self.iface.mainWindow(),
-                self.tr("GeoServer Manager — first connection"),
+                self.tr("GeoServer Manager: first connection"),
                 self.tr(
                     "Welcome to GeoServer Manager.\n\n"
                     "Enter your GeoServer's URL, user name and password on the "
@@ -216,8 +216,8 @@ class GeoServerManagerPlugin:
         if not self.main_dialog:
             self.main_dialog = GeoServerMainDialog(self.iface.mainWindow(), self.iface)
 
-        # refresh_ui only starts the connection probe — it runs in a QgsTask
-        # and calls back when it lands — so the window paints straight away
+        # refresh_ui only starts the connection probe. It runs in a QgsTask
+        # and calls back when it lands, so the window paints straight away
         # even against a host that swallows the SYN (VPN down, firewall DROP).
         self.main_dialog.show()
         self.main_dialog.refresh_ui()

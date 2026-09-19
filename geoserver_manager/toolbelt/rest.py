@@ -60,8 +60,8 @@ class ProgressReader:
 
     `requests` streams anything with read(); __len__ is what gives the request
     its Content-Length. Each read() reports the whole percent sent so far
-    through on_progress — QgsTask.setProgress is thread-safe, so the task's
-    own method fits — and raises UploadCancelled when is_cancelled() says so.
+    through on_progress (QgsTask.setProgress is thread-safe, so the task's
+    own method fits), and raises UploadCancelled when is_cancelled() says so.
     """
 
     def __init__(self, handle, total, on_progress=None, is_cancelled=None):

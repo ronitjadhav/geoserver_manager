@@ -2,7 +2,7 @@
 
 """
 Lock the parts of geoservercloud's behaviour the plugin relies on, using the
-bundled wheel itself — no server needed.
+bundled wheel itself; no server needed.
 
 Usage from the repo root folder:
 

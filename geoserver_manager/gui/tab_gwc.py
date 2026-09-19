@@ -1,7 +1,7 @@
 #! python3  # noqa: E265
 
 """
-Tile Cache tab — the layers GeoWebCache caches, with their gridsets and
+Tile Cache tab: the layers GeoWebCache caches, with their gridsets and
 formats, and the two things one does to a cache: truncate it, stop caching.
 
 Used as a mixin for GeoServerMainDialog.
@@ -9,8 +9,8 @@ Used as a mixin for GeoServerMainDialog.
 GeoWebCache's REST API is XML-first, and on GeoServer 2.28.5 its JSON *writes*
 are broken: a PUT of the very document a GET returned fails with "Duplicate
 field mimeFormats" (every array) or "defaultValue" (the STYLES parameter filter
-loses its class). Every write here is therefore XML — GET `.xml`, edit the
-document, PUT `.xml` — which round-trips byte for byte. Reads stay JSON.
+loses its class). Every write here is therefore XML: GET `.xml`, edit the
+document, PUT `.xml`, which round-trips byte for byte. Reads stay JSON.
 """
 
 import xml.etree.ElementTree as ElementTree
@@ -45,8 +45,8 @@ _NEW_LAYER_XML = (
 # Every user-visible string in this file goes through translate() with this
 # file's own class as the context. self.tr() cannot: pylupdate extracts it
 # under GwcTabMixin, but at runtime self.tr is QObject.tr with the context of
-# the *instance's* class, GeoServerMainDialog — QDialog precedes the mixins in
-# the MRO — so every lookup would miss. A wrapper function would not be
+# the *instance's* class, GeoServerMainDialog. QDialog precedes the mixins in
+# the MRO, so every lookup would miss. A wrapper function would not be
 # extracted at all (pylupdate only understands a literal context), hence the
 # repetition.
 translate = QCoreApplication.translate
@@ -165,14 +165,14 @@ class GwcTabMixin:
             payload = self._check(self.gs.get_gwc_layer(workspace, layer))
         else:
             # TODO(#50): get_gwc_layer() takes a workspace and a layer, so a
-            # global layer group — cached under its bare name — is out of reach.
+            # global layer group (cached under its bare name) is out of reach.
             payload = self._raw_rest("get", self._gwc_layer_path(name)).json()
         if not isinstance(payload, dict):
             raise RuntimeError(f"Unexpected response: {str(payload)[:200]}")
         return payload.get("GeoServerLayer") or {}
 
     def _gwc_layer_xml(self, name):
-        """The same document as XML — the only form a PUT accepts.
+        """The same document as XML: the only form a PUT accepts.
 
         TODO(#50): get_gwc_layer() reads JSON only, and nothing updates a
         cached layer. Workaround: GET the `.xml` rendition and edit it.
@@ -222,7 +222,7 @@ class GwcTabMixin:
     def _gwc_layer_summary(self, detail):
         """(enabled, gridsets, formats) cells; a layer whose GET failed shows dashes."""
         if not isinstance(detail, dict) or not detail:
-            return ("—", "—", "—")
+            return ("-", "-", "-")
         gridsets = ", ".join(
             (
                 str(subset.get("gridSetName", "?"))
@@ -234,8 +234,8 @@ class GwcTabMixin:
         formats = ", ".join(str(fmt) for fmt in as_list(detail.get("mimeFormats")))
         return (
             self._yes_no(detail.get("enabled", True)),
-            gridsets or "—",
-            formats or "—",
+            gridsets or "-",
+            formats or "-",
         )
 
     # -- The document ---------------------------------------------------------
@@ -293,8 +293,8 @@ class GwcTabMixin:
     def _gwc_xml_with_values(xml_text, values):
         """The document with the form's fields written into it. Pure.
 
-        Everything the form does not model — the id, the parameter filters, a
-        gridset's zoom bounds and extent — stays as GeoServer wrote it: a kept
+        Everything the form does not model (the id, the parameter filters, a
+        gridset's zoom bounds and extent) stays as GeoServer wrote it: a kept
         gridset keeps its element, only new ones are created bare.
         """
         gridsets = GwcTabMixin._lines(values.get("gridsets"))
@@ -359,7 +359,7 @@ class GwcTabMixin:
         """PUT the edited document back. Raises on a bad form or an HTTP error."""
         document = self._gwc_xml_with_values(xml_text, values)
         # TODO(#50): no update of a cached layer in the library, and a JSON PUT
-        # fails server-side ("Duplicate field mimeFormats") — XML it is.
+        # fails server-side ("Duplicate field mimeFormats"), so XML it is.
         self._raw_rest(
             "put",
             self._gwc_layer_path(name, "xml"),
@@ -378,8 +378,8 @@ class GwcTabMixin:
                 translate("GwcTabMixin", "'{}' is cached already.").format(name)
             )
         # TODO(#50): publish_gwc_layer() PUTs a JSON template GeoWebCache reads
-        # as a degraded configuration — no formats, 0×0 meta-tiles, a single
-        # gridset, no STYLES filter — after a needless configuration reload.
+        # as a degraded configuration: no formats, 0×0 meta-tiles, a single
+        # gridset, no STYLES filter, after a needless configuration reload.
         # Workaround: PUT the XML document GeoServer itself would write.
         document = self._gwc_xml_with_values(
             _NEW_LAYER_XML.format(name=escape(name)), values
@@ -396,7 +396,7 @@ class GwcTabMixin:
 
         TODO(#50): the library has no seed or truncate call. Workaround: GWC's
         mass-truncate endpoint, the one request that covers every gridset,
-        format and parameter set at once — the seed endpoint takes one
+        format and parameter set at once; the seed endpoint takes one
         combination per request. It wants `text/xml`: `application/xml`, which
         the layer PUTs take, is a 400 "Format extension unknown" here.
         """
@@ -607,7 +607,7 @@ class GwcTabMixin:
             self.show_warning_message(
                 translate(
                     "GwcTabMixin",
-                    "Every published layer is cached already — GeoServer caches new "
+                    "Every published layer is cached already. GeoServer caches new "
                     "layers by itself.",
                 )
             )

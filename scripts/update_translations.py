@@ -7,7 +7,7 @@
 Every .ts in geoserver_manager/resources/i18n/ is updated in one go. Uses
 pylupdate6 (pip install PyQt6), not pylupdate5: that one silently skipped a
 translate() call black had wrapped onto several lines, or whose text was
-written as adjacent literals — 65 of 455 strings when measured. CI runs this
+written as adjacent literals: 65 of 455 strings when measured. CI runs this
 before lrelease at packaging time.
 """
 
@@ -22,4 +22,4 @@ ts_args = [arg for ts in ts_files for arg in ("--ts", str(ts))]
 try:
     sys.exit(subprocess.call(["pylupdate6", "--no-obsolete", *ts_args, str(PLUGIN)]))
 except FileNotFoundError:
-    sys.exit("pylupdate6 not found — python -m pip install PyQt6")
+    sys.exit("pylupdate6 not found. python -m pip install PyQt6")

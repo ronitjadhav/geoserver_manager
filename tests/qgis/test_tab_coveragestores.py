@@ -261,7 +261,7 @@ class TestCoverageStoresTab(unittest.TestCase):
         self.assertEqual(failures, [])
 
     def test_a_workspace_without_stores_is_not_a_failure(self):
-        # GeoServer answers {"coverageStores": ""} — not a list, not an error.
+        # GeoServer answers {"coverageStores": ""}, not a list, not an error.
         self.assertEqual(self.dlg._coverage_store_names("empty"), [])
 
     def test_one_unreadable_workspace_keeps_the_rest(self):
@@ -306,7 +306,7 @@ class TestStoreAndCoverageDetail(unittest.TestCase):
 
     def test_store_without_published_coverages_says_so(self):
         values = CoverageStoreTabMixin._coverage_store_form_values(SFDEM_STORE, [])
-        self.assertEqual(values["coverages"], "—")
+        self.assertEqual(values["coverages"], "-")
 
     def test_coverage_prefill_keeps_the_bbox_keywords_and_bands(self):
         values = CoverageStoreTabMixin._coverage_form_values(SFDEM_COVERAGE)
@@ -325,7 +325,7 @@ class TestStoreAndCoverageDetail(unittest.TestCase):
         values = CoverageStoreTabMixin._coverage_form_values({"name": "bare"})
         self.assertEqual(values["size"], "")
         self.assertEqual(values["bounds"], "")
-        self.assertEqual(values["bands"], "—")
+        self.assertEqual(values["bands"], "-")
 
     def test_the_store_dialog_is_read_only(self):
         dlg = SyncDialog()
@@ -822,7 +822,7 @@ class TestPublishQgisRaster(RasterFixture):
 
         self.dlg.gs = FakeGS(exists=False)
         report()
-        self.assertIn("nothing was left", self.warnings[-1])
+        self.assertIn("Nothing was left", self.warnings[-1])
 
         self.dlg.gs = FakeGS(exists=True)  # a Replace: the store outlives its file
         report()
@@ -831,7 +831,7 @@ class TestPublishQgisRaster(RasterFixture):
 
         self.dlg.gs = None  # a Refresh dropped the client meanwhile
         report()
-        self.assertIn("check the Coverage Stores tab", self.warnings[-1])
+        self.assertIn("Check the Coverage Stores tab", self.warnings[-1])
 
     def test_the_form_shows_that_types_fields_and_prefills_a_safe_name(self):
         self.add_layer("Rivière DEM")

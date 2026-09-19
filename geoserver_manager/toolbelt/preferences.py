@@ -54,7 +54,7 @@ class PlgSettingsStructure:
     # geoserver connection
     geoserver_url: str = ""
     geoserver_auth_cfg_id: str = ""
-    # Off only for a private-CA / self-signed server you trust — the usual
+    # Off only for a private-CA / self-signed server you trust: the usual
     # on-prem case; default on so nothing is silently insecure.
     geoserver_verify_tls: bool = True
 

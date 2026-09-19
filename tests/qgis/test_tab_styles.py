@@ -216,7 +216,7 @@ class TestStylesTab(unittest.TestCase):
                 "sld": SLD,
             }
         )
-        # the definition first, then the body — not create_style_from_string,
+        # the definition first, then the body, not create_style_from_string,
         # which would force the SLD 1.0 content type on any document
         self.assertEqual(
             self.dlg.gs.calls[0], ("definition", "brand_new", "brand_new.sld", None)
@@ -334,7 +334,7 @@ SLD_11 = (
 
 
 class TestStoredVersionIsVisible(unittest.TestCase):
-    """A 1.1 style is served as its 1.0 rendition — the dialog says so."""
+    """A 1.1 style is served as its 1.0 rendition; the dialog says so."""
 
     def setUp(self):
         Recording.opened.clear()

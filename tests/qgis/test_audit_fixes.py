@@ -1,7 +1,7 @@
 #! python3  # noqa E265
 
 """
-Fixes from the September 2026 audit — each test fails on the code before it.
+Fixes from the September 2026 audit: each test fails on the code before it.
 
 Usage from the repo root folder:
 

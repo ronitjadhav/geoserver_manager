@@ -105,7 +105,7 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
 
         The plugin authenticates with HTTP Basic, so over `http://` the
         password is readable by anything on the path. Loopback is exempt:
-        those requests never leave the machine — and a warning on every local
+        those requests never leave the machine, and a warning on every local
         sandbox (this repo ships one) is a warning nobody reads.
         """
         if not (username or password):
@@ -131,7 +131,7 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         settings.version = __version__
         settings.geoserver_verify_tls = self.opt_verify_tls.isChecked()
 
-        # geoserver URL (not sensitive — stored in QgsSettings)
+        # geoserver URL (not sensitive, stored in QgsSettings)
         url = self.txt_gs_url.text().strip()
         parsed = urlparse(url)
         if url and (parsed.username or parsed.password):
@@ -139,7 +139,7 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
             # line, every error banner and the persistent QGIS log.
             self.log(
                 message=self.tr(
-                    "The URL must not carry a user name or password — the fields "
+                    "The URL must not carry a user name or password. The fields "
                     "below do. URL not saved."
                 ),
                 log_level=Qgis.MessageLevel.Warning,
@@ -147,11 +147,11 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
             )
         elif url and not url.startswith(("http://", "https://")):
             # apply() cannot stop the options dialog from closing, so keep the
-            # previous URL and warn — dropping out here would also discard the
+            # previous URL and warn: dropping out here would also discard the
             # credentials the user just typed.
             self.log(
                 message=self.tr(
-                    "GeoServer URL must start with http:// or https:// — URL not saved."
+                    "GeoServer URL must start with http:// or https://. URL not saved."
                 ),
                 log_level=Qgis.MessageLevel.Warning,
                 push=True,
@@ -159,7 +159,7 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         else:
             settings.geoserver_url = url
 
-        # credentials (sensitive — stored encrypted in QgsAuthManager)
+        # credentials (sensitive, stored encrypted in QgsAuthManager)
         username = self.txt_gs_username.text()
         password = self.txt_gs_password.text()
         if not (username or password) and settings.geoserver_auth_cfg_id:
@@ -200,7 +200,7 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
 
         Informs rather than refuses: apply() cannot stop the options dialog
         from closing, and a plain-HTTP server on a trusted network is a
-        legitimate setup — the settings are saved either way.
+        legitimate setup: the settings are saved either way.
         """
         if not self._password_travels_in_clear(url, username, password):
             return
@@ -214,7 +214,7 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         )
 
     def test_connection(self) -> None:
-        """Probe the server with the fields as typed — saved or not."""
+        """Probe the server with the fields as typed, saved or not."""
         url = self.txt_gs_url.text().strip()
         if not url.startswith(("http://", "https://")):
             self._show_test_result(
@@ -226,7 +226,7 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         if parsed.username or parsed.password:
             self._show_test_result(
                 self.tr(
-                    "Take the user name and password out of the URL — the fields "
+                    "Take the user name and password out of the URL. The fields "
                     "below carry them."
                 ),
                 "error",
@@ -244,7 +244,7 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         finally:
             QApplication.restoreOverrideCursor()
         if problem is None:
-            self._show_test_result(self.tr("Connected — GeoServer answered."), "ok")
+            self._show_test_result(self.tr("Connected. GeoServer answered."), "ok")
         else:
             _status, message = problem
             self._show_test_result(message, "error")

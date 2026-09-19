@@ -1,7 +1,7 @@
 #! python3  # noqa: E265
 
 """
-Coverage Stores tab — list and create raster stores, view and publish their
+Coverage Stores tab: list and create raster stores, view and publish their
 coverages, delete a store.
 
 Used as a mixin for GeoServerMainDialog, which provides `_open_workspace_from_row`
@@ -37,7 +37,7 @@ from geoserver_manager.toolbelt.qgis_export import (
 from geoserver_manager.toolbelt.rest import raw_rest
 
 # Store types offered by the Add form. GeoServer knows more (ArcGrid, WorldImage,
-# NetCDF, …); these are the ones the library has a call for — plus the upload
+# NetCDF, …); these are the ones the library has a call for, plus the upload
 # of a raster from this project, which is a GeoTIFF store GeoServer fills itself.
 GEOTIFF = "GeoTIFF"
 COG = "GeoTIFF (COG)"
@@ -67,8 +67,8 @@ _TYPED_KEYS = tuple(
 # Every user-visible string in this file goes through translate() with this
 # file's own class as the context. self.tr() cannot: pylupdate extracts it
 # under CoverageStoreTabMixin, but at runtime self.tr is QObject.tr with the context of the
-# *instance's* class, GeoServerMainDialog — QDialog precedes the mixins in the
-# MRO — so every lookup would miss. A wrapper function would not be extracted
+# *instance's* class, GeoServerMainDialog. QDialog precedes the mixins in the
+# MRO, so every lookup would miss. A wrapper function would not be extracted
 # at all (pylupdate only understands a literal context), hence the repetition.
 translate = QCoreApplication.translate
 
@@ -84,7 +84,7 @@ class CoverageStoreTabMixin:
             translate("CoverageStoreTabMixin", "Add a Coverage Store"),
             translate(
                 "CoverageStoreTabMixin",
-                "Create a raster store from a GeoTIFF, a COG, an ImageMosaic — or "
+                "Create a raster store from a GeoTIFF, a COG, an ImageMosaic, or "
                 "a raster layer of this project, uploaded and published",
             ),
             self._add_coverage_store,
@@ -103,7 +103,7 @@ class CoverageStoreTabMixin:
                 self._show_coverages,
                 translate(
                     "CoverageStoreTabMixin",
-                    "Coverages — the rasters this store holds, published or not, "
+                    "Coverages: the rasters this store holds, published or not, "
                     "with their details.",
                 ),
             ),
@@ -113,7 +113,7 @@ class CoverageStoreTabMixin:
                 self._publish_coverage,
                 translate(
                     "CoverageStoreTabMixin",
-                    "Publish a coverage — make one of the store's rasters a layer.",
+                    "Publish a coverage: make one of the store's rasters a layer.",
                 ),
             ),
             (
@@ -122,7 +122,7 @@ class CoverageStoreTabMixin:
                 self._delete_coverage_store,
                 translate(
                     "CoverageStoreTabMixin",
-                    "Delete — remove the store, its coverages and their layers "
+                    "Delete: remove the store, its coverages and their layers "
                     "(asks first).",
                 ),
             ),
@@ -171,7 +171,7 @@ class CoverageStoreTabMixin:
     def _coverage_store_names(self, workspace_name):
         """Coverage-store names of one workspace. Raises on HTTP errors.
 
-        TODO(#50): upstream as get_coverage_stores(ws) — the library has
+        TODO(#50): upstream as get_coverage_stores(ws); the library has
         get_coverage_store() for one store but no call that lists them, so the
         whole tab would have nothing to show. Workaround: GET the collection.
         """
@@ -186,14 +186,14 @@ class CoverageStoreTabMixin:
         """(type, number of published coverages). Raises on HTTP errors."""
         detail = self._coverage_store_detail(workspace_name, name)
         published = self._published_coverage_names(workspace_name, name)
-        return detail.get("type", "—"), len(published)
+        return detail.get("type", "-"), len(published)
 
     # -- One store -------------------------------------------------------------
 
     def _coverage_store_detail(self, workspace_name, name):
         """One coverage store, as GeoServer stores it.
 
-        TODO(#50): upstream — get_coverage_store() exists, but its model drops
+        TODO(#50): upstream: get_coverage_store() exists, but its model drops
         the store's description, and CoverageStore.put_payload() raises
         NotImplementedError, so there is no way to edit a store either.
         Workaround: GET the store path.
@@ -205,8 +205,8 @@ class CoverageStoreTabMixin:
     def _published_coverage_names(self, workspace_name, store_name):
         """The store's coverages that are published as layers.
 
-        TODO(#50): upstream as get_coverages(ws, store, list="configured") —
-        the library hardcodes `list=all`, which returns every coverage the
+        TODO(#50): upstream as get_coverages(ws, store, list="configured").
+        The library hardcodes `list=all`, which returns every coverage the
         store can expose, published or not. Both are needed: "all" to offer
         publish candidates, "configured" to say what is live.
         """
@@ -262,7 +262,7 @@ class CoverageStoreTabMixin:
             "url": detail.get("url", ""),
             "enabled": str(detail.get("enabled", "")),
             "description": detail.get("description", ""),
-            "coverages": "\n".join(published) or "—",
+            "coverages": "\n".join(published) or "-",
         }
 
     def _show_coverage_store_info(self, row_data):
@@ -287,7 +287,7 @@ class CoverageStoreTabMixin:
             ),
             description=translate(
                 "CoverageStoreTabMixin",
-                "Read-only in this version — edit it in GeoServer's web UI.",
+                "Read-only in this version. Edit it in GeoServer's web UI.",
             ),
             fields=self._coverage_store_info_fields(),
             values=dict(
@@ -304,7 +304,7 @@ class CoverageStoreTabMixin:
     def _coverage_detail(self, workspace_name, store_name, name):
         """One coverage, as GeoServer stores it.
 
-        TODO(#50): upstream — get_coverage() exists, but Coverage.asdict()
+        TODO(#50): upstream: get_coverage() exists, but Coverage.asdict()
         drops nativeBoundingBox, latLonBoundingBox and keywords, which is most
         of what a detail view is for. Workaround: GET the coverage path.
         """
@@ -364,7 +364,7 @@ class CoverageStoreTabMixin:
             # GeoServer's own "Generated from <file>" note on a configured
             # coverage, worth showing only when nobody wrote an abstract.
             "abstract": detail.get("abstract") or detail.get("description") or "",
-            "bands": bands or "—",
+            "bands": bands or "-",
         }
 
     def _coverage_fields(self, names):
@@ -441,7 +441,7 @@ class CoverageStoreTabMixin:
             self.show_warning_message(
                 translate(
                     "CoverageStoreTabMixin",
-                    "'{}' has no published coverage yet — use Publish a coverage.",
+                    "'{}' has no published coverage yet. Use Publish a coverage.",
                 ).format(store_name)
             )
             return
@@ -468,8 +468,8 @@ class CoverageStoreTabMixin:
     def _publishable_coverages(self, workspace_name, store_name):
         """Coverages the store exposes that are not published yet.
 
-        The library's get_coverages() answers `list=all` — everything the store
-        can expose — so the candidates are that list minus what is already
+        The library's get_coverages() answers `list=all` (everything the store
+        can expose), so the candidates are that list minus what is already
         configured (see _published_coverage_names).
         """
         every = [
@@ -627,7 +627,7 @@ class CoverageStoreTabMixin:
                 "help": translate(
                     "CoverageStoreTabMixin",
                     "A ZIP holding indexer.properties, datastore.properties and at "
-                    "least one granule — GeoServer refuses a properties-only "
+                    "least one granule. GeoServer refuses a properties-only "
                     "archive. Nothing is published yet. Give the indexer a Name "
                     "nobody used before: deleting a mosaic store leaves its "
                     "granule index table behind, and a re-used name picks it up.",
@@ -644,7 +644,7 @@ class CoverageStoreTabMixin:
                 "help": translate(
                     "CoverageStoreTabMixin",
                     "File-based rasters of this project. The layer is written to a "
-                    "GeoTIFF and uploaded — a copy, not a link — and GeoServer "
+                    "GeoTIFF and uploaded (a copy, not a link), and GeoServer "
                     "publishes it under the store's name. The export to GeoTIFF "
                     "runs before the upload and may take a moment; the upload "
                     "itself runs in the background.",
@@ -705,7 +705,7 @@ class CoverageStoreTabMixin:
             description=translate(
                 "CoverageStoreTabMixin",
                 "A coverage store is a source of rasters. Creating it does not "
-                "publish anything — except an ImageMosaic from a directory, which "
+                "publish anything, except an ImageMosaic from a directory, which "
                 "discovers its coverages itself, and a raster uploaded from this "
                 "project, which GeoServer publishes as a layer on arrival.",
             ),
@@ -752,7 +752,7 @@ class CoverageStoreTabMixin:
         2.28.5 with both the object and the array payload shape), so without
         GeoServer's COG extension the store ends up a plain GeoTIFF that reads
         whole files instead of ranges. That still works, so it is a warning
-        rather than a failure — but it must not pass unmentioned.
+        rather than a failure, but it must not pass unmentioned.
         """
         if values["type"] != COG:
             return
@@ -764,7 +764,7 @@ class CoverageStoreTabMixin:
             self.show_warning_message(
                 translate(
                     "CoverageStoreTabMixin",
-                    "'{}' was created, but GeoServer dropped the COG settings — it "
+                    "'{}' was created, but GeoServer dropped the COG settings. It "
                     "will read whole files instead of ranges. Is the COG extension "
                     "installed on the server?",
                 ).format(values["name"])
@@ -779,7 +779,7 @@ class CoverageStoreTabMixin:
         name, ws_name, store_type = values["name"], values["workspace"], values["type"]
         self._require_safe_name(name)
         # create_coverage_store POSTs to the collection, and GeoServer answers
-        # 409 for a name in use — but the message is clearer from here, and the
+        # 409 for a name in use, but the message is clearer from here, and the
         # mosaic calls are PUTs, which overwrite the store instead.
         if self._resource_exists(self.gs.get_coverage_store, ws_name, name):
             raise ValueError(
@@ -814,7 +814,7 @@ class CoverageStoreTabMixin:
         being read into memory under the wait cursor.
 
         TODO(#50): create_imagemosaic_store_from_properties_zip() takes bytes
-        only — a file-like body would let the library stream it. Until then this
+        only. A file-like body would let the library stream it. Until then this
         is its PUT (…/file.imagemosaic?configure=none, application/zip) done raw.
         """
         if not self._upload_slot_free():
@@ -878,13 +878,13 @@ class CoverageStoreTabMixin:
         reach it, and deleting the store leaves the file in the data directory.
 
         The layer, its CRS, the name check and the export happen here on the
-        GUI thread — a live QGIS layer, invariant 9 — and the PUTs stream in a
+        GUI thread (a live QGIS layer, invariant 9), and the PUTs stream in a
         task through _upload_file, with progress and Cancel. `layer` is given
         when the Layers tab's *Publish a Layer* routes a raster here; else it
         is the one the coverage-store form picked.
 
         TODO(#50): upstream as create_coverage_store_from_file(ws, name, path,
-        coverage_name=None) — create_coverage_store() only points at a path
+        coverage_name=None). create_coverage_store() only points at a path
         already on the server, so the upload is a raw PUT of
         .../coveragestores/{name}/file.geotiff (row 31).
         """
@@ -918,7 +918,7 @@ class CoverageStoreTabMixin:
             if metadata:
                 # A partial coverage PUT merges (measured), so the SRS, bounds
                 # and grid read from the file stay. TODO(#50): update_coverage(
-                # ws, store, name, title=…, abstract=…) — create_coverage()
+                # ws, store, name, title=…, abstract=…); create_coverage()
                 # POSTs a new one (row 32).
                 raw_rest(client, "put", metadata_path, json={"coverage": metadata})
 
@@ -957,8 +957,8 @@ class CoverageStoreTabMixin:
 
         Returns (path, temporary folder or None). Refuses, before any request,
         a raster with no file behind it, a layer without a CRS or with one
-        GeoServer cannot declare — a raster is uploaded as it is, never
-        reprojected — and a taken name unless *Replace* is ticked, because the
+        GeoServer cannot declare (a raster is uploaded as it is, never
+        reprojected), and a taken name unless *Replace* is ticked, because the
         PUT would overwrite the store silently.
         """
         layer = layer or raster_layer_by_label(values["qgis_layer"])
@@ -966,7 +966,7 @@ class CoverageStoreTabMixin:
             raise ValueError(
                 translate(
                     "CoverageStoreTabMixin",
-                    "'{}' has no file to upload — a WMS, XYZ or other remote raster "
+                    "'{}' has no file to upload. A WMS, XYZ or other remote raster "
                     "cannot be published this way.",
                 ).format(layer.name())
             )
@@ -976,7 +976,7 @@ class CoverageStoreTabMixin:
                 translate(
                     "CoverageStoreTabMixin",
                     "'{}' uses a CRS without an EPSG code, which GeoServer cannot "
-                    "declare. Reproject the raster in QGIS first — rasters are "
+                    "declare. Reproject the raster in QGIS first, rasters are "
                     "uploaded as they are.",
                 ).format(layer.name())
             )

@@ -191,7 +191,7 @@ class TestTestConnection(unittest.TestCase):
         self.assertIn("Connected", self.page.lbl_test_result.text())
 
     def test_a_problem_shows_its_message(self):
-        problem = ("Server unreachable", "Cannot reach GeoServer — is it running?")
+        problem = ("Server unreachable", "Cannot reach GeoServer, is it running?")
         with self.probe(problem):
             self.page.btn_test_connection.click()
         self.assertIn("is it running", self.page.lbl_test_result.text())

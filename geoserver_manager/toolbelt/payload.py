@@ -4,8 +4,8 @@
 GeoServer's JSON payload shapes, tolerated in one place.
 
 A collection comes back as `{"layers": {"layer": [...]}}`, but an empty one
-is `{"layers": ""}`, a one-entry one may wrap a bare object — or, for the
-`list=available` and GeoWebCache answers, a bare string — instead of a
+is `{"layers": ""}`, a one-entry one may wrap a bare object, or, for the
+`list=available` and GeoWebCache answers, a bare string, instead of a
 one-item list. Every tab used to carry its own copy of these rules.
 
 No QGIS import: the unit suite runs this on a plain Python.
@@ -45,7 +45,7 @@ def crs_text(value):
 def bbox_text(box):
     """One line for a bounding box, or "" when it is not one.
 
-    `minx, miny → maxx, maxy  (crs)` — the same words on every tab.
+    `minx, miny → maxx, maxy  (crs)`, the same words on every tab.
     """
     if not isinstance(box, dict) or not {"minx", "miny", "maxx", "maxy"} <= set(box):
         return ""

@@ -4,8 +4,8 @@
 Turning a QGIS layer into something GeoServer can ingest: a name it can carry,
 a GeoPackage for a vector layer, a GeoTIFF for a raster.
 
-`geoserver_name` imports nothing from QGIS, so the naming rules — the part that
-is easy to get subtly wrong — are tested in an interpreter without QGIS, like
+`geoserver_name` imports nothing from QGIS, so the naming rules (the part that
+is easy to get subtly wrong) are tested in an interpreter without QGIS, like
 the CI unit job. The export functions read a live layer and must run on the
 GUI thread (invariant 9 in CLAUDE.md).
 """
@@ -20,12 +20,12 @@ _RUNS = re.compile(r"_{2,}")
 
 
 def geoserver_name(text):
-    """A GeoServer-safe name derived from `text` — a QGIS layer name, usually.
+    """A GeoServer-safe name derived from `text`, a QGIS layer name, usually.
 
     Accents are folded ("Rivière" → "Riviere"), anything else outside
     [A-Za-z0-9_.-] becomes an underscore, and runs of underscores collapse.
     Separators at either end go, so "  Roads (2024) " is "Roads_2024" rather
-    than "_Roads_2024_" — except a leading underscore the caller actually
+    than "_Roads_2024_", except a leading underscore the caller actually
     typed, which is kept. A name left starting with a digit gets one
     underscore in front: an NCName may start with an underscore, so the digit
     does not have to be thrown away.
@@ -57,7 +57,7 @@ def require_crs(layer):
 
         raise ValueError(
             QCoreApplication.translate(
-                "QgisExport", "'{}' has no CRS — set one in its layer properties first."
+                "QgisExport", "'{}' has no CRS. Set one in its layer properties first."
             ).format(layer.name())
         )
 
@@ -107,7 +107,7 @@ def export_to_geopackage(layer, path, table_name, target_crs=None):
     result = QgsVectorFileWriter.writeAsVectorFormatV3(
         layer, str(path), QgsCoordinateTransformContext(), options
     )
-    # (error code, message, …) — the tuple grew across QGIS versions.
+    # (error code, message, …); the tuple grew across QGIS versions.
     if result[0] != QgsVectorFileWriter.WriterError.NoError:
         detail = next(
             (item for item in result[1:] if isinstance(item, str) and item), ""
@@ -138,7 +138,7 @@ def unique_labels(entries):
 
 
 def raster_project_layers():
-    """The project's file-based rasters, as [(label, layer)] — what can be uploaded.
+    """The project's file-based rasters, as [(label, layer)]: what can be uploaded.
 
     GDAL-provided layers only: a WMS or XYZ layer has no file to send, and the
     raster writer would only render it at screen resolution. The label carries
@@ -157,7 +157,7 @@ def raster_project_layers():
 def raster_layer_by_label(label):
     """The layer a `raster_project_layers` label points at.
 
-    Raises ValueError when it has left the project since the form was filled —
+    Raises ValueError when it has left the project since the form was filled;
     a dialog can sit open for a long time.
     """
     for candidate, layer in raster_project_layers():
@@ -194,7 +194,7 @@ def local_geotiff_path(layer):
 def export_to_geotiff(layer, path):
     """Write a QGIS raster layer as a tiled, DEFLATE-compressed GeoTIFF.
 
-    GUI thread only. The grid is the provider's own — no resampling — and the
+    GUI thread only. The grid is the provider's own (no resampling), and the
     CRS is the layer's: a CRS override set in QGIS is written into the file,
     which is what an override means, without reprojecting the pixels
     (measured). Raises RuntimeError when QGIS cannot write it.
