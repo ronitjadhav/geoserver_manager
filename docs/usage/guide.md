@@ -66,7 +66,9 @@ GeoPackage and *Web Feature Server (NG)* — a remote WFS cascaded as a
 datastore, whose feature types then publish like tables — with a form each; any other type gets a *Connection parameters*
 editor, one `key = value` per line, exactly as GeoServer stores them.
 
-Click a name to modify a store. A datastore cannot be renamed. The password is
+Click a name to modify a store, or to enable or disable it — GeoServer
+disables a store itself when its connection fails at startup. A datastore
+cannot be renamed. The password is
 never shown — GeoServer only returns it encrypted — so the field is blank when
 you edit: leave it empty to keep the stored password, type to replace it. Everything the
 form does not show (extra parameters, the `enabled` flag) is kept as the
@@ -95,8 +97,8 @@ that has no EPSG code, is refused before anything is sent.
 The WMS and WMTS stores that proxy another server, listed across every
 workspace with their type and capabilities URL. *Add a Cascaded Store*: type,
 workspace, name and the remote GetCapabilities URL. Row actions: **Cascaded
-layers** (the layers already published from this store, with their details
-and a delete), **Publish a layer** (pick one of the layers the remote
+layers** (the layers already published from this store, with their details;
+delete one from the Layers tab), **Publish a layer** (pick one of the layers the remote
 advertises, under its own name or one of yours — GeoServer reads title, SRS
 and bounds from the remote capabilities), **Delete**. The remote server is
 never touched.
@@ -111,12 +113,14 @@ name and store.
 
 *Publish a Layer* has two sources:
 
-- **A table in a datastore** — pick workspace, datastore and table, declare
-  the SRS, add title, abstract and keywords.
-- **A layer from this QGIS project** — the layer is written to a GeoPackage and
-  uploaded; GeoServer creates a datastore of that name and publishes the layer
-  in one request, and the layer's QGIS symbology is uploaded as its default
-  style. Tick *Replace it if it already exists* to overwrite a previous upload.
+- **A table in a datastore** — pick workspace, datastore and table, give the
+  EPSG code of its SRS (look it up in the table's geometry column; GeoServer's
+  web UI can compute it), add title, abstract and keywords.
+- **A layer from this QGIS project** — a vector layer is written to a GeoPackage
+  and uploaded; GeoServer creates a datastore of that name and publishes the
+  layer in one request, and the layer's QGIS symbology is uploaded as its
+  default style. A raster layer goes the way the Coverage Stores tab sends it:
+  a GeoTIFF, uploaded and published as a coverage. Tick *Replace it if it already exists* to overwrite a previous upload.
   The layer's name is made GeoServer-safe first (spaces and accents become
   `_`). The upload runs as a QGIS task with progress and *Cancel*; a layer
   whose CRS has no EPSG code is reprojected to EPSG:4326 on the way.
@@ -124,8 +128,9 @@ name and store.
 Row actions: **Add to QGIS** (*Load as* WMS, WMTS or, for a vector layer, WFS — the credentials
 travel as a QGIS authentication configuration, so a saved project never
 contains a password), **Set style** (pick the default style among the server's
-styles), **Style from QGIS** (upload the matching project layer's symbology
-and make it the default), **Preview** (the layer on a map of its own inside QGIS — drag to pan,
+styles), **Push style from QGIS** (upload the matching project layer's
+symbology and make it the default — it asks before replacing a style that
+exists, since every layer using it would change), **Preview** (the layer on a map of its own inside QGIS — drag to pan,
 wheel to zoom, click for the feature info GeoServer returns there; nothing
 reaches the project), **Preview in a browser** (GeoServer's own OpenLayers
 page, framed on the layer's extent — the browser's session is not the
@@ -153,7 +158,8 @@ GeoServer renders for the style — fetched while the dialog is open, with a
 problem explained in its place rather than a broken image.
 
 Row actions: **Apply to a QGIS layer** (pick a project layer and get the
-server's style on it), **Save as SLD** (to disk), **Delete** — GeoServer refuses
+server's style on it), **Save to disk** (the definition, whatever its format),
+**Delete** — GeoServer refuses
 to delete a style that a layer still uses.
 
 ## Tile cache
