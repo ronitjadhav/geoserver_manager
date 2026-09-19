@@ -14,6 +14,7 @@ document, PUT `.xml` — which round-trips byte for byte. Reads stay JSON.
 """
 
 import xml.etree.ElementTree as ElementTree
+from urllib.parse import quote
 from xml.sax.saxutils import escape
 
 from qgis.PyQt.QtCore import QCoreApplication
@@ -21,6 +22,7 @@ from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.scope import GLOBAL
+from geoserver_manager.toolbelt.payload import as_list
 
 _XML = {"Content-Type": "application/xml"}
 
@@ -105,7 +107,7 @@ class GwcTabMixin:
         ]
         self._setup_table(
             [
-                translate("GwcTabMixin", "Layer"),
+                translate("GwcTabMixin", "Name"),
                 translate("GwcTabMixin", "Workspace"),
                 translate("GwcTabMixin", "Enabled"),
                 translate("GwcTabMixin", "Gridsets"),
@@ -138,8 +140,12 @@ class GwcTabMixin:
         return self.gs.rest_service.gwc_endpoints.base_url
 
     def _gwc_layer_path(self, name, ext="json"):
-        """REST path of one cached layer, by its qualified (or bare) name."""
-        return f"{self._gwc_base()}/layers/{name}.{ext}"
+        """REST path of one cached layer, by its qualified (or bare) name.
+
+        Quoted: `requests` would send `layers/a#b.json` as `layers/a`. The
+        `:` between workspace and layer is part of GWC's own naming.
+        """
+        return f"{self._gwc_base()}/layers/{quote(name, safe=':')}.{ext}"
 
     def _gwc_layer_names(self):
         """Every layer GeoWebCache caches: `ws:name`, a global layer group bare.
@@ -213,16 +219,7 @@ class GwcTabMixin:
         workspace, _, _layer = name.rpartition(":")
         return workspace or GLOBAL
 
-    @staticmethod
-    def _as_list(value):
-        """GeoWebCache's JSON writes an empty collection as "" and may write a
-        one-entry collection bare."""
-        if value in (None, ""):
-            return []
-        return [value] if isinstance(value, (dict, str)) else list(value)
-
-    @staticmethod
-    def _gwc_layer_summary(detail):
+    def _gwc_layer_summary(self, detail):
         """(enabled, gridsets, formats) cells; a layer whose GET failed shows dashes."""
         if not isinstance(detail, dict) or not detail:
             return ("—", "—", "—")
@@ -232,12 +229,14 @@ class GwcTabMixin:
                 if isinstance(subset, dict)
                 else str(subset)
             )
-            for subset in GwcTabMixin._as_list(detail.get("gridSubsets"))
+            for subset in as_list(detail.get("gridSubsets"))
         )
-        formats = ", ".join(
-            str(fmt) for fmt in GwcTabMixin._as_list(detail.get("mimeFormats"))
+        formats = ", ".join(str(fmt) for fmt in as_list(detail.get("mimeFormats")))
+        return (
+            self._yes_no(detail.get("enabled", True)),
+            gridsets or "—",
+            formats or "—",
         )
-        return (str(detail.get("enabled", True)), gridsets or "—", formats or "—")
 
     # -- The document ---------------------------------------------------------
 
@@ -373,6 +372,7 @@ class GwcTabMixin:
         name = (values.get("layer") or "").strip()
         if not name:
             raise ValueError(translate("GwcTabMixin", "Pick a layer."))
+        self._require_safe_name(name)
         if self._gwc_layer_exists(name):
             raise ValueError(
                 translate("GwcTabMixin", "'{}' is cached already.").format(name)
@@ -664,7 +664,7 @@ class GwcTabMixin:
                 "GwcTabMixin",
                 "Every tile GeoWebCache stored for this layer is deleted, in every "
                 "gridset and format. The layer and its cache configuration stay; "
-                "tiles are rendered again on request.\n\n",
+                "tiles are rendered again on request.",
             ),
         ):
             return
@@ -696,6 +696,6 @@ class GwcTabMixin:
             cascade=translate(
                 "GwcTabMixin",
                 "The cached tiles and the cache configuration are removed; the layer "
-                "itself stays published and can be added to the cache again.\n\n",
+                "itself stays published and can be added to the cache again.",
             ),
         )

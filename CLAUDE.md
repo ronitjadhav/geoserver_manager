@@ -175,11 +175,15 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   stateless, so worker-safe — but it returns the raw `Response`: an OGC exception is **HTTP 200 with an
   XML body**, so the content type decides, and it runs with the client's 120 s timeout. GetLegendGraphic
   needs a `LAYER` even for a stored style; the layer only supplies the rendering context, so
-  `tab_styles.py` takes one from the global `/rest/layers.json` (the facade has no `get_layers()` and
-  `RestEndpoints` no path for it — its `layers()` / `layer()` are GeoWebCache's), preferring the
-  style's own workspace, and explains
-  in the `image` field when there is none. The legend lands through `_run_in_task` into a modal dialog
-  that may already be closed — the landing checks `finished` and `sip.isdeleted` first. *Preview in a
+  `tab_styles.py` takes the first layer of the style's own workspace collection,
+  `/rest/workspaces/{ws}/layers.json` — names come back **bare** there, so it re-qualifies them — and
+  the global `/rest/layers.json` for a global style (the facade has no `get_layers()` and `RestEndpoints`
+  no path for either — its `layers()` / `layer()` are GeoWebCache's), and explains in the `image` field
+  when there is none. The legend lands through `_run_quietly` — its own task slot, so it neither
+  supersedes a load nor turns Refresh into Cancel — into a modal dialog that may already be closed; the
+  landing checks `finished` and `sip.isdeleted` first. The Styles table's Format and Version columns
+  cost one definition GET per style, fanned out: whether a style is SLD decides what *Apply to a QGIS
+  layer* can do with it. *Preview in a
   browser* is GeoServer's own OpenLayers GetMap page, built by the pure `_preview_url` from
   `latLonBoundingBox` (a group: its `bounds`) with a world fallback; the browser's session is not the
   plugin's, so a secured server asks it to log in, which the tooltip says.
@@ -270,7 +274,11 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   the *plugin's* machine, forces EPSG:4326 and deletes an existing layer first); a cascaded layer
   DELETE needs `recurse=true` or GeoServer answers 403 "wms layer referenced by layer(s)"; a store
   DELETE with `recurse=true` takes its layers along. Cascaded layers also appear in the Layers tab (it
-  reads `/rest/layers`), which reaches this tab's detail and delete helpers for them.
+  reads `/rest/layers`), which reaches this tab's detail and delete helpers for them — the tab's own
+  *Cascaded layers* dialog is a viewer, deleting is the Layers tab's action. Names go into the library's
+  path builders **pre-quoted** (`_q`, `quote(name, safe="")`): `RestEndpoints` interpolates them raw and
+  `requests` sends `stores/a#b.json` as `stores/a`; `tab_styles.py` (`_style_path`) and `tab_gwc.py`
+  (`_gwc_layer_path`, `safe=":"` for `ws:layer`) do the same, all to drop once the library quotes.
 - **Tile cache — GeoWebCache** (rows 42–47 of #50): GeoServer caches every layer and layer group
   by itself, so `GET /gwc/rest/layers.json` — a bare JSON array of names, `ws:name`, a global group bare —
   lists about everything published, and *Add a Layer to the Cache* only ever offers what was removed.

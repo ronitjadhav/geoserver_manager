@@ -18,6 +18,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   with that name, instead of coming back as GeoServer's HTTP error.
 - Editing a workspace without renaming it is one PUT; it used to POST,
   collect a 409 and PUT.
+- A style, cascaded store, cascaded layer or tile-cache name with `/`, `?`,
+  `#` or `%` is refused before any request, and names the server already
+  holds are URL-quoted on their way into this plugin's REST paths —
+  `requests` sent `styles/a#b.json` as `styles/a`, a different style.
+- The style dialog's legend picks its context layer from the style's own
+  workspace listing instead of the whole server's layer list.
+- The cascaded-layers dialog was a viewer whose primary button — Enter —
+  deleted the selected layer. It is a viewer; a cascaded layer is deleted
+  from the Layers tab, like any other.
 - The Layers tab listed only the feature types it found by walking the
   datastores, so a raster layer — including one just published from QGIS —
   and a cascaded WMS or WMTS layer never appeared there. It now shows
@@ -48,6 +57,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   an Opaque Container is. The first column of the Workspaces, Datastores
   and Layer Groups tables is *Name*; the datastore form lists Name,
   Workspace, Type like every other form; Enabled cells read Yes / No.
+- Styles, Cascaded Stores and Tile Cache: the first column is *Name*, an
+  *Enabled* cell reads Yes / No rather than Python's `True` / `False`, and
+  the style row actions say what they do — *Save to disk* (the body, whatever
+  its format, not only SLD) and a tooltip on *Apply to a QGIS layer* that
+  names the layer tree's *Apply style from GeoServer* as the same thing from
+  the other end. The style editor's description says what Save does.
 - Editing a PostGIS store no longer demands the password again: leave the
   field empty to keep the stored one, type to replace it. GeoServer accepts
   its own encrypted value back — measured, a store still connected after the
@@ -59,6 +74,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   a store itself when its connection fails at startup; this is the switch
   back (measured: a disabled PostGIS store re-enabled through the form and
   listed its tables again, every other parameter kept).
+- The Styles table shows each style's **format** (SLD, CSS, MBStyle) and
+  **SLD version** — what *Apply to a QGIS layer* can take is SLD only.
 - **Web Feature Server (NG) datastores** — a remote WFS cascaded as a
   datastore — get a form of their own: capabilities URL, optional
   credentials, timeout, max features, lenient parsing. Its feature types then

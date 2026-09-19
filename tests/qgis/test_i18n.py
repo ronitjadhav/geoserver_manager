@@ -173,7 +173,7 @@ class TestRuntimeContext(unittest.TestCase):
 
         # Before the fix these read "Style Name": the lookup used
         # GeoServerMainDialog, where the string was never extracted.
-        self.assertIn("[StyleTabMixin] Style Name", self.headers())
+        self.assertIn("[StyleTabMixin] Name", self.headers())
         self.assertIn("[StyleTabMixin] Workspace", self.headers())
 
     def test_each_tab_uses_its_own_context(self):
@@ -194,7 +194,7 @@ class TestRuntimeContext(unittest.TestCase):
         self.dlg._load_workspaces()
         self.assertIn("[WorkspaceTabMixin] Name", self.headers())
         self.dlg._load_styles()
-        self.assertIn("[StyleTabMixin] Style Name", self.headers())
+        self.assertIn("[StyleTabMixin] Name", self.headers())
 
     def test_the_actions_column_still_resizes_when_translated(self):
         """Its label is compared, so both sides must share one context."""

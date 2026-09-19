@@ -14,7 +14,7 @@ from qgis.PyQt.QtWidgets import QDialog
 from qgis.testing import start_app, unittest
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.gui.tab_cascaded import WMS, WMTS, CascadedStoreTabMixin
+from geoserver_manager.gui.tab_cascaded import WMS, WMTS
 from tests.qgis.sync_dialog import SyncDialog
 
 start_app()
@@ -223,8 +223,8 @@ class FakeGS:
         return ("", 200)
 
 
-REMOTE_ROW = ["remote", "topp", WMS, "True", CAPS]
-TILES_ROW = ["tiles", "sf", WMTS, "False", TILES]
+REMOTE_ROW = ["remote", "topp", WMS, "Yes", CAPS]
+TILES_ROW = ["tiles", "sf", WMTS, "No", TILES]
 
 
 class TestListing(unittest.TestCase):
@@ -245,9 +245,7 @@ class TestListing(unittest.TestCase):
         self.assertEqual(self.dlg.btn_add.text(), "Add a Cascaded Store")
 
     def test_a_store_whose_get_fails_shows_dashes(self):
-        self.assertEqual(
-            CascadedStoreTabMixin._cascaded_store_summary(None), ("—", "—")
-        )
+        self.assertEqual(self.dlg._cascaded_store_summary(None), ("—", "—"))
 
     def test_layer_names_configured_and_advertised(self):
         self.assertEqual(
@@ -384,17 +382,17 @@ class TestCascadedLayers(unittest.TestCase):
         )
 
     def test_layer_form_values_read_both_payload_shapes(self):
-        from_library = CascadedStoreTabMixin._cascaded_layer_form_values(STATES_DETAIL)
+        from_library = self.dlg._cascaded_layer_form_values(STATES_DETAIL)
         self.assertEqual(from_library["native_name"], "topp:states")
         self.assertEqual(from_library["keywords"], "census, states")
+        # the one bounding-box format every tab uses (toolbelt/payload.py)
         self.assertEqual(
-            from_library["bounds"], "-124.73 24.96 — -66.97 49.37 (EPSG:4326)"
+            from_library["bounds"], "-124.73, 24.96 → -66.97, 49.37  (EPSG:4326)"
         )
-        raw = CascadedStoreTabMixin._cascaded_layer_form_values(
-            RAW_TILES_DETAIL["wmtsLayer"]
-        )
+        self.assertEqual(from_library["enabled"], "Yes")
+        raw = self.dlg._cascaded_layer_form_values(RAW_TILES_DETAIL["wmtsLayer"])
         self.assertEqual(raw["keywords"], "census")
-        self.assertEqual(raw["bounds"], "-124.73 24.96 — -66.97 49.37 (EPSG:4326)")
+        self.assertEqual(raw["bounds"], "-124.73, 24.96 → -66.97, 49.37  (EPSG:4326)")
         self.assertEqual(raw["abstract"], "")
 
     def test_the_layers_viewer_warns_when_nothing_is_published(self):
@@ -426,7 +424,7 @@ class TestDelete(unittest.TestCase):
         self.assertIn(("delete_wmts_store", "sf", "tiles"), self.gs.calls)
 
     def test_store_form_values(self):
-        values = CascadedStoreTabMixin._cascaded_store_form_values(
+        values = self.dlg._cascaded_store_form_values(
             {
                 "name": "tiles",
                 "type": "WMTS",
@@ -438,9 +436,84 @@ class TestDelete(unittest.TestCase):
             [],
         )
         self.assertEqual(values["capabilities_url"], TILES)
-        self.assertEqual(values["enabled"], "False")
+        self.assertEqual(values["enabled"], "No")  # a word, not Python's repr
         self.assertEqual(values["layers"], "—")
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNamesInPaths(unittest.TestCase):
+    """Security: a name is refused before it reaches a request, and one that
+    the server already holds is quoted on its way into a path."""
+
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.gs = FakeGS()
+        self.dlg.gs = self.gs
+
+    def test_a_store_name_the_paths_cannot_carry_is_refused_first(self):
+        for bad in ("a/b", "a#b", "a?b", " remote"):
+            with self.assertRaises(ValueError, msg=bad):
+                self.dlg._create_cascaded_store_from_values(
+                    {
+                        "workspace": "topp",
+                        "name": bad,
+                        "type": WMS,
+                        "capabilities_url": CAPS,
+                    }
+                )
+        self.assertEqual([c for c in self.gs.calls if c[0].startswith("create")], [])
+
+    def test_a_published_name_is_refused_the_same_way(self):
+        with self.assertRaises(ValueError):
+            self.dlg._create_cascaded_layer("topp", "remote", WMS, "topp:states", "a/b")
+        self.assertNotIn(
+            ("create_wms_layer", "topp", "remote", "topp:states", "a/b"), self.gs.calls
+        )
+
+    def test_names_from_the_server_are_quoted_into_the_raw_paths(self):
+        import contextlib
+
+        # the fake knows none of these, so each GET is a 404 — the path is the point
+        with contextlib.suppress(RuntimeError):
+            self.dlg._cascaded_store_detail("my ws", "my store", WMTS)
+        with contextlib.suppress(RuntimeError):
+            self.dlg._cascaded_layer_detail("my ws", "my store", WMTS, "a b")
+        self.dlg._delete_cascaded_layer("my ws", "my store", WMTS, "a#b")
+        paths = [call[1] for call in self.gs.calls if call[0] in ("GET", "DELETE")]
+        self.assertIn("/rest/workspaces/my%20ws/wmtsstores/my%20store.json", paths)
+        self.assertIn(
+            "/rest/workspaces/my%20ws/wmtsstores/my%20store/layers/a%20b.json", paths
+        )
+        self.assertIn(
+            "/rest/workspaces/my%20ws/wmtsstores/my%20store/layers/a%23b.json", paths
+        )
+
+
+class TestLayersViewerIsAViewer(unittest.TestCase):
+    """Its primary button used to be *Delete layer*: Enter on a details dialog
+    destroyed. It is a viewer now; deleting is the Layers tab's job."""
+
+    def test_no_delete_button_and_no_delete_on_close(self):
+        from qgis.PyQt.QtWidgets import QDialogButtonBox
+
+        dlg = SyncDialog()
+        gs = FakeGS()
+        dlg.gs = gs
+        opened = []
+
+        class Recording(ResourceFormDialog):
+            def exec(inner):
+                opened.append(inner)
+                return QDialog.DialogCode.Accepted  # Enter, as before
+
+        with patch("geoserver_manager.gui.tab_cascaded.ResourceFormDialog", Recording):
+            dlg._show_cascaded_layers(REMOTE_ROW)
+        form = opened[0]
+        ok = form._button_box.button(QDialogButtonBox.StandardButton.Ok)
+        self.assertFalse(ok.isVisibleTo(form))
+        self.assertEqual(
+            [c for c in gs.calls if c[0] in ("DELETE", "delete_wms_layer")], []
+        )

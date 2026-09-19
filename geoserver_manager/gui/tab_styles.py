@@ -8,6 +8,7 @@ Used as a mixin for GeoServerMainDialog.
 
 import re
 from pathlib import Path
+from urllib.parse import quote
 
 from qgis.PyQt import sip
 from qgis.PyQt.QtCore import QCoreApplication
@@ -50,16 +51,14 @@ translate = QCoreApplication.translate
 class StyleTabMixin:
     """Mixin that adds style methods to the main dialog."""
 
-    @staticmethod
-    def _scope(workspace_label):
-        """Workspace name for the API, or None for the global scope."""
-        return scope(workspace_label)
-
     def _load_styles(self):
         """Arm the Styles tab, then fetch its rows in the background."""
         self._setup_add_button(
             translate("StyleTabMixin", "Upload a Style"),
-            translate("StyleTabMixin", "Upload a style from an SLD file or pasted SLD"),
+            translate(
+                "StyleTabMixin",
+                "Upload a style from an SLD file, pasted SLD, or a QGIS layer's symbology",
+            ),
             self._add_style,
         )
         self._setup_delete_selected_button(self._delete_selected_styles)
@@ -72,11 +71,20 @@ class StyleTabMixin:
                 "mActionSharingImport.svg",
                 translate("StyleTabMixin", "Apply to a QGIS layer"),
                 self._apply_style_to_qgis,
+                translate(
+                    "StyleTabMixin",
+                    "Put this server style on a layer of the open project — the same "
+                    "as the layer tree's Apply style from GeoServer, from this end",
+                ),
             ),
             (
                 "mActionFileSaveAs.svg",
-                translate("StyleTabMixin", "Save as SLD"),
+                translate("StyleTabMixin", "Save to disk"),
                 self._save_style_to_disk,
+                translate(
+                    "StyleTabMixin",
+                    "Write the style's body (SLD, CSS or MBStyle) to a file",
+                ),
             ),
             (
                 "mActionDeleteSelected.svg",
@@ -86,8 +94,10 @@ class StyleTabMixin:
         ]
         self._setup_table(
             [
-                translate("StyleTabMixin", "Style Name"),
+                translate("StyleTabMixin", "Name"),
                 translate("StyleTabMixin", "Workspace"),
+                translate("StyleTabMixin", "Format"),
+                translate("StyleTabMixin", "Version"),
                 self.actions_column_label(),
             ]
         )
@@ -96,9 +106,14 @@ class StyleTabMixin:
         )
 
     def _fetch_style_rows(self, task=None):
-        """(rows, failures) for the Styles table. Runs in a worker thread."""
-        rows = [
-            [self._name_of(style), GLOBAL]
+        """(rows, failures) for the Styles table. Runs in a worker thread.
+
+        The format and the SLD version come from each style's definition — one
+        GET per style, fanned out — because whether a style is SLD decides what
+        *Apply to a QGIS layer* can do with it.
+        """
+        pairs = [
+            (self._name_of(style), GLOBAL)
             for style in self._fetch_list(self.gs.get_styles)
         ]
         ws_names = self._get_workspace_names()
@@ -112,8 +127,30 @@ class StyleTabMixin:
             if error:
                 failures.append((ws_name, error))
                 continue
-            rows.extend([self._name_of(style), ws_name] for style in styles)
+            pairs.extend((self._name_of(style), ws_name) for style in styles)
+        details = self._fan_out(
+            lambda pair: self._style_summary(pair[0], scope(pair[1])), pairs, task
+        )
+        rows = [
+            [name, ws_label, *(summary or ("—", "—"))]
+            for (name, ws_label), (summary, _error) in zip(pairs, details)
+        ]
+        failures += [
+            (f"{ws_label}/{name}", error)
+            for (name, ws_label), (_summary, error) in zip(pairs, details)
+            if error
+        ]
         return rows, failures
+
+    def _style_summary(self, name, workspace_name):
+        """(format, SLD version) cells of one style. Raises on HTTP errors."""
+        definition = self._check(self.gs.get_style_definition(name, workspace_name))
+        if not isinstance(definition, dict):
+            return ("—", "—")
+        return (
+            str(definition.get("format") or "sld").lower(),
+            self._language_version(definition) or "—",
+        )
 
     # -- Body ------------------------------------------------------------------
 
@@ -125,9 +162,7 @@ class StyleTabMixin:
         mbstyle, so a CSS style comes back as its JSON definition instead of its
         body. Workaround: GET the style path with the definition's own format.
         """
-        path = self.gs.rest_service.rest_endpoints.style(
-            name, workspace_name, format="json"
-        )
+        path = self._style_path(name, workspace_name, "json")
         path = path[: -len(".json")] + f".{style_format}"
         content = self._raw_rest("get", path).content
         return content.decode("utf-8", errors="replace")
@@ -164,14 +199,25 @@ class StyleTabMixin:
                 )
             )
             return
-        path = self.gs.rest_service.rest_endpoints.style(
-            name, workspace_name, format="sld"
-        )
         self._raw_rest(
             "put",
-            path,
+            self._style_path(name, workspace_name, "sld"),
             data=sld.encode("utf-8"),
             headers={"Content-Type": content_type},
+        )
+
+    def _style_path(self, name, workspace_name, style_format):
+        """The style's REST path with its segments URL-quoted.
+
+        TODO(#50): `RestEndpoints.style()` interpolates the names raw, and
+        `requests` sends `styles/a#b.json` as `styles/a` — a different style.
+        Pre-quoting the segments the builder receives is the smallest fix; it
+        has to go when the library quotes them itself, or `%` doubles.
+        """
+        return self.gs.rest_service.rest_endpoints.style(
+            quote(name, safe=""),
+            quote(workspace_name, safe="") if workspace_name else None,
+            format=style_format,
         )
 
     # -- View / edit -----------------------------------------------------------
@@ -263,7 +309,7 @@ class StyleTabMixin:
 
     def _show_style_info(self, row_data):
         """Open a style: definition read-only, body editable for SLD/MBStyle."""
-        name, workspace_name = row_data[0], self._scope(row_data[1])
+        name, workspace_name = row_data[0], scope(row_data[1])
 
         def fetch():
             definition = self._check(self.gs.get_style_definition(name, workspace_name))
@@ -287,7 +333,13 @@ class StyleTabMixin:
         dlg = ResourceFormDialog(
             title=translate("StyleTabMixin", "Style '{}'").format(name),
             description=(
-                translate("StyleTabMixin", "Modify the style") if editable else None
+                translate(
+                    "StyleTabMixin",
+                    "Edit the definition below and Save to replace it on the server; "
+                    "every layer using the style changes with it.",
+                )
+                if editable
+                else None
             ),
             fields=self._style_fields(editable, language_version),
             values={
@@ -331,14 +383,17 @@ class StyleTabMixin:
         /rest/layers.json — the global list, qualified names included.
         """
         base = self.gs.rest_service.rest_endpoints.base_url
+        if workspace_name:
+            # The workspace's own collection: names come back bare there.
+            path = f"{base}/workspaces/{quote(workspace_name, safe='')}/layers.json"
+            payload = self._raw_rest("get", path).json()
+            for entry in self._unwrap(payload, "layers", "layer"):
+                name = self._name_of(entry)
+                return name if ":" in name else f"{workspace_name}:{name}"
         payload = self._raw_rest("get", f"{base}/layers.json").json()
         names = [
             self._name_of(entry) for entry in self._unwrap(payload, "layers", "layer")
         ]
-        if workspace_name:
-            for name in names:
-                if name.startswith(f"{workspace_name}:"):
-                    return name
         return names[0] if names else None
 
     def _legend_png(self, layer, name, workspace_name):
@@ -522,7 +577,8 @@ class StyleTabMixin:
 
     def _create_style_from_values(self, values):
         """Create a style through the library, refusing to overwrite an existing one."""
-        name, workspace_name = values["name"], self._scope(values["workspace"])
+        name, workspace_name = values["name"].strip(), scope(values["workspace"])
+        self._require_safe_name(name)
         # create_style_* upsert (and rewrite the definition's filename)
         if self._resource_exists(self.gs.get_style_definition, name, workspace_name):
             raise ValueError(
@@ -572,7 +628,7 @@ class StyleTabMixin:
         QGIS reads SLD only, so a CSS or MBStyle style is refused here rather
         than handed over for QGIS to fail on.
         """
-        name, workspace_name = row_data[0], self._scope(row_data[1])
+        name, workspace_name = row_data[0], scope(row_data[1])
         fetched = self._fetch(
             lambda: self._check(self.gs.get_style_definition(name, workspace_name)),
             translate("StyleTabMixin", "Failed to load style '{}'").format(name),
@@ -656,7 +712,7 @@ class StyleTabMixin:
 
     def _save_style_to_disk(self, row_data):
         """Write a style's body to a file the user picks."""
-        name, workspace_name = row_data[0], self._scope(row_data[1])
+        name, workspace_name = row_data[0], scope(row_data[1])
         definition = self._fetch(
             lambda: self._check(self.gs.get_style_definition(name, workspace_name)),
             translate("StyleTabMixin", "Failed to load style '{}'").format(name),
@@ -707,7 +763,7 @@ class StyleTabMixin:
             [
                 (
                     f"{row[1]}/{row[0]}",
-                    lambda name=row[0], ws=self._scope(row[1]): self._do_delete_style(
+                    lambda name=row[0], ws=scope(row[1]): self._do_delete_style(
                         name, ws
                     ),
                 )
@@ -717,7 +773,7 @@ class StyleTabMixin:
             cascade=translate(
                 "StyleTabMixin",
                 "The style file is removed from the server too, and layers that used "
-                "it fall back to GeoServer's default style.\n\n",
+                "it fall back to GeoServer's default style.",
             ),
         )
 
@@ -728,7 +784,8 @@ class StyleTabMixin:
         the library has no delete for styles. Workaround: DELETE the style path
         with purge=true&recurse=true.
         """
-        path = self.gs.rest_service.rest_endpoints.style(
-            name, workspace_name, format="json"
+        self._raw_rest(
+            "delete",
+            self._style_path(name, workspace_name, "json"),
+            params={"purge": "true", "recurse": "true"},
         )
-        self._raw_rest("delete", path, params={"purge": "true", "recurse": "true"})

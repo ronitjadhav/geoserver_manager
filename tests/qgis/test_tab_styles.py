@@ -154,7 +154,11 @@ class TestStylesTab(unittest.TestCase):
         self.dlg._load_styles()
         self.assertEqual(
             self.dlg._all_rows,
-            [["population", GLOBAL], ["generic", GLOBAL], ["roads_style", "topp"]],
+            [
+                ["population", GLOBAL, "sld", "1.0.0"],
+                ["generic", GLOBAL, "css", "1.0.0"],
+                ["roads_style", "topp", "sld", "1.0.0"],
+            ],
         )
         self.assertEqual(self.warnings, [])
 
@@ -166,9 +170,11 @@ class TestStylesTab(unittest.TestCase):
         self.assertIn("topp", self.warnings[0])
 
     def test_scope_maps_the_global_label_to_none(self):
-        self.assertIsNone(self.dlg._scope(GLOBAL))
-        self.assertIsNone(self.dlg._scope(""))
-        self.assertEqual(self.dlg._scope("topp"), "topp")
+        from geoserver_manager.gui.scope import scope
+
+        self.assertIsNone(scope(GLOBAL))
+        self.assertIsNone(scope(""))
+        self.assertEqual(scope("topp"), "topp")
 
     def test_body_is_fetched_in_the_definitions_own_format(self):
         body = self.dlg._style_body("generic", None, "css")
@@ -612,6 +618,16 @@ class LegendFakeGS(FakeGS):
                 if path == "/rest/layers.json":
                     layer = [{"name": name} for name in outer.layers]
                     return Response({"layers": {"layer": layer} if layer else ""})
+                if path.startswith("/rest/workspaces/") and path.endswith(
+                    "/layers.json"
+                ):
+                    workspace = path.split("/")[3]
+                    layer = [
+                        {"name": name.split(":", 1)[1]}
+                        for name in outer.layers
+                        if name.startswith(f"{workspace}:")
+                    ]
+                    return Response({"layers": {"layer": layer} if layer else ""})
                 return Response()
 
         class Endpoints(type(self.rest_service.rest_endpoints)):
@@ -695,6 +711,11 @@ class TestLegendPreview(unittest.TestCase):
 
     def test_a_layer_of_the_styles_workspace_first_then_any(self):
         self.assertEqual(self.dlg._legend_layer("topp"), "topp:states")
+        # the workspace's own collection was asked, not the whole server's
+        self.assertIn(
+            "/rest/workspaces/topp/layers.json",
+            [call[1] for call in self.dlg.gs.calls if call[0] == "GET"],
+        )
         self.assertEqual(self.dlg._legend_layer("nurc"), "tiger:poi")
         self.assertEqual(self.dlg._legend_layer(None), "tiger:poi")
         self.dlg.gs = LegendFakeGS(layers=())
@@ -754,3 +775,62 @@ class TestLegendPreview(unittest.TestCase):
         result = captured["work"](None)
         sip.delete(form)  # the C++ dialog is gone
         captured["landed"](result)  # must not raise
+
+
+class TestFormatAndVersionColumns(unittest.TestCase):
+    """The table says what each style is, because Apply needs SLD."""
+
+    def test_rows_carry_the_format_and_the_sld_version(self):
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        rows, failures = dlg._fetch_style_rows()
+        self.assertEqual(failures, [])
+        by_name = {row[0]: row for row in rows}
+        self.assertEqual(by_name["population"], ["population", GLOBAL, "sld", "1.0.0"])
+        self.assertEqual(by_name["generic"][2], "css")
+        self.assertEqual(by_name["roads_style"][:2], ["roads_style", "topp"])
+        dlg._load_styles()
+        headers = [
+            dlg.resultsTable.horizontalHeaderItem(i).text()
+            for i in range(dlg.resultsTable.columnCount())
+        ]
+        self.assertEqual(headers[:4], ["Name", "Workspace", "Format", "Version"])
+
+
+class TestNamesInPaths(unittest.TestCase):
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.gs = FakeGS()
+        self.dlg.gs = self.gs
+
+    def test_an_upload_name_the_paths_cannot_carry_is_refused_first(self):
+        for bad in ("a/b", "new#style", "a%b"):
+            with self.assertRaises(ValueError, msg=bad):
+                self.dlg._create_style_from_values(
+                    {
+                        "name": bad,
+                        "workspace": GLOBAL,
+                        "source": "Paste SLD",
+                        "sld": SLD,
+                    }
+                )
+        self.assertEqual([c for c in self.gs.calls if c[0] == "definition"], [])
+
+    def test_a_style_name_from_the_server_is_quoted_into_its_paths(self):
+        self.dlg._style_body("my style", "my ws", "sld")
+        self.dlg._do_delete_style("a#b", None)
+        paths = [call[1] for call in self.gs.calls if call[0] in ("GET", "DELETE")]
+        self.assertIn("/rest/workspaces/my%20ws/styles/my%20style.sld", paths)
+        self.assertIn("/rest/styles/a%23b.json", paths)
+
+
+class TestWording(unittest.TestCase):
+    def test_row_actions_say_what_they_do(self):
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        dlg._load_styles()
+        labels = [action[1] for action in dlg._row_actions]
+        self.assertIn("Save to disk", labels)
+        self.assertNotIn("Save as SLD", labels)
+        tooltips = [action[3] for action in dlg._row_actions if len(action) > 3]
+        self.assertTrue(any("layer tree" in tip for tip in tooltips), tooltips)

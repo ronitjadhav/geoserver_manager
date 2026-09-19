@@ -7,10 +7,13 @@ remote layers published through them.
 Used as a mixin for GeoServerMainDialog.
 """
 
+from urllib.parse import quote
+
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.toolbelt.payload import bbox_text
 
 # GeoServer's own `type` values. The Type column carries them, and every
 # action reads the row's type to pick the WMS or the WMTS endpoint.
@@ -30,6 +33,14 @@ _LAYER_KEYS = {WMS: ("wmsLayers", "wmsLayer"), WMTS: ("wmtsLayers", "wmtsLayer")
 # be extracted at all (pylupdate only understands a literal context), hence
 # the repetition.
 translate = QCoreApplication.translate
+
+
+def _q(segment):
+    """A URL path segment. TODO(#50): the library's `RestEndpoints` builders
+    interpolate names raw and `requests` sends `stores/a#b.json` as `stores/a`;
+    pre-quoting what they receive is the smallest fix, to drop once the
+    library quotes itself (or `%` doubles)."""
+    return quote(str(segment), safe="")
 
 
 class CascadedStoreTabMixin:
@@ -73,7 +84,7 @@ class CascadedStoreTabMixin:
         ]
         self._setup_table(
             [
-                translate("CascadedStoreTabMixin", "Store Name"),
+                translate("CascadedStoreTabMixin", "Name"),
                 translate("CascadedStoreTabMixin", "Workspace"),
                 translate("CascadedStoreTabMixin", "Type"),
                 translate("CascadedStoreTabMixin", "Enabled"),
@@ -111,12 +122,14 @@ class CascadedStoreTabMixin:
         ]
         return rows, failures
 
-    @staticmethod
-    def _cascaded_store_summary(detail):
+    def _cascaded_store_summary(self, detail):
         """(enabled, capabilities URL) cells; a store whose GET failed shows dashes."""
         if not isinstance(detail, dict):
             return ("—", "—")
-        return (str(detail.get("enabled", True)), detail.get("capabilitiesURL") or "—")
+        return (
+            self._yes_no(detail.get("enabled", True)),
+            detail.get("capabilitiesURL") or "—",
+        )
 
     def _cascaded_store_names(self, workspace_name):
         """[(name, type)] of one workspace's WMS and WMTS stores. Raises on HTTP errors.
@@ -128,8 +141,8 @@ class CascadedStoreTabMixin:
         endpoints = self.gs.rest_service.rest_endpoints
         stores = []
         for kind, path in (
-            (WMS, endpoints.wmsstores(workspace_name)),
-            (WMTS, endpoints.wmtsstores(workspace_name)),
+            (WMS, endpoints.wmsstores(_q(workspace_name))),
+            (WMTS, endpoints.wmtsstores(_q(workspace_name))),
         ):
             payload = self._raw_rest("get", path).json()
             stores += [
@@ -144,7 +157,9 @@ class CascadedStoreTabMixin:
             return self._check(self.gs.get_wms_store(workspace_name, name))
         # TODO(#50): the library has get_wms_store() but no get_wmts_store().
         # Workaround: GET the store path.
-        path = self.gs.rest_service.rest_endpoints.wmtsstore(workspace_name, name)
+        path = self.gs.rest_service.rest_endpoints.wmtsstore(
+            _q(workspace_name), _q(name)
+        )
         return self._raw_rest("get", path).json().get("wmtsStore") or {}
 
     def _cascaded_store_exists(self, workspace_name, name, kind):
@@ -155,7 +170,7 @@ class CascadedStoreTabMixin:
         # service layer's own existence check stands in.
         service = self.gs.rest_service
         return service.resource_exists(
-            service.rest_endpoints.wmtsstore(workspace_name, name)
+            service.rest_endpoints.wmtsstore(_q(workspace_name), _q(name))
         )
 
     # -- Cascaded layers ------------------------------------------------------
@@ -172,14 +187,13 @@ class CascadedStoreTabMixin:
         """
         endpoints = self.gs.rest_service.rest_endpoints
         if kind == WMS:
-            path = endpoints.wmslayers(workspace_name, store_name)
+            path = endpoints.wmslayers(_q(workspace_name), _q(store_name))
         else:
-            path = endpoints.wmtslayers(workspace_name, store_name)
+            path = endpoints.wmtslayers(_q(workspace_name), _q(store_name))
         if available:
             payload = self._raw_rest("get", path, params={"list": "available"}).json()
-            names = (payload.get("list") or {}).get("string") or []
-            # GeoServer's JSON writes a one-entry list as a bare string
-            return [names] if isinstance(names, str) else list(names)
+            # a one-entry list is a bare string; _unwrap knows
+            return [str(name) for name in self._unwrap(payload, "list", "string")]
         payload = self._raw_rest("get", path).json()
         return sorted(
             self._name_of(layer) for layer in self._unwrap(payload, *_LAYER_KEYS[kind])
@@ -193,7 +207,7 @@ class CascadedStoreTabMixin:
             )
         # TODO(#50): no get_wmts_layer() in the library. Workaround: GET the path.
         path = self.gs.rest_service.rest_endpoints.wmtslayer(
-            workspace_name, store_name, layer_name
+            _q(workspace_name), _q(store_name), _q(layer_name)
         )
         return self._raw_rest("get", path).json().get("wmtsLayer") or {}
 
@@ -205,11 +219,14 @@ class CascadedStoreTabMixin:
             )
         service = self.gs.rest_service  # TODO(#50): as for the store
         return service.resource_exists(
-            service.rest_endpoints.wmtslayer(workspace_name, store_name, layer_name)
+            service.rest_endpoints.wmtslayer(
+                _q(workspace_name), _q(store_name), _q(layer_name)
+            )
         )
 
     def _create_cascaded_layer(self, workspace_name, store_name, kind, native, name):
         """Publish one remote layer under `name`. Raises when the name is taken."""
+        self._require_safe_name(name)
         # create_wms_layer deletes and recreates an existing name, so refuse it first
         if self._cascaded_layer_exists(workspace_name, store_name, kind, name):
             raise ValueError(
@@ -228,7 +245,7 @@ class CascadedStoreTabMixin:
         # GeoServer needs only the two names and reads title, abstract, SRS
         # and bounds from the capabilities itself. Workaround: POST them.
         path = self.gs.rest_service.rest_endpoints.wmtslayers(
-            workspace_name, store_name
+            _q(workspace_name), _q(store_name)
         )
         self._raw_rest(
             "post", path, json={"wmtsLayer": {"name": name, "nativeName": native}}
@@ -247,38 +264,24 @@ class CascadedStoreTabMixin:
             return
         # TODO(#50): no delete_wmts_layer() in the library. Workaround: DELETE.
         path = self.gs.rest_service.rest_endpoints.wmtslayer(
-            workspace_name, store_name, layer_name
+            _q(workspace_name), _q(store_name), _q(layer_name)
         )
         self._raw_rest("delete", path, params={"recurse": "true"})
 
-    @staticmethod
-    def _cascaded_layer_form_values(detail):
+    def _cascaded_layer_form_values(self, detail):
         """Prefill for the layer viewer, from the library's dict or GeoServer's
-        raw payload — keywords and CRS differ in shape between the two. Pure."""
+        raw payload — the keywords differ in shape between the two."""
         keywords = detail.get("keywords") or []
         if isinstance(keywords, dict):  # raw payload: {"string": [...]}
             keywords = keywords.get("string") or []
         if isinstance(keywords, str):
             keywords = [keywords]
-        bbox = detail.get("latLonBoundingBox") or {}
-        crs = bbox.get("crs") or ""
-        if isinstance(crs, dict):  # raw payload: {"@class": …, "$": "EPSG:…"}
-            crs = crs.get("$") or ""
-        bounds = "—"
-        if bbox:
-            bounds = "{minx} {miny} — {maxx} {maxy} ({crs})".format(
-                minx=bbox.get("minx", "?"),
-                miny=bbox.get("miny", "?"),
-                maxx=bbox.get("maxx", "?"),
-                maxy=bbox.get("maxy", "?"),
-                crs=crs,
-            )
         return {
             "native_name": detail.get("nativeName", ""),
             "title": str(detail.get("title") or ""),
             "srs": detail.get("srs", ""),
-            "enabled": str(detail.get("enabled", True)),
-            "bounds": bounds,
+            "enabled": self._yes_no(detail.get("enabled", True)),
+            "bounds": bbox_text(detail.get("latLonBoundingBox")) or "—",
             "keywords": ", ".join(keywords) or "—",
             "abstract": str(detail.get("abstract") or ""),
         }
@@ -334,7 +337,7 @@ class CascadedStoreTabMixin:
                 widget.setText(value)
 
     def _show_cascaded_layers(self, row_data):
-        """List the store's cascaded layers, view one at a time, delete one."""
+        """List the store's cascaded layers and view one at a time."""
         store_name, ws_name, kind = row_data[0], row_data[1], row_data[2]
         names = self._fetch(
             lambda: self._cascaded_layer_names(ws_name, store_name, kind),
@@ -359,41 +362,20 @@ class CascadedStoreTabMixin:
             ),
             description=translate(
                 "CascadedStoreTabMixin",
-                "What this store publishes from the remote server. Delete layer "
-                "removes the selected one from this GeoServer; the remote is not "
-                "touched.",
+                "What this store publishes from the remote server. To remove one, "
+                "delete it from the Layers tab.",
             ),
             fields=self._cascaded_layer_fields(names),
             parent=self,
-            ok_label=translate("CascadedStoreTabMixin", "Delete layer"),
         )
+        dlg.hide_save_button()
         dlg.get_widget("layer").currentTextChanged.connect(
             lambda name: self._refill_cascaded_layer_detail(
                 dlg, ws_name, store_name, kind, name
             )
         )
         self._refill_cascaded_layer_detail(dlg, ws_name, store_name, kind, names[0])
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-
-        layer_name = dlg.get_values()["layer"]
-        self._delete_many(
-            translate("CascadedStoreTabMixin", "cascaded layer"),
-            [
-                (
-                    f"{ws_name}:{layer_name}",
-                    lambda: self._delete_cascaded_layer(
-                        ws_name, store_name, kind, layer_name
-                    ),
-                )
-            ],
-            self._load_cascaded_stores,
-            cascade=translate(
-                "CascadedStoreTabMixin",
-                "The layer disappears from this GeoServer; the remote server is "
-                "not touched.\n\n",
-            ),
-        )
+        dlg.exec()
 
     def _publish_cascaded_layer(self, row_data):
         """Publish one of the remote server's layers through this store."""
@@ -556,6 +538,7 @@ class CascadedStoreTabMixin:
         """Create the store the form describes. Raises on a taken name or a bad URL."""
         ws = values["workspace"]
         name = values["name"].strip()
+        self._require_safe_name(name)
         kind = values["type"]
         url = values["capabilities_url"].strip()
         if not url.startswith(("http://", "https://")):
@@ -587,7 +570,7 @@ class CascadedStoreTabMixin:
         fields = [
             {"key": key, "label": label, "type": "text", "read_only": True}
             for key, label in (
-                ("name", translate("CascadedStoreTabMixin", "Store Name")),
+                ("name", translate("CascadedStoreTabMixin", "Name")),
                 ("workspace", translate("CascadedStoreTabMixin", "Workspace")),
                 ("type", translate("CascadedStoreTabMixin", "Type")),
                 (
@@ -612,15 +595,14 @@ class CascadedStoreTabMixin:
         )
         return fields
 
-    @staticmethod
-    def _cascaded_store_form_values(detail, workspace_name, kind, published):
-        """Prefill for the store dialog. Pure, so it is unit-testable."""
+    def _cascaded_store_form_values(self, detail, workspace_name, kind, published):
+        """Prefill for the store dialog."""
         return {
             "name": detail.get("name", ""),
             "workspace": workspace_name,
             "type": detail.get("type") or kind,
             "capabilities_url": detail.get("capabilitiesURL", ""),
-            "enabled": str(detail.get("enabled", "")),
+            "enabled": self._yes_no(detail.get("enabled", True)),
             "layers": "\n".join(published) or "—",
         }
 
@@ -679,7 +661,7 @@ class CascadedStoreTabMixin:
             cascade=translate(
                 "CascadedStoreTabMixin",
                 "Every cascaded layer published from it is deleted too; the remote "
-                "server is not touched.\n\n",
+                "server is not touched.",
             ),
         )
 

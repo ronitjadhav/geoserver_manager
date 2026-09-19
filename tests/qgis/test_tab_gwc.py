@@ -205,11 +205,11 @@ class FakeGS:
 STATES_ROW = [
     "topp:states",
     "topp",
-    "True",
+    "Yes",
     "EPSG:4326, EPSG:900913",
     "image/png, image/jpeg",
 ]
-TASMANIA_ROW = ["tasmania", "(global)", "False", "EPSG:4326", "image/png"]
+TASMANIA_ROW = ["tasmania", "(global)", "No", "EPSG:4326", "image/png"]
 BROKEN_ROW = ["broken:layer", "broken", "—", "—", "—"]
 
 
@@ -256,17 +256,17 @@ class TestListing(unittest.TestCase):
         self.assertEqual(opened, [["topp"]])
 
     def test_a_layer_whose_get_failed_shows_dashes(self):
-        self.assertEqual(GwcTabMixin._gwc_layer_summary(None), ("—", "—", "—"))
+        self.assertEqual(self.dlg._gwc_layer_summary(None), ("—", "—", "—"))
         # GWC writes an empty collection as "" and a single entry bare
         self.assertEqual(
-            GwcTabMixin._gwc_layer_summary(
+            self.dlg._gwc_layer_summary(
                 {
                     "enabled": True,
                     "gridSubsets": {"gridSetName": "EPSG:4326"},
                     "mimeFormats": "",
                 }
             ),
-            ("True", "EPSG:4326", "—"),
+            ("Yes", "EPSG:4326", "—"),
         )
 
     def test_gridsets_and_uncached_layers_come_from_the_server(self):
@@ -488,3 +488,23 @@ class TestActions(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNamesInPaths(unittest.TestCase):
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.dlg.gs = FakeGS()
+
+    def test_a_cached_layer_path_is_quoted_but_keeps_its_colon(self):
+        self.assertEqual(
+            self.dlg._gwc_layer_path("topp:a b", "xml"),
+            "/gwc/rest/layers/topp:a%20b.xml",
+        )
+        self.assertEqual(self.dlg._gwc_layer_path("a#b"), "/gwc/rest/layers/a%23b.json")
+
+    def test_a_name_the_paths_cannot_carry_is_refused_before_any_request(self):
+        with self.assertRaises(ValueError):
+            self.dlg._create_gwc_layer_from_values(
+                {"layer": "topp/roads", "gridsets": "EPSG:4326", "formats": "image/png"}
+            )
+        self.assertEqual([c for c in self.dlg.gs.calls if c[0] == "PUT"], [])
