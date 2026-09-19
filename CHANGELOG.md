@@ -27,6 +27,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - The cascaded-layers dialog was a viewer whose primary button — Enter —
   deleted the selected layer. It is a viewer; a cascaded layer is deleted
   from the Layers tab, like any other.
+- *Publish a Layer → A layer from this QGIS project* listed raster layers and
+  then tried to write them as a GeoPackage. A raster picked there now goes the
+  way the Coverage Stores tab sends it — a GeoTIFF, uploaded and published as
+  a coverage — with the same *Replace* rule; the form says which kind becomes
+  what. A WMS or XYZ raster, which has no file to send, is refused in words.
+- An ImageMosaic *properties ZIP* was read into memory and sent under the
+  wait cursor; it streams in a task like the other uploads, with progress and
+  Cancel. All three uploads share one helper (`_upload_file`) and one cancel
+  report.
+- Starting a second upload while one ran exported the layer first — minutes
+  for a big raster — then refused and left the exported file in the temp
+  folder. It refuses before exporting.
+
 - The Layers tab listed only the feature types it found by walking the
   datastores, so a raster layer — including one just published from QGIS —
   and a cascaded WMS or WMTS layer never appeared there. It now shows

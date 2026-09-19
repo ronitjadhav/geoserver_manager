@@ -12,6 +12,8 @@ Usage from the repo root folder:
 """
 
 # standard library
+import shutil
+from pathlib import Path
 from unittest.mock import patch
 
 from qgis.PyQt.QtWidgets import QDialog
@@ -1105,6 +1107,12 @@ class GpkgPublishFakeGS(StyleFakeGS):
                     f"{datastore_name}/featuretypes/{name}.json"
                 )
 
+            def coverage(inner, workspace_name, store_name, name):
+                return (
+                    f"/rest/workspaces/{workspace_name}/coveragestores/"
+                    f"{store_name}/coverages/{name}.json"
+                )
+
         class Rest:
             rest_client = Client()
             rest_endpoints = Endpoints()
@@ -1128,6 +1136,9 @@ class GpkgPublishFakeGS(StyleFakeGS):
 
     def get_feature_type(self, workspace_name, datastore_name, name):
         return ({"name": name}, 200 if self.layer_exists else 404)
+
+    def get_coverage_store(self, workspace_name, name):
+        return ("not found", 404)
 
     def create_datastore(self, **kwargs):
         self.style_calls.append(("create_datastore", kwargs))
@@ -1262,6 +1273,44 @@ class TestPublishQgisLayer(unittest.TestCase):
         self.add_layer()
         self.dlg._publish_layer_from_values(self.values())
         self.assertEqual(glob.glob(f"{tempfile.gettempdir()}/gsm_publish_*"), [])
+
+    def test_a_raster_picked_here_goes_down_the_coverage_store_path(self):
+        """The picker lists rasters too; they used to hit the GeoPackage writer."""
+        import tempfile
+
+        from qgis.core import QgsRasterLayer
+
+        from tests.qgis.test_tab_coveragestores import write_raster
+
+        folder = Path(tempfile.mkdtemp(prefix="gsm_test_"))
+        try:
+            layer = QgsRasterLayer(str(write_raster(folder / "dem.tif")), "dem", "gdal")
+            self.assertTrue(layer.isValid())
+            self.project.addMapLayer(layer)
+            self.dlg._publish_layer_from_values(
+                self.values(qgis_layer="dem  (raster)", name="dem")
+            )
+            puts = self.sent("PUT")
+            self.assertEqual(len(puts), 1)
+            self.assertTrue(puts[0][1].endswith("/coveragestores/dem/file.geotiff"))
+            self.assertEqual(puts[0][2]["headers"]["Content-Type"], "image/tiff")
+            self.assertEqual(puts[0][2]["params"]["coverageName"], "dem")
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
+
+    def test_a_second_upload_is_refused_before_anything_is_exported(self):
+        import glob
+        import tempfile
+
+        self.add_layer()
+        warnings = []
+        self.dlg.show_warning_message = warnings.append
+        self.dlg._upload = object()  # one is running
+        self.dlg._publish_layer_from_values(self.values())
+        self.assertEqual(self.sent("PUT"), [])
+        self.assertTrue(any("already running" in w for w in warnings), warnings)
+        self.assertEqual(glob.glob(f"{tempfile.gettempdir()}/gsm_publish_*"), [])
+        self.dlg._upload = None
 
     def test_a_table_source_still_goes_the_old_way(self):
         # the dispatch must not disturb the datastore-table path

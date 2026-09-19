@@ -26,7 +26,6 @@ from geoserver_manager.toolbelt.qgis_export import (
     reprojection_target,
     require_crs,
 )
-from geoserver_manager.toolbelt.rest import ProgressReader, raw_rest
 from geoserver_manager.toolbelt.sld import layer_to_sld, styleable_project_layers
 
 # How a GeoServer layer can be brought into QGIS. WFS gives the actual features
@@ -498,8 +497,9 @@ class LayerTabMixin:
                 "visible": False,
                 "help": translate(
                     "LayerTabMixin",
-                    "The layer is written to a GeoPackage and uploaded, so the "
-                    "data is copied to the server, not linked.",
+                    "A vector is written to a GeoPackage and becomes a datastore; "
+                    "a raster to a GeoTIFF and becomes a coverage store. Either way "
+                    "the data is copied to the server, not linked.",
                 ),
             },
             {
@@ -529,6 +529,10 @@ class LayerTabMixin:
                 "type": "checkbox",
                 "default": True,
                 "visible": False,
+                "help": translate(
+                    "LayerTabMixin",
+                    "Vector layers only — a raster's symbology is not uploaded.",
+                ),
             },
         ]
 
@@ -605,7 +609,8 @@ class LayerTabMixin:
             description=translate(
                 "LayerTabMixin",
                 "Publish a table of a datastore, or a layer of this QGIS "
-                "project — that one is uploaded to the server as a GeoPackage.",
+                "project — uploaded as a GeoPackage (a vector becomes a datastore) "
+                "or as a GeoTIFF (a raster becomes a coverage store).",
             ),
             fields=self._publish_fields(workspace_names),
             parent=self,
@@ -656,7 +661,8 @@ class LayerTabMixin:
         return self._publish_table(values)
 
     def _publish_qgis_layer(self, values):
-        """Upload a QGIS layer as a GeoPackage datastore and publish it.
+        """Upload a QGIS layer and publish it: a GeoPackage datastore for a
+        vector, a GeoTIFF coverage store for a raster.
 
         One store per published layer, named after it, which is also the name
         of the table inside the GeoPackage — GeoServer configures a feature
@@ -667,17 +673,31 @@ class LayerTabMixin:
         The layer, its CRS, the name check, the export and the SLD happen here
         on the GUI thread — a live QGIS layer, invariant 9 — and raise into the
         caller's _run_action; the PUT then streams in a task through
-        _run_upload, with progress and Cancel, and the metadata and the style
-        follow on the GUI thread once it lands. The client is captured now: a
-        Refresh drops self.gs while the task runs.
+        _upload_file, with progress and Cancel, and the metadata and the style
+        follow on the GUI thread once it lands. A raster goes down the Coverage
+        Stores tab's path (_publish_qgis_raster), the same Replace semantics.
 
         TODO(#50): upstream as create_datastore_from_file(ws, name, path) — the
         library can only create datastores from connection parameters, so the
         upload is a raw PUT of .../datastores/{name}/file.gpkg (row 28).
         """
+        if not self._upload_slot_free():
+            return
         ws_name = values["workspace"]
         name = geoserver_name(values["name"])
         layer = self._picked_layer(values)
+        if isinstance(layer, QgsRasterLayer):
+            self._publish_qgis_raster(
+                {
+                    "workspace": ws_name,
+                    "name": values["name"],
+                    "replace": values.get("replace"),
+                    "title": values.get("title", ""),
+                    "abstract": values.get("abstract", ""),
+                },
+                layer=layer,
+            )
+            return
         require_crs(layer)
         if not values.get("replace"):
             for exists, message in (
@@ -713,32 +733,12 @@ class LayerTabMixin:
             shutil.rmtree(folder, ignore_errors=True)
             raise
         sld = layer_to_sld(layer) if values.get("with_style") else None
-        client = self.gs.rest_service.rest_client
         upload_path = (
             f"{self.gs.rest_service.rest_endpoints.base_url}"
-            f"/workspaces/{ws_name}/datastores/{name}/file.gpkg"
+            f"/workspaces/{quote(ws_name, safe='')}/datastores/{quote(name, safe='')}"
+            "/file.gpkg"
         )
         failure = translate("LayerTabMixin", "Failed to publish '{}'").format(name)
-
-        def work(task):
-            try:
-                with open(package, "rb") as handle:
-                    body = ProgressReader(
-                        handle,
-                        package.stat().st_size,
-                        on_progress=task.setProgress if task is not None else None,
-                        is_cancelled=task.isCanceled if task is not None else None,
-                    )
-                    raw_rest(
-                        client,
-                        "put",
-                        upload_path,
-                        params={"update": "overwrite"},
-                        data=body,
-                        headers={"Content-Type": "application/x-sqlite3"},
-                    )
-            finally:
-                shutil.rmtree(folder, ignore_errors=True)
 
         def published(_result):
             if self.gs is None:  # a Refresh dropped the client meanwhile
@@ -773,46 +773,22 @@ class LayerTabMixin:
             # The user may have moved to another tab while it uploaded.
             self._reload_current_tab()
 
-        self._run_upload(
+        self._upload_file(
             failure,
-            work,
+            self.gs.rest_service.rest_client,
+            upload_path,
+            package,
+            {"update": "overwrite"},
+            {"Content-Type": "application/x-sqlite3"},
             published,
-            lambda _task: self._report_cancelled_layer_upload(ws_name, name),
+            lambda _task: self._report_cancelled_upload(
+                translate("LayerTabMixin", "datastore"),
+                translate("LayerTabMixin", "Datastores"),
+                lambda: self._resource_exists(self.gs.get_datastore, ws_name, name),
+                name,
+            ),
+            folder=folder,
         )
-
-    def _report_cancelled_layer_upload(self, ws_name, name):
-        """Say what a cancelled upload left behind — measured on 2.28.5.
-
-        The same two cases as a raster (see _report_cancelled_raster_upload):
-        an aborted first upload leaves nothing; an aborted *Replace* keeps the
-        store and its layer, but GeoServer has already deleted the previous
-        file.
-        """
-        kept = None
-        if self.gs is not None:  # a Refresh may have dropped the client meanwhile
-            try:
-                kept = self._resource_exists(self.gs.get_datastore, ws_name, name)
-            except Exception:  # the report must not fail the cancel
-                kept = None
-        if kept:
-            message = translate(
-                "LayerTabMixin",
-                "Upload of '{}' cancelled. GeoServer kept the datastore and its "
-                "layer but had already removed their data file — publish it again "
-                "with Replace ticked, or delete the datastore.",
-            )
-        elif kept is None:
-            message = translate(
-                "LayerTabMixin",
-                "Upload of '{}' cancelled — check the Datastores tab for what was "
-                "left.",
-            )
-        else:
-            message = translate(
-                "LayerTabMixin",
-                "Upload of '{}' cancelled — nothing was left on the server.",
-            )
-        self.show_warning_message(message.format(name))
 
     def _make_datastore_read_only(self, workspace_name, name):
         """Mark an uploaded GeoPackage store read-only.

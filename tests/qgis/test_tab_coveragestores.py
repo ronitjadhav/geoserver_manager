@@ -9,6 +9,7 @@ Usage from the repo root folder:
 """
 
 # standard library
+from pathlib import Path
 from unittest.mock import patch
 
 from qgis.core import (
@@ -411,18 +412,25 @@ class TestCreateCoverageStore(unittest.TestCase):
             ("from_directory", "nurc", "mos", "/opt/geoserver_data/coverages/mos"),
         )
 
-    def test_a_properties_zip_is_read_and_uploaded(self):
+    def test_a_properties_zip_streams_to_the_imagemosaic_file_endpoint(self):
+        """Not read into memory under the wait cursor: the ZIP holds granules."""
         import tempfile
 
         with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as handle:
             handle.write(b"PK\x03\x04 pretend")
             path = handle.name
-        self.dlg._create_coverage_store_from_values(
+        self.dlg._upload_mosaic_zip(
             {"name": "mos", "workspace": "nurc", "type": MOSAIC_ZIP, "zip": path}
         )
-        self.assertEqual(
-            self.dlg.gs.calls[-1], ("from_zip", "nurc", "mos", b"PK\x03\x04 pretend")
-        )
+        puts = [call for call in self.dlg.gs.calls if call[0] == "PUT"]
+        self.assertEqual(len(puts), 1)  # the reload afterwards only GETs
+        _verb, url, kwargs = puts[0]
+        self.assertTrue(url.endswith("/coveragestores/mos/file.imagemosaic"), url)
+        self.assertEqual(kwargs["params"], {"configure": "none"})
+        self.assertEqual(kwargs["headers"]["Content-Type"], "application/zip")
+        self.assertEqual(kwargs["data"], b"PK\x03\x04 pretend")
+        self.assertTrue(Path(path).exists())  # the user's own file is not removed
+        Path(path).unlink()
 
     def test_a_server_that_drops_the_cog_settings_is_reported(self):
         """GeoServer silently ignores store metadata it does not understand."""
@@ -802,16 +810,27 @@ class TestPublishQgisRaster(RasterFixture):
         self.assertEqual(self.puts(), [])
 
     def test_a_cancelled_upload_says_what_the_server_kept(self):
+        def report():
+            self.dlg._report_cancelled_upload(
+                "coverage store",
+                "Coverage Stores",
+                lambda: self.dlg._resource_exists(
+                    self.dlg.gs.get_coverage_store, "sf", "My_DEM"
+                ),
+                "My_DEM",
+            )
+
         self.dlg.gs = FakeGS(exists=False)
-        self.dlg._report_cancelled_raster_upload("sf", "My_DEM")
+        report()
         self.assertIn("nothing was left", self.warnings[-1])
 
         self.dlg.gs = FakeGS(exists=True)  # a Replace: the store outlives its file
-        self.dlg._report_cancelled_raster_upload("sf", "My_DEM")
+        report()
         self.assertIn("removed their data file", self.warnings[-1])
+        self.assertIn("coverage store", self.warnings[-1])
 
         self.dlg.gs = None  # a Refresh dropped the client meanwhile
-        self.dlg._report_cancelled_raster_upload("sf", "My_DEM")
+        report()
         self.assertIn("check the Coverage Stores tab", self.warnings[-1])
 
     def test_the_form_shows_that_types_fields_and_prefills_a_safe_name(self):

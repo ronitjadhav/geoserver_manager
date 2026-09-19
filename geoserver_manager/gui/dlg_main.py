@@ -1347,3 +1347,103 @@ class GeoServerMainDialog(
             self.iface.showOptionsDialog(currentPage=f"mOptionsPage{__title__}")
             self.refresh_ui(show_message=True)
             self.show()
+
+    # -- Uploads shared by the tabs ------------------------------------------
+
+    def _upload_slot_free(self):
+        """True when an upload can start; else say so and return False.
+
+        Callers check this *before* exporting: an export can take minutes and
+        a refusal after it would leave the exported file behind.
+        """
+        if self._upload is None:
+            return True
+        self.show_warning_message(
+            self.tr("An upload is already running — wait for it or cancel it.")
+        )
+        return False
+
+    def _upload_file(
+        self,
+        failure_message,
+        client,
+        url,
+        source,
+        params,
+        headers,
+        on_success,
+        on_cancel,
+        folder=None,
+        after=None,
+    ):
+        """Stream one file to a REST path through _run_upload.
+
+        Everything a worker needs is an argument (invariant 9): the client
+        held now, the URL, the path of the file. `folder`, when given, is the
+        temporary folder holding `source` and is removed however the upload
+        ends — including a refusal because another upload runs. `after(client)`
+        runs in the worker once the PUT succeeded (a metadata PUT). Returns
+        False when nothing was started.
+        """
+        import shutil
+
+        from geoserver_manager.toolbelt.rest import ProgressReader
+
+        if self._upload is not None:
+            if folder is not None:
+                shutil.rmtree(folder, ignore_errors=True)
+            return self._upload_slot_free()
+
+        def work(task):
+            try:
+                with open(source, "rb") as handle:
+                    body = ProgressReader(
+                        handle,
+                        source.stat().st_size,
+                        on_progress=task.setProgress if task is not None else None,
+                        is_cancelled=task.isCanceled if task is not None else None,
+                    )
+                    raw_rest(
+                        client, "put", url, params=params, data=body, headers=headers
+                    )
+                if after is not None:
+                    after(client)
+            finally:
+                if folder is not None:
+                    shutil.rmtree(folder, ignore_errors=True)
+
+        return self._run_upload(failure_message, work, on_success, on_cancel)
+
+    def _report_cancelled_upload(self, kind, tab, exists, name):
+        """Say what a cancelled upload left behind — measured on 2.28.5.
+
+        An aborted first upload leaves nothing: no store, no file, whatever
+        was already sent. An aborted *Replace* keeps the store, its layer and
+        its configuration, but GeoServer has already deleted the previous
+        file — a layer with no data behind it — so that one is a warning with
+        the way out.
+
+        :param kind: "datastore" / "coverage store", translated by the caller.
+        :param tab: the tab to look at, translated by the caller.
+        :param exists: zero-arg callable saying whether the store is there;
+            anything it raises (a Refresh dropped the client) reads as unknown.
+        """
+        try:
+            kept = exists()
+        except Exception:  # the report must not fail the cancel
+            kept = None
+        if kept:
+            message = self.tr(
+                "Upload of '{name}' cancelled. GeoServer kept the {kind} and its "
+                "layer but had already removed their data file — upload it again "
+                "with Replace ticked, or delete the {kind}."
+            )
+        elif kept is None:
+            message = self.tr(
+                "Upload of '{name}' cancelled — check the {tab} tab for what was left."
+            )
+        else:
+            message = self.tr(
+                "Upload of '{name}' cancelled — nothing was left on the server."
+            )
+        self.show_warning_message(message.format(name=name, kind=kind, tab=tab))
