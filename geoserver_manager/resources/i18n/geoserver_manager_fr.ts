@@ -1218,81 +1218,91 @@
         <translation>Aucun résultat</translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1016" />
+        <location filename="../../gui/dlg_main.py" line="1011" />
+        <source>Yes</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/dlg_main.py" line="1011" />
+        <source>No</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/dlg_main.py" line="1022" />
         <source>'{}' cannot be used as a name: no slash, '?', '#', '%' or leading and trailing spaces.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1053" />
+        <location filename="../../gui/dlg_main.py" line="1059" />
         <source>Not connected to GeoServer — press Refresh (F5) to connect.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1179" />
+        <location filename="../../gui/dlg_main.py" line="1185" />
         <source>{count} item(s) could not be listed: {names} — details in the QGIS log (GeoServer Manager tab).</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1241" />
-        <location filename="../../gui/dlg_main.py" line="1195" />
+        <location filename="../../gui/dlg_main.py" line="1247" />
+        <location filename="../../gui/dlg_main.py" line="1201" />
         <source>delete</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1198" />
+        <location filename="../../gui/dlg_main.py" line="1204" />
         <source>Are you sure you want to {verb} {subject}?</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1202" />
+        <location filename="../../gui/dlg_main.py" line="1208" />
         <source>Are you sure you want to {verb} {count} {kind}(s)?
 
 {items}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1211" />
+        <location filename="../../gui/dlg_main.py" line="1217" />
         <source>This action cannot be undone.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1214" />
+        <location filename="../../gui/dlg_main.py" line="1220" />
         <source>Please confirm</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1242" />
+        <location filename="../../gui/dlg_main.py" line="1248" />
         <source>deleted</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1265" />
+        <location filename="../../gui/dlg_main.py" line="1271" />
         <source>Failed to {verb} some {kind}(s):
 {errors}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1273" />
+        <location filename="../../gui/dlg_main.py" line="1279" />
         <source>{kind} '{name}' {done}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1279" />
+        <location filename="../../gui/dlg_main.py" line="1285" />
         <source>{count} {kind}(s) {done}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1287" />
+        <location filename="../../gui/dlg_main.py" line="1293" />
         <source>Cancelled — what was already done stays done.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1292" />
+        <location filename="../../gui/dlg_main.py" line="1298" />
         <source>{verb} failed</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1296" />
+        <location filename="../../gui/dlg_main.py" line="1302" />
         <source>Working…</source>
         <translation type="unfinished" />
     </message>
@@ -1383,7 +1393,7 @@
 </context><context>
     <name>GwcTabMixin</name>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="614" />
+        <location filename="../../gui/tab_gwc.py" line="617" />
         <location filename="../../gui/tab_gwc.py" line="69" />
         <source>Add a Layer to the Cache</source>
         <translation type="unfinished" />
@@ -1425,26 +1435,26 @@
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="432" />
-        <location filename="../../gui/tab_gwc.py" line="425" />
+        <location filename="../../gui/tab_gwc.py" line="435" />
+        <location filename="../../gui/tab_gwc.py" line="428" />
         <location filename="../../gui/tab_gwc.py" line="108" />
         <source>Layer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="445" />
+        <location filename="../../gui/tab_gwc.py" line="448" />
         <location filename="../../gui/tab_gwc.py" line="110" />
         <source>Enabled</source>
         <translation type="unfinished">Activé</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="454" />
+        <location filename="../../gui/tab_gwc.py" line="457" />
         <location filename="../../gui/tab_gwc.py" line="111" />
         <source>Gridsets</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="471" />
+        <location filename="../../gui/tab_gwc.py" line="474" />
         <location filename="../../gui/tab_gwc.py" line="112" />
         <source>Formats</source>
         <translation type="unfinished" />
@@ -1455,204 +1465,204 @@
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="304" />
+        <location filename="../../gui/tab_gwc.py" line="305" />
         <source>At least one gridset is required.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="308" />
+        <location filename="../../gui/tab_gwc.py" line="309" />
         <source>At least one format is required.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="374" />
+        <location filename="../../gui/tab_gwc.py" line="375" />
         <source>Pick a layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="377" />
+        <location filename="../../gui/tab_gwc.py" line="378" />
         <source>'{}' is cached already.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="421" />
+        <location filename="../../gui/tab_gwc.py" line="424" />
         <source>Advanced</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="436" />
+        <location filename="../../gui/tab_gwc.py" line="439" />
         <source>A published layer or layer group GeoWebCache does not cache yet.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="447" />
+        <location filename="../../gui/tab_gwc.py" line="450" />
         <source>Disabled, GeoWebCache neither serves nor stores tiles for it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="457" />
+        <location filename="../../gui/tab_gwc.py" line="460" />
         <source>One per line: the tile grids the layer is cached in.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="464" />
+        <location filename="../../gui/tab_gwc.py" line="467" />
         <source>Add a gridset</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="467" />
+        <location filename="../../gui/tab_gwc.py" line="470" />
         <source>Appends to the list above.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="474" />
+        <location filename="../../gui/tab_gwc.py" line="477" />
         <source>One MIME type per line, e.g. image/png, image/jpeg, image/png8.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="481" />
+        <location filename="../../gui/tab_gwc.py" line="484" />
         <source>Meta-tile width</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="486" />
+        <location filename="../../gui/tab_gwc.py" line="489" />
         <source>Tiles rendered together in one request, so labels are not cut at tile edges.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="494" />
+        <location filename="../../gui/tab_gwc.py" line="497" />
         <source>Meta-tile height</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="502" />
+        <location filename="../../gui/tab_gwc.py" line="505" />
         <source>Gutter (px)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="507" />
+        <location filename="../../gui/tab_gwc.py" line="510" />
         <source>Extra pixels rendered around each meta-tile, for symbols that overflow.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="515" />
+        <location filename="../../gui/tab_gwc.py" line="518" />
         <source>Expire cached tiles after (s)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="520" />
+        <location filename="../../gui/tab_gwc.py" line="523" />
         <source>0 keeps a tile until it is truncated.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="526" />
+        <location filename="../../gui/tab_gwc.py" line="529" />
         <source>Client cache max-age (s)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="531" />
+        <location filename="../../gui/tab_gwc.py" line="534" />
         <source>Sent to browsers and QGIS as Cache-Control; 0 sends none.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="559" />
+        <location filename="../../gui/tab_gwc.py" line="562" />
         <source>Failed to load the tile cache of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="568" />
+        <location filename="../../gui/tab_gwc.py" line="571" />
         <source>Tile cache of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="569" />
+        <location filename="../../gui/tab_gwc.py" line="572" />
         <source>How GeoWebCache caches this layer. Changes apply to the tiles rendered from now on; Truncate clears what is cached already.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="585" />
+        <location filename="../../gui/tab_gwc.py" line="588" />
         <source>Failed to save the tile cache of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="590" />
+        <location filename="../../gui/tab_gwc.py" line="593" />
         <source>Tile cache of '{}' saved.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="598" />
+        <location filename="../../gui/tab_gwc.py" line="601" />
         <source>Failed to list the layers that can be cached</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="605" />
+        <location filename="../../gui/tab_gwc.py" line="608" />
         <source>Every published layer is cached already — GeoServer caches new layers by itself.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="615" />
+        <location filename="../../gui/tab_gwc.py" line="618" />
         <source>GeoServer caches every new layer by itself, so this is for a layer whose cache was removed. Tiles are stored the first time they are requested.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="633" />
+        <location filename="../../gui/tab_gwc.py" line="636" />
         <source>Create</source>
         <translation type="unfinished">Créer</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="642" />
+        <location filename="../../gui/tab_gwc.py" line="645" />
         <source>Failed to cache '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="647" />
+        <location filename="../../gui/tab_gwc.py" line="650" />
         <source>'{}' is now cached.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="657" />
+        <location filename="../../gui/tab_gwc.py" line="660" />
         <source>the tiles of layer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="659" />
+        <location filename="../../gui/tab_gwc.py" line="662" />
         <source>truncate</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="660" />
+        <location filename="../../gui/tab_gwc.py" line="663" />
         <source>Every tile GeoWebCache stored for this layer is deleted, in every gridset and format. The layer and its cache configuration stay; tiles are rendered again on request.
 
 </source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="670" />
+        <location filename="../../gui/tab_gwc.py" line="673" />
         <source>Failed to truncate the tile cache of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="675" />
+        <location filename="../../gui/tab_gwc.py" line="678" />
         <source>Tile cache of '{}' truncated.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="685" />
+        <location filename="../../gui/tab_gwc.py" line="688" />
         <source>layer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="691" />
+        <location filename="../../gui/tab_gwc.py" line="694" />
         <source>stop caching</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="692" />
+        <location filename="../../gui/tab_gwc.py" line="695" />
         <source>removed from the cache</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="693" />
+        <location filename="../../gui/tab_gwc.py" line="696" />
         <source>The cached tiles and the cache configuration are removed; the layer itself stays published and can be added to the cache again.
 
 </source>

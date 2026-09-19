@@ -1004,6 +1004,12 @@ class GeoServerMainDialog(
     _unwrap = staticmethod(unwrap)
     _as_list = staticmethod(as_list)
 
+    def _yes_no(self, value):
+        """A boolean cell: Yes / No, translated — never Python's True / False."""
+        if isinstance(value, str):
+            value = value.strip().lower() == "true"
+        return self.tr("Yes") if value else self.tr("No")
+
     def _require_safe_name(self, name):
         """Refuse a name the REST paths cannot carry, before it reaches them.
 

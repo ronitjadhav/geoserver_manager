@@ -365,3 +365,13 @@ class TestTileCacheXml(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestYesNo(unittest.TestCase):
+    def test_a_boolean_cell_reads_as_words(self):
+        dlg = SyncDialog()
+        self.assertEqual(dlg._yes_no(True), "Yes")
+        self.assertEqual(dlg._yes_no("true"), "Yes")
+        self.assertEqual(dlg._yes_no(False), "No")
+        self.assertEqual(dlg._yes_no("False"), "No")
+        self.assertEqual(dlg._yes_no(None), "No")
