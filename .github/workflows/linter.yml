@@ -1,17 +1,24 @@
 name: "✅ Linter"
 
 on:
+  # development.txt is what this job installs, and the workflow file pins the
+  # actions it runs with: a bump to either has to be linted by this job, or it
+  # reaches main with nothing having checked it.
   push:
     branches:
       - main
     paths:
       - '**.py'
+      - .github/workflows/linter.yml
+      - requirements/development.txt
 
   pull_request:
     branches:
       - main
     paths:
       - '**.py'
+      - .github/workflows/linter.yml
+      - requirements/development.txt
 
 env:
   PROJECT_FOLDER: "geoserver_manager"
