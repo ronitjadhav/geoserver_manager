@@ -1,10 +1,9 @@
-# Development
+# Set up an environment
 
-## Environment setup
+Written for Ubuntu. Windows and macOS work the same way, with the paths
+noted where they differ.
 
-> Typically on Ubuntu (but should also work on Windows with potential small adjustments).
-
-### 1. Install virtual environment
+## Install a virtual environment
 
 Using [qgis-venv-creator](https://github.com/GispoCoding/qgis-venv-creator) (see [this article](https://blog.geotribu.net/2024/11/25/creating-a-python-virtual-environment-for-pyqgis-development-with-vs-code-on-windows/#with-the-qgis-venv-creator-utility)) through [pipx](https://pipx.pypa.io) (`sudo apt install pipx`):
 
@@ -28,7 +27,7 @@ python3 -m venv .venv --system-site-packages
 source .venv/bin/activate
 ```
 
-### 2. Install development dependencies
+## Install the development dependencies
 
 ```sh
 # bump dependencies inside venv
@@ -39,7 +38,7 @@ python -m pip install -U -r requirements/development.txt
 pre-commit install
 ```
 
-### 3. Dedicated QGIS profile
+## A dedicated QGIS profile
 
 It's recommended to create a dedicated QGIS profile for the development of the plugin to avoid conflicts with other plugins.
 
@@ -111,7 +110,7 @@ serving from one needs the community module; see the commented
 docker compose down -v     # stop and discard both volumes
 ```
 
-### 4. Load the plugin: symlink (alternative to `QGIS_PLUGINPATH`)
+## Load the plugin with a symlink
 
 Instead of the environment variable, symlink the `geoserver_manager` package
 into the profile's plugin folder. QGIS then loads the working tree directly and

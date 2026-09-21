@@ -111,6 +111,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- The documentation site was rebuilt: a landing page that shows the plugin,
+  a modern theme with a dark mode, and pages for testing, packaging and
+  documentation that describe this repository rather than the template it
+  started from.
 - A visual identity: the Ribbon G logo, used as the plugin's icon in the
   toolbar, menus and plugin manager, and on the documentation website.
   `docs/branding.md` explains it and links a brand kit;

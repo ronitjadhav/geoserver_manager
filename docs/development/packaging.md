@@ -1,47 +1,58 @@
-# Packaging and deployment
+# Packaging and release
 
-## Packaging
-
-This plugin is using the [qgis-plugin-ci](https://github.com/opengisch/qgis-plugin-ci/) tool to perform packaging operations.  
-Under the hood, the package command is performing a `git archive` run based on `CHANGELOG.md`.
-
-Install additional dependencies:
+Packaging is [qgis-plugin-ci](https://github.com/opengisch/qgis-plugin-ci/),
+which builds the zip with `git archive` and reads `CHANGELOG.md` for the
+release notes. There is no build step of the plugin itself: the
+`geoservercloud` and `xmltodict` wheels in `geoserver_manager/extras/` are
+committed, and the translations are compiled by CI.
 
 ```bash
 python -m pip install -U -r requirements/packaging.txt
-```
 
-Then use it:
-
-```bash
-# package a specific version
-qgis-plugin-ci package 1.3.1
-# package latest version
+# the zip CI would publish, for the version in metadata.txt
 qgis-plugin-ci package latest
 ```
 
+Expect around 125 KB. If it is suddenly megabytes, the bundled
+`geoservercloud` wheel was replaced with the upstream one: the shipped copy
+has the 15 MB of acceptance-test fixtures stripped out, which takes it from
+16 MB to 49 KB. Strip the new wheel the same way on every version bump, and
+keep `GSC_REQUIRED` in `toolbelt/dependencies.py` equal to what is shipped.
+A test asserts those two agree.
+
 ## Release a version
 
-Everything is done through the continuous deployment, sticking to a classic git workflow: 1 released version = 1 git tag.
+One released version is one git tag, and the continuous deployment does the
+rest. For a tag `X.Y.Z`, which must be SemVer:
 
-Here comes the process for a tag `X.y.z` (which has to be SemVer compliant):
+1. Move the *Unreleased* entries of `CHANGELOG.md` under a new
+   `## X.Y.Z - YYYY-MM-DD` heading. This text becomes the release notes and
+   the plugin repository's description, so it is worth reading once as a
+   stranger would.
+2. Set `version=X.Y.Z` in `geoserver_manager/metadata.txt`, and drop
+   `experimental=True` when the release is no longer experimental.
+3. Tick what shipped in the [roadmap](../github_issue_roadmap.md).
+4. Tag and push:
 
-1. Add the new version to the `CHANGELOG.md`.You can write it manually or use the auto-generated release notes by Github:
-    1. Go to [project's releases](https://github.com/WhereGroup/profile_manager/releases) and click on `Draft a new release`
-    1. In `Choose a tag`, enter the new tag
-    1. Click on `Generate release notes`
-    1. Copy/paste the generated text from `## What's changed` until the line before `**Full changelog**:...` in the CHANGELOG.md replacing `What's changed` with the tag and the publication date.
-1. Optionally change the version number in `metadata.txt`. It's recommended to use the next version number with `-DEV` suffix (e.g. `1.4.0-DEV` when `X.y.z` is `1.3.0` ) to avoid confusion during the development phase.
-1. Apply a git tag with the relevant version: `git tag -a X.y.z {git commit hash} -m "This version rocks!"`
-1. Push tag to main branch: `git push origin X.y.z` or `git push --tags` if you want to push all tags at once.
-1. The CI/CD pipeline will be triggered and will create a new release on your Git repository and publish it to the [official QGIS plugins repository](https://plugins.qgis.org/) (if you picked up the option).
+    ```sh
+    git tag -a X.Y.Z -m "X.Y.Z"
+    git push origin X.Y.Z
+    ```
 
-If things go wrong (failed CI/CD pipeline, missed step...), here comes the fix process:
+5. The tag triggers *Package and release*, which builds the zip, creates the
+   GitHub release and publishes to the
+   [QGIS plugin repository](https://plugins.qgis.org/) using the
+   `OSGEO_USER` and `OSGEO_PASSWORD` secrets.
+
+The first upload decides the plugin's permanent identifier there, which is the
+package folder name, `geoserver_manager`. It cannot be changed afterwards; a
+different folder name would be a different plugin. Once the plugin exists on
+that repository, set its numeric id as `official_repository_id` in
+`docs/conf.py`, so the deployment snippet on the installation page is right.
+
+If a tag went out wrong, remove it and try again:
 
 ```sh
-git tag -d old
-git push origin :refs/tags/old
-git push --tags
+git tag -d X.Y.Z
+git push origin :refs/tags/X.Y.Z
 ```
-
-And try again!
