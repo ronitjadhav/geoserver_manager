@@ -171,26 +171,6 @@ published to <https://ronitjadhav.github.io/geoserver_manager/>.
 Start with the [usage guide](docs/usage/guide.md): connecting, what each tab
 does, publishing from QGIS, styles both ways, keyboard shortcuts, troubleshooting.
 
-## Branding
-
-<a href="docs/branding.md"><img alt="The GeoServer Manager identity" src="docs/static/branding/preview.png" width="720"></a>
-
-The Ribbon G is the plugin's logo: a blue ribbon traces a rounded map tile, then
-bends inward in green to form a G. Blue for GeoServer, green for QGIS, readable
-down to 16 px and in a single colour.
-
-| Colour | Hex |
-| :-- | :-- |
-| Green | `#589632` |
-| Blue | `#0099C0` |
-| Ink | `#172F36` |
-| Paper | `#F6F7F3` |
-
-The [branding guide](docs/branding.md) has the icons, wordmarks, favicon, avatars
-and social card, with the rules for using them.
-[Download the brand kit](docs/static/branding/brand-kit.zip), or regenerate
-everything from the source SVG with `python3 scripts/export_branding.py`.
-
 ## License
 
 Distributed under the terms of the [`GPLv2+` license](LICENSE).
