@@ -86,17 +86,16 @@ pygments_style: str = "sphinx"
 
 # -- Theme
 
-html_favicon: str = str(__about__.__icon_path__)
-html_logo: str = str(__about__.__icon_path__)
-# uncomment next line if you store some statics which are not directly linked into the markdown/RST files
-# html_static_path = ["static/include_additional"]
+html_favicon: str = "static/branding/favicon.ico"
+html_logo: str = "static/branding/mark.svg"
+html_static_path = ["static/branding"]
 html_theme = "sphinx_rtd_theme"
 html_theme_options: dict[str, Union[bool, int, str]] = {
     "display_version": True,
     "logo_only": False,
     "prev_next_buttons_location": "both",
     "style_external_links": True,
-    "style_nav_header_background": "SteelBlue",
+    "style_nav_header_background": "#172f36",
     # Toc options
     "collapse_navigation": True,
     "includehidden": False,

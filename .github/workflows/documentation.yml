@@ -17,6 +17,7 @@ on:
       - 'docs/**/*'
       - "geoserver_manager/**/*.py"
       - "geoserver_manager/metadata.txt"
+      - "geoserver_manager/resources/images/**"
       - 'requirements/documentation.txt'
     tags:
       - "*"
@@ -27,6 +28,7 @@ on:
     paths:
       - ".github/workflows/documentation.yml"
       - docs/**/*
+      - "geoserver_manager/resources/images/**"
       - requirements/documentation.txt
 
   workflow_dispatch:

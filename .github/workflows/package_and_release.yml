@@ -17,6 +17,7 @@ on:
       - "geoserver_manager/**/*.py"
       - "geoserver_manager/**/*.ui"
       - "geoserver_manager/extras/**"
+      - "geoserver_manager/resources/images/**"
       - "geoserver_manager/metadata.txt"
       - requirements/packaging.txt
       - setup.cfg
@@ -33,6 +34,7 @@ on:
       - "geoserver_manager/**/*.py"
       - "geoserver_manager/**/*.ui"
       - "geoserver_manager/extras/**"
+      - "geoserver_manager/resources/images/**"
       - "geoserver_manager/metadata.txt"
       - requirements/packaging.txt
       - setup.cfg
