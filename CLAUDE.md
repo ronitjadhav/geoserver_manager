@@ -396,6 +396,14 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   `.ts` lacks. Extraction is `python scripts/update_translations.py` (pylupdate6, `pip install PyQt6`);
   run it after changing a user-visible string. Never pylupdate5: it silently skipped every `translate()`
   black wrapped onto several lines or wrote as adjacent literals: 65 of 455 strings when measured.
+- **The icon and the screenshots are generated, never hand-edited.**
+  `scripts/export_branding.py` renders every brand asset from
+  `resources/images/geoserver_manager.svg`, including the
+  `resources/images/default_icon.png` that `metadata.txt` points at, and the website's
+  logo and favicon; `docs/branding.md` is the guide. `scripts/capture_screenshot.py`
+  regrabs the README and usage-guide screenshot from the real dialog against the docker
+  sandbox, off screen. Re-run it when the dialog's layout changes, or the screenshot
+  quietly starts showing an interface that no longer exists.
 - Messages: user-facing outcomes go to the dialog's message bar (`show_*_message`); details go to the QGIS
   log (`self.log(..., log_level=Qgis.MessageLevel.Critical)`). `_run_action` does both. Errors and warnings
   **stay until closed** (duration 0): they say what to do next, and were gone in 5 s before. Success fades.
