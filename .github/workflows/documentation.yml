@@ -57,17 +57,17 @@ jobs:
 
     steps:
     - name: Get source code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Set up Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
           cache: "pip"
           cache-dependency-path: "requirements/documentation.txt"
           python-version: ${{ env.PYTHON_VERSION }}
 
     - name: Cache Sphinx cache
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: docs/_build/cache
         key: ${{ runner.os }}-sphinx-${{ hashFiles('docs/**/*') }}
@@ -84,7 +84,7 @@ jobs:
 
     - name: Download artifact from build workflow
       if: ${{ env.CONDITION_IS_PUSH || env.CONDITION_IS_WORKFLOW_RUN }}
-      uses: dawidd6/action-download-artifact@v19
+      uses: dawidd6/action-download-artifact@v24
       with:
         allow_forks: false
         branch: main
@@ -109,7 +109,7 @@ jobs:
       if: ${{ env.CONDITION_IS_PUSH || env.CONDITION_IS_WORKFLOW_RUN }}
 
     - name: Upload artifact
-      uses: actions/upload-pages-artifact@v4
+      uses: actions/upload-pages-artifact@v5
       if: ${{ env.CONDITION_IS_PUSH || env.CONDITION_IS_WORKFLOW_RUN }}
       with:
         # Upload entire repository
