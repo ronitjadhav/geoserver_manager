@@ -111,6 +111,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- A visual identity: the Ribbon G logo, used as the plugin's icon in the
+  toolbar, menus and plugin manager, and on the documentation website.
+  `docs/branding.md` explains it and links a brand kit;
+  `scripts/export_branding.py` regenerates every export from one SVG.
 - **Enable or disable a datastore** from its edit form. GeoServer disables
   a store itself when its connection fails at startup; this is the switch
   back (measured: a disabled PostGIS store re-enabled through the form and

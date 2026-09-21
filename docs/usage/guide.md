@@ -1,5 +1,7 @@
 # Using the plugin
 
+![The Layers tab, listing a server's layers with their workspace, type, store and default style](../static/screenshot-layers.png)
+
 ## Connect
 
 *Settings → Options → GeoServer Manager* (or the plugin menu's *Settings*
