@@ -28,7 +28,8 @@ Skills in `.claude/skills/` hold the step-by-step procedures:
 | `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser`, `probe` (the bounded connection check the dialog and Settings share), `rest` (the raw REST call, `summarise_body` for banners, the streaming upload body; no QGIS import), `payload` (GeoServer's collection shapes, pure), `sld` and `qgis_export` (QGIS ↔ GeoServer conversions, pure) |
 | `geoserver_manager/extras/*.whl` | Bundled `geoservercloud` (stripped, see below) and `xmltodict`, added to `sys.path` at startup |
 | `tests/unit/` | Runs without QGIS. `tests/qgis/` needs the QGIS Python (headless via `qgis.testing.start_app()`) |
-| `docs/github_issue_roadmap.md` | Feature backlog; GitHub milestones mirror it |
+| `docs/` | The site: Sphinx + MyST + Furo, deployed to GitHub Pages on every push to main. `usage/` is written for the user, `development/` for a contributor, `github_issue_roadmap.md` is the feature backlog that GitHub milestones mirror |
+| `scripts/` | `update_translations.py` (pylupdate6), `export_branding.py` (every brand asset from one SVG), `capture_screenshot.py` (the screenshot the README and guide show, grabbed from the real dialog) |
 | `docker-compose.yml` | Throwaway GeoServer 2.28.5 (`:8080`, admin/geoserver) + PostGIS, for testing against a real server |
 
 The `Inspiration/` folder is untracked reference code. Never import from it.
@@ -430,6 +431,24 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
 - Commit messages: conventional prefix (`fix:`, `feat:`, `refactor:`, `chore:`, `ci:`, `docs:`), a body
   that says *why*. Pre-commit runs ruff, ruff-format, black, isort, flake8(+flake8-qgis) and the
   hygiene hooks on every commit; if black rewrites a file the commit aborts. Re-add and commit again.
+- **Documentation ships with the change, in the same commit.** The docs are not a
+  follow-up task; a change that reaches the user and leaves them stale is unfinished.
+  What to touch:
+
+  | Changed | Update |
+  |---|---|
+  | A tab, button, form or message | the matching section of `docs/usage/guide.md`, and `CHANGELOG.md` under *Unreleased* |
+  | The dialog's layout | the guide, plus `python3 scripts/capture_screenshot.py` against the sandbox (the README and the guide show that image) |
+  | A new resource type or tab | a guide section, a row in the feature tables of `README.md` and `docs/index.md`, and the roadmap ticked |
+  | Install or configuration | `docs/usage/installation.md` and the README's Configuration section |
+  | A dev step, tool or command | the page under `docs/development/` that teaches it, and this file if an agent would get it wrong |
+  | The logo or a brand asset | `python3 scripts/export_branding.py`, never the exported files by hand |
+  | A dependency or a workflow path filter | `.github/dependabot.yml` explains which workflow must see each requirements file; keep that mapping true |
+
+  The site build must stay silent: `sphinx-build -b html -q docs docs/_build/html`
+  prints nothing when it is healthy, so a warning is a broken link or an orphan page.
+  There is no API reference and there cannot be one: the plugin does not import
+  without QGIS, which the documentation job does not install.
 - **No em dashes, and prefer short sentences.** In code, comments, docstrings, docs, commit messages and
   every user-facing string, use commas, periods, colons, semicolons or parentheses instead of an em dash.
   Split a long sentence into two rather than joining two clauses with a dash.
