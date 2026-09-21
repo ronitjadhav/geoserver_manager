@@ -1,4 +1,22 @@
-# GeoServer Manager: QGIS Plugin
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/static/branding/wordmark-white.png">
+  <img src="docs/static/branding/wordmark.png" alt="GeoServer Manager" width="400">
+</picture>
+
+<p><strong>GeoServer, inside QGIS.</strong></p>
+
+<p>
+  <a href="https://qgis.org"><img alt="QGIS 3.40+" src="https://img.shields.io/badge/QGIS-3.40%2B-589632?logo=qgis&logoColor=white"></a>
+  <a href="https://geoserver.org"><img alt="GeoServer 2.28" src="https://img.shields.io/badge/GeoServer-2.28-0099C0"></a>
+  <a href="https://github.com/camptocamp/python-geoservercloud"><img alt="Built on python-geoservercloud" src="https://img.shields.io/badge/built%20on-python--geoservercloud-172F36"></a>
+  <a href="LICENSE"><img alt="License GPLv2+" src="https://img.shields.io/badge/license-GPLv2%2B-172F36"></a>
+</p>
+
+<img alt="The Layers tab of GeoServer Manager, listing a server's layers with their workspace, type, store and default style" src="docs/static/screenshot-layers.png" width="880">
+
+</div>
 
 Manage a GeoServer from inside QGIS. Browse, create, edit and delete
 workspaces, datastores, coverage stores, cascaded WMS/WMTS stores, layers, layer
@@ -13,11 +31,6 @@ so that it gets added there rather than worked around here.
 
 > **Status:** experimental, not yet released. Developed against GeoServer 2.28;
 > what is still missing is on the [roadmap](docs/github_issue_roadmap.md).
-
-[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
-[![flake8](https://img.shields.io/badge/linter-flake8-green)](https://flake8.pycqa.org/)
 
 ## Features
 
@@ -133,6 +146,11 @@ Details in
 
 ### Checks
 
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
+[![flake8](https://img.shields.io/badge/linter-flake8-green)](https://flake8.pycqa.org/)
+
 ```sh
 python -m pip install -U -r requirements/development.txt
 pre-commit install
@@ -152,6 +170,26 @@ published to <https://ronitjadhav.github.io/geoserver_manager/>.
 
 Start with the [usage guide](docs/usage/guide.md): connecting, what each tab
 does, publishing from QGIS, styles both ways, keyboard shortcuts, troubleshooting.
+
+## Branding
+
+<a href="docs/branding.md"><img alt="The GeoServer Manager identity" src="docs/static/branding/preview.png" width="720"></a>
+
+The Ribbon G is the plugin's logo: a blue ribbon traces a rounded map tile, then
+bends inward in green to form a G. Blue for GeoServer, green for QGIS, readable
+down to 16 px and in a single colour.
+
+| Colour | Hex |
+| :-- | :-- |
+| Green | `#589632` |
+| Blue | `#0099C0` |
+| Ink | `#172F36` |
+| Paper | `#F6F7F3` |
+
+The [branding guide](docs/branding.md) has the icons, wordmarks, favicon, avatars
+and social card, with the rules for using them.
+[Download the brand kit](docs/static/branding/brand-kit.zip), or regenerate
+everything from the source SVG with `python3 scripts/export_branding.py`.
 
 ## License
 
