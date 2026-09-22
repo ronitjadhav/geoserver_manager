@@ -16,8 +16,8 @@ import threading
 import time
 from unittest.mock import patch
 
-from qgis.PyQt.QtCore import QEventLoop, QTimer
-from qgis.PyQt.QtWidgets import QDialog, QPushButton
+from qgis.PyQt.QtCore import QCoreApplication, QEventLoop, QObject, QTimer
+from qgis.PyQt.QtWidgets import QApplication, QDialog, QProgressDialog, QPushButton
 from qgis.testing import start_app, unittest
 
 # project
@@ -1476,6 +1476,64 @@ class TestConnectionGuard(unittest.TestCase):
         self.assertIsNone(self.dlg.gs)
         self.assertFalse(self.dlg.btn_add.isEnabled())
         self.assertFalse(self.dlg.btn_delete_selected.isEnabled())
+
+
+class TestReadsOffTheGuiThread(unittest.TestCase):
+    """_fetch: a form opener's read must not freeze QGIS (issue #59)."""
+
+    def setUp(self):
+        self.dlg = GeoServerMainDialog()
+        self.errors = []
+        self.dlg.show_error_message = self.errors.append
+        self.dlg.show_warning_message = lambda text: None
+
+    def test_a_slow_read_keeps_the_event_loop_running(self):
+        ticks = []
+        heartbeat = QTimer()
+        heartbeat.setInterval(20)
+        heartbeat.timeout.connect(lambda: ticks.append(1))
+        heartbeat.start()
+        value = self.dlg._fetch(lambda: time.sleep(1) or "answer", "failed")
+        heartbeat.stop()
+        self.assertEqual(value, "answer")
+        # Inline, the sleep would hold the GUI thread and no tick could fire.
+        self.assertGreater(len(ticks), 10)
+
+    def test_cancel_returns_at_once_and_reports_nothing(self):
+        release = threading.Event()
+
+        def press_cancel():
+            box = QApplication.activeModalWidget()
+            self.assertIsInstance(box, QProgressDialog)
+            box.cancel()
+
+        QTimer.singleShot(500, press_cancel)
+        started = time.monotonic()
+        value = self.dlg._fetch(lambda: release.wait(10) and "late", "failed")
+        release.set()
+        self.assertIsNone(value)
+        self.assertLess(time.monotonic() - started, 3)
+        self.assertEqual(self.errors, [])
+
+    def test_a_fast_read_shows_no_box(self):
+        with patch("geoserver_manager.gui.dlg_main.QProgressDialog") as box:
+            self.assertEqual(self.dlg._fetch(lambda: 42, "failed"), 42)
+        box.assert_not_called()
+
+    def test_the_error_of_the_read_is_reported(self):
+        def fail():
+            raise RuntimeError("HTTP 500")
+
+        self.assertIsNone(self.dlg._fetch(fail, "Failed to load"))
+        self.assertEqual(self.errors, ["Failed to load: HTTP 500"])
+
+    def test_an_object_built_in_the_worker_comes_back_on_the_gui_thread(self):
+        built = self.dlg._fetch(QObject, "failed")
+        self.assertIs(built.thread(), QCoreApplication.instance().thread())
+
+    def test_work_on_a_qgis_layer_can_stay_on_the_gui_thread(self):
+        where = self.dlg._fetch(threading.current_thread, "failed", in_worker=False)
+        self.assertIs(where, threading.main_thread())
 
 
 # ############################################################################

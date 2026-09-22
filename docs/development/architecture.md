@@ -59,7 +59,8 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   | Helper | Use it for |
   |---|---|
   | `_run_action(fn, failure_message) -> bool` | any mutation: wait cursor, banner + QGIS log on failure |
-  | `_fetch(fn, failure_message) -> value \| None` | any read the UI needs before continuing |
+  | `_fetch(fn, failure_message) -> value \| None` | any read the UI needs before continuing: runs `fn` in a worker thread and waits behind an application-modal *Waiting for GeoServer* box (after 0.3 s) with Cancel, so a dead server cannot freeze QGIS. `in_worker=False` for work on a live QGIS layer. A map layer `fn` builds comes back moved to the GUI thread |
+  | `_wait_for(fn) -> value` | the same wait without the reporting, for a read inside a handler that does its own (the Publish form's combo refills) |
   | `_check((content, status))` | unwrap a geoservercloud tuple; raises on ≥ 400 |
   | `_fetch_list(api_method, *args)` | a list endpoint; `[]` when the payload is not a list |
   | `_resource_exists(getter, *args)` | pre-check before *Add* (the library upserts) |

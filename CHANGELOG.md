@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- Opening a form, a detail view, a preview or *Add to QGIS* no longer
+  freezes QGIS when the server is slow or gone. Each of those reads now runs
+  in a worker thread. After 0.3 s a *Waiting for GeoServer* box appears, and
+  its *Cancel* works; before, QGIS hung for up to the library's 120 s
+  timeout. The Publish form's datastore and table pickers work the same way.
 - A workspace, datastore or layer-group name with `/`, `?`, `#` or `%` is
   refused before any request: `requests` would have sent
   `datastores/a#b.json` as `datastores/a` (another store's path), and a

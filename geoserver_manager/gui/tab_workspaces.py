@@ -405,14 +405,15 @@ class WorkspaceTabMixin:
             lambda: (
                 self._check(self.gs.get_workspace(old_name)),
                 self._wms_settings(old_name),
+                self._default_workspace_name(),
             ),
             translate("WorkspaceTabMixin", "Failed to load workspace details"),
         )
         if fetched is None:
             return
-        detail, wms_settings = fetched
+        detail, wms_settings, default_name = fetched
 
-        is_default = self._default_workspace_name() == old_name
+        is_default = default_name == old_name
         values = {
             "name": old_name,
             "isolated": (
