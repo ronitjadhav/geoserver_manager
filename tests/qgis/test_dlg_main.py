@@ -826,6 +826,25 @@ class TestBackgroundLoading(unittest.TestCase):
         # the empty state explains itself now: nothing loaded, here is Add
         self.assertIn("Nothing here yet", self.dlg.lbl_page_info.text())
 
+    def test_a_refresh_cancels_the_load_before_it_drops_the_client(self):
+        """A fetcher reads self.gs from its worker (issue #59), which is safe
+        only because the client never changes under a load that still owns
+        the table: refresh_ui cancels it first.
+        """
+        self.dlg.gs = SlowGS(latency=0.05, workspaces=50)
+        self.dlg._load_datastores()
+        spin_until(lambda: self.dlg._task.progress() > 0)
+        stale = self.dlg._task
+
+        self.dlg._build_client = lambda settings: None  # the refresh fails
+        self.dlg.refresh_ui()
+
+        self.assertIsNone(self.dlg.gs)
+        self.assertTrue(stale.isCanceled())
+        spin_until(lambda: not self.dlg._loading())
+        self.assertEqual(self.dlg._all_rows, [])
+        self.assertEqual(self.errors, [])  # the worker's AttributeError is dropped
+
     def test_a_load_that_lands_after_close_touches_nothing(self):
         """The task outlives the dialog; its callback must stay away."""
         self.dlg.gs = SlowGS(latency=0.05, workspaces=20)
