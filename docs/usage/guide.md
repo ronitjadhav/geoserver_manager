@@ -57,6 +57,9 @@ style to GeoServer, down brings it into QGIS.
   activate it. In a menu, use the arrow keys and Enter; Esc dismisses it.
 - Lists load in the background: QGIS stays usable, the task bar shows the
   progress, and *Refresh* turns into *Cancel* while a load runs.
+- Opening a form or a detail view reads from the server first. If the server
+  is slow to answer, a *Waiting for GeoServer* box appears with *Cancel*,
+  so a server that went away never freezes QGIS.
 
 Every delete asks first and names what it cascades to; GeoServer deletes
 recursively (a workspace takes its stores, layers and styles with it).

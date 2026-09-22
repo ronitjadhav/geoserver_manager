@@ -536,7 +536,7 @@ class LayerGroupTabMixin:
         name, workspace_name = row_data[0], scope(row_data[1])
         qualified = f"{workspace_name}:{name}" if workspace_name else name
 
-        def add():
+        def build():
             settings = self.plg_settings.get_plg_settings()
             uri, provider = self._layer_uri(
                 "WMS",
@@ -544,18 +544,21 @@ class LayerGroupTabMixin:
                 qualified,
                 settings.geoserver_auth_cfg_id,
             )
+            # The constructor reads the capabilities: a request, so a worker's.
             layer = QgsRasterLayer(uri, name, provider)
             if not layer.isValid():
                 raise RuntimeError(
                     layer.error().message()
                     or translate("LayerGroupTabMixin", "layer is not valid")
                 )
-            QgsProject.instance().addMapLayer(layer)
+            return layer
 
-        if self._run_action(
-            add,
+        layer = self._fetch(
+            build,
             translate("LayerGroupTabMixin", "Could not add '{}' to QGIS").format(name),
-        ):
+        )
+        if layer is not None:
+            QgsProject.instance().addMapLayer(layer)
             self.show_success_message(
                 translate(
                     "LayerGroupTabMixin", "'{}' added to the project as WMS."

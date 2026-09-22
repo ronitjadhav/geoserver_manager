@@ -10,6 +10,7 @@ Every load runs in a QgsTask: a loader arms the GUI and hands a fetch function
 to _start_load, which returns immediately and renders the rows when they land.
 """
 
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import urlparse
@@ -17,15 +18,26 @@ from urllib.parse import urlparse
 from qgis.core import Qgis, QgsApplication, QgsTask
 from qgis.gui import QgsMessageBar
 from qgis.PyQt import uic
-from qgis.PyQt.QtCore import QByteArray, QEvent, QSize, Qt, QTimer
+from qgis.PyQt.QtCore import (
+    QByteArray,
+    QCoreApplication,
+    QEvent,
+    QObject,
+    QSize,
+    Qt,
+    QThread,
+    QTimer,
+)
 from qgis.PyQt.QtGui import QPalette
 from qgis.PyQt.QtWidgets import (
+    QApplication,
     QDialog,
     QHBoxLayout,
     QHeaderView,
     QListWidgetItem,
     QMenu,
     QMessageBox,
+    QProgressDialog,
     QPushButton,
     QSizePolicy,
     QTableWidgetItem,
@@ -56,9 +68,40 @@ from geoserver_manager.toolbelt.rest import raw_rest, summarise_body
 _MAX_PARALLEL_REQUESTS = 8
 _UNSAFE_IN_NAMES = "/?#%\\"
 
+# A read that answers within this many seconds never shows the waiting box, so
+# a healthy server looks exactly as it did when reads ran inline.
+_WAIT_BEFORE_BOX = 0.3
+
 # The connection probe is the request the user waits for before anything is on
 # screen, so it gets its own short ceiling. The library cannot do this: its
 # RestClient hardcodes timeout=TIMEOUT (120 s); see _probe and issue #50.
+
+
+class _Abandoned(Exception):
+    """The user stopped waiting for a read (the waiting box's Cancel)."""
+
+
+class _ReadThread(QThread):
+    """The worker of one _wait_for read.
+
+    A QThread, not a Python thread: QGIS's network access manager and the
+    WMS/WFS providers start Qt timers (their own timeouts), which a thread
+    without a Qt event dispatcher cannot run. Running threads are kept in
+    _RUNNING, because a QThread collected while it runs aborts QGIS, and an
+    abandoned read still runs to the library's timeout.
+    """
+
+    def __init__(self, work):
+        super().__init__()
+        self._work = work
+        _RUNNING.add(self)
+        self.finished.connect(lambda: _RUNNING.discard(self))
+
+    def run(self):
+        self._work()
+
+
+_RUNNING = set()
 
 
 class _FetchTask(QgsTask):
@@ -1256,6 +1299,9 @@ class GeoServerMainDialog(
         try:
             action()
             return True
+        except _Abandoned:
+            # The user pressed Cancel: they know, and there is nothing to report.
+            return False
         except Exception as e:
             detail = self._error_text(e)
             self.show_error_message(f"{failure_message}: {detail}")
@@ -1266,12 +1312,74 @@ class GeoServerMainDialog(
         finally:
             self.unsetCursor()
 
-    def _fetch(self, action, failure_message):
-        """_run_action for reads: return the value, or None after reporting."""
+    def _fetch(self, action, failure_message, in_worker=True):
+        """_run_action for reads: return the value, or None after reporting.
+
+        The read runs in a worker thread (see _wait_for), so a server that
+        stopped answering cannot freeze QGIS. `in_worker=False` is for work
+        on a live QGIS layer, which must stay on the GUI thread (invariant 9).
+        """
         result = []
-        if self._run_action(lambda: result.append(action()), failure_message):
+        run = self._wait_for if in_worker else (lambda fn: fn())
+        if self._run_action(lambda: result.append(run(action)), failure_message):
             return result[0]
         return None
+
+    def _wait_for(self, action):
+        """Run action() in a worker thread and return its value, or raise its error.
+
+        A fast answer returns under the wait cursor, as before. After
+        _WAIT_BEFORE_BOX a modal "Waiting for GeoServer" box with Cancel
+        appears, and the GUI thread keeps processing events until the read
+        lands. The box being application-modal is what makes the nested event
+        loop safe: no click can reach the dialog, a form or QGIS while a read
+        is outstanding, so nothing can start a second one or clear `self.gs`.
+        Cancel raises _Abandoned. The request itself runs to the library's
+        own timeout and its answer is dropped.
+
+        A QObject result (a map layer) is moved to the GUI thread before it
+        is handed back, because a layer built in a worker belongs to it.
+        ponytail: one thread per read; a pool only if reads ever overlap.
+        """
+        outcome = {}
+        done = threading.Event()
+
+        def work():
+            try:
+                value = action()
+                if isinstance(value, QObject):
+                    value.moveToThread(QCoreApplication.instance().thread())
+                outcome["value"] = value
+            except Exception as e:  # re-raised on the GUI thread, below
+                outcome["error"] = e
+            finally:
+                done.set()
+
+        _ReadThread(work).start()
+        if not done.wait(_WAIT_BEFORE_BOX):
+            box = QProgressDialog(
+                self.tr("Waiting for GeoServer…"),
+                self.tr("Cancel"),
+                0,
+                0,
+                # A form's own read must block the form, not only this dialog.
+                QApplication.activeModalWidget() or self,
+            )
+            box.setWindowTitle(__title__)
+            box.setWindowModality(Qt.WindowModality.ApplicationModal)
+            box.setMinimumDuration(0)
+            box.show()
+            try:
+                while not done.wait(0.05):
+                    QCoreApplication.processEvents()
+                    if box.wasCanceled():
+                        raise _Abandoned()
+            finally:
+                box.close()
+                box.deleteLater()
+        if "error" in outcome:
+            raise outcome["error"]
+        return outcome["value"]
 
     def _raw_rest(self, method, path, **kwargs):
         """Call the REST client directly for what geoservercloud has no method for.

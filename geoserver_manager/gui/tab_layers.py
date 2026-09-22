@@ -589,7 +589,9 @@ class LayerTabMixin:
             ds_combo.blockSignals(True)  # the table refill below is explicit
             ds_combo.clear()
             try:
-                ds_combo.addItems(self._datastore_names(workspace))
+                ds_combo.addItems(
+                    self._wait_for(lambda: self._datastore_names(workspace))
+                )
             except Exception as e:
                 self.log(f"Could not list datastores of {workspace}: {e}")
             ds_combo.blockSignals(False)
@@ -598,7 +600,9 @@ class LayerTabMixin:
         table_combo.clear()
         if workspace and datastore:
             try:
-                table_combo.addItems(self._available_tables(workspace, datastore))
+                table_combo.addItems(
+                    self._wait_for(lambda: self._available_tables(workspace, datastore))
+                )
             except Exception as e:
                 self.log(f"Could not list tables of {workspace}/{datastore}: {e}")
 
@@ -1053,6 +1057,7 @@ class LayerTabMixin:
             translate("LayerTabMixin", "Could not export the symbology of '{}'").format(
                 layer.name()
             ),
+            in_worker=False,
         )
         if sld is None:
             return
@@ -1352,7 +1357,7 @@ class LayerTabMixin:
             return
         protocol = dlg.get_values()["protocol"]
 
-        def add():
+        def build():
             settings = self.plg_settings.get_plg_settings()
             uri, provider = self._layer_uri(
                 protocol,
@@ -1361,6 +1366,7 @@ class LayerTabMixin:
                 settings.geoserver_auth_cfg_id,
             )
             layer_class = QgsVectorLayer if provider == "WFS" else QgsRasterLayer
+            # The constructor reads the capabilities: a request, so a worker's.
             layer = layer_class(uri, name, provider)
             if not layer.isValid():
                 # Build first and check, instead of iface.addRasterLayer(), so an
@@ -1369,11 +1375,13 @@ class LayerTabMixin:
                     layer.error().message()
                     or translate("LayerTabMixin", "layer is not valid")
                 )
-            QgsProject.instance().addMapLayer(layer)
+            return layer
 
-        if self._run_action(
-            add, translate("LayerTabMixin", "Could not add '{}' to QGIS").format(name)
-        ):
+        layer = self._fetch(
+            build, translate("LayerTabMixin", "Could not add '{}' to QGIS").format(name)
+        )
+        if layer is not None:
+            QgsProject.instance().addMapLayer(layer)
             self.show_success_message(
                 translate("LayerTabMixin", "'{}' added to the project as {}.").format(
                     name, protocol

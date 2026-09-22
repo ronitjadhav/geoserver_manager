@@ -898,7 +898,9 @@ class CoverageStoreTabMixin:
             "CoverageStoreTabMixin", "Failed to publish raster '{}'"
         ).format(name)
         prepared = self._fetch(
-            lambda: self._prepare_qgis_raster(ws_name, name, values, layer), failure
+            lambda: self._prepare_qgis_raster(ws_name, name, values, layer),
+            failure,
+            in_worker=False,  # a live QGIS layer, and a local export
         )
         if prepared is None:
             return
