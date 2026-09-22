@@ -85,7 +85,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   source and usage. Future stock fallbacks must be registered as needing
   custom artwork. Checks catch missing or unregistered icons and stale previews.
   A reusable style guide records drawing rules and a generation brief, linked
-  from `AGENTS.md`.
+  from the conventions page of the documentation.
 
 - Layer-group modes read as GeoServer's web admin names them (Single,
   Opaque Container, Named Tree, Container Tree, Earth Observation Tree)

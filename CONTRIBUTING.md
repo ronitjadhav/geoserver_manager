@@ -23,6 +23,15 @@ Make sure your code *roughly* follows [PEP-8](https://www.python.org/dev/peps/pe
 Two habits the whole repository keeps: no em dashes, and two short sentences
 rather than one long one joined by a dash.
 
+## Before changing code
+
+Three pages of the documentation record what the code cannot tell you. Read
+them first, in this order:
+[architecture](https://ronitjadhav.github.io/geoserver_manager/development/architecture.html),
+[invariants](https://ronitjadhav.github.io/geoserver_manager/development/invariants.html),
+[conventions](https://ronitjadhav.github.io/geoserver_manager/development/conventions.html).
+A change that breaks an invariant is a bug even when every test passes.
+
 ## Tests
 
 Every fix comes with a test that fails without it. Run the new test against the

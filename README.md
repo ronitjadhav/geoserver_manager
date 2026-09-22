@@ -144,6 +144,13 @@ sees it: host `postgis`, port `5432`, database / user / password `geoserver`.
 Details in
 [docs/development/environment.md](docs/development/environment.md).
 
+### Before changing code
+
+Read the [architecture](docs/development/architecture.md), the
+[invariants](docs/development/invariants.md) and the
+[conventions](docs/development/conventions.md). They record what the code
+cannot tell you, and each invariant was a real bug.
+
 ### Checks
 
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)

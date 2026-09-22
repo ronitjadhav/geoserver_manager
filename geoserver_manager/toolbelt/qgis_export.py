@@ -7,7 +7,7 @@ a GeoPackage for a vector layer, a GeoTIFF for a raster.
 `geoserver_name` imports nothing from QGIS, so the naming rules (the part that
 is easy to get subtly wrong) are tested in an interpreter without QGIS, like
 the CI unit job. The export functions read a live layer and must run on the
-GUI thread (invariant 9 in AGENTS.md).
+GUI thread (invariant 9 in docs/development/invariants.md).
 """
 
 import re

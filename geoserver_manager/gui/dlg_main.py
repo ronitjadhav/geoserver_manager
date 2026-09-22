@@ -817,7 +817,7 @@ class GeoServerMainDialog(
         its text to size it to its buttons. The mixins take the label from
         here rather than translating "Actions" in their own context, so the
         two sides of that comparison cannot drift apart once a translation is
-        installed (see invariant 10 in AGENTS.md).
+        installed (see invariant 10 in docs/development/invariants.md).
         """
         return self.tr("Actions")
 
