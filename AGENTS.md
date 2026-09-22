@@ -11,8 +11,9 @@ library; when the library lacks something, the gap is recorded in
 [issue #50](https://github.com/ronitjadhav/geoserver_manager/issues/50) so it can be
 implemented *there*, and only then worked around here. See Conventions.
 
-Skills in `.claude/skills/` hold the step-by-step procedures:
-`add-resource-tab`, `verify-plugin`, `release-plugin`.
+The step-by-step procedures (`add-resource-tab`, `verify-plugin`, `release-plugin`) are
+skills kept in the maintainer's private knowledge repository, linked into a clone as
+`.claude/skills/` by its `link-project.sh`. They are not tracked here.
 
 ## Layout
 
