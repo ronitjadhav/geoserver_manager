@@ -46,10 +46,13 @@ permissions:
   id-token: write
   pages: write
 
-# Allow one concurrent deployment per branch/pr
+# Pull request builds run independently. Deployments queue behind each other:
+# this workflow runs twice per merge, on the push and again when the package
+# workflow finishes, and cancelling the first while its Pages deployment was
+# in flight made GitHub reject the second ("in progress deployment").
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.event_name == 'pull_request' && format('docs-pr-{0}', github.event.pull_request.number) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
