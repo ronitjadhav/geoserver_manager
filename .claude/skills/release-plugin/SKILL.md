@@ -40,7 +40,7 @@ ls -la *.whl        # expect tens of KB
 
 Then: copy it into `geoserver_manager/extras/`, delete the old wheel, update the
 filename in `toolbelt/dependencies.py` (`BUNDLED_WHLS`), and re-check every
-library fact in `CLAUDE.md` (`raise_for_status` per verb, which `create_*` upsert,
+library fact in `docs/development/geoserver-notes.md` (`raise_for_status` per verb, which `create_*` upsert,
 which methods are still missing) against the new source; the plugin's
 `_raw_rest` workarounds ride on private attributes. Verify the import path:
 
