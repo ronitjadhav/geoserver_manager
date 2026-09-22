@@ -1,4 +1,4 @@
-"""Build the icon gallery and inventory. Use --check to detect stale outputs."""
+"""Validate the icon registry or build an optional, untracked HTML preview."""
 
 import argparse
 import ast
@@ -18,8 +18,7 @@ from geoserver_manager.toolbelt.icon_catalog import (  # noqa: E402
     load_catalog,
 )
 
-GALLERY = Path("docs/static/icons/icon-catalog.html")
-INVENTORY = Path("docs/development/icon-catalog.md")
+GALLERY = Path("build/icon-catalog.html")
 
 
 def scan_usage(root=ROOT):
@@ -202,25 +201,6 @@ def render_gallery(catalog, usages):
     return page
 
 
-def render_inventory(catalog, usages):
-    custom = sum(entry["status"] == "custom" for entry in catalog["icons"].values())
-    pending = len(catalog["icons"]) - custom
-    rows = []
-    for name, entry in catalog["icons"].items():
-        used = (
-            ", ".join(f"`{Path(path).name}`" for path in sorted(usages.get(name, ())))
-            or "Not used yet"
-        )
-        status = "Custom" if entry["status"] == "custom" else "**Needs custom artwork**"
-        label = entry["label"].replace("|", "/")
-        rows.append(f"| `{name}` | {label} | {status} | {used} |")
-    return (
-        GUIDE.replace("{{CUSTOM}}", str(custom))
-        .replace("{{PENDING}}", str(pending))
-        .replace("{{ROWS}}", "\n".join(rows))
-    )
-
-
 TEMPLATE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GeoServer Manager icon catalogue</title>
@@ -269,102 +249,23 @@ setTheme(window.matchMedia('(prefers-color-scheme: dark)').matches);
 </script></body></html>
 """
 
-GUIDE = """# Icon catalogue
-
-This page and its gallery are generated from
-`geoserver_manager/resources/icons/catalog.json` and the plugin's icon usage.
-**{{CUSTOM}} icons have custom artwork; {{PENDING}} still need it.**
-
-Before drawing or generating artwork, read the [icon style guide](icon-style-guide.md).
-It holds the drawing rules, shared symbols, SVG starter and generation brief.
-
-```{raw} html
-<iframe src="../_static/icon-catalog.html" title="Interactive icon catalogue" style="width:100%;height:850px;border:0" loading="lazy"></iframe>
-```
-
-The gallery filters by purpose, source file and artwork status. Switch between
-light and dark previews, or inspect the same glyph at 16, 20, 24 and 32 px.
-Each card shows normal, selected and disabled states. The gallery also works
-as a standalone file at `docs/static/icons/icon-catalog.html`.
-
-## Adding an icon with a feature
-
-1. Reuse an existing ID when its meaning matches. Pass that ID to `icon()`,
-   the navigation registry or the row-action tuple. Do not call `QIcon`,
-   `getThemeIcon` or `iconPath` directly outside the shared renderer.
-2. For a new meaning, add an entry to `resources/icons/catalog.json` with a
-   stable ID, label, category and purpose. Add the SVG under `resources/icons/`
-   and set `status` to `custom` with its resource-relative `asset` path.
-3. If artwork is not ready, register it immediately as `needs-custom` with a
-   QGIS `fallback` filename and `notes` describing the intended symbol. Omit
-   `asset`. It stays visible in the gallery's **Needs custom artwork** filter.
-4. Follow the [icon style guide](icon-style-guide.md) when drawing the SVG.
-   Keep a visible label or a clear tooltip and accessible name. The existing
-   brand mark keeps its original proportions and stroke.
-5. Regenerate this inventory and the gallery, then inspect the new icon at
-   16, 20 and 24 px in light and dark themes and in selected and disabled states:
-
-   ```sh
-   python scripts/build_icon_catalog.py
-   python scripts/build_icon_catalog.py --check
-   ```
-
-The unit suite checks for unregistered uses, direct QGIS icon lookups, missing
-assets, untracked SVGs, inconsistent stroke widths and stale generated files.
-A registered fallback is allowed and remains explicitly marked as unfinished.
-Qt's own message-box symbols, checkboxes, disclosure arrows and window controls
-belong to QGIS or the platform and are outside this plugin icon inventory.
-
-A temporary entry looks like this:
-
-```json
-"new-feature": {
-  "label": "New feature",
-  "category": "Utilities",
-  "purpose": "Describe the action and the intended visual metaphor.",
-  "status": "needs-custom",
-  "fallback": "mActionHelpContents.svg",
-  "notes": "Replace the temporary help symbol with artwork for this action."
-}
-```
-
-When the SVG is ready, change the status to `custom`, add its `asset` path,
-remove `fallback` and `notes`, then regenerate. Never leave an unrecorded
-stock icon in a new feature.
-
-## Inventory
-
-Usage is collected from the source code when this page is regenerated.
-
-| ID | Meaning | Artwork | Used in |
-| :-- | :------ | :------ | :------ |
-{{ROWS}}
-"""
-
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true")
+    parser.add_argument(
+        "--check", action="store_true", help="validate without writing a preview"
+    )
     args = parser.parse_args()
     catalog = load_catalog()
     usages, problems = scan_usage()
     problems += validate_catalog(catalog, usages)
     if problems:
         raise SystemExit("\n".join(problems))
-    outputs = {
-        GALLERY: render_gallery(catalog, usages),
-        INVENTORY: render_inventory(catalog, usages),
-    }
-    for relative, text in outputs.items():
-        path = ROOT / relative
-        if args.check:
-            if not path.is_file() or path.read_text(encoding="utf-8") != text:
-                raise SystemExit(
-                    f"Stale {relative}. Run python scripts/build_icon_catalog.py"
-                )
-        else:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text, encoding="utf-8")
+    if not args.check:
+        path = ROOT / GALLERY
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(render_gallery(catalog, usages), encoding="utf-8")
+        print(f"Local preview: {path}")
     pending = sum(
         entry["status"] == "needs-custom" for entry in catalog["icons"].values()
     )

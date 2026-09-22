@@ -36,6 +36,8 @@ plugin says so once, when saving.
 The list on the left picks the resource type; the table on the right shows it.
 Navigation and row-action icons adapt to light and dark themes. Hover over an
 action for its explanation; each action also has a name for screen readers.
+Style-transfer icons put a full-height arrow beside the brush: up sends a
+style to GeoServer, down brings it into QGIS.
 
 - **Search** (Ctrl+F) filters every column of the loaded list; Esc clears it.
 - **Sort** by clicking a column header; click again to reverse. The sort stays
@@ -175,9 +177,9 @@ global group). Click a name to edit the caching: enabled, gridsets (*Add a
 gridset* picks from the server's list), formats and, under *Advanced*,
 meta-tiling, gutter and expiry. Row actions: **Truncate** (deletes the cached
 tiles, after confirmation; they are rendered again on demand), **Remove from
-cache** (the layer itself stays published). The eraser icon clears tile content;
-the minus icon stops caching. *Add a Layer to the Cache* offers
-the published layers and groups that are not cached yet.
+cache** (the layer itself stays published). The eraser with a flat lower edge
+clears tile content; the minus icon stops caching. *Add a Layer to the Cache*
+offers the published layers and groups that are not cached yet.
 
 ## From the layer tree
 

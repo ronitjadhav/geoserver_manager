@@ -76,16 +76,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- Refined the thin icon family for small controls: fuller brush tips, larger
+  chain links, separate full-height style-transfer arrows and a clearer cache
+  eraser. The 1.2-unit stroke weight is unchanged.
 - All plugin icons now use custom SVG artwork: navigation, row actions,
   settings, help and layer-tree actions. Thin strokes and shared symbols keep
   them consistent. Preview, publish, style transfer and cache operations have
   distinct symbols; colours follow light, dark, selected and disabled states.
   Row buttons also have accessible names.
-- An icon catalogue and interactive gallery track every icon's purpose,
-  source and usage. Future stock fallbacks must be registered as needing
-  custom artwork. Checks catch missing or unregistered icons and stale previews.
-  A reusable style guide records drawing rules and a generation brief, linked
-  from the conventions page of the documentation.
+- A central icon registry tracks custom artwork and pending fallbacks, with
+  checks for missing or unregistered icons. A short style guide keeps future
+  additions consistent. The visual gallery is generated locally on demand;
+  generated previews and inventories are not tracked in the repository.
 
 - Layer-group modes read as GeoServer's web admin names them (Single,
   Opaque Container, Named Tree, Container Tree, Earth Observation Tree)

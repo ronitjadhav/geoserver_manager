@@ -68,18 +68,12 @@ what the pieces are; this page says how to work on them.
   `.ts` lacks. Extraction is `python scripts/update_translations.py` (pylupdate6, `pip install PyQt6`);
   run it after changing a user-visible string. Never pylupdate5: it silently skipped every `translate()`
   black wrapped onto several lines or wrote as adjacent literals: 65 of 455 strings when measured.
-- **Every plugin icon goes through the catalogue.** Use registered IDs from
-  `resources/icons/catalog.json` in `gui/icons.py`, `TABS` and `_row_actions`.
-  Do not call `QIcon`, `QgsApplication.getThemeIcon` or `iconPath` elsewhere.
-  Before drawing or generating artwork, read the
-  [icon style guide](icon-style-guide.md) for the thin-stroke
-  rules, shared symbols, SVG starter and reusable generation brief. If artwork is
-  pending, register `status: needs-custom`, a QGIS `fallback` filename and design
-  `notes` first. Run `python scripts/build_icon_catalog.py` after icon or usage
-  changes. Review `docs/static/icons/icon-catalog.html` at 16, 20 and 24 px in
-  light/dark and selected/disabled states. `tests/unit/test_icon_catalog.py`
-  checks that uses, SVGs and the generated catalogue stay in sync. The full
-  workflow and inventory are in the [icon catalogue](icon-catalog.md).
+- **Every plugin icon goes through the registry.** Use IDs from
+  `resources/icons/catalog.json` through `gui/icons.py`, `TABS` and `_row_actions`.
+  Read the [icon style guide](icon-style-guide.md) before adding artwork.
+  Register pending artwork as `needs-custom` with a QGIS `fallback` and `notes`.
+  Run `python scripts/build_icon_catalog.py --check` to validate usage and SVGs.
+  The optional local preview goes to ignored `build/icon-catalog.html`.
 - **The icon and the screenshots are generated, never hand-edited.**
   `scripts/export_branding.py` renders every brand asset from
   `resources/images/geoserver_manager.svg`, including the

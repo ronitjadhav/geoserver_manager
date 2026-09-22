@@ -7,8 +7,6 @@ on:
     paths:
       - '**.py'
       - 'geoserver_manager/resources/icons/**'
-      - 'docs/static/icons/**'
-      - 'docs/development/icon-catalog.md'
       - .github/workflows/tester.yml
       - requirements/testing.txt
 
@@ -18,8 +16,6 @@ on:
     paths:
       - '**.py'
       - 'geoserver_manager/resources/icons/**'
-      - 'docs/static/icons/**'
-      - 'docs/development/icon-catalog.md'
       - .github/workflows/tester.yml
       - requirements/testing.txt
 

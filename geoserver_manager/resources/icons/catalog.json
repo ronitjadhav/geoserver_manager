@@ -120,14 +120,14 @@
     "push-style": {
       "label": "Push style to GeoServer",
       "category": "Styles",
-      "purpose": "A brush with an upward arrow sends project symbology to the server.",
+      "purpose": "A brush with a separate upward arrow sends project symbology to the server.",
       "status": "custom",
       "asset": "icons/push-style.svg"
     },
     "apply-style": {
       "label": "Apply style to QGIS",
       "category": "Styles",
-      "purpose": "A brush with a downward arrow brings server symbology into the project.",
+      "purpose": "A brush with a separate downward arrow brings server symbology into the project.",
       "status": "custom",
       "asset": "icons/apply-style.svg"
     },
@@ -141,7 +141,7 @@
     "clear-cache": {
       "label": "Truncate cached tiles",
       "category": "Cache and removal",
-      "purpose": "An eraser clears tile content but keeps the cache configuration.",
+      "purpose": "An eraser with a flat contact edge clears tile content but keeps the cache configuration.",
       "status": "custom",
       "asset": "icons/clear-cache.svg"
     },
