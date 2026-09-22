@@ -511,7 +511,7 @@ class TestSharedWorkspaceLink(unittest.TestCase):
 class TestSortableColumns(unittest.TestCase):
     """A header click sorts the row cache itself, so every index-based lookup
     (selection, Enter, Delete) sees the order on screen; Qt's own sorting stays
-    off (AGENTS.md invariant 2)."""
+    off (invariant 2 in docs/development/invariants.md)."""
 
     ROWS = [["b", "topp"], ["a", None], ["c", "nurc"]]
 

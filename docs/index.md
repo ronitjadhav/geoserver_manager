@@ -91,6 +91,9 @@ hidden:
 ---
 Contributing <development/contribute>
 Environment <development/environment>
+Architecture <development/architecture>
+Invariants <development/invariants>
+Conventions <development/conventions>
 GeoServer and library notes <development/geoserver-notes>
 Testing <development/testing>
 Translations <development/translation>

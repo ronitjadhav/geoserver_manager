@@ -5,7 +5,9 @@ This site is [Sphinx](https://www.sphinx-doc.org/) with the
 [MyST parser](https://myst-parser.readthedocs.io/). Pages live in `docs/`,
 the configuration in `docs/conf.py`.
 
-There is no API reference generated from docstrings: the plugin cannot be
+The [architecture](architecture.md), [invariants](invariants.md) and
+[conventions](conventions.md) pages are the contributor's map of the code;
+read them before changing anything. There is no API reference generated from docstrings: the plugin cannot be
 imported without QGIS, which the documentation job does not install. Most pages
 are written by hand. The changelog and code of conduct are
 included from the repository root. The [icon catalogue](icon-catalog.md) and its
@@ -46,7 +48,7 @@ pull request:
 | The dialog's layout | the guide and the screenshot: `python3 scripts/capture_screenshot.py` against the [sandbox](environment.md) |
 | A new resource type or tab | a section in the guide, a row in the feature table on the home page, and the roadmap ticked |
 | How the plugin is installed or configured | [installation](../usage/installation.md) and the configuration section of `README.md` |
-| A development step, a tool or a command | the page here that teaches it, and `AGENTS.md` if an agent would get it wrong |
+| A development step, a tool or a command | the page here that teaches it, and the [conventions](conventions.md) page if a contributor would get it wrong |
 | An interface icon or where it is used | register it in `resources/icons/catalog.json`, then run `python scripts/build_icon_catalog.py` and review the gallery |
 | The logo or any brand asset | `python3 scripts/export_branding.py`, never the exported files by hand |
 

@@ -9,7 +9,7 @@ Nothing here imports `qgis` at module level, so `sld_version` and
 `sld_content_type` (the part with the rules worth pinning) are testable in an
 interpreter without QGIS, like the CI unit job. The functions that do touch a
 QGIS layer import it when called, and must run on the GUI thread: they read and
-write live layer objects (see invariant 9 in AGENTS.md).
+write live layer objects (see invariant 9 in docs/development/invariants.md).
 """
 
 import re
