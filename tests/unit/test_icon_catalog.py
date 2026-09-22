@@ -1,17 +1,17 @@
 """Every plugin icon must be registered, reviewable and correctly packaged."""
 
 import copy
+import io
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from geoserver_manager.toolbelt.icon_catalog import RESOURCES, icon_spec, load_catalog
 from scripts.build_icon_catalog import (
-    GALLERY,
-    INVENTORY,
-    ROOT,
+    main,
     render_gallery,
-    render_inventory,
     scan_usage,
     validate_catalog,
 )
@@ -23,16 +23,21 @@ class TestIconCatalogue(unittest.TestCase):
         self.assertTrue(usages)
         self.assertEqual(problems + validate_catalog(load_catalog(), usages), [])
 
-    def test_gallery_and_inventory_are_current(self):
-        usages, _ = scan_usage()
-        self.assertEqual(
-            (ROOT / GALLERY).read_text(encoding="utf-8"),
-            render_gallery(load_catalog(), usages),
-        )
-        self.assertEqual(
-            (ROOT / INVENTORY).read_text(encoding="utf-8"),
-            render_inventory(load_catalog(), usages),
-        )
+    def test_check_needs_no_preview_and_generation_is_optional(self):
+        with tempfile.TemporaryDirectory() as folder:
+            preview = Path(folder) / "icon-catalog.html"
+            with patch("scripts.build_icon_catalog.GALLERY", preview):
+                with patch("sys.argv", ["build_icon_catalog.py", "--check"]):
+                    with redirect_stdout(io.StringIO()):
+                        main()
+                self.assertFalse(preview.exists())
+                with patch("sys.argv", ["build_icon_catalog.py"]):
+                    with redirect_stdout(io.StringIO()):
+                        main()
+            self.assertEqual(list(Path(folder).iterdir()), [preview])
+            page = preview.read_text()
+            self.assertIn("<svg", page)
+            self.assertEqual(page.count("<article "), len(load_catalog()["icons"]))
 
     def test_unknown_icon_cannot_silently_fall_back(self):
         with self.assertRaisesRegex(ValueError, "Unregistered icon"):
@@ -80,6 +85,5 @@ class TestIconCatalogue(unittest.TestCase):
         }
         self.assertEqual(validate_catalog(catalog, {}), [])
         self.assertIn('data-status="needs-custom"', render_gallery(catalog, {}))
-        self.assertIn("**Needs custom artwork**", render_inventory(catalog, {}))
         del catalog["icons"]["new-feature"]["notes"]
         self.assertTrue(validate_catalog(catalog, {}))

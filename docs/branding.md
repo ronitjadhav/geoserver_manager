@@ -63,37 +63,8 @@ dependency to the plugin or build dependency to the documentation website.
 
 ## Interface icons
 
-All icons supplied by the plugin use original SVG artwork. Navigation, row
-actions, settings, help and the layer-tree menu share the same family.
-The [icon catalogue](development/icon-catalog.md) tracks every icon's meaning,
-source, usage and artwork status, with an interactive visual gallery. Read the
-[icon style guide](development/icon-style-guide.md) for drawing rules, shared
-symbols, an SVG starter and a reusable generation brief.
-
-`geoserver_manager/resources/icons/catalog.json` is the source of truth.
-Use an icon's registered ID with `gui/icons.py`; do not add direct QGIS theme
-lookups. A temporary fallback must be registered as `needs-custom` with its
-filename and design notes, so unfinished artwork stays visible in the gallery.
-
-Interface SVGs use a 24 × 24 canvas, 1.2-unit strokes, round caps and round
-joins. At the dialog's 20 px display size, strokes are one logical pixel wide.
-Keep shapes legible at 16 px. Upward arrows mean publishing or uploading to
-GeoServer; downward arrows mean bringing content back to QGIS or disk. The
-Ribbon G keeps its existing proportions as the brand mark.
-
-Source colours name roles: `#172f36` for text, `#0099c0` for blue,
-`#589632` for green and `#b3261e` for destructive actions. The renderer uses
-the widget's own text and selection colours and the catalogue's light or dark
-accents. Selected icons use highlighted text; disabled icons use disabled
-text. Preserve labels, tooltips and accessible names when changing artwork.
-
-After editing the catalogue or artwork:
-
-```sh
-python scripts/build_icon_catalog.py
-python scripts/build_icon_catalog.py --check
-QT_QPA_PLATFORM=offscreen QT_SCALE_FACTOR=2 python3 scripts/capture_screenshot.py
-```
-
-The gallery shows normal, selected and disabled states at several sizes.
-Review it in light and dark themes before accepting a new icon.
+Navigation, row actions, settings, help and the layer-tree menu share original
+SVG artwork. The [icon style guide](development/icon-style-guide.md) records
+the thin-stroke rules and how to register a new icon. `catalog.json` tracks
+custom artwork and pending fallbacks. An optional gallery can be generated
+locally for visual review; it is not committed or published with this site.
