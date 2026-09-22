@@ -394,6 +394,10 @@ class ResourceFormDialog(QDialog):
                 label.maximumHeight(), Qt.TransformationMode.SmoothTransformation
             )
         label.setPixmap(pixmap)
+        # The picture usually lands after the form is shown. Without a minimum
+        # the label keeps the one-line height of its placeholder text, and the
+        # form does not grow to show the rest.
+        label.setMinimumHeight(pixmap.height())
         label.setToolTip(text)
 
     def get_widget(self, key):
@@ -403,6 +407,19 @@ class ResourceFormDialog(QDialog):
         :return: the widget, or None if key not found.
         """
         return self._widgets.get(key)
+
+    def showEvent(self, event):  # noqa: N802 (Qt's own spelling)
+        """Open tall enough for the wrapped description and help text.
+
+        A top-level window ignores height-for-width: its size comes from the
+        size hint, which assumes one line per label. On a high-DPI screen the
+        rows were then squeezed and the help text cut off.
+        """
+        super().showEvent(event)
+        needed = self.layout().totalHeightForWidth(self.width())
+        screen = self.screen().availableGeometry().height() if self.screen() else needed
+        if self.height() < needed:
+            self.resize(self.width(), min(needed, screen))
 
     def hide_save_button(self):
         """Hide the Save button, leaving only Cancel (for view-only dialogs)."""

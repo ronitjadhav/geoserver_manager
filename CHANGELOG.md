@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   in a worker thread. After 0.3 s a *Waiting for GeoServer* box appears, and
   its *Cancel* works; before, QGIS hung for up to the library's 120 s
   timeout. The Publish form's datastore and table pickers work the same way.
+- A form whose description or help text wraps opens tall enough to show it.
+  On a high-DPI screen the rows were squeezed and the help text cut off.
+- The style dialog shows the whole legend. It arrives after the dialog opens,
+  and only its first row used to fit.
 - A workspace, datastore or layer-group name with `/`, `?`, `#` or `%` is
   refused before any request: `requests` would have sent
   `datastores/a#b.json` as `datastores/a` (another store's path), and a

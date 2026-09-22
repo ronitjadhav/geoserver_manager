@@ -81,3 +81,37 @@ class TestResourceFormDialog(unittest.TestCase):
 # ################################
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestResourceFormHeight(unittest.TestCase):
+    """The form opens tall enough for its wrapped text."""
+
+    def test_wrapped_help_text_is_not_clipped(self):
+        # A top-level window ignores height-for-width, so a form whose
+        # description and help text wrap opened too short and squeezed its rows.
+        from qgis.PyQt.QtWidgets import QApplication
+
+        help_text = "A hint long enough to wrap onto a second and a third line. " * 2
+        fields = [
+            {"key": "name", "label": "Name", "type": "text"},
+            {"key": "a", "label": "Isolated", "type": "checkbox", "help": help_text},
+            {"key": "b", "label": "Default", "type": "checkbox", "help": help_text},
+            {"key": "own", "label": "Own", "type": "checkbox", "group": "WMS"},
+        ] + [
+            {"key": f"w{i}", "label": "Title", "type": "text", "group": "WMS"}
+            for i in range(12)
+        ]
+        dlg = ResourceFormDialog(
+            title="t", description="A description that wraps. " * 6, fields=fields
+        )
+        # The workspace form hides its WMS fields until "Own" is ticked.
+        for i in range(12):
+            dlg.set_field_visible(f"w{i}", False)
+        # How short it opened depended on the scale factor; at 2x it was
+        # clipped badly. Opening at the minimum size shows it at any scale.
+        dlg.resize(dlg.minimumSizeHint())
+        dlg.show()
+        QApplication.processEvents()
+        needed = dlg.layout().totalHeightForWidth(dlg.width())
+        self.assertGreaterEqual(dlg.height(), needed)
+        dlg.close()

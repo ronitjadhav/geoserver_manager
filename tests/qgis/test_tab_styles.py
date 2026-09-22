@@ -688,6 +688,23 @@ class TestImageField(unittest.TestCase):
         self.assertEqual(label.text(), "")
         self.assertEqual(label.pixmap().height(), 100)
 
+    def test_a_picture_landing_after_show_gets_its_full_height(self):
+        # The legend lands while the form is open. The label was laid out for
+        # one line of placeholder text and kept that height, so only the first
+        # row of a legend showed.
+        from qgis.PyQt.QtGui import QPixmap
+        from qgis.PyQt.QtWidgets import QApplication
+
+        dlg = self.dialog()
+        dlg.show()
+        QApplication.processEvents()
+        legend = QPixmap(20, 80)
+        legend.fill()
+        dlg.set_image("legend", legend)
+        QApplication.processEvents()
+        self.assertGreaterEqual(dlg.get_widget("legend").height(), 80)
+        dlg.close()
+
     def test_no_picture_means_an_explanation(self):
         dlg = self.dialog()
         dlg.set_image("legend", None, "No such style")
