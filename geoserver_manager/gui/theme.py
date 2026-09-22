@@ -16,6 +16,8 @@ against the palette's window colour rather than for brand.
 
 from qgis.PyQt.QtGui import QColor, QPalette
 
+from geoserver_manager.toolbelt.icon_catalog import load_catalog
+
 # Status colours, as (on a light background, on a dark background).
 _STATUS = {
     "ok": ("#1e7b34", "#6ddf8a"),
@@ -38,6 +40,21 @@ def status_colour(kind, palette):
     light, dark = _STATUS.get(kind, _STATUS["neutral"])
     colour = dark if is_dark(palette) else light
     return colour
+
+
+def icon_colours(palette):
+    """Ink, blue, green and destructive strokes for the resource icons.
+
+    The accents echo the logo, with darker strokes on light backgrounds and
+    lighter ones on dark backgrounds. Selection uses HighlightedText instead.
+    """
+    accents = load_catalog()["accents"]["dark" if is_dark(palette) else "light"]
+    return (
+        palette.color(QPalette.ColorRole.Text).name(),
+        accents["blue"],
+        accents["green"],
+        status_colour("error", palette),
+    )
 
 
 def hint_colour(palette):

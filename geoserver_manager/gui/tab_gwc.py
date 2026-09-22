@@ -85,7 +85,7 @@ class GwcTabMixin:
         }
         self._row_actions = [
             (
-                "mIconClearItem.svg",
+                "clear-cache",
                 translate("GwcTabMixin", "Truncate"),
                 self._truncate_gwc_layer,
                 translate(
@@ -95,7 +95,7 @@ class GwcTabMixin:
                 ),
             ),
             (
-                "mActionDeleteSelected.svg",
+                "remove-cache",
                 translate("GwcTabMixin", "Remove from cache"),
                 self._remove_gwc_layer,
                 translate(

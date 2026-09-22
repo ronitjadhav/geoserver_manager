@@ -88,7 +88,7 @@ pygments_dark_style: str = "monokai"
 # -- Theme
 
 html_favicon: str = "static/branding/favicon.ico"
-html_static_path = ["static/branding"]
+html_static_path = ["static/branding", "static/icons"]
 html_theme = "furo"
 
 # The brand blue and green are too light to read as text on white (3.3:1 and

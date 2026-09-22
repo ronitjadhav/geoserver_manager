@@ -83,7 +83,7 @@ class LayerTabMixin:
         # what it does and how it differs from its neighbour.
         self._row_actions = [
             (
-                "mActionAddLayer.svg",
+                "add-to-qgis",
                 translate("LayerTabMixin", "Add to QGIS"),
                 self._add_layer_to_qgis,
                 translate(
@@ -93,7 +93,7 @@ class LayerTabMixin:
                 ),
             ),
             (
-                "mActionZoomToLayer.svg",
+                "preview-map",
                 translate("LayerTabMixin", "Preview"),
                 self._preview_layer,
                 translate(
@@ -103,7 +103,7 @@ class LayerTabMixin:
                 ),
             ),
             (
-                "mIconWms.svg",
+                "preview-browser",
                 translate("LayerTabMixin", "Preview in a browser"),
                 self._preview_layer_in_browser,
                 translate(
@@ -113,7 +113,7 @@ class LayerTabMixin:
                 ),
             ),
             (
-                "mActionStyleManager.svg",
+                "styles",
                 translate("LayerTabMixin", "Set style"),
                 self._set_layer_style,
                 translate(
@@ -123,7 +123,7 @@ class LayerTabMixin:
                 ),
             ),
             (
-                "mActionSharingExport.svg",
+                "push-style",
                 translate("LayerTabMixin", "Push style from QGIS"),
                 self._style_from_qgis,
                 translate(
@@ -133,7 +133,7 @@ class LayerTabMixin:
                 ),
             ),
             (
-                "mActionDeleteSelected.svg",
+                "delete",
                 translate("LayerTabMixin", "Delete"),
                 self._delete_layer,
                 translate(

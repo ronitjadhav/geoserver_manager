@@ -76,6 +76,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- All plugin icons now use custom SVG artwork: navigation, row actions,
+  settings, help and layer-tree actions. Thin strokes and shared symbols keep
+  them consistent. Preview, publish, style transfer and cache operations have
+  distinct symbols; colours follow light, dark, selected and disabled states.
+  Row buttons also have accessible names.
+- An icon catalogue and interactive gallery track every icon's purpose,
+  source and usage. Future stock fallbacks must be registered as needing
+  custom artwork. Checks catch missing or unregistered icons and stale previews.
+  A reusable style guide records drawing rules and a generation brief, linked
+  from `AGENTS.md`.
+
 - Layer-group modes read as GeoServer's web admin names them (Single,
   Opaque Container, Named Tree, Container Tree, Earth Observation Tree)
   in the table, the detail and the create form, which also explains what

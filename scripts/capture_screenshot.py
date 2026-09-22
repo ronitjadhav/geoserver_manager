@@ -41,8 +41,14 @@ def parse_args():
 def main():
     args = parse_args()
 
+    from qgis.PyQt.QtCore import QCoreApplication, Qt
     from qgis.testing import start_app
 
+    # The test app does not enable Qt5's high-DPI icons like QGIS does.
+    # Qt6 enables them by default and no longer needs this attribute.
+    high_dpi = getattr(Qt.ApplicationAttribute, "AA_UseHighDpiPixmaps", None)
+    if high_dpi is not None:
+        QCoreApplication.setAttribute(high_dpi)
     app = start_app()
 
     from geoserver_manager.toolbelt.dependencies import ensure_dependencies

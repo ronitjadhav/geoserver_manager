@@ -9,7 +9,8 @@ A tab is one mixin file plus one line in the registry. Everything else (table,
 search, pagination, buttons, wait cursor, error reporting, delete confirmation)
 is inherited from `GeoServerMainDialog`. Do not re-implement any of it.
 
-Read `CLAUDE.md` first; the invariants there are the acceptance criteria.
+Read `AGENTS.md` first; the invariants there are the acceptance criteria, and
+`docs/development/geoserver-notes.md` has the library facts.
 
 ## 1. Check what the library offers
 
@@ -34,7 +35,7 @@ form, nested listing, parallel fetch). Skeleton:
 from qgis.PyQt.QtCore import QCoreApplication
 
 # Strings are looked up in this file's own context: self.tr() would resolve
-# against GeoServerMainDialog instead (see CLAUDE.md).
+# against GeoServerMainDialog instead (see AGENTS.md).
 translate = QCoreApplication.translate
 
 
@@ -54,7 +55,7 @@ class StyleTabMixin:
             translate("StyleTabMixin", "Workspace"): self._open_workspace_from_row
         }
         self._row_actions = [
-            ("mActionDeleteSelected.svg", translate("StyleTabMixin", "Delete"), self._delete_style)
+            ("delete", translate("StyleTabMixin", "Delete"), self._delete_style)
         ]
         self._setup_table([
             translate("StyleTabMixin", "Style Name"),
@@ -127,13 +128,19 @@ Rules for the mixin:
 class GeoServerMainDialog(QDialog, WorkspaceTabMixin, DatastoreTabMixin, StyleTabMixin):
     ...
     TABS = (
-        ("Workspaces", "mIconFolder.svg", "_load_workspaces"),
-        ("Datastores", "mIconDbSchema.svg", "_load_datastores"),
-        ("Styles", "mIconRendererCategory.svg", "_load_styles"),
+        ("Workspaces", "workspaces", "_load_workspaces"),
+        ("Datastores", "datastores", "_load_datastores"),
+        ("Styles", "styles", "_load_styles"),
     )
 ```
 
-Icons come from `QgsApplication.iconPath(name)`; pick an existing QGIS theme icon.
+Icons use registered IDs from `geoserver_manager/resources/icons/catalog.json`.
+Reuse an existing meaning, or add a custom SVG on the 24 px grid with 1.2-unit
+strokes. If artwork is pending, register `needs-custom`, a QGIS `fallback`
+filename and design `notes`. Never use a raw QGIS filename in `TABS` or row
+actions. Run `python scripts/build_icon_catalog.py` and review the gallery.
+Read `docs/development/icon-style-guide.md` before drawing or generating an
+icon. See `docs/development/icon-catalog.md` for the inventory and workflow.
 Prefix the mixin's method names with the resource (`_load_styles`, `_add_style`)
 so nothing collides in the shared namespace.
 

@@ -17,8 +17,7 @@ from urllib.parse import urlparse
 from qgis.core import Qgis, QgsApplication, QgsTask
 from qgis.gui import QgsMessageBar
 from qgis.PyQt import uic
-from qgis.PyQt.QtCore import QByteArray, Qt, QTimer
-from qgis.PyQt.QtGui import QIcon
+from qgis.PyQt.QtCore import QByteArray, QEvent, QSize, Qt, QTimer
 from qgis.PyQt.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -32,6 +31,7 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from geoserver_manager.__about__ import __title__
+from geoserver_manager.gui.icons import icon
 from geoserver_manager.gui.scope import scope
 from geoserver_manager.gui.tab_cascaded import CascadedStoreTabMixin
 from geoserver_manager.gui.tab_coveragestores import CoverageStoreTabMixin
@@ -122,6 +122,9 @@ class GeoServerMainDialog(
 
         self.splitter.setSizes([160, 740])
 
+        self._icon_refresh_timer = QTimer(self)
+        self._icon_refresh_timer.setSingleShot(True)
+        self._icon_refresh_timer.timeout.connect(self._refresh_icons)
         self._setup_nav()
 
         # Pagination state
@@ -627,17 +630,17 @@ class GeoServerMainDialog(
 
     # -- Left navigation ---------------------------------------------------
 
-    # One entry per tab: (label, QGIS icon, loader method name). Adding a
+    # One entry per tab: (label, plugin icon, loader method name). Adding a
     # resource type means adding a line here and a mixin with that loader.
     TABS = (
-        ("Workspaces", "mIconFolder.svg", "_load_workspaces"),
-        ("Datastores", "mIconDbSchema.svg", "_load_datastores"),
-        ("Coverage Stores", "mIconRasterLayer.svg", "_load_coverage_stores"),
-        ("Cascaded Stores", "mIconWms.svg", "_load_cascaded_stores"),
-        ("Layers", "mIconVector.svg", "_load_layers"),
-        ("Layer Groups", "mActionAddGroup.svg", "_load_layer_groups"),
-        ("Styles", "mActionStyleManager.svg", "_load_styles"),
-        ("Tile Cache", "mActionAddXyzLayer.svg", "_load_gwc_layers"),
+        ("Workspaces", "workspaces", "_load_workspaces"),
+        ("Datastores", "datastores", "_load_datastores"),
+        ("Coverage Stores", "coverage-stores", "_load_coverage_stores"),
+        ("Cascaded Stores", "cascaded-stores", "_load_cascaded_stores"),
+        ("Layers", "layers", "_load_layers"),
+        ("Layer Groups", "layer-groups", "_load_layer_groups"),
+        ("Styles", "styles", "_load_styles"),
+        ("Tile Cache", "tile-cache", "_load_gwc_layers"),
     )
 
     def _tab_help(self):
@@ -675,8 +678,8 @@ class GeoServerMainDialog(
     def _setup_nav(self):
         """Build the navigation list on the left from TABS."""
         self.navList.clear()
-        for label, icon, _loader in self.TABS:
-            item = QListWidgetItem(QIcon(QgsApplication.iconPath(icon)), label)
+        for label, icon_name, _loader in self.TABS:
+            item = QListWidgetItem(icon(icon_name, self.navList.palette()), label)
             item.setToolTip(self._tab_help().get(label, ""))
             self.navList.addItem(item)
         if self.navList.count():
@@ -814,7 +817,7 @@ class GeoServerMainDialog(
         its text to size it to its buttons. The mixins take the label from
         here rather than translating "Actions" in their own context, so the
         two sides of that comparison cannot drift apart once a translation is
-        installed (see invariant 10 in CLAUDE.md).
+        installed (see invariant 10 in AGENTS.md).
         """
         return self.tr("Actions")
 
@@ -824,6 +827,7 @@ class GeoServerMainDialog(
         self.btn_delete_selected.setEnabled(
             has_selection and self._delete_selected_callback is not None
         )
+        self._refresh_action_icons()
 
     def _get_selected_rows(self):
         """Return the row data for all currently selected table rows.
@@ -992,7 +996,7 @@ class GeoServerMainDialog(
 
     def _make_action_widget(self, row_data):
         """Create a widget with icon action buttons for a table row."""
-        widget = QWidget()
+        widget = QWidget(self.resultsTable)
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(2, 0, 2, 0)
         layout.setSpacing(4)
@@ -1001,8 +1005,12 @@ class GeoServerMainDialog(
             # An optional fourth element says more than the label can. The
             # button is icon-only, so the tooltip is all the user reads.
             tooltip = action[3] if len(action) > 3 else label
-            btn = QPushButton()
-            btn.setIcon(QIcon(QgsApplication.iconPath(icon_name)))
+            btn = QPushButton(widget)
+            btn.setProperty("resourceIcon", icon_name)
+            btn.setIcon(icon(icon_name, btn.palette()))
+            btn.setIconSize(QSize(20, 20))
+            btn.setAccessibleName(label)
+            btn.setAccessibleDescription(tooltip)
             btn.setToolTip(tooltip)
             btn.setFlat(True)
             btn.setFixedSize(24, 24)
@@ -1013,6 +1021,41 @@ class GeoServerMainDialog(
             )
             layout.addWidget(btn)
         return widget
+
+    def changeEvent(self, event):  # noqa: N802 (Qt's own spelling)
+        """Recolour icons after a theme change without reloading server data."""
+        super().changeEvent(event)
+        if event.type() in (QEvent.Type.PaletteChange, QEvent.Type.StyleChange):
+            if hasattr(self, "_icon_refresh_timer"):
+                # Let the new palette propagate to children first. A styled
+                # sidebar can have a different palette from the dialog.
+                self._icon_refresh_timer.start(0)
+
+    def _refresh_icons(self):
+        """Use each widget's effective colours, retaining rows and selection."""
+        for index, (_label, icon_name, _loader) in enumerate(self.TABS):
+            item = self.navList.item(index)
+            if item is not None:
+                item.setIcon(icon(icon_name, self.navList.palette()))
+        self._refresh_action_icons()
+
+    def _refresh_action_icons(self):
+        # QPushButton does not inherit the table row's Selected icon mode.
+        # Use its highlight foreground explicitly so small arrows stay visible.
+        selected = {
+            index.row() for index in self.resultsTable.selectionModel().selectedRows()
+        }
+        column = self.resultsTable.columnCount() - 1
+        for row in range(self.resultsTable.rowCount()):
+            widget = self.resultsTable.cellWidget(row, column)
+            if widget is None:
+                continue
+            for button in widget.findChildren(QPushButton):
+                icon_name = button.property("resourceIcon")
+                if icon_name:
+                    button.setIcon(
+                        icon(icon_name, button.palette(), selected=row in selected)
+                    )
 
     # -- Pagination slots --------------------------------------------------
 

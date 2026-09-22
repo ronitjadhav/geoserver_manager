@@ -34,6 +34,8 @@ plugin says so once, when saving.
 ## The dialog
 
 The list on the left picks the resource type; the table on the right shows it.
+Navigation and row-action icons adapt to light and dark themes. Hover over an
+action for its explanation; each action also has a name for screen readers.
 
 - **Search** (Ctrl+F) filters every column of the loaded list; Esc clears it.
 - **Sort** by clicking a column header; click again to reverse. The sort stays
@@ -128,16 +130,16 @@ name and store.
   `_`). The upload runs as a QGIS task with progress and *Cancel*; a layer
   whose CRS has no EPSG code is reprojected to EPSG:4326 on the way.
 
-Row actions: **Add to QGIS** (*Load as* WMS, WMTS or, for a vector layer, WFS; the credentials
-travel as a QGIS authentication configuration, so a saved project never
-contains a password), **Set style** (pick the default style among the server's
-styles), **Push style from QGIS** (upload the matching project layer's
-symbology and make it the default; it asks before replacing a style that
-exists, since every layer using it would change), **Preview** (the layer on a map of its own inside QGIS: drag to pan,
-wheel to zoom, click for the feature info GeoServer returns there; nothing
-reaches the project), **Preview in a browser** (GeoServer's own OpenLayers
-page, framed on the layer's extent; the browser's session is not the
-plugin's, so a secured server asks it to log in), **Delete**.
+The row actions appear in this order:
+
+| Icon | Action | What it does |
+| :--- | :----- | :----------- |
+| Layers with a plus | **Add to QGIS** | Load as WMS, WMTS or, for a vector layer, WFS. Credentials travel as a QGIS authentication configuration, so a saved project never contains a password. |
+| Eye | **Preview** | Show the layer on a map inside QGIS. Drag to pan, scroll to zoom, and click for feature info. Nothing is added to the project. |
+| Browser with an outward arrow | **Preview in a browser** | Open GeoServer's OpenLayers page on the layer's extent. A secured server asks the browser to log in. |
+| Brush | **Set style** | Pick the default style from the server's existing styles. |
+| Brush with an upward arrow | **Push style from QGIS** | Upload a project layer's symbology and make it the default. Replacing an existing style asks first, because every layer using it would change. |
+| Bin | **Delete** | Remove the layer from GeoServer after confirmation. |
 
 ## Layer groups
 
@@ -173,7 +175,8 @@ global group). Click a name to edit the caching: enabled, gridsets (*Add a
 gridset* picks from the server's list), formats and, under *Advanced*,
 meta-tiling, gutter and expiry. Row actions: **Truncate** (deletes the cached
 tiles, after confirmation; they are rendered again on demand), **Remove from
-cache** (the layer itself stays published). *Add a Layer to the Cache* offers
+cache** (the layer itself stays published). The eraser icon clears tile content;
+the minus icon stops caching. *Add a Layer to the Cache* offers
 the published layers and groups that are not cached yet.
 
 ## From the layer tree

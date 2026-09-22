@@ -13,21 +13,21 @@ from typing import Callable
 from urllib.parse import quote, urlparse
 
 # PyQGIS
-from qgis.core import Qgis, QgsApplication
+from qgis.core import Qgis
 from qgis.gui import QgsOptionsPageWidget, QgsOptionsWidgetFactory
 from qgis.PyQt import uic
-from qgis.PyQt.QtCore import Qt, QUrl
+from qgis.PyQt.QtCore import QEvent, QSize, Qt, QTimer, QUrl
 from qgis.PyQt.QtGui import QDesktopServices, QIcon
 from qgis.PyQt.QtWidgets import QApplication, QWidget
 
 # project
 from geoserver_manager.__about__ import (
-    __icon_path__,
     __title__,
     __uri_homepage__,
     __uri_tracker__,
     __version__,
 )
+from geoserver_manager.gui.icons import icon
 from geoserver_manager.gui.theme import status_colour
 from geoserver_manager.toolbelt.log_handler import PlgLogger
 from geoserver_manager.toolbelt.preferences import (
@@ -52,6 +52,9 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         # load UI and set objectName
         uic.loadUi(Path(__file__).parent / f"{Path(__file__).stem}.ui", self)
         self.setObjectName("mOptionsPage{}".format(__title__))
+        self._icon_refresh_timer = QTimer(self)
+        self._icon_refresh_timer.setSingleShot(True)
+        self._icon_refresh_timer.timeout.connect(self._refresh_icons)
         self.initGui()
 
     def initGui(self) -> None:  # noqa: N802
@@ -68,14 +71,11 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         self.lbl_title.setText(f"{__title__} - Version {__version__}")
 
         # customization
-        self.btn_help.setIcon(QIcon(QgsApplication.iconPath("mActionHelpContents.svg")))
+        self._refresh_icons()
         self.btn_help.pressed.connect(
             partial(QDesktopServices.openUrl, QUrl(__uri_homepage__))
         )
 
-        self.btn_report.setIcon(
-            QIcon(QgsApplication.iconPath("console/iconSyntaxErrorConsole.svg"))
-        )
         self.btn_report.pressed.connect(
             partial(
                 QDesktopServices.openUrl,
@@ -87,7 +87,6 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
             )
         )
 
-        self.btn_reset.setIcon(QIcon(QgsApplication.iconPath("mActionUndo.svg")))
         self.btn_reset.pressed.connect(self.on_reset_settings)
 
         self.btn_test_connection.clicked.connect(self.test_connection)
@@ -98,6 +97,19 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
 
         # load previously saved settings
         self.load_settings()
+
+    def _refresh_icons(self):
+        self.btn_help.setIcon(icon("help", self.btn_help.palette()))
+        self.btn_report.setIcon(icon("report-issue", self.btn_report.palette()))
+        self.btn_reset.setIcon(icon("reset-settings", self.btn_reset.palette()))
+        for button in (self.btn_help, self.btn_report, self.btn_reset):
+            button.setIconSize(QSize(20, 20))
+
+    def changeEvent(self, event):  # noqa: N802
+        super().changeEvent(event)
+        if event.type() in (QEvent.Type.PaletteChange, QEvent.Type.StyleChange):
+            if hasattr(self, "_icon_refresh_timer"):
+                self._icon_refresh_timer.start(0)
 
     @staticmethod
     def _password_travels_in_clear(url: str, username: str, password: str) -> bool:
@@ -289,7 +301,7 @@ class PlgOptionsFactory(QgsOptionsWidgetFactory):
         super().__init__()
 
     def icon(self) -> QIcon:
-        return QIcon(str(__icon_path__))
+        return icon("plugin")
 
     def createWidget(self, parent: QWidget) -> ConfigOptionsPage:  # noqa: N802
         return ConfigOptionsPage(parent)

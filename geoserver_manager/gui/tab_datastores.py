@@ -109,7 +109,7 @@ class DatastoreTabMixin:
         }
         self._row_actions = [
             (
-                "mActionDeleteSelected.svg",
+                "delete",
                 translate("DatastoreTabMixin", "Delete"),
                 self._delete_datastore,
             ),

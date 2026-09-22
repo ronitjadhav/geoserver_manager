@@ -91,6 +91,7 @@ hidden:
 ---
 Contributing <development/contribute>
 Environment <development/environment>
+GeoServer and library notes <development/geoserver-notes>
 Testing <development/testing>
 Translations <development/translation>
 Documentation <development/documentation>
@@ -106,5 +107,7 @@ maxdepth: 1
 hidden:
 ---
 Branding <branding>
+Icon catalogue <development/icon-catalog>
+Icon style guide <development/icon-style-guide>
 Code of conduct <development/code_of_conduct>
 ```
