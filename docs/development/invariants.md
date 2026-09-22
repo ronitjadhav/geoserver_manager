@@ -47,5 +47,9 @@ one of them unnecessary usually has not understood it yet. The
    the twenty methods behind them, so a new tab cannot forget it. A refresh also disables the
    header buttons immediately; the loader re-arms them. This was a reported crash:
    `AttributeError: 'NoneType' object has no attribute 'get_workspaces'` from *Publish a Layer*.
+   The tab fetchers read `self.gs` from their worker, which is safe for one reason only: the client
+   changes solely after the running load is cancelled (`refresh_ui()` cancels, then clears), and a
+   cancelled load renders nothing. Anything new that assigns `self.gs` must cancel the load first;
+   `test_a_refresh_cancels_the_load_before_it_drops_the_client` guards it.
 11. **Nav labels in `TABS` are logic keys as well as text.** The `tr("Actions")` column and the
    `tr("Workspace")` key in `_extra_click_callbacks` must match the header strings exactly.
