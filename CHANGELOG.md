@@ -4,6 +4,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## Unreleased
 
+### Changed
+
+- The documentation has a quick start, and the user guide is rewritten in
+  plainer words with a screenshot of every tab and main form. The capture
+  script grabs them all from the sandbox, so they stay current.
+
 ### Fixed
 
 - Opening a form, a detail view, a preview or *Add to QGIS* no longer

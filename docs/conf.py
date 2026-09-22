@@ -88,7 +88,8 @@ pygments_dark_style: str = "monokai"
 # -- Theme
 
 html_favicon: str = "static/branding/favicon.ico"
-html_static_path = ["static/branding"]
+html_static_path = ["static/branding", "static/css"]
+html_css_files = ["screenshots.css"]
 html_theme = "furo"
 
 # The brand blue and green are too light to read as text on white (3.3:1 and
@@ -144,6 +145,9 @@ myst_substitutions: dict[str, str] = {
     "version": version,
     "release_version": release,
 }
+
+# Anchors for "page.md#a-heading" links, down to ### headings.
+myst_heading_anchors: int = 3
 
 myst_url_scheme: tuple[str, str, str] = ("http", "https", "mailto")
 

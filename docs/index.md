@@ -11,7 +11,7 @@ project, and bring what the server has back in as WMS, WFS or WMTS.
 :alt: The Layers tab, listing a server's layers with their workspace, type, store and default style
 ```
 
-::::{grid} 1 1 3 3
+::::{grid} 1 2 2 4
 :gutter: 3
 
 :::{grid-item-card} {octicon}`download;1.5em` Install
@@ -21,11 +21,18 @@ project, and bring what the server has back in as WMS, WFS or WMTS.
 Get the plugin into QGIS, from a release zip or from the development feed.
 :::
 
-:::{grid-item-card} {octicon}`book;1.5em` Use it
+:::{grid-item-card} {octicon}`rocket;1.5em` Quick start
+:link: usage/quickstart
+:link-type: doc
+
+Connect to a server and publish your first layer in five minutes.
+:::
+
+:::{grid-item-card} {octicon}`book;1.5em` User guide
 :link: usage/guide
 :link-type: doc
 
-Connect to a server, then what every tab does and what each button means.
+Every tab, every button and every form, with screenshots.
 :::
 
 :::{grid-item-card} {octicon}`git-pull-request;1.5em` Contribute
@@ -80,7 +87,8 @@ maxdepth: 1
 hidden:
 ---
 Installation <usage/installation>
-Using the plugin <usage/guide>
+Quick start <usage/quickstart>
+User guide <usage/guide>
 ```
 
 ```{toctree}

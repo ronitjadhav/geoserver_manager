@@ -79,9 +79,10 @@ what the pieces are; this page says how to work on them.
   `resources/images/geoserver_manager.svg`, including the
   `resources/images/default_icon.png` that `metadata.txt` points at, and the website's
   logo and favicon; `docs/branding.md` is the guide. `scripts/capture_screenshot.py`
-  regrabs the README and usage-guide screenshot from the real dialog against the docker
-  sandbox, off screen. Re-run it when the dialog's layout changes, or the screenshot
-  quietly starts showing an interface that no longer exists.
+  regrabs every screenshot of the README and the user guide (each tab, the main forms,
+  the preview and the settings page) from the real dialog against the docker sandbox,
+  off screen. Re-run it when a tab or a form changes, or the screenshots quietly start
+  showing an interface that no longer exists.
 - Messages: user-facing outcomes go to the dialog's message bar (`show_*_message`); details go to the QGIS
   log (`self.log(..., log_level=Qgis.MessageLevel.Critical)`). `_run_action` does both. Errors and warnings
   **stay until closed** (duration 0): they say what to do next, and were gone in 5 s before. Success fades.
@@ -115,7 +116,7 @@ what the pieces are; this page says how to work on them.
   | Changed | Update |
   |---|---|
   | A tab, button, form or message | the matching section of `docs/usage/guide.md`, and `CHANGELOG.md` under *Unreleased* |
-  | The dialog's layout | the guide, plus `python3 scripts/capture_screenshot.py` against the sandbox (the README and the guide show that image) |
+  | The dialog's layout, a tab or a form | the guide, plus `scripts/capture_screenshot.py` against the sandbox (it regrabs every image the README and the guide show) |
   | A new resource type or tab | a guide section, a row in the feature tables of `README.md` and `docs/index.md`, and the roadmap ticked |
   | Install or configuration | `docs/usage/installation.md` and the README's Configuration section |
   | A dev step, tool or command | the page under `docs/development/` that teaches it, and this page if a contributor would get it wrong |
