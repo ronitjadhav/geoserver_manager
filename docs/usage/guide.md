@@ -47,7 +47,14 @@ style to GeoServer, down brings it into QGIS.
   the resource's details. The *Workspace* column jumps to that workspace.
 - **Actions**: the button above the table adds or publishes, *Delete Selected*
   removes every highlighted row (Del does the same while the table has the
-  focus), and the right-hand column holds the per-row actions.
+  focus), and the right-hand column holds the per-row actions. Frequent actions
+  stay visible, with larger click targets and a focus outline. On Layers,
+  **Add to QGIS** and **Preview** sit beside **More**, which contains browser
+  preview, style actions and a separated **Delete** entry. Other tabs use
+  **More** beside their quick actions, or **Actions** when all actions are in
+  the menu. Style actions always show their full labels in these menus.
+- **Keyboard actions**: Tab to a row button, then press Enter or Space to
+  activate it. In a menu, use the arrow keys and Enter; Esc dismisses it.
 - Lists load in the background: QGIS stays usable, the task bar shows the
   progress, and *Refresh* turns into *Cancel* while a load runs.
 
