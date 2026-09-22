@@ -76,6 +76,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- Row actions now keep frequent controls visible and put secondary actions in
+  labelled More or Actions menus. Destructive actions appear last, separated
+  from other menu entries. Larger click targets, palette-based hover and focus
+  states, and keyboard access make the thin custom icons easier to use.
+
 - Refined the thin icon family for small controls: fuller brush tips, larger
   chain links, separate full-height style-transfer arrows and a clearer cache
   eraser. The 1.2-unit stroke weight is unchanged.

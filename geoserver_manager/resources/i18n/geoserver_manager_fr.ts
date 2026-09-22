@@ -269,42 +269,42 @@
 </context><context>
     <name>ConfigOptionsPage</name>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="141" />
+        <location filename="../../gui/dlg_settings.py" line="153" />
         <source>The URL must not carry a user name or password. The fields below do. URL not saved.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="153" />
+        <location filename="../../gui/dlg_settings.py" line="165" />
         <source>GeoServer URL must start with http:// or https://. URL not saved.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="177" />
+        <location filename="../../gui/dlg_settings.py" line="189" />
         <source>Could not store the credentials in the QGIS authentication database. Check that the master password is set, then save again.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="208" />
+        <location filename="../../gui/dlg_settings.py" line="220" />
         <source>{url} is plain HTTP, so the password is sent unencrypted with every request. Use https:// where the server offers it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="221" />
+        <location filename="../../gui/dlg_settings.py" line="233" />
         <source>Enter a URL starting with http:// or https:// first.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="228" />
+        <location filename="../../gui/dlg_settings.py" line="240" />
         <source>Take the user name and password out of the URL. The fields below carry them.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="236" />
+        <location filename="../../gui/dlg_settings.py" line="248" />
         <source>Testing…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="247" />
+        <location filename="../../gui/dlg_settings.py" line="259" />
         <source>Connected. GeoServer answered.</source>
         <translation type="unfinished" />
     </message>
@@ -1041,333 +1041,344 @@
 </context><context>
     <name>GeoServerMainDialog</name>
     <message>
-        <location filename="../../gui/dlg_main.py" line="149" />
+        <location filename="../../gui/dlg_main.py" line="154" />
         <source>Close the dialog</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="607" />
-        <location filename="../../gui/dlg_main.py" line="151" />
+        <location filename="../../gui/dlg_main.py" line="612" />
+        <location filename="../../gui/dlg_main.py" line="156" />
         <source>Refresh resources from the GeoServer (F5)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="154" />
+        <location filename="../../gui/dlg_main.py" line="159" />
         <source>Open settings to edit GeoServer credentials</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="157" />
+        <location filename="../../gui/dlg_main.py" line="162" />
         <source>Search resources by name or other attributes (Ctrl+F to jump here, Esc to clear)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="162" />
+        <location filename="../../gui/dlg_main.py" line="167" />
         <source>Filter this list…  (Ctrl+F)</source>
         <translation>Filtrer cette liste…  (Ctrl+F)</translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="163" />
+        <location filename="../../gui/dlg_main.py" line="168" />
         <source>First page</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="164" />
+        <location filename="../../gui/dlg_main.py" line="169" />
         <source>Previous page</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="165" />
+        <location filename="../../gui/dlg_main.py" line="170" />
         <source>Next page</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="166" />
+        <location filename="../../gui/dlg_main.py" line="171" />
         <source>Last page</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="168" />
+        <location filename="../../gui/dlg_main.py" line="173" />
         <source>Delete the selected resources (Del)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="278" />
+        <location filename="../../gui/dlg_main.py" line="283" />
         <source>Success</source>
         <translation>Succès</translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="283" />
+        <location filename="../../gui/dlg_main.py" line="288" />
         <source>Error</source>
         <translation>Erreur</translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="288" />
+        <location filename="../../gui/dlg_main.py" line="293" />
         <source>Warning</source>
         <translation>Avertissement</translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="312" />
+        <location filename="../../gui/dlg_main.py" line="317" />
         <source>Not configured</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="314" />
+        <location filename="../../gui/dlg_main.py" line="319" />
         <source>GeoServer not configured. Open Settings to add credentials.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="320" />
+        <location filename="../../gui/dlg_main.py" line="325" />
         <source>Auth error</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="322" />
+        <location filename="../../gui/dlg_main.py" line="327" />
         <source>Could not read the credentials from QGIS's authentication database. Its master password was probably declined. Open Settings and save them again.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="384" />
+        <location filename="../../gui/dlg_main.py" line="389" />
         <source>Connecting…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="425" />
+        <location filename="../../gui/dlg_main.py" line="430" />
         <source>Connected: {}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="432" />
+        <location filename="../../gui/dlg_main.py" line="437" />
         <source>Resources loaded.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="435" />
+        <location filename="../../gui/dlg_main.py" line="440" />
         <source>Connection failed</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="457" />
+        <location filename="../../gui/dlg_main.py" line="462" />
         <source>Loading cancelled.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1362" />
-        <location filename="../../gui/dlg_main.py" line="494" />
+        <location filename="../../gui/dlg_main.py" line="1511" />
+        <location filename="../../gui/dlg_main.py" line="499" />
         <source>An upload is already running. Wait for it or cancel it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="503" />
+        <location filename="../../gui/dlg_main.py" line="508" />
         <source>Uploading…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="605" />
+        <location filename="../../gui/dlg_main.py" line="610" />
         <source>Cancel</source>
         <translation>Annuler</translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="605" />
+        <location filename="../../gui/dlg_main.py" line="610" />
         <source>Refresh</source>
         <translation>Rafraîchir</translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="609" />
+        <location filename="../../gui/dlg_main.py" line="614" />
         <source>Cancel the upload</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="611" />
+        <location filename="../../gui/dlg_main.py" line="616" />
         <source>Stop loading</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="614" />
+        <location filename="../../gui/dlg_main.py" line="619" />
         <source>Loading…</source>
         <translation>Chargement…</translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="649" />
+        <location filename="../../gui/dlg_main.py" line="654" />
         <source>Namespaces that group stores, layers and styles; one is the default.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="652" />
+        <location filename="../../gui/dlg_main.py" line="657" />
         <source>Vector sources: databases and files on the server that layers are published from.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="656" />
+        <location filename="../../gui/dlg_main.py" line="661" />
         <source>Raster sources: GeoTIFFs, COGs and image mosaics.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="659" />
+        <location filename="../../gui/dlg_main.py" line="664" />
         <source>WMS and WMTS stores that proxy another server's layers.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="662" />
+        <location filename="../../gui/dlg_main.py" line="667" />
         <source>Everything published (vector, raster and cascaded), with its store and default style.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="666" />
+        <location filename="../../gui/dlg_main.py" line="671" />
         <source>Several layers served as one, in drawing order.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="667" />
+        <location filename="../../gui/dlg_main.py" line="672" />
         <source>SLD (or CSS, MBStyle) definitions, global or per workspace.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="670" />
+        <location filename="../../gui/dlg_main.py" line="675" />
         <source>What GeoWebCache caches: tiles per layer, gridset and format.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="768" />
+        <location filename="../../gui/dlg_main.py" line="773" />
         <source>Delete Selected</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="819" />
+        <location filename="../../gui/dlg_main.py" line="1052" />
+        <location filename="../../gui/dlg_main.py" line="824" />
         <source>Actions</source>
         <translation>Actions</translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="924" />
+        <location filename="../../gui/dlg_main.py" line="930" />
         <source>Click to open (or select and press Enter)</source>
         <translation>Cliquer pour ouvrir (ou sélectionner et appuyer sur Entrée)</translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="956" />
+        <location filename="../../gui/dlg_main.py" line="962" />
         <source>Results {} to {} (out of {} items)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="963" />
+        <location filename="../../gui/dlg_main.py" line="969" />
         <source>Not connected. Press Refresh (F5), or open Settings.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="966" />
+        <location filename="../../gui/dlg_main.py" line="972" />
         <source>Nothing matches '{}'. Esc clears the filter.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="972" />
+        <location filename="../../gui/dlg_main.py" line="978" />
         <source>Nothing here yet. Start with '{}' above.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="975" />
+        <location filename="../../gui/dlg_main.py" line="981" />
         <source>No results</source>
         <translation>Aucun résultat</translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1047" />
+        <location filename="../../gui/dlg_main.py" line="1052" />
+        <source>More</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/dlg_main.py" line="1057" />
+        <source>Actions for {}</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/dlg_main.py" line="1196" />
         <source>Yes</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1047" />
+        <location filename="../../gui/dlg_main.py" line="1196" />
         <source>No</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1058" />
+        <location filename="../../gui/dlg_main.py" line="1207" />
         <source>'{}' cannot be used as a name: no slash, '?', '#', '%' or leading and trailing spaces.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1095" />
+        <location filename="../../gui/dlg_main.py" line="1244" />
         <source>Not connected to GeoServer. Press Refresh (F5) to connect.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1221" />
+        <location filename="../../gui/dlg_main.py" line="1370" />
         <source>{count} item(s) could not be listed: {names}. Details in the QGIS log (GeoServer Manager tab).</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1283" />
-        <location filename="../../gui/dlg_main.py" line="1237" />
+        <location filename="../../gui/dlg_main.py" line="1432" />
+        <location filename="../../gui/dlg_main.py" line="1386" />
         <source>delete</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1240" />
+        <location filename="../../gui/dlg_main.py" line="1389" />
         <source>Are you sure you want to {verb} {subject}?</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1244" />
+        <location filename="../../gui/dlg_main.py" line="1393" />
         <source>Are you sure you want to {verb} {count} {kind}(s)?
 
 {items}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1253" />
+        <location filename="../../gui/dlg_main.py" line="1402" />
         <source>This action cannot be undone.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1256" />
+        <location filename="../../gui/dlg_main.py" line="1405" />
         <source>Please confirm</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1284" />
+        <location filename="../../gui/dlg_main.py" line="1433" />
         <source>deleted</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1307" />
+        <location filename="../../gui/dlg_main.py" line="1456" />
         <source>Failed to {verb} some {kind}(s):
 {errors}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1315" />
+        <location filename="../../gui/dlg_main.py" line="1464" />
         <source>{kind} '{name}' {done}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1321" />
+        <location filename="../../gui/dlg_main.py" line="1470" />
         <source>{count} {kind}(s) {done}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1329" />
+        <location filename="../../gui/dlg_main.py" line="1478" />
         <source>Cancelled. What was already done stays done.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1334" />
+        <location filename="../../gui/dlg_main.py" line="1483" />
         <source>{verb} failed</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1338" />
+        <location filename="../../gui/dlg_main.py" line="1487" />
         <source>Working…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1436" />
+        <location filename="../../gui/dlg_main.py" line="1585" />
         <source>Upload of '{name}' cancelled. GeoServer kept the {kind} and its layer but had already removed their data file. Upload it again with Replace ticked, or delete the {kind}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1442" />
+        <location filename="../../gui/dlg_main.py" line="1591" />
         <source>Upload of '{name}' cancelled. Check the {tab} tab for what was left.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1446" />
+        <location filename="../../gui/dlg_main.py" line="1595" />
         <source>Upload of '{name}' cancelled. Nothing was left on the server.</source>
         <translation type="unfinished" />
     </message>
@@ -1456,12 +1467,12 @@
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../plugin_main.py" line="201" />
+        <location filename="../../plugin_main.py" line="224" />
         <source>GeoServer Manager: first connection</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../plugin_main.py" line="202" />
+        <location filename="../../plugin_main.py" line="225" />
         <source>Welcome to GeoServer Manager.
 
 Enter your GeoServer's URL, user name and password on the settings page that opens next; Test connection tells you whether they work before you save.</source>
@@ -2539,162 +2550,162 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
 </context><context>
     <name>LayerTreeMenu</name>
     <message>
-        <location filename="../../gui/layer_tree.py" line="76" />
+        <location filename="../../gui/layer_tree.py" line="78" />
         <source>Push style to GeoServer…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="78" />
+        <location filename="../../gui/layer_tree.py" line="82" />
         <source>Apply style from GeoServer…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="81" />
+        <location filename="../../gui/layer_tree.py" line="85" />
         <source>Not connected. Open GeoServer Manager first</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="89" />
+        <location filename="../../gui/layer_tree.py" line="94" />
         <source>Open GeoServer Manager to connect…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="159" />
+        <location filename="../../gui/layer_tree.py" line="164" />
         <source>Could not list the layers of the server</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="173" />
+        <location filename="../../gui/layer_tree.py" line="178" />
         <source>No layer on the server is named like '{}'. Publish it first, from the Layers tab.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="185" />
+        <location filename="../../gui/layer_tree.py" line="190" />
         <source>Several layers on the server are named like '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="191" />
+        <location filename="../../gui/layer_tree.py" line="196" />
         <source>GeoServer layer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="199" />
+        <location filename="../../gui/layer_tree.py" line="204" />
         <source>Continue</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="212" />
+        <location filename="../../gui/layer_tree.py" line="217" />
         <source>Push the style of '{}' to GeoServer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="221" />
+        <location filename="../../gui/layer_tree.py" line="226" />
         <source>The symbology of '{}' is exported as SLD and uploaded to workspace '{}' as the style of layer '{}'. A style of that name there is replaced, which is how you push a change you just made in QGIS.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="230" />
+        <location filename="../../gui/layer_tree.py" line="235" />
         <source>Style name</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="237" />
+        <location filename="../../gui/layer_tree.py" line="242" />
         <source>Make it the layer's default style</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="245" />
+        <location filename="../../gui/layer_tree.py" line="250" />
         <source>Upload</source>
         <translation type="unfinished">Téléverser</translation>
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="255" />
+        <location filename="../../gui/layer_tree.py" line="260" />
         <source>Could not export the symbology of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="267" />
+        <location filename="../../gui/layer_tree.py" line="272" />
         <source>Failed to upload the style of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="274" />
+        <location filename="../../gui/layer_tree.py" line="279" />
         <source>Style '{}' left as it is.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="282" />
+        <location filename="../../gui/layer_tree.py" line="287" />
         <source>'{}' on GeoServer now uses the style of '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="286" />
+        <location filename="../../gui/layer_tree.py" line="291" />
         <source>Style '{}' uploaded to workspace '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="326" />
+        <location filename="../../gui/layer_tree.py" line="331" />
         <source>'{}' is a {} style. QGIS can only read SLD.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="337" />
+        <location filename="../../gui/layer_tree.py" line="342" />
         <source>Apply a GeoServer style to '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="347" />
+        <location filename="../../gui/layer_tree.py" line="352" />
         <source>Failed to load the styles of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="355" />
+        <location filename="../../gui/layer_tree.py" line="360" />
         <source>'{}' has no style on the server.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="365" />
+        <location filename="../../gui/layer_tree.py" line="370" />
         <source>'{}' has several styles on the server; the default comes first. The style is applied to this project only.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="373" />
+        <location filename="../../gui/layer_tree.py" line="378" />
         <source>Style</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="381" />
+        <location filename="../../gui/layer_tree.py" line="386" />
         <source>Apply</source>
         <translation type="unfinished">Appliquer</translation>
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="390" />
+        <location filename="../../gui/layer_tree.py" line="395" />
         <source>Failed to load style '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="397" />
+        <location filename="../../gui/layer_tree.py" line="402" />
         <source>Failed to apply '{}' to '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="407" />
+        <location filename="../../gui/layer_tree.py" line="412" />
         <source>'{}' now uses the GeoServer style '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="415" />
+        <location filename="../../gui/layer_tree.py" line="420" />
         <source>QGIS could not read all of '{}': {}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="418" />
+        <location filename="../../gui/layer_tree.py" line="423" />
         <source>no detail given</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="451" />
+        <location filename="../../gui/layer_tree.py" line="456" />
         <source>Not connected to GeoServer. Open GeoServer Manager and connect first.</source>
         <translation type="unfinished" />
     </message>

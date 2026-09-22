@@ -69,7 +69,7 @@ class TestIconPalette(unittest.TestCase):
     def test_selected_row_actions_use_the_selection_text_colour(self):
         dialog = GeoServerMainDialog()
         self.addCleanup(dialog.close)
-        dialog._row_actions = [("push-style", "Push style from QGIS", lambda row: None)]
+        dialog._row_actions = [("add-to-qgis", "Add to QGIS", lambda row: None)]
         dialog._setup_table(["Name", dialog.actions_column_label()])
         dialog._populate_rows([["roads"]])
         button = dialog.resultsTable.cellWidget(0, 1).findChild(QPushButton)

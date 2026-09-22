@@ -18,11 +18,13 @@ from qgis.core import Qgis, QgsApplication, QgsTask
 from qgis.gui import QgsMessageBar
 from qgis.PyQt import uic
 from qgis.PyQt.QtCore import QByteArray, QEvent, QSize, Qt, QTimer
+from qgis.PyQt.QtGui import QPalette
 from qgis.PyQt.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QHeaderView,
     QListWidgetItem,
+    QMenu,
     QMessageBox,
     QPushButton,
     QSizePolicy,
@@ -995,32 +997,134 @@ class GeoServerMainDialog(
             callback(self._filtered_rows[index])
 
     def _make_action_widget(self, row_data):
-        """Create a widget with icon action buttons for a table row."""
+        """Keep frequent actions visible and give secondary actions readable labels."""
         widget = QWidget(self.resultsTable)
         layout = QHBoxLayout(widget)
-        layout.setContentsMargins(2, 0, 2, 0)
+        layout.setContentsMargins(2, 2, 2, 2)
         layout.setSpacing(4)
+        size = max(30, widget.fontMetrics().height() + 10)
+        self.resultsTable.verticalHeader().setDefaultSectionSize(size + 4)
+        quick_ids = {"add-to-qgis", "preview-map", "browse-resources", "publish-layer"}
+        destructive_ids = {"delete", "clear-cache", "remove-cache"}
+        secondary = []
         for action in self._row_actions:
             icon_name, label, callback = action[:3]
-            # An optional fourth element says more than the label can. The
-            # button is icon-only, so the tooltip is all the user reads.
             tooltip = action[3] if len(action) > 3 else label
+            if icon_name not in quick_ids or layout.count() >= 2:
+                secondary.append(action)
+                continue
             btn = QPushButton(widget)
             btn.setProperty("resourceIcon", icon_name)
-            btn.setIcon(icon(icon_name, btn.palette()))
+            btn.setIcon(icon(icon_name, widget.palette()))
             btn.setIconSize(QSize(20, 20))
             btn.setAccessibleName(label)
             btn.setAccessibleDescription(tooltip)
             btn.setToolTip(tooltip)
-            btn.setFlat(True)
-            btn.setFixedSize(24, 24)
+            btn.setFixedSize(size, size)
             btn.clicked.connect(
                 lambda _checked=False, cb=callback, row=row_data: (
                     self._require_connection() and cb(row)
                 )
             )
             layout.addWidget(btn)
+        if secondary:
+            menu = QMenu(widget)
+            menu.setAttribute(Qt.WidgetAttribute.WA_WindowPropagation, True)
+            menu.setToolTipsVisible(True)
+            ordinary = [a for a in secondary if a[0] not in destructive_ids]
+            destructive = [a for a in secondary if a[0] in destructive_ids]
+            for action in ordinary + destructive:
+                if ordinary and destructive and action is destructive[0]:
+                    menu.addSeparator()
+                icon_name, label, callback = action[:3]
+                entry = menu.addAction(
+                    icon(icon_name, menu.palette(), for_menu=True), label
+                )
+                entry.setProperty("resourceIcon", icon_name)
+                entry.setToolTip(action[3] if len(action) > 3 else label)
+                entry.triggered.connect(
+                    lambda _checked=False, cb=callback, row=row_data: (
+                        self._require_connection() and cb(row)
+                    )
+                )
+            menu.aboutToShow.connect(lambda: self._refresh_action_menu(menu))
+            btn = QPushButton(
+                self.tr("More") if layout.count() else self.tr("Actions"), widget
+            )
+            btn.setObjectName("rowActionMenu")
+            btn.setMenu(menu)
+            btn.setMinimumHeight(size)
+            description = self.tr("Actions for {}").format(row_data[0])
+            btn.setAccessibleName(description)
+            btn.setToolTip(description)
+            layout.addWidget(btn)
+        for button in widget.findChildren(QPushButton):
+            button.setAutoDefault(False)
+            button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            button.installEventFilter(self)
+            self._style_action_button(button, widget.palette(), selected=False)
         return widget
+
+    def eventFilter(self, watched, event):  # noqa: N802 (Qt's own spelling)
+        # Row actions are never dialog defaults. Enter still activates the
+        # focused control, without stealing Enter from search or the table.
+        if (
+            isinstance(watched, QPushButton)
+            and event.type() == QEvent.Type.KeyPress
+            and event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
+        ):
+            watched.click()
+            return True
+        return super().eventFilter(watched, event)
+
+    @staticmethod
+    def _style_action_button(button, palette, selected):
+        # Resolve colours before applying QSS: palette() in a stylesheet can
+        # retain the old theme, or the selected foreground after deselection.
+        def colour(role):
+            return palette.color(role).name()
+
+        text = colour(
+            QPalette.ColorRole.HighlightedText if selected else QPalette.ColorRole.Text
+        )
+        hover = colour(
+            QPalette.ColorRole.Highlight
+            if selected
+            else QPalette.ColorRole.AlternateBase
+        )
+        border = colour(
+            QPalette.ColorRole.HighlightedText if selected else QPalette.ColorRole.Mid
+        )
+        focus = colour(
+            QPalette.ColorRole.HighlightedText
+            if selected
+            else QPalette.ColorRole.Highlight
+        )
+        pressed = colour(
+            QPalette.ColorRole.Highlight if selected else QPalette.ColorRole.Button
+        )
+        disabled = palette.color(
+            QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text
+        ).name()
+        sheet = (
+            f"QPushButton {{ background: transparent; color: {text};"
+            " border: 1px solid transparent; border-radius: 4px; padding: 3px; }"
+            "QPushButton#rowActionMenu { padding-right: 16px; }"
+            "QPushButton::menu-indicator { subcontrol-position: right center; right: 4px; }"
+            f"QPushButton:hover {{ background: {hover}; border-color: {border}; }}"
+            f"QPushButton:focus {{ border: 2px solid {focus}; padding: 2px; }}"
+            f"QPushButton:pressed {{ background: {pressed}; }}"
+            f"QPushButton:disabled {{ color: {disabled}; }}"
+        )
+        if button.styleSheet() != sheet:
+            button.setStyleSheet(sheet)
+
+    @staticmethod
+    def _refresh_action_menu(menu):
+        for action in menu.actions():
+            icon_name = action.property("resourceIcon")
+            if icon_name:
+                action.setIcon(icon(icon_name, menu.palette(), for_menu=True))
 
     def changeEvent(self, event):  # noqa: N802 (Qt's own spelling)
         """Recolour icons after a theme change without reloading server data."""
@@ -1050,12 +1154,14 @@ class GeoServerMainDialog(
             widget = self.resultsTable.cellWidget(row, column)
             if widget is None:
                 continue
+            palette = self.resultsTable.palette()
+            for menu in widget.findChildren(QMenu):
+                self._refresh_action_menu(menu)
             for button in widget.findChildren(QPushButton):
+                self._style_action_button(button, palette, selected=row in selected)
                 icon_name = button.property("resourceIcon")
                 if icon_name:
-                    button.setIcon(
-                        icon(icon_name, button.palette(), selected=row in selected)
-                    )
+                    button.setIcon(icon(icon_name, palette, selected=row in selected))
 
     # -- Pagination slots --------------------------------------------------
 

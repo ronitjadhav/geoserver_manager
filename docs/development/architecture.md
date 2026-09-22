@@ -34,8 +34,13 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   `_row_actions`, calls `_setup_table(columns)`, then hands a fetch function to
   `_start_load(failure_message, fetch)` and returns. Rows are plain lists of display strings;
   column 0 is the resource name. A `_row_actions` entry is `(icon, label, callback)`, plus an
-  optional fourth element when the icon-only button's tooltip must say more than the label
+  optional fourth element when the action's tooltip must say more than the label
   (the browser preview's login note).
+  `_make_action_widget` keeps up to two frequent actions visible (add to QGIS,
+  preview, browse and publish). Other actions get labels in a More or Actions
+  menu, with destructive actions last and separated when needed. Both paths
+  check the connection at activation and capture the row from the page render.
+  Keep this grouping central; tabs only declare their existing action tuples.
 - **Loads run off the GUI thread.** `_start_load` wraps the fetch in a `_FetchTask` (a
   `QgsTask`), so `_load_x()` returns before a single row exists: QGIS's task bar shows the
   progress, *Refresh* turns into *Cancel*, and `finished()` comes back on the GUI thread to

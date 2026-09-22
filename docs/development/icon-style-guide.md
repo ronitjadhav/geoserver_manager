@@ -64,7 +64,10 @@ When ready, replace `fallback` and `notes` with the SVG's `asset` and set
 `icon("new-feature", button.palette())` from `gui/icons.py`. Do not call
 `QIcon`, `getThemeIcon` or `iconPath` elsewhere. Menu-only actions use
 `for_menu=True` for highlighted colours; shared toolbar actions leave it off.
-Give icon-only controls a tooltip and accessible name.
+Give icon-only controls a tooltip and accessible name. Row buttons show 20 px
+icons inside targets of at least 30 px. Use the shared row-action builder for
+spacing, keyboard focus, selection colours and labelled secondary actions.
+Do not make destructive actions quick buttons.
 
 ## Review
 
