@@ -67,17 +67,17 @@ class CascadedStoreTabMixin:
         }
         self._row_actions = [
             (
-                "mIconListView.svg",
+                "browse-resources",
                 translate("CascadedStoreTabMixin", "Cascaded layers"),
                 self._show_cascaded_layers,
             ),
             (
-                "mActionAddWmsLayer.svg",
+                "publish-layer",
                 translate("CascadedStoreTabMixin", "Publish a layer"),
                 self._publish_cascaded_layer,
             ),
             (
-                "mActionDeleteSelected.svg",
+                "delete",
                 translate("CascadedStoreTabMixin", "Delete"),
                 self._delete_cascaded_store,
             ),

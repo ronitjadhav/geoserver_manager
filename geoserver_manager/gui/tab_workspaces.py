@@ -44,7 +44,7 @@ class WorkspaceTabMixin:
         self._extra_click_callbacks = {}
         self._row_actions = [
             (
-                "mActionDeleteSelected.svg",
+                "delete",
                 translate("WorkspaceTabMixin", "Delete"),
                 self._delete_workspace,
             ),

@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GeoServer Manager icon catalogue</title>
+<style>
+:root{color-scheme:light;--bg:#f6f7f8;--surface:#fff;--text:#172f36;--muted:#60717a;--line:#dce3e7;--ink:#202020;--blue:#007d9e;--green:#477d28;--danger:#b3261e;--highlight:#2980b9;--disabled:#999;--size:20px}
+body.dark{color-scheme:dark;--bg:#191d21;--surface:#23292e;--text:#eff0f1;--muted:#a7b4bc;--line:#3d4850;--ink:#eff0f1;--blue:#69cce5;--green:#9acf7f;--danger:#ff8a80;--disabled:#899198}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif}main{max-width:1240px;margin:auto;padding:36px 24px 48px}
+.eyebrow{color:var(--blue);font-size:12px;font-weight:650;letter-spacing:.09em;text-transform:uppercase}h1{font-size:30px;line-height:1.2;margin:8px 0 12px;font-weight:650}header p{max-width:780px;color:var(--muted);margin:8px 0}.summary{font-size:13px;margin:18px 0 22px}.summary b{color:var(--green)}
+.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin-bottom:18px}label{display:grid;gap:5px;font-size:12px;color:var(--muted)}label.search{flex:1;min-width:230px}input,select,button{font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 11px}input{width:100%}button{cursor:pointer;min-height:38px}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+#count{margin:8px 0 16px;color:var(--muted);font-size:12px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:16px}.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;min-width:0}.card[hidden]{display:none}.card-top{display:flex;gap:8px;justify-content:space-between;align-items:center;min-height:32px}.category{font-size:11px;color:var(--muted)}.badge{font-size:10px;font-weight:650;white-space:nowrap;padding:3px 7px;border:1px solid var(--line);border-radius:4px}.badge.custom{color:var(--green)}.badge.needs-custom{color:var(--danger)}
+.samples{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:18px 0}.sample{display:grid;gap:7px;text-align:center;font-size:10px;color:var(--muted)}.glyph{height:52px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:var(--bg)}.sample.selected .glyph{background:var(--highlight);--ink:#fff;--blue:#fff;--green:#fff;--danger:#fff}.sample.disabled .glyph{--ink:var(--disabled);--blue:var(--disabled);--green:var(--disabled);--danger:var(--disabled)}.brand .normal .glyph{--blue:#0099c0;--green:#589632}.glyph svg{width:var(--size);height:var(--size);display:block}.pending-symbol{display:grid;place-items:center;width:var(--size);height:var(--size);border:1px dashed var(--muted);color:var(--muted)}
+h2{font-size:15px;line-height:1.35;margin:0 0 5px;font-weight:650}code{font:11px/1.4 ui-monospace,monospace;color:var(--muted);overflow-wrap:anywhere}.card p{font-size:12px;margin:11px 0;color:var(--muted)}details{margin-top:auto;padding-top:12px}summary{font-size:11px;cursor:pointer;color:var(--blue)}details p{font-size:11px}.notes{border-left:2px solid var(--danger);padding-left:9px}footer{margin-top:28px;font-size:12px;color:var(--muted)}#empty{padding:32px;border:1px dashed var(--line);border-radius:8px;text-align:center}
+</style></head><body><main>
+<header><div class="eyebrow">GeoServer Manager / design reference</div><h1>Icon catalogue</h1>
+<p>One inventory for every icon the plugin supplies. Compare silhouettes at their actual display size, check theme contrast, and find artwork still needed for new features.</p>
+<p class="summary"><b>24 custom</b> · 0 need artwork · 1.2-unit strokes on a 24 px grid</p></header>
+<div class="controls"><label class="search">Find an icon<input id="search" type="search" placeholder="Search by action, icon name, or file"></label>
+<label>Artwork<select id="status"><option value="all">All icons</option><option value="custom">Custom SVG</option><option value="needs-custom">Needs custom artwork</option></select></label>
+<label>Display size<select id="size"><option>16</option><option selected>20</option><option>24</option><option>32</option></select></label>
+<button id="theme" type="button" aria-pressed="false">Dark theme</button></div>
+<p id="count" aria-live="polite">24 icons shown</p><section class="grid" aria-label="Icon previews"><article class="card brand" data-status="custom" data-search="plugin geoserver manager brand open or identify geoserver manager. the existing ribbon g is the brand mark. dlg_settings.py, layer_tree.py, plugin_main.py">
+<div class="card-top"><span class="category">Brand</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
+  <title>GeoServer Manager</title>
+  <desc>A blue ribbon traces a rounded map tile and bends inward in green to form a G.</desc>
+  <path d="M45 17L39 11Q32 4 25 11L11 25Q4 32 11 39L25 53Q32 60 39 53L53 39Q56.5 35.5 56.5 32H33" fill="none" stroke="var(--blue)" stroke-width="9" stroke-linecap="butt" stroke-linejoin="round" />
+  <path d="M44 48L53 39Q56.5 35.5 56.5 32H33" fill="none" stroke="var(--green)" stroke-width="9" stroke-linecap="butt" stroke-linejoin="round" />
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
+  <title>GeoServer Manager</title>
+  <desc>A blue ribbon traces a rounded map tile and bends inward in green to form a G.</desc>
+  <path d="M45 17L39 11Q32 4 25 11L11 25Q4 32 11 39L25 53Q32 60 39 53L53 39Q56.5 35.5 56.5 32H33" fill="none" stroke="var(--blue)" stroke-width="9" stroke-linecap="butt" stroke-linejoin="round" />
+  <path d="M44 48L53 39Q56.5 35.5 56.5 32H33" fill="none" stroke="var(--green)" stroke-width="9" stroke-linecap="butt" stroke-linejoin="round" />
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
+  <title>GeoServer Manager</title>
+  <desc>A blue ribbon traces a rounded map tile and bends inward in green to form a G.</desc>
+  <path d="M45 17L39 11Q32 4 25 11L11 25Q4 32 11 39L25 53Q32 60 39 53L53 39Q56.5 35.5 56.5 32H33" fill="none" stroke="var(--blue)" stroke-width="9" stroke-linecap="butt" stroke-linejoin="round" />
+  <path d="M44 48L53 39Q56.5 35.5 56.5 32H33" fill="none" stroke="var(--green)" stroke-width="9" stroke-linecap="butt" stroke-linejoin="round" />
+</svg></div><span>Disabled</span></div></div><h2>GeoServer Manager</h2><code>plugin</code>
+<p>Open or identify GeoServer Manager. The existing Ribbon G is the brand mark.</p><details><summary>Usage and source</summary><p>dlg_settings.py, layer_tree.py, plugin_main.py</p><code>images/geoserver_manager.svg</code></details></article>
+<article class="card " data-status="custom" data-search="workspaces workspaces navigation a folder for the namespaces that group stores, layers and styles. dlg_main.py">
+<div class="card-top"><span class="category">Navigation</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 8V5.5A1.5 1.5 0 0 1 4.5 4H9l3 3h7.5A1.5 1.5 0 0 1 21 8.5V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" />
+    <path d="M3 10h18" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 8V5.5A1.5 1.5 0 0 1 4.5 4H9l3 3h7.5A1.5 1.5 0 0 1 21 8.5V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" />
+    <path d="M3 10h18" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 8V5.5A1.5 1.5 0 0 1 4.5 4H9l3 3h7.5A1.5 1.5 0 0 1 21 8.5V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" />
+    <path d="M3 10h18" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Workspaces</h2><code>workspaces</code>
+<p>A folder for the namespaces that group stores, layers and styles.</p><details><summary>Usage and source</summary><p>dlg_main.py</p><code>icons/workspaces.svg</code></details></article>
+<article class="card " data-status="custom" data-search="datastores datastores navigation a database cylinder for vector data sources. dlg_main.py">
+<div class="card-top"><span class="category">Navigation</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6" />
+    <path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
+    <ellipse cx="12" cy="6" rx="8" ry="3" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6" />
+    <path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
+    <ellipse cx="12" cy="6" rx="8" ry="3" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6" />
+    <path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
+    <ellipse cx="12" cy="6" rx="8" ry="3" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Datastores</h2><code>datastores</code>
+<p>A database cylinder for vector data sources.</p><details><summary>Usage and source</summary><p>dlg_main.py</p><code>icons/datastores.svg</code></details></article>
+<article class="card " data-status="custom" data-search="coverage-stores coverage stores navigation an image frame for raster data sources. dlg_main.py">
+<div class="card-top"><span class="category">Navigation</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M3 15l5-5 4 5 3-3 6 6" stroke="var(--green)" />
+    <circle cx="16" cy="8" r="1.5" fill="var(--blue)" stroke="none" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M3 15l5-5 4 5 3-3 6 6" stroke="var(--green)" />
+    <circle cx="16" cy="8" r="1.5" fill="var(--blue)" stroke="none" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M3 15l5-5 4 5 3-3 6 6" stroke="var(--green)" />
+    <circle cx="16" cy="8" r="1.5" fill="var(--blue)" stroke="none" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Coverage stores</h2><code>coverage-stores</code>
+<p>An image frame for raster data sources.</p><details><summary>Usage and source</summary><p>dlg_main.py</p><code>icons/coverage-stores.svg</code></details></article>
+<article class="card " data-status="custom" data-search="cascaded-stores cascaded stores navigation a chain link for connections to remote wms or wmts services. dlg_main.py">
+<div class="card-top"><span class="category">Navigation</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m10 7 2-2a4.2 4.2 0 0 1 6 6l-2 2" />
+    <path d="m14 17-2 2a4.2 4.2 0 0 1-6-6l2-2" stroke="var(--blue)" />
+    <path d="m9 15 6-6" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m10 7 2-2a4.2 4.2 0 0 1 6 6l-2 2" />
+    <path d="m14 17-2 2a4.2 4.2 0 0 1-6-6l2-2" stroke="var(--blue)" />
+    <path d="m9 15 6-6" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m10 7 2-2a4.2 4.2 0 0 1 6 6l-2 2" />
+    <path d="m14 17-2 2a4.2 4.2 0 0 1-6-6l2-2" stroke="var(--blue)" />
+    <path d="m9 15 6-6" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Cascaded stores</h2><code>cascaded-stores</code>
+<p>A chain link for connections to remote WMS or WMTS services.</p><details><summary>Usage and source</summary><p>dlg_main.py</p><code>icons/cascaded-stores.svg</code></details></article>
+<article class="card " data-status="custom" data-search="layers layers navigation a neutral stack for all published layer types, including raster and vector. dlg_main.py">
+<div class="card-top"><span class="category">Navigation</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m3 12 9 5 9-5M3 17l9 5 9-5" />
+    <path d="m12 2 9 5-9 5-9-5Z" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m3 12 9 5 9-5M3 17l9 5 9-5" />
+    <path d="m12 2 9 5-9 5-9-5Z" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m3 12 9 5 9-5M3 17l9 5 9-5" />
+    <path d="m12 2 9 5-9 5-9-5Z" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Layers</h2><code>layers</code>
+<p>A neutral stack for all published layer types, including raster and vector.</p><details><summary>Usage and source</summary><p>dlg_main.py</p><code>icons/layers.svg</code></details></article>
+<article class="card " data-status="custom" data-search="layer-groups layer groups navigation brackets contain several layers served together. dlg_main.py">
+<div class="card-top"><span class="category">Navigation</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 3H3v18h4M17 3h4v18h-4" />
+    <path d="m7 7 5-3 5 3-5 3Z" stroke="var(--blue)" />
+    <path d="m7 12 5 3 5-3m-10 5 5 3 5-3" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 3H3v18h4M17 3h4v18h-4" />
+    <path d="m7 7 5-3 5 3-5 3Z" stroke="var(--blue)" />
+    <path d="m7 12 5 3 5-3m-10 5 5 3 5-3" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 3H3v18h4M17 3h4v18h-4" />
+    <path d="m7 7 5-3 5 3-5 3Z" stroke="var(--blue)" />
+    <path d="m7 12 5 3 5-3m-10 5 5 3 5-3" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Layer groups</h2><code>layer-groups</code>
+<p>Brackets contain several layers served together.</p><details><summary>Usage and source</summary><p>dlg_main.py</p><code>icons/layer-groups.svg</code></details></article>
+<article class="card " data-status="custom" data-search="styles styles / set style navigation a brush for symbology and choosing a server style. dlg_main.py, tab_layers.py">
+<div class="card-top"><span class="category">Navigation</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m10 12 8-9a2.1 2.1 0 0 1 3 3l-9 8Z" />
+    <path d="M11.5 14.5a3.5 3.5 0 0 1-1 5C8.5 21 5 21 3 20c3-1 1-5 4-6.5a3.7 3.7 0 0 1 4.5 1Z" stroke="var(--green)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m10 12 8-9a2.1 2.1 0 0 1 3 3l-9 8Z" />
+    <path d="M11.5 14.5a3.5 3.5 0 0 1-1 5C8.5 21 5 21 3 20c3-1 1-5 4-6.5a3.7 3.7 0 0 1 4.5 1Z" stroke="var(--green)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m10 12 8-9a2.1 2.1 0 0 1 3 3l-9 8Z" />
+    <path d="M11.5 14.5a3.5 3.5 0 0 1-1 5C8.5 21 5 21 3 20c3-1 1-5 4-6.5a3.7 3.7 0 0 1 4.5 1Z" stroke="var(--green)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Styles / set style</h2><code>styles</code>
+<p>A brush for symbology and choosing a server style.</p><details><summary>Usage and source</summary><p>dlg_main.py, tab_layers.py</p><code>icons/styles.svg</code></details></article>
+<article class="card " data-status="custom" data-search="tile-cache tile cache navigation four map tiles for geowebcache. dlg_main.py">
+<div class="card-top"><span class="category">Navigation</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Tile cache</h2><code>tile-cache</code>
+<p>Four map tiles for GeoWebCache.</p><details><summary>Usage and source</summary><p>dlg_main.py</p><code>icons/tile-cache.svg</code></details></article>
+<article class="card " data-status="custom" data-search="add-to-qgis add to qgis layers and stores a layer stack with a plus adds an existing server layer to the project. tab_layergroups.py, tab_layers.py">
+<div class="card-top"><span class="category">Layers and stores</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m10 3 8 4.5-8 4.5-8-4.5Zm-8 9 8 4.5 2-1M2 17l8 4.5 2-1" />
+    <path d="M18 13v8m-4-4h8" stroke="var(--green)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m10 3 8 4.5-8 4.5-8-4.5Zm-8 9 8 4.5 2-1M2 17l8 4.5 2-1" />
+    <path d="M18 13v8m-4-4h8" stroke="var(--green)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m10 3 8 4.5-8 4.5-8-4.5Zm-8 9 8 4.5 2-1M2 17l8 4.5 2-1" />
+    <path d="M18 13v8m-4-4h8" stroke="var(--green)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Add to QGIS</h2><code>add-to-qgis</code>
+<p>A layer stack with a plus adds an existing server layer to the project.</p><details><summary>Usage and source</summary><p>tab_layergroups.py, tab_layers.py</p><code>icons/add-to-qgis.svg</code></details></article>
+<article class="card " data-status="custom" data-search="preview-map preview in qgis layers and stores an eye opens a temporary map without adding a layer to the project. tab_layers.py">
+<div class="card-top"><span class="category">Layers and stores</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+    <circle cx="12" cy="12" r="3" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+    <circle cx="12" cy="12" r="3" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+    <circle cx="12" cy="12" r="3" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Preview in QGIS</h2><code>preview-map</code>
+<p>An eye opens a temporary map without adding a layer to the project.</p><details><summary>Usage and source</summary><p>tab_layers.py</p><code>icons/preview-map.svg</code></details></article>
+<article class="card " data-status="custom" data-search="preview-browser preview in browser layers and stores a browser window with an outward arrow opens the external preview. tab_layergroups.py, tab_layers.py">
+<div class="card-top"><span class="category">Layers and stores</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 10V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8M3 8h18" />
+    <path d="M15 13h6v6m-9 3 9-9" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 10V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8M3 8h18" />
+    <path d="M15 13h6v6m-9 3 9-9" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 10V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8M3 8h18" />
+    <path d="M15 13h6v6m-9 3 9-9" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Preview in browser</h2><code>preview-browser</code>
+<p>A browser window with an outward arrow opens the external preview.</p><details><summary>Usage and source</summary><p>tab_layergroups.py, tab_layers.py</p><code>icons/preview-browser.svg</code></details></article>
+<article class="card " data-status="custom" data-search="browse-resources browse store contents layers and stores a list shows the coverages or cascaded layers held by a store. tab_cascaded.py, tab_coveragestores.py">
+<div class="card-top"><span class="category">Layers and stores</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M10 7h7m-7 5h7m-7 5h7" />
+    <g fill="var(--blue)" stroke="none"><circle cx="7" cy="7" r=".8" /><circle cx="7" cy="12" r=".8" /><circle cx="7" cy="17" r=".8" /></g>
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M10 7h7m-7 5h7m-7 5h7" />
+    <g fill="var(--blue)" stroke="none"><circle cx="7" cy="7" r=".8" /><circle cx="7" cy="12" r=".8" /><circle cx="7" cy="17" r=".8" /></g>
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M10 7h7m-7 5h7m-7 5h7" />
+    <g fill="var(--blue)" stroke="none"><circle cx="7" cy="7" r=".8" /><circle cx="7" cy="12" r=".8" /><circle cx="7" cy="17" r=".8" /></g>
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Browse store contents</h2><code>browse-resources</code>
+<p>A list shows the coverages or cascaded layers held by a store.</p><details><summary>Usage and source</summary><p>tab_cascaded.py, tab_coveragestores.py</p><code>icons/browse-resources.svg</code></details></article>
+<article class="card " data-status="custom" data-search="publish-layer publish a layer layers and stores a layer stack with an upward arrow publishes a store resource on geoserver. tab_cascaded.py, tab_coveragestores.py">
+<div class="card-top"><span class="category">Layers and stores</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m10 3 8 4.5-8 4.5-8-4.5Zm-8 9 8 4.5 2-1M2 17l8 4.5 2-1" />
+    <path d="M18 22V12m-4 4 4-4 4 4" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m10 3 8 4.5-8 4.5-8-4.5Zm-8 9 8 4.5 2-1M2 17l8 4.5 2-1" />
+    <path d="M18 22V12m-4 4 4-4 4 4" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m10 3 8 4.5-8 4.5-8-4.5Zm-8 9 8 4.5 2-1M2 17l8 4.5 2-1" />
+    <path d="M18 22V12m-4 4 4-4 4 4" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Publish a layer</h2><code>publish-layer</code>
+<p>A layer stack with an upward arrow publishes a store resource on GeoServer.</p><details><summary>Usage and source</summary><p>tab_cascaded.py, tab_coveragestores.py</p><code>icons/publish-layer.svg</code></details></article>
+<article class="card " data-status="custom" data-search="push-style push style to geoserver styles a brush with an upward arrow sends project symbology to the server. layer_tree.py, tab_layers.py">
+<div class="card-top"><span class="category">Styles</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m7 13 6-9a1.8 1.8 0 0 1 3 2l-6 9Z" />
+    <path d="M9.5 15a3 3 0 0 1-.5 4c-1.5 1.5-4 2-7 1 3-1 1-5 4-6a3 3 0 0 1 3.5 1Z" stroke="var(--green)" />
+    <path d="M18 21V11m-4 4 4-4 4 4" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m7 13 6-9a1.8 1.8 0 0 1 3 2l-6 9Z" />
+    <path d="M9.5 15a3 3 0 0 1-.5 4c-1.5 1.5-4 2-7 1 3-1 1-5 4-6a3 3 0 0 1 3.5 1Z" stroke="var(--green)" />
+    <path d="M18 21V11m-4 4 4-4 4 4" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m7 13 6-9a1.8 1.8 0 0 1 3 2l-6 9Z" />
+    <path d="M9.5 15a3 3 0 0 1-.5 4c-1.5 1.5-4 2-7 1 3-1 1-5 4-6a3 3 0 0 1 3.5 1Z" stroke="var(--green)" />
+    <path d="M18 21V11m-4 4 4-4 4 4" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Push style to GeoServer</h2><code>push-style</code>
+<p>A brush with an upward arrow sends project symbology to the server.</p><details><summary>Usage and source</summary><p>layer_tree.py, tab_layers.py</p><code>icons/push-style.svg</code></details></article>
+<article class="card " data-status="custom" data-search="apply-style apply style to qgis styles a brush with a downward arrow brings server symbology into the project. layer_tree.py, tab_styles.py">
+<div class="card-top"><span class="category">Styles</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m7 13 6-9a1.8 1.8 0 0 1 3 2l-6 9Z" />
+    <path d="M9.5 15a3 3 0 0 1-.5 4c-1.5 1.5-4 2-7 1 3-1 1-5 4-6a3 3 0 0 1 3.5 1Z" stroke="var(--green)" />
+    <path d="M18 11v10m-4-4 4 4 4-4" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m7 13 6-9a1.8 1.8 0 0 1 3 2l-6 9Z" />
+    <path d="M9.5 15a3 3 0 0 1-.5 4c-1.5 1.5-4 2-7 1 3-1 1-5 4-6a3 3 0 0 1 3.5 1Z" stroke="var(--green)" />
+    <path d="M18 11v10m-4-4 4 4 4-4" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m7 13 6-9a1.8 1.8 0 0 1 3 2l-6 9Z" />
+    <path d="M9.5 15a3 3 0 0 1-.5 4c-1.5 1.5-4 2-7 1 3-1 1-5 4-6a3 3 0 0 1 3.5 1Z" stroke="var(--green)" />
+    <path d="M18 11v10m-4-4 4 4 4-4" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Apply style to QGIS</h2><code>apply-style</code>
+<p>A brush with a downward arrow brings server symbology into the project.</p><details><summary>Usage and source</summary><p>layer_tree.py, tab_styles.py</p><code>icons/apply-style.svg</code></details></article>
+<article class="card " data-status="custom" data-search="save-style save style to disk styles a document with a downward arrow writes a style definition to a local file. tab_styles.py">
+<div class="card-top"><span class="category">Styles</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M13 3H5v18h6M13 3l6 6h-6V3Z" />
+    <path d="M18 12v9m-4-4 4 4 4-4" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M13 3H5v18h6M13 3l6 6h-6V3Z" />
+    <path d="M18 12v9m-4-4 4 4 4-4" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M13 3H5v18h6M13 3l6 6h-6V3Z" />
+    <path d="M18 12v9m-4-4 4 4 4-4" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Save style to disk</h2><code>save-style</code>
+<p>A document with a downward arrow writes a style definition to a local file.</p><details><summary>Usage and source</summary><p>tab_styles.py</p><code>icons/save-style.svg</code></details></article>
+<article class="card " data-status="custom" data-search="clear-cache truncate cached tiles cache and removal an eraser clears tile content but keeps the cache configuration. tab_gwc.py">
+<div class="card-top"><span class="category">Cache and removal</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <path d="m14 18 4-5 4 3-4 5h-2Zm2-2 4 3" stroke="var(--danger)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <path d="m14 18 4-5 4 3-4 5h-2Zm2-2 4 3" stroke="var(--danger)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <path d="m14 18 4-5 4 3-4 5h-2Zm2-2 4 3" stroke="var(--danger)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Truncate cached tiles</h2><code>clear-cache</code>
+<p>An eraser clears tile content but keeps the cache configuration.</p><details><summary>Usage and source</summary><p>tab_gwc.py</p><code>icons/clear-cache.svg</code></details></article>
+<article class="card " data-status="custom" data-search="remove-cache stop caching cache and removal a minus removes the cache configuration; the published layer remains. tab_gwc.py">
+<div class="card-top"><span class="category">Cache and removal</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <path d="M14 18h8" stroke="var(--danger)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <path d="M14 18h8" stroke="var(--danger)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <path d="M14 18h8" stroke="var(--danger)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Stop caching</h2><code>remove-cache</code>
+<p>A minus removes the cache configuration; the published layer remains.</p><details><summary>Usage and source</summary><p>tab_gwc.py</p><code>icons/remove-cache.svg</code></details></article>
+<article class="card " data-status="custom" data-search="delete delete resource cache and removal a familiar bin removes a server resource after confirmation. tab_cascaded.py, tab_coveragestores.py, tab_datastores.py, tab_layergroups.py, tab_layers.py, tab_styles.py, tab_workspaces.py">
+<div class="card-top"><span class="category">Cache and removal</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" stroke="var(--danger)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" stroke="var(--danger)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" stroke="var(--danger)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Delete resource</h2><code>delete</code>
+<p>A familiar bin removes a server resource after confirmation.</p><details><summary>Usage and source</summary><p>tab_cascaded.py, tab_coveragestores.py, tab_datastores.py, tab_layergroups.py, tab_layers.py, tab_styles.py, tab_workspaces.py</p><code>icons/delete.svg</code></details></article>
+<article class="card " data-status="custom" data-search="settings settings utilities a six-tooth cog opens the plugin settings. plugin_main.py">
+<div class="card-top"><span class="category">Utilities</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="19.52,9.26 21.85,10.26 21.85,13.74 19.52,14.74 18.13,17.14 18.43,19.66 15.42,21.40 13.39,19.88 10.61,19.88 8.58,21.40 5.57,19.66 5.87,17.14 4.48,14.74 2.15,13.74 2.15,10.26 4.48,9.26 5.87,6.86 5.57,4.34 8.58,2.60 10.61,4.12 13.39,4.12 15.42,2.60 18.43,4.34 18.13,6.86" />
+    <circle cx="12" cy="12" r="3" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="19.52,9.26 21.85,10.26 21.85,13.74 19.52,14.74 18.13,17.14 18.43,19.66 15.42,21.40 13.39,19.88 10.61,19.88 8.58,21.40 5.57,19.66 5.87,17.14 4.48,14.74 2.15,13.74 2.15,10.26 4.48,9.26 5.87,6.86 5.57,4.34 8.58,2.60 10.61,4.12 13.39,4.12 15.42,2.60 18.43,4.34 18.13,6.86" />
+    <circle cx="12" cy="12" r="3" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="19.52,9.26 21.85,10.26 21.85,13.74 19.52,14.74 18.13,17.14 18.43,19.66 15.42,21.40 13.39,19.88 10.61,19.88 8.58,21.40 5.57,19.66 5.87,17.14 4.48,14.74 2.15,13.74 2.15,10.26 4.48,9.26 5.87,6.86 5.57,4.34 8.58,2.60 10.61,4.12 13.39,4.12 15.42,2.60 18.43,4.34 18.13,6.86" />
+    <circle cx="12" cy="12" r="3" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Settings</h2><code>settings</code>
+<p>A six-tooth cog opens the plugin settings.</p><details><summary>Usage and source</summary><p>plugin_main.py</p><code>icons/settings.svg</code></details></article>
+<article class="card " data-status="custom" data-search="help help utilities a question mark opens the documentation. dlg_settings.py, plugin_main.py">
+<div class="card-top"><span class="category">Utilities</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9 9a3 3 0 1 1 5 2.2c-1.3.8-2 1.3-2 2.8" stroke="var(--blue)" />
+    <circle cx="12" cy="17" r=".75" fill="var(--blue)" stroke="none" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9 9a3 3 0 1 1 5 2.2c-1.3.8-2 1.3-2 2.8" stroke="var(--blue)" />
+    <circle cx="12" cy="17" r=".75" fill="var(--blue)" stroke="none" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9 9a3 3 0 1 1 5 2.2c-1.3.8-2 1.3-2 2.8" stroke="var(--blue)" />
+    <circle cx="12" cy="17" r=".75" fill="var(--blue)" stroke="none" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Help</h2><code>help</code>
+<p>A question mark opens the documentation.</p><details><summary>Usage and source</summary><p>dlg_settings.py, plugin_main.py</p><code>icons/help.svg</code></details></article>
+<article class="card " data-status="custom" data-search="report-issue report an issue utilities a bug opens the issue reporter. dlg_settings.py">
+<div class="card-top"><span class="category">Utilities</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 7V5a3 3 0 0 1 6 0v2M5 9 2 7m3 7H2m4 4-3 3m16-12 3-2m-3 7h3m-4 4 3 3M9 3 7 1m8 2 2-2" />
+    <rect x="6" y="7" width="12" height="14" rx="6" />
+    <path d="M12 11v6" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 7V5a3 3 0 0 1 6 0v2M5 9 2 7m3 7H2m4 4-3 3m16-12 3-2m-3 7h3m-4 4 3 3M9 3 7 1m8 2 2-2" />
+    <rect x="6" y="7" width="12" height="14" rx="6" />
+    <path d="M12 11v6" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 7V5a3 3 0 0 1 6 0v2M5 9 2 7m3 7H2m4 4-3 3m16-12 3-2m-3 7h3m-4 4 3 3M9 3 7 1m8 2 2-2" />
+    <rect x="6" y="7" width="12" height="14" rx="6" />
+    <path d="M12 11v6" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Report an issue</h2><code>report-issue</code>
+<p>A bug opens the issue reporter.</p><details><summary>Usage and source</summary><p>dlg_settings.py</p><code>icons/report-issue.svg</code></details></article>
+<article class="card " data-status="custom" data-search="reset-settings reset settings utilities a counterclockwise arrow restores the default settings. dlg_settings.py">
+<div class="card-top"><span class="category">Utilities</span><span class="badge custom">Custom SVG</span></div>
+<div class="samples"><div class="sample normal"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 10a8 8 0 1 1 .5 6" />
+    <path d="M4 4v6h6" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Normal</span></div><div class="sample selected"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 10a8 8 0 1 1 .5 6" />
+    <path d="M4 4v6h6" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Selected</span></div><div class="sample disabled"><div class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+  <g fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 10a8 8 0 1 1 .5 6" />
+    <path d="M4 4v6h6" stroke="var(--blue)" />
+  </g>
+</svg></div><span>Disabled</span></div></div><h2>Reset settings</h2><code>reset-settings</code>
+<p>A counterclockwise arrow restores the default settings.</p><details><summary>Usage and source</summary><p>dlg_settings.py</p><code>icons/reset-settings.svg</code></details></article></section>
+<p id="empty" hidden>No icons match these filters. All current plugin icons have custom artwork when the pending count is zero.</p>
+<footer>Edit <code>geoserver_manager/resources/icons/catalog.json</code>, then run <code>python scripts/build_icon_catalog.py</code>. Palette previews use the default light and dark colours; QGIS uses each widget's own text and selection colours. The brand mark keeps its original proportions and stroke.</footer>
+</main><script>
+const cards = [...document.querySelectorAll('.card')];
+const search = document.getElementById('search');
+const status = document.getElementById('status');
+function filter() {
+  const query = search.value.toLowerCase().trim();
+  let visible = 0;
+  for (const card of cards) {
+    card.hidden = !card.dataset.search.includes(query) || (status.value !== 'all' && card.dataset.status !== status.value);
+    if (!card.hidden) visible++;
+  }
+  document.getElementById('count').textContent = `${visible} of ${cards.length} icons shown`;
+  document.getElementById('empty').hidden = visible > 0;
+}
+search.addEventListener('input', filter);status.addEventListener('change', filter);
+document.getElementById('size').addEventListener('change', event => document.body.style.setProperty('--size', `${event.target.value}px`));
+const theme = document.getElementById('theme');
+function setTheme(dark) {
+  document.body.classList.toggle('dark', dark);theme.setAttribute('aria-pressed', String(dark));theme.textContent = dark ? 'Light theme' : 'Dark theme';
+}
+theme.addEventListener('click', () => setTheme(!document.body.classList.contains('dark')));
+setTheme(window.matchMedia('(prefers-color-scheme: dark)').matches);
+</script></body></html>

@@ -22,11 +22,11 @@ from urllib.parse import parse_qs, urlparse
 
 from qgis.core import Qgis, QgsDataSourceUri, QgsMapLayer
 from qgis.PyQt.QtCore import QCoreApplication, Qt
-from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QApplication, QDialog
 
-from geoserver_manager.__about__ import __icon_path__, __title__
+from geoserver_manager.__about__ import __title__
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.gui.icons import icon
 from geoserver_manager.toolbelt.log_handler import PlgLogger
 from geoserver_manager.toolbelt.qgis_export import geoserver_name
 from geoserver_manager.toolbelt.sld import apply_sld_to_layer, layer_to_sld
@@ -72,10 +72,14 @@ class LayerTreeMenu:
         layer = self._view.currentLayer()
         if layer is None or layer.type() not in _STYLEABLE:
             return
-        submenu = menu.addMenu(QIcon(str(__icon_path__)), __title__)
-        push = submenu.addAction(translate("LayerTreeMenu", "Push style to GeoServer…"))
+        submenu = menu.addMenu(icon("plugin", menu.palette(), for_menu=True), __title__)
+        push = submenu.addAction(
+            icon("push-style", submenu.palette(), for_menu=True),
+            translate("LayerTreeMenu", "Push style to GeoServer…"),
+        )
         pull = submenu.addAction(
-            translate("LayerTreeMenu", "Apply style from GeoServer…")
+            icon("apply-style", submenu.palette(), for_menu=True),
+            translate("LayerTreeMenu", "Apply style from GeoServer…"),
         )
         if self._connected_dialog() is None:
             reason = translate(
@@ -86,7 +90,8 @@ class LayerTreeMenu:
                 action.setToolTip(reason)
             submenu.addSeparator()
             connect = submenu.addAction(
-                translate("LayerTreeMenu", "Open GeoServer Manager to connect…")
+                icon("plugin", submenu.palette(), for_menu=True),
+                translate("LayerTreeMenu", "Open GeoServer Manager to connect…"),
             )
             if self._open_dialog is None:
                 connect.setEnabled(False)

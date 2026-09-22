@@ -85,7 +85,7 @@ class TestTableState(unittest.TestCase):
         self.dlg._name_click_callback = lambda row: None
         self.dlg._delete_selected_callback = lambda rows: None
         self.dlg._extra_click_callbacks = {"Workspace": lambda row: None}
-        self.dlg._row_actions = [("icon.svg", "Delete", lambda row: None)]
+        self.dlg._row_actions = [("delete", "Delete", lambda row: None)]
 
         self.dlg._reset_table_state()
 
@@ -512,9 +512,7 @@ class TestLinkCells(unittest.TestCase):
             "Workspace": lambda row: self.opened.append(("ws", row))
         }
         self.dlg._setup_table(["Name", "Workspace", "Type", "Actions"])
-        self.dlg._row_actions = [
-            ("mActionDeleteSelected.svg", "Delete", lambda r: None)
-        ]
+        self.dlg._row_actions = [("delete", "Delete", lambda r: None)]
         self.dlg._populate_rows([[f"ds{i:02d}", "topp", "PostGIS"] for i in range(25)])
 
     def test_link_cells_are_items_not_widgets(self):

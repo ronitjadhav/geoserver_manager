@@ -7,21 +7,21 @@ from functools import partial
 from pathlib import Path
 
 # PyQGIS
-from qgis.core import Qgis, QgsApplication, QgsSettings
+from qgis.core import Qgis, QgsSettings
 from qgis.gui import QgisInterface
-from qgis.PyQt.QtCore import QCoreApplication, QLocale, QTranslator, QUrl
-from qgis.PyQt.QtGui import QDesktopServices, QIcon
-from qgis.PyQt.QtWidgets import QAction, QMessageBox
+from qgis.PyQt.QtCore import QCoreApplication, QLocale, QTimer, QTranslator, QUrl
+from qgis.PyQt.QtGui import QDesktopServices
+from qgis.PyQt.QtWidgets import QAction, QApplication, QMessageBox
 
 # project
 from geoserver_manager.__about__ import (
     DIR_PLUGIN_ROOT,
-    __icon_path__,
     __title__,
     __uri_homepage__,
 )
 from geoserver_manager.gui.dlg_main import GeoServerMainDialog
 from geoserver_manager.gui.dlg_settings import PlgOptionsFactory
+from geoserver_manager.gui.icons import icon
 from geoserver_manager.gui.layer_tree import LayerTreeMenu
 from geoserver_manager.toolbelt.log_handler import PlgLogger
 from geoserver_manager.toolbelt.preferences import PlgOptionsManager
@@ -80,7 +80,7 @@ class GeoServerManagerPlugin:
 
         # -- Actions
         self.action_help = QAction(
-            QgsApplication.getThemeIcon("mActionHelpContents.svg"),
+            icon("help", for_menu=True),
             self.tr("Help"),
             self.iface.mainWindow(),
         )
@@ -89,7 +89,7 @@ class GeoServerManagerPlugin:
         )
 
         self.action_settings = QAction(
-            QgsApplication.getThemeIcon("console/iconSettingsConsole.svg"),
+            icon("settings", for_menu=True),
             self.tr("Settings"),
             self.iface.mainWindow(),
         )
@@ -100,7 +100,7 @@ class GeoServerManagerPlugin:
         )
 
         self.action_main = QAction(
-            QIcon(str(__icon_path__)),
+            icon("plugin"),
             self.tr(__title__),
             self.iface.mainWindow(),
         )
@@ -119,7 +119,7 @@ class GeoServerManagerPlugin:
         # documentation
         self._help_separator = self.iface.pluginHelpMenu().addSeparator()
         self.action_help_plugin_menu_documentation = QAction(
-            QIcon(str(__icon_path__)),
+            icon("plugin", for_menu=True),
             f"{__title__} - Documentation",
             self.iface.mainWindow(),
         )
@@ -131,11 +131,31 @@ class GeoServerManagerPlugin:
             self.action_help_plugin_menu_documentation
         )
 
+        self._icon_refresh_timer = QTimer(self.iface.mainWindow())
+        self._icon_refresh_timer.setSingleShot(True)
+        self._icon_refresh_timer.timeout.connect(self._refresh_menu_icons)
+        QApplication.instance().paletteChanged.connect(self._queue_menu_icon_refresh)
+        self._refresh_menu_icons()
+
         # -- Layer tree context menu: push / apply the clicked layer's style.
         # The connection is the main dialog's, which exists once run() has
         # opened it; until then the entries are disabled and say so.
         self.layer_tree_menu = LayerTreeMenu(
             self.iface, dialog=lambda: self.main_dialog, open_dialog=self.run
+        )
+
+    def _queue_menu_icon_refresh(self, _palette):
+        # QApplication emits before the main window inherits the new palette.
+        self._icon_refresh_timer.start(0)
+
+    def _refresh_menu_icons(self):
+        window = self.iface.mainWindow()
+        palette = window.palette() if window is not None else QApplication.palette()
+        self.action_main.setIcon(icon("plugin", palette))
+        self.action_help.setIcon(icon("help", palette, for_menu=True))
+        self.action_settings.setIcon(icon("settings", palette, for_menu=True))
+        self.action_help_plugin_menu_documentation.setIcon(
+            icon("plugin", palette, for_menu=True)
         )
 
     def tr(self, message: str) -> str:
@@ -151,6 +171,9 @@ class GeoServerManagerPlugin:
 
     def unload(self) -> None:
         """Cleans up when plugin is disabled/uninstalled."""
+        QApplication.instance().paletteChanged.disconnect(self._queue_menu_icon_refresh)
+        self._icon_refresh_timer.stop()
+        self._icon_refresh_timer.deleteLater()
         # -- The layer-tree hook first: left connected, it would fire into a
         # dead plugin after the next reload.
         if self.layer_tree_menu:

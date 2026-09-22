@@ -68,7 +68,7 @@ class StyleTabMixin:
         }
         self._row_actions = [
             (
-                "mActionSharingImport.svg",
+                "apply-style",
                 translate("StyleTabMixin", "Apply to a QGIS layer"),
                 self._apply_style_to_qgis,
                 translate(
@@ -78,7 +78,7 @@ class StyleTabMixin:
                 ),
             ),
             (
-                "mActionFileSaveAs.svg",
+                "save-style",
                 translate("StyleTabMixin", "Save to disk"),
                 self._save_style_to_disk,
                 translate(
@@ -87,7 +87,7 @@ class StyleTabMixin:
                 ),
             ),
             (
-                "mActionDeleteSelected.svg",
+                "delete",
                 translate("StyleTabMixin", "Delete"),
                 self._delete_style,
             ),

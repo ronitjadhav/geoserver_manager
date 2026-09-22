@@ -76,12 +76,12 @@ class LayerGroupTabMixin:
         }
         self._row_actions = [
             (
-                "mActionAddLayer.svg",
+                "add-to-qgis",
                 translate("LayerGroupTabMixin", "Add to QGIS"),
                 self._add_group_to_qgis,
             ),
             (
-                "mIconWms.svg",
+                "preview-browser",
                 translate("LayerGroupTabMixin", "Preview in a browser"),
                 self._preview_group_in_browser,
                 translate(
@@ -91,7 +91,7 @@ class LayerGroupTabMixin:
                 ),
             ),
             (
-                "mActionDeleteSelected.svg",
+                "delete",
                 translate("LayerGroupTabMixin", "Delete"),
                 self._delete_layer_group,
             ),

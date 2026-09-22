@@ -98,7 +98,7 @@ class CoverageStoreTabMixin:
         }
         self._row_actions = [
             (
-                "mIconRaster.svg",
+                "browse-resources",
                 translate("CoverageStoreTabMixin", "Coverages"),
                 self._show_coverages,
                 translate(
@@ -108,7 +108,7 @@ class CoverageStoreTabMixin:
                 ),
             ),
             (
-                "mActionAddRasterLayer.svg",
+                "publish-layer",
                 translate("CoverageStoreTabMixin", "Publish a coverage"),
                 self._publish_coverage,
                 translate(
@@ -117,7 +117,7 @@ class CoverageStoreTabMixin:
                 ),
             ),
             (
-                "mActionDeleteSelected.svg",
+                "delete",
                 translate("CoverageStoreTabMixin", "Delete"),
                 self._delete_coverage_store,
                 translate(

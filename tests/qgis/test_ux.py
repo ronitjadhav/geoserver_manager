@@ -511,15 +511,13 @@ class TestSharedWorkspaceLink(unittest.TestCase):
 class TestSortableColumns(unittest.TestCase):
     """A header click sorts the row cache itself, so every index-based lookup
     (selection, Enter, Delete) sees the order on screen; Qt's own sorting stays
-    off (CLAUDE.md invariant 2)."""
+    off (AGENTS.md invariant 2)."""
 
     ROWS = [["b", "topp"], ["a", None], ["c", "nurc"]]
 
     def setUp(self):
         self.dlg = SyncDialog()
-        self.dlg._row_actions = [
-            ("mActionDeleteSelected.svg", "Delete", lambda row: None)
-        ]
+        self.dlg._row_actions = [("delete", "Delete", lambda row: None)]
         self.columns = ["Name", "Workspace", self.dlg.actions_column_label()]
         self.dlg._setup_table(self.columns)
         self.dlg._populate_rows([list(row) for row in self.ROWS])
@@ -591,8 +589,13 @@ class TestRowActionTooltips(unittest.TestCase):
 
         dlg = SyncDialog()
         dlg._row_actions = [
-            ("a.svg", "Delete", lambda row: None),
-            ("b.svg", "Preview", lambda row: None, "Preview: the browser may ask"),
+            ("delete", "Delete", lambda row: None),
+            (
+                "preview-browser",
+                "Preview",
+                lambda row: None,
+                "Preview: the browser may ask",
+            ),
         ]
         widget = dlg._make_action_widget(["row"])
         buttons = widget.findChildren(QPushButton)

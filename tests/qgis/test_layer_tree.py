@@ -14,7 +14,9 @@ from unittest.mock import patch
 
 from qgis.core import Qgis, QgsLayerTreeModel, QgsProject, QgsVectorLayer
 from qgis.gui import QgsLayerTreeView
-from qgis.PyQt.QtWidgets import QDialog, QMenu
+from qgis.PyQt.QtCore import QSize
+from qgis.PyQt.QtGui import QColor, QIcon, QPalette
+from qgis.PyQt.QtWidgets import QApplication, QDialog, QMainWindow, QMenu
 from qgis.testing import start_app, unittest
 
 from geoserver_manager.gui import layer_tree
@@ -457,6 +459,60 @@ class TestPluginWiring(unittest.TestCase):
         menu = QMenu()
         self.iface.view.contextMenuAboutToShow.emit(menu)
         return [action for action in menu.actions() if action.menu() is not None]
+
+    def test_menu_icons_follow_the_palette_and_disconnect_on_unload(self):
+        app = QApplication.instance()
+        original = QPalette(app.palette())
+        self.addCleanup(QApplication.setPalette, original)
+        receivers = app.receivers(app.paletteChanged)
+        window = QMainWindow()
+        self.addCleanup(window.deleteLater)
+        self.iface.mainWindow = lambda: window
+        plugin = GeoServerManagerPlugin(self.iface)
+        plugin.initGui()
+        try:
+            self.assertEqual(app.receivers(app.paletteChanged), receivers + 1)
+            before = plugin.action_help.icon().pixmap(QSize(20, 20)).toImage()
+            changed = QPalette(original)
+            changed.setColor(QPalette.ColorRole.Text, QColor("#526fa8"))
+            QApplication.setPalette(changed)
+            QApplication.processEvents()
+            after = plugin.action_help.icon().pixmap(QSize(20, 20)).toImage()
+            self.assertNotEqual(before, after)
+        finally:
+            plugin.unload()
+        self.assertEqual(app.receivers(app.paletteChanged), receivers)
+
+    def test_highlighted_menu_icons_keep_their_strokes_visible(self):
+        plugin = GeoServerManagerPlugin(self.iface)
+        plugin.initGui()
+        try:
+            image = (
+                plugin.action_help.icon()
+                .pixmap(QSize(20, 20), QIcon.Mode.Active)
+                .toImage()
+            )
+            expected = QApplication.palette().color(QPalette.ColorRole.HighlightedText)
+            visible = 0
+            for x in range(image.width()):
+                for y in range(image.height()):
+                    pixel = image.pixelColor(x, y)
+                    if pixel.alpha() > 128:
+                        visible += 1
+                        for actual, target in zip(
+                            pixel.getRgb()[:3], expected.getRgb()[:3]
+                        ):
+                            self.assertLessEqual(abs(actual - target), 3)
+            self.assertGreater(visible, 5)
+            # The toolbar action also appears in a menu. Preserve its normal
+            # brand colours on hover so it stays visible on a light toolbar.
+            toolbar = plugin.action_main.icon()
+            self.assertEqual(
+                toolbar.pixmap(QSize(20, 20), QIcon.Mode.Normal).toImage(),
+                toolbar.pixmap(QSize(20, 20), QIcon.Mode.Active).toImage(),
+            )
+        finally:
+            plugin.unload()
 
     def test_the_hook_lives_from_init_gui_to_unload(self):
         plugin = GeoServerManagerPlugin(self.iface)
