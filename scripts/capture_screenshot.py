@@ -1,41 +1,71 @@
-"""Capture a screenshot of the main dialog, connected to the local sandbox.
+"""Capture the documentation's screenshots, connected to the local sandbox.
 
-Start the sandbox first, so the shot shows GeoServer's demo data:
+Start the sandbox first, so the shots show GeoServer's demo data:
 
     docker compose up -d
     QT_QPA_PLATFORM=offscreen QT_SCALE_FACTOR=2 python3 scripts/capture_screenshot.py
 
+Every tab, the main forms, the map preview and the settings page land in
+docs/static/screenshots/, and the Layers tab also in
+docs/static/screenshot-layers.png for the home page. Pass `--only layers` (a
+shot's name, repeatable) to redo just some of them.
+
 The dialog is grabbed off screen, so nothing else on the desktop lands in the
 image and the result is the same on every machine. `QT_SCALE_FACTOR=2` renders
-it at twice the size, which stays sharp on a high-resolution display. The PNG
+it at twice the size, which stays sharp on a high-resolution display. Each PNG
 is reduced to 256 colours afterwards: a flat interface looks the same and the
 file stays under pre-commit's 500 KB ceiling.
 
 Loads run in a task in the real dialog, so this uses the tests' `SyncDialog`,
-which runs the same fetch on the calling thread. The widget is the real one.
+which runs the same fetch on the calling thread. The widgets are the real ones.
+Forms are modal, so `exec()` is replaced by a grab that closes the form
+without saving: nothing on the server changes.
 """
 
 import argparse
+import shutil
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-DEFAULT_OUTPUT = ROOT / "docs/static/screenshot-layers.png"
+OUTPUT_DIR = ROOT / "docs/static/screenshots"
+HOME_SHOT = ROOT / "docs/static/screenshot-layers.png"
 DEFAULT_URL = "http://localhost:8080/geoserver"
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
     parser.add_argument("--url", default=DEFAULT_URL)
     parser.add_argument("--user", default="admin")
     parser.add_argument("--password", default="geoserver")
-    parser.add_argument("--tab", type=int, default=4, help="index in TABS, 4 = Layers")
+    parser.add_argument("--only", action="append", help="a shot name, repeatable")
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--height", type=int, default=800)
     return parser.parse_args()
+
+
+def save(widget, path):
+    """Grab a widget into a 256-colour PNG."""
+    from PIL import Image
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    widget.grab().save(str(path))
+    with Image.open(path) as shot:
+        flat = shot.convert("RGB").quantize(colors=256, dither=Image.NONE)
+        flat.save(path, optimize=True)
+    print(f"{path} ({path.stat().st_size // 1024} KB)")
+
+
+def settle(app, seconds=0.3):
+    """Let Qt paint, and let a map canvas finish rendering."""
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        app.processEvents()
+        time.sleep(0.02)
 
 
 def main():
@@ -55,6 +85,10 @@ def main():
 
     ensure_dependencies()
 
+    from qgis.PyQt.QtWidgets import QDialog
+
+    from geoserver_manager.gui.dlg_preview import LayerPreviewDialog
+    from geoserver_manager.gui.dlg_settings import ConfigOptionsPage
     from geoserver_manager.toolbelt.preferences import PlgSettingsStructure
     from tests.qgis.sync_dialog import SyncDialog
 
@@ -74,23 +108,126 @@ def main():
     dialog.show()
     app.processEvents()
     dialog.refresh_ui()
-    dialog.navList.setCurrentRow(args.tab)
-    for _ in range(5):
-        app.processEvents()
-
+    settle(app)
     if dialog.gs is None:
         raise SystemExit(f"Not connected to {args.url}. Is the sandbox running?")
-    print(f"{dialog.lbl_status.text()}, {len(dialog._all_rows)} rows")
+    print(dialog.lbl_status.text())
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    dialog.grab().save(str(args.output))
+    # A form's exec() grabs it into `target` and closes it unsaved.
+    target = {}
 
-    from PIL import Image
+    def grab_instead_of_exec(form):
+        form.show()
+        settle(app)
+        # The offscreen screen is 400 px tall at 2x, which caps the form's own
+        # growth; a real screen does not, so grow it here the same way.
+        form.resize(form.width(), form.layout().totalHeightForWidth(form.width()))
+        if target.get("prepare"):
+            target.pop("prepare")(form)
+        settle(app)
+        save(form, target["path"])
+        form.close()
+        return QDialog.DialogCode.Rejected
 
-    with Image.open(args.output) as shot:
-        flat = shot.convert("RGB").quantize(colors=256, dither=Image.NONE)
-        flat.save(args.output, optimize=True)
-    print(f"{args.output} ({args.output.stat().st_size // 1024} KB)")
+    QDialog.exec = grab_instead_of_exec
+    QDialog.exec_ = grab_instead_of_exec
+
+    def tab(index):
+        dialog.navList.setCurrentRow(index)
+        settle(app)
+
+    def row(name):
+        return next(r for r in dialog._all_rows if r[0] == name)
+
+    def form(name, open_form, prepare=None):
+        target["path"] = args.output_dir / f"{name}.png"
+        target["prepare"] = prepare
+        open_form()
+
+    def preview():
+        # The demo layers are public: no auth config, which this run never stores.
+        dialog.plg_settings.get_plg_settings = lambda: PlgSettingsStructure(
+            geoserver_url=args.url
+        )
+        dialog._preview_layer(row("states"))
+        window = dialog.findChildren(LayerPreviewDialog)[-1]
+        window.resize(900, 650)
+        settle(app, 4)
+        save(window, args.output_dir / "layer-preview.png")
+        window.close()
+
+    def settings():
+        page = ConfigOptionsPage(None)
+        page.show()
+        settle(app)
+        page.resize(900, page.sizeHint().height())
+        settle(app)
+        save(page, args.output_dir / "settings.png")
+
+    tabs = (
+        (
+            "workspaces",
+            0,
+            [("workspace-edit", lambda: dialog._show_workspace_info(row("topp")))],
+        ),
+        ("datastores", 1, [("datastore-add", dialog._add_datastore)]),
+        ("coverage-stores", 2, [("coverage-store-add", dialog._add_coverage_store)]),
+        ("cascaded-stores", 3, [("cascaded-store-add", dialog._add_cascaded_store)]),
+        (
+            "layers",
+            4,
+            [
+                ("layer-publish", dialog._publish_layer),
+                ("layer-details", lambda: dialog._show_layer_info(row("states"))),
+                ("layer-preview", None),
+            ],
+        ),
+        ("layer-groups", 5, [("layer-group-add", dialog._add_layer_group)]),
+        (
+            "styles",
+            6,
+            [("style-edit", lambda: dialog._show_style_info(row("population")))],
+        ),
+        (
+            "tile-cache",
+            7,
+            [
+                (
+                    "tile-cache-edit",
+                    lambda: dialog._show_gwc_layer_info(row("topp:states")),
+                )
+            ],
+        ),
+    )
+
+    # The first workspace, cite, has no datastore: pick one with tables.
+    prepare = {
+        "layer-publish": lambda f: f.get_widget("workspace").setCurrentText("sf"),
+    }
+
+    wanted = set(args.only or [])
+    for name, index, forms in tabs:
+        names = {name, *(f for f, _ in forms)}
+        if wanted and not wanted & names:
+            continue
+        tab(index)
+        # An empty list (the demo has no cascaded store) shows nothing useful.
+        if (not wanted or name in wanted) and dialog._all_rows:
+            save(dialog, args.output_dir / f"{name}.png")
+        for form_name, open_form in forms:
+            if wanted and form_name not in wanted:
+                continue
+            if form_name == "layer-preview":
+                preview()
+            else:
+                form(form_name, open_form, prepare.get(form_name))
+    if not wanted or "settings" in wanted:
+        settings()
+
+    # Only a real run replaces the home page's image, not a scratch one.
+    layers_shot = args.output_dir / "layers.png"
+    if args.output_dir == OUTPUT_DIR and layers_shot.exists():
+        shutil.copyfile(layers_shot, HOME_SHOT)
 
 
 if __name__ == "__main__":

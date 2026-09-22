@@ -44,8 +44,8 @@ pull request:
 | What changed | What to update |
 | :----------- | :------------- |
 | A tab, a button, a form or a message | the matching section of the [usage guide](../usage/guide.md), and `CHANGELOG.md` under *Unreleased* |
-| The dialog's layout | the guide and the screenshot: `python3 scripts/capture_screenshot.py` against the [sandbox](environment.md) |
-| A new resource type or tab | a section in the guide, a row in the feature table on the home page, and the roadmap ticked |
+| The dialog's layout, a form or a tab | the guide and its screenshots: run `scripts/capture_screenshot.py` against the [sandbox](environment.md) (the command is in its docstring; `--only <name>` redoes one shot) |
+| A new resource type or tab | a section in the guide with its screenshots (add the tab and its main form to the capture script), a row in the feature table on the home page, and the roadmap ticked |
 | How the plugin is installed or configured | [installation](../usage/installation.md) and the configuration section of `README.md` |
 | A development step, a tool or a command | the page here that teaches it, and the [conventions](conventions.md) page if a contributor would get it wrong |
 | An interface icon or where it is used | register it in `resources/icons/catalog.json`, follow the [style guide](icon-style-guide.md) and run `python scripts/build_icon_catalog.py --check` |

@@ -20,7 +20,7 @@ what the code cannot tell you. Python 3.12 (QGIS 3.40 and newer), PyQt5
 | `geoserver_manager/extras/*.whl` | Bundled `geoservercloud` (stripped, see the [GeoServer notes](geoserver-notes.md)) and `xmltodict`, added to `sys.path` at startup |
 | `tests/unit/` | Runs without QGIS. `tests/qgis/` needs the QGIS Python (headless via `qgis.testing.start_app()`) |
 | `docs/` | The site: Sphinx + MyST + Furo, deployed to GitHub Pages on every push to main. `usage/` is written for the user, `development/` for a contributor, `github_issue_roadmap.md` is the feature backlog that GitHub milestones mirror. **`development/geoserver-notes.md` holds the measured GeoServer and library facts this plugin depends on** |
-| `scripts/` | `update_translations.py` (pylupdate6), `export_branding.py` (every brand asset from one SVG), `capture_screenshot.py` (the screenshot the README and guide show, grabbed from the real dialog) |
+| `scripts/` | `update_translations.py` (pylupdate6), `export_branding.py` (every brand asset from one SVG), `capture_screenshot.py` (every screenshot the README and the guide show, grabbed from the real dialog) |
 | `docker-compose.yml` | Throwaway GeoServer 2.28.5 (`:8080`, admin/geoserver) + PostGIS, for testing against a real server |
 
 The `Inspiration/` folder is untracked reference code. Never import from it.
