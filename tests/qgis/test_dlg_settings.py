@@ -11,6 +11,7 @@ Usage from the repo root folder:
 from unittest.mock import patch
 
 from qgis.core import Qgis
+from qgis.PyQt.QtWidgets import QMessageBox
 from qgis.testing import start_app, unittest
 
 from geoserver_manager.gui.dlg_settings import ConfigOptionsPage
@@ -287,6 +288,51 @@ class TestProfiles(unittest.TestCase):
         self.assertEqual(self.manager.values["active_profile"], "")
         self.assertEqual(self.settings.geoserver_url, "")
         self.assertNotIn("idA", self.store)
+
+    def test_naming_a_first_connection_keeps_what_was_typed(self):
+        self.manager.profiles = []
+        self.manager.values = {}
+        self.page.load_settings()
+        self.page.txt_gs_url.setText("https://first.example.org/geoserver")
+        self.page.txt_gs_username.setText("u1")
+        self.page.txt_gs_password.setText("p1")
+        self.add("first")
+        self.assertEqual(
+            self.page.txt_gs_url.text(), "https://first.example.org/geoserver"
+        )
+        self.assertEqual(self.page.txt_gs_password.text(), "p1")
+        self.page.apply()
+        (first,) = self.manager.profiles
+        self.assertEqual(first["name"], "first")
+        self.assertEqual(self.store[first["auth_cfg_id"]], ("u1", "p1"))
+
+    def test_removing_another_profile_keeps_the_active_one(self):
+        self.manager.profiles = [
+            {
+                "name": n,
+                "url": f"https://{n}.example.org/geoserver",
+                "auth_cfg_id": f"id{n}",
+                "verify_tls": True,
+            }
+            for n in ("A", "B", "C")
+        ]
+        self.manager.values = {"active_profile": "C"}
+        self.page.load_settings()
+        self.page.cmb_profile.setCurrentText("B")
+        self.page._remove_profile()
+        self.assertEqual(self.page.cmb_profile.currentText(), "C")
+        self.page.apply()
+        self.assertEqual(self.manager.values["active_profile"], "C")
+
+    def test_reset_asks_first_and_no_keeps_everything(self):
+        with patch(
+            "geoserver_manager.gui.dlg_settings.QMessageBox.question",
+            return_value=QMessageBox.StandardButton.No,
+        ) as asked:
+            self.page.on_reset_settings()
+        asked.assert_called_once()
+        self.assertIn("idA", self.store)
+        self.assertEqual(len(self.manager.profiles), 1)
 
     def test_cancel_keeps_a_removed_profile(self):
         self.page._remove_profile()

@@ -198,7 +198,7 @@ class GwcTabMixin:
         return sorted(str(name) for name in self._as_list(payload))
 
     def _uncached_layer_names(self):
-        """Published layers and global layer groups GeoWebCache does not cache."""
+        """Published layers and layer groups GeoWebCache does not cache."""
         base = self.gs.rest_service.rest_endpoints.base_url
         # TODO(#50): no get_layers() in the library (row 39), and the global
         # layer-group collection is out of its reach too (row 16).
@@ -211,6 +211,18 @@ class GwcTabMixin:
             self._name_of(item)
             for item in self._unwrap(groups, "layerGroups", "layerGroup")
         }
+        # A workspace's own groups are not in that collection; GWC names them
+        # "ws:group", like its layers. Without them, one removed from the cache
+        # could never be added back from here.
+        workspaces = self._get_workspace_names()
+        for ws_name, (items, error) in zip(
+            workspaces,
+            self._fan_out(
+                lambda ws: self._fetch_list(self.gs.get_layer_groups, ws), workspaces
+            ),
+        ):
+            if error is None:
+                published |= {f"{ws_name}:{self._name_of(item)}" for item in items}
         return sorted(published - set(self._gwc_layer_names()))
 
     @staticmethod

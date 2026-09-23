@@ -268,6 +268,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- A batch delete is no longer stopped half way, without a word, by a tab
+  switch or F5. Deletes run on their own, Cancel still stops them, and the
+  table reloads only if you are still on the tab they started from.
+- *Push style* and *Apply style* in the layer tree read from the server in
+  the background, with Cancel, instead of freezing QGIS against a dead
+  server. Their warnings and errors now stay until closed.
+- Server profiles: naming a first connection with *Add…* keeps what was
+  typed; removing another profile no longer switches the active one; *Reset*
+  asks before deleting every profile's stored password.
+- Publishing a QGIS raster keeps the keywords typed in the form.
+- Clearing a datastore's description clears it; it used to stay as it was.
+- A coverage store whose details cannot be read keeps its row, so it can
+  still be deleted. A raster layer's details say Yes or No, not True or
+  False, and a failed coverage load no longer shows "Enabled: Yes".
+- *Add a Layer to the Cache* offers a workspace's own layer groups too.
+- A layer-group name with `#` or `?` is quoted in its workspace path, so it
+  cannot reach another group.
+- The toolbar button explains again why the plugin cannot start when its
+  library failed to load, instead of doing nothing.
+- The status under the table says "Uploading…" or "Working…" while only an
+  upload or a delete is still running, instead of "Loading…".
 - Counts read naturally: "3 workspaces deleted" instead of "3 workspace(s)
   deleted", in the delete confirmations, their result banners and the
   "could not be listed" warning. Each locale gets its own plural forms,

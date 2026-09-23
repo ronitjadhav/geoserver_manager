@@ -157,6 +157,23 @@ class TestDatastoreUpdate(unittest.TestCase):
         # and the type comes from the server, not the combo box
         self.assertEqual(self.captured["datastore_type"], "PostGIS")
 
+    def test_an_emptied_description_is_sent_to_clear_it(self):
+        values = {
+            "workspace": "ws",
+            "name": "store",
+            "description": "",
+            "pg_host": "db.example.org",
+            "pg_port": 5432,
+            "pg_db": "gis",
+            "pg_user": "geo",
+            "pg_password": "",
+            "pg_schema": "public",
+        }
+        self.dlg._update_datastore_from_values(
+            values, {"type": "PostGIS", "enabled": True}, self.STORED
+        )
+        self.assertEqual(self.captured["description"], "")
+
     def test_pmtiles_edit_keeps_its_range_reader_config(self):
         stored = {
             "pmtiles": "s3://bucket/tiles.pmtiles",
@@ -1572,6 +1589,18 @@ class TestProfileSwitcher(unittest.TestCase):
         self.assertEqual(self.activated, ["prod"])
         self.assertEqual(self.refreshed, [True])
         self.assertEqual(self.dlg.cmb_profile.currentText(), "prod")
+
+
+class TestBusyLabel(unittest.TestCase):
+    def test_an_ended_load_does_not_leave_loading_behind_an_upload(self):
+        dlg = SyncDialog()
+        dlg._task, dlg._upload = None, object()  # the upload is what still runs
+        dlg._set_loading(True)
+        self.assertEqual(dlg.lbl_page_info.text(), "Uploading…")
+        dlg._upload, dlg._delete = None, object()
+        dlg._set_loading(True)
+        self.assertEqual(dlg.lbl_page_info.text(), "Working…")
+        dlg._delete = None
 
 
 class TestReadsOffTheGuiThread(unittest.TestCase):

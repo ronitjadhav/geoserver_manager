@@ -383,7 +383,11 @@ class LayerTabMixin:
         name, ws_name, kind, store = row_data[0], row_data[1], row_data[2], row_data[3]
         if kind == RASTER:
             fields = [f for f in self._coverage_fields([]) if f["key"] != "coverage"]
-            values = self._coverage_form_values(detail)
+            # A boolean cell reads Yes / No, translated, never True / False.
+            values = dict(
+                self._coverage_form_values(detail),
+                enabled=self._yes_no(detail.get("enabled", True)),
+            )
             origin = translate("LayerTabMixin", "Coverage of store {ws}/{store}.")
         elif kind in (WMS, WMTS):
             fields = [f for f in self._cascaded_layer_fields([]) if f["key"] != "layer"]
@@ -860,6 +864,7 @@ class LayerTabMixin:
                     "replace": values.get("replace"),
                     "title": values.get("title", ""),
                     "abstract": values.get("abstract", ""),
+                    "keywords": values.get("keywords", ""),
                 },
                 layer=layer,
                 on_done=on_done,

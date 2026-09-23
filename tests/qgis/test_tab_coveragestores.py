@@ -260,6 +260,33 @@ class TestCoverageStoresTab(unittest.TestCase):
         )
         self.assertEqual(failures, [])
 
+    def test_a_coverage_that_cannot_be_read_leaves_the_viewer_alone(self):
+        """After the error banner, blank fields must not claim Enabled: Yes."""
+        self.dlg.show_error_message = lambda text: None
+        filled = []
+
+        class Form:
+            def get_widget(inner, key):
+                filled.append(key)
+
+        self.dlg._fetch = lambda action, failure, **kwargs: None
+        self.dlg._refill_coverage_detail(Form(), "sf", "sfdem", "sfdem")
+        self.assertEqual(filled, [])
+
+    def test_a_store_that_cannot_be_read_keeps_its_row(self):
+        """It is the one to delete; it used to vanish from the table."""
+        summary = self.dlg._coverage_store_summary
+
+        def broken(ws_name, name):
+            if name == "mosaic":
+                raise RuntimeError("HTTP 500: corrupt mosaic")
+            return summary(ws_name, name)
+
+        self.dlg._coverage_store_summary = broken
+        rows, failures = self.dlg._fetch_coverage_store_rows()
+        self.assertIn(["mosaic", "nurc", "-", "-"], rows)
+        self.assertEqual([label for label, _ in failures], ["nurc/mosaic"])
+
     def test_a_workspace_without_stores_is_not_a_failure(self):
         # GeoServer answers {"coverageStores": ""}, not a list, not an error.
         self.assertEqual(self.dlg._coverage_store_names("empty"), [])
@@ -781,6 +808,15 @@ class TestPublishQgisRaster(RasterFixture):
         self.assertEqual(
             kwargs["json"],
             {"coverage": {"title": "Elevation", "abstract": "Metres above the sea"}},
+        )
+
+    def test_keywords_go_in_the_same_put(self):
+        """The Publish form asks for keywords; a raster used to drop them."""
+        self.add_layer("dem")
+        self.dlg._publish_qgis_raster(self.values(title="", keywords="dem, , terrain "))
+        _upload, (_verb, _path, kwargs) = self.puts()
+        self.assertEqual(
+            kwargs["json"], {"coverage": {"keywords": {"string": ["dem", "terrain"]}}}
         )
 
     def test_without_metadata_the_upload_is_the_only_request(self):

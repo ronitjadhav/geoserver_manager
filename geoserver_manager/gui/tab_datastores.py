@@ -825,7 +825,9 @@ class DatastoreTabMixin:
                 datastore_name=values["name"],
                 datastore_type=ds_type,
                 connection_parameters=merged,
-                description=values.get("description") or None,
+                # "" clears it; None would leave the key out of the PUT, and
+                # GeoServer keeps what it had (measured on 2.28.5).
+                description=values.get("description") or "",
                 enabled=bool(enabled),
             )
         )

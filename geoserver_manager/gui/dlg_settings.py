@@ -24,6 +24,7 @@ from qgis.PyQt.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
     QLabel,
+    QMessageBox,
     QPushButton,
     QWidget,
 )
@@ -349,6 +350,9 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
 
     def on_reset_settings(self) -> None:
         """Reset settings to default values, every profile included."""
+        count = len(self.plg_settings.get_profiles())
+        if count and not self._confirm_reset(count):
+            return
         for profile in self.plg_settings.get_profiles():
             PlgSettingsStructure(
                 geoserver_auth_cfg_id=profile.get("auth_cfg_id", "")
@@ -362,6 +366,22 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         self.plg_settings.save_profiles([])
         self.plg_settings.set_value_from_key("active_profile", "")
         self.load_settings()
+
+    def _confirm_reset(self, count) -> bool:
+        """Reset saves at once: Cancel on the options dialog cannot undo it."""
+        answer = QMessageBox.question(
+            self,
+            self.tr("Reset settings"),
+            self.tr(
+                "Remove %n saved profile(s) and their stored passwords? "
+                "This cannot be undone.",
+                None,
+                count,
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return answer == QMessageBox.StandardButton.Yes
 
     # -- Server profiles (#47) -------------------------------------------------
 
@@ -469,10 +489,15 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
                 self.tr("A profile named '{}' already exists.").format(name), "error"
             )
             return
+        typed = self._fields() if self._shown is None else None
         self._commit_fields()
         self._profiles.append(
             {"name": name, "url": "", "auth_cfg_id": "", "verify_tls": True}
         )
+        if typed is not None:
+            # No profile yet: what was typed is this first profile's, and
+            # naming it must not blank the fields.
+            self._buffers[name] = typed
         self._fill_profile_combo(name)
 
     def _remove_profile(self) -> None:
@@ -485,7 +510,12 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         if profile.get("auth_cfg_id"):
             self._removed_auth.append(profile["auth_cfg_id"])
         self._shown = None
-        self._fill_profile_combo(self._profiles[0]["name"] if self._profiles else None)
+        # Keep the active profile on screen (Save makes the shown one active),
+        # so removing another one does not quietly switch servers.
+        active = self.plg_settings.active_profile_name()
+        if self._profile(active) is None:
+            active = self._profiles[0]["name"] if self._profiles else None
+        self._fill_profile_combo(active)
 
 
 class PlgOptionsFactory(QgsOptionsWidgetFactory):

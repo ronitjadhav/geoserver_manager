@@ -162,7 +162,10 @@ class CoverageStoreTabMixin:
             ),
         ):
             if error:
+                # Keep the row, as Datastores does: a store that cannot be read
+                # is the one the user most needs to see, and to delete.
                 failures.append((f"{ws_name}/{name}", error))
+                rows.append([name, ws_name, "-", "-"])
                 continue
             store_type, coverage_count = summary
             rows.append([name, ws_name, store_type, str(coverage_count)])
@@ -417,8 +420,10 @@ class CoverageStoreTabMixin:
                 name
             ),
         )
-        values = self._coverage_form_values(detail or {})
-        values["enabled"] = self._yes_no((detail or {}).get("enabled", True))
+        if detail is None:
+            return  # reported; blank fields would read "Enabled: Yes"
+        values = self._coverage_form_values(detail)
+        values["enabled"] = self._yes_no(detail.get("enabled", True))
         for key, value in values.items():
             widget = dlg.get_widget(key)
             if hasattr(widget, "setPlainText"):
@@ -914,6 +919,14 @@ class CoverageStoreTabMixin:
         metadata = {
             key: values[key] for key in ("title", "abstract") if values.get(key)
         }
+        keywords = [
+            word.strip()
+            for word in (values.get("keywords") or "").split(",")
+            if word.strip()
+        ]
+        if keywords:
+            # The feature type's shape; a partial coverage PUT merges it too.
+            metadata["keywords"] = {"string": keywords}
         metadata_path = endpoints.coverage(ws_name, name, name)
 
         def after(client):

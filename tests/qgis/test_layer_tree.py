@@ -311,6 +311,47 @@ class TestNotConnected(MenuCase):
         self.dlg.hide()
 
 
+class TestReadsAndMessages(MenuCase):
+    """The menu's server reads and its message bar (review of 2026-09-23)."""
+
+    def test_a_server_read_runs_in_a_worker(self):
+        import threading
+
+        self.dlg = connected_dialog(["topp:states"])
+        ok, where = self.menu._read(self.dlg, threading.current_thread, "failed")
+        self.assertTrue(ok)
+        self.assertIsNot(where, threading.main_thread())
+
+    def test_cancelling_the_wait_reports_nothing(self):
+        from geoserver_manager.gui.dlg_main import _Abandoned
+
+        self.dlg = connected_dialog(["topp:states"])
+
+        def abandon(_fn):
+            raise _Abandoned()
+
+        self.dlg._wait_for = abandon
+        self.assertEqual(self.menu._read(self.dlg, lambda: 1, "failed"), (False, None))
+        self.assertEqual(self.iface.bar.messages, [])
+
+    def test_warnings_and_errors_stay_until_closed(self):
+        durations = []
+        self.iface.bar.pushMessage = lambda title, text, level, duration: (
+            durations.append((level, duration))
+        )
+        self.menu._say("gone", Qgis.MessageLevel.Critical)
+        self.menu._say("careful", Qgis.MessageLevel.Warning)
+        self.menu._say("done", Qgis.MessageLevel.Success)
+        self.assertEqual(
+            durations,
+            [
+                (Qgis.MessageLevel.Critical, 0),
+                (Qgis.MessageLevel.Warning, 0),
+                (Qgis.MessageLevel.Success, 8),
+            ],
+        )
+
+
 class TestWhichServerLayer(unittest.TestCase):
     """Pure: the target comes from the layer's source, else from its name."""
 
@@ -503,6 +544,19 @@ class TestPluginWiring(unittest.TestCase):
         menu = QMenu()
         self.iface.view.contextMenuAboutToShow.emit(menu)
         return [action for action in menu.actions() if action.menu() is not None]
+
+    def test_opening_without_the_library_explains_itself_again(self):
+        """The failure was said once at startup; a later click was silent."""
+        plugin = GeoServerManagerPlugin(self.iface)
+        plugin.dependencies_available = False
+        tried = []
+        with patch(
+            "geoserver_manager.toolbelt.dependencies.ensure_dependencies",
+            lambda: tried.append(1) or False,
+        ):
+            plugin.run()
+        self.assertEqual(tried, [1])
+        self.assertIsNone(plugin.main_dialog)
 
     def test_menu_icons_follow_the_palette_and_disconnect_on_unload(self):
         app = QApplication.instance()
