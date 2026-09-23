@@ -214,6 +214,13 @@
       "purpose": "Two progress bars: the seed and truncate tasks GeoWebCache is running for a layer.",
       "status": "custom",
       "asset": "icons/seed-tasks.svg"
+    },
+    "server": {
+      "label": "Server",
+      "category": "Navigation",
+      "purpose": "Two stacked server units with a status light: the settings of the whole GeoServer.",
+      "status": "custom",
+      "asset": "icons/server.svg"
     }
   }
 }

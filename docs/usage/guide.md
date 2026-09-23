@@ -380,6 +380,35 @@ Row actions:
 Each zoom level has four times the tiles of the one before.
 ```
 
+## Server
+
+The settings that belong to the whole GeoServer, one row each. Click a row to
+change it; *Open in the web interface* opens GeoServer's own page for it.
+
+```{figure} ../static/screenshots/server.png
+:alt: The Server tab, with rows for the contact, global settings, the four services, logging and the catalog
+:width: 100%
+```
+
+- **Contact:** the person, organization and address that the capabilities
+  documents and GeoServer's home page show.
+- **Global settings:** the proxy base URL GeoServer writes into capabilities
+  when it sits behind a proxy, the character set, the number of decimals, and
+  verbose output.
+- **WMS, WFS, WCS, WMTS:** each service on or off, its title, abstract,
+  keywords and contact lines, and for WFS the maximum features per request.
+  The form also gives the capabilities URL, the address to connect QGIS to.
+- **Logging:** the logging profile and the log file. *Show the log* opens the
+  last 500 lines.
+- **Catalog:** *Reload* reads the whole configuration from the data directory
+  again, after it changed outside GeoServer. *Reset* drops the caches of
+  stores, feature types and styles.
+
+```{figure} ../static/screenshots/server-service.png
+:alt: The WFS service settings, with enabled, capabilities URL, title, abstract, keywords and maximum features
+:width: 420px
+```
+
 ## From the layer tree
 
 Right-click a layer in the QGIS *Layers* panel to find the

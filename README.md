@@ -20,7 +20,7 @@
 
 Manage a GeoServer from inside QGIS. Browse, create, edit and delete
 workspaces, datastores, coverage stores, cascaded WMS/WMTS stores, layers, layer
-groups, styles and the tile cache; publish a table, or a vector or raster layer of the open
+groups, styles, the tile cache and the server's own settings; publish a table, or a vector or raster layer of the open
 project; bring what the server has back into QGIS as WMS, WFS or WMTS, without
 switching to the GeoServer web admin.
 
@@ -41,9 +41,10 @@ so that it gets added there rather than worked around here.
 | Coverage stores | list, create from a GeoTIFF, a COG or an ImageMosaic, or from a raster layer of the open QGIS project, uploaded as a compressed GeoTIFF and published in the same request; browse the coverages of a store, publish a coverage as a layer, delete |
 | Cascaded stores | the WMS and WMTS stores that proxy another server, listed across every workspace; create one from a GetCapabilities URL, publish the layers the remote advertises, inspect and delete them, delete the store |
 | Layers | every layer of the server whatever its type (vector, raster, cascaded WMS/WMTS) with workspace, type, store and default style; publish a table of a datastore, or a layer of the open QGIS project, uploaded as a GeoPackage together with its symbology; change the default style, including one made from a QGIS layer's symbology; add to QGIS as WMS, WMTS or, for a vector, WFS; preview on a map inside QGIS with feature info on click, or in a browser on GeoServer's own OpenLayers page; delete |
-| Layer groups | list global and workspace groups, create (ordered layers with their styles), inspect, add to QGIS, preview in a browser, delete |
-| Styles | list global and workspace styles; create by pasting an SLD, from a file (`.sld`, a `.zip` with its resources, `.mbstyle`) or from a QGIS layer's symbology; view and edit the SLD next to the legend GeoServer renders for it; apply a server style to a QGIS layer; save it to disk; delete |
-| Tile cache | what GeoWebCache caches (every layer and layer group, by default) with each layer's gridsets and formats; edit a layer's caching (gridsets, formats, meta-tiling, expiry), truncate its tiles, remove it from the cache, add an uncached layer |
+| Layer groups | list global and workspace groups; create and edit them (ordered layers and nested groups with their styles, mode, title, enabled, advertised, an Earth Observation root layer), with their bounds recomputed; add to QGIS, preview in a browser, delete |
+| Styles | list global and workspace styles; create by pasting SLD, CSS, YSLD or MBStyle, from a file, or from a QGIS layer's symbology; view and edit the definition next to the legend GeoServer renders for it; rename, copy, see what uses a style; apply it to a QGIS layer (any format); save it to disk; delete |
+| Tile cache | what GeoWebCache caches (every layer and layer group, by default) with each layer's gridsets and formats; edit a layer's caching (gridsets and their zoom levels, formats, meta-tiling, expiry, parameter filters); seed, reseed or truncate part of it and follow the tasks; truncate its tiles, remove it from the cache, add an uncached layer |
+| Server | the contact details, global settings (proxy base URL, decimals, verbosity), each service's settings and capabilities URL, the logging profile and the log's last lines, the catalog's reload and reset; each opens GeoServer's own page too |
 | Layer tree | right-click a layer in QGIS for *Push style to GeoServer…* and *Apply style from GeoServer…*; a layer that came from the server is matched through its source, any other by name; the entries say when the plugin is not connected |
 
 Every list is searchable, sortable by column and paginated (20 per page), and

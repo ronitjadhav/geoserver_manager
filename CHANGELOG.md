@@ -15,6 +15,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   plugin asks GeoServer to open it, and a warning gives GeoServer's reason
   when it cannot (a wrong host, password, path or URL).
 - **Reset** on datastores and coverage stores makes GeoServer re-read them.
+- **Server tab:** the contact details, the global settings (proxy base URL,
+  character set, decimals, verbosity), each service's settings (on or off,
+  title, abstract, keywords; WFS maximum features) with its capabilities URL,
+  the logging profile with a view of the log's last lines, and the catalog's
+  reload and reset. Each row opens GeoServer's own page for it too.
 - **Seed, reseed and truncate** part of a layer's tile cache: one gridset,
   format and zoom range, optionally one area or one parameter value. A task
   list follows the progress and can stop the tasks.
@@ -330,6 +335,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- A long value in a form (a title, a URL) opens at its beginning, not
+  scrolled to its end.
 - An error GeoServer reports on its HTML error page now shows GeoServer's
   reason ("Invalid style: … (line 1, column 18)") instead of only the
   page's title, which says nothing more than the status code.

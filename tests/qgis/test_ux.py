@@ -347,8 +347,12 @@ class TestPrimaryButtons(unittest.TestCase):
         dlg._all_group_names = lambda: []
         ok = QDialogButtonBox.StandardButton.Ok
         seen = {}
+        without_add = []
         for _label, _icon, loader in type(dlg).TABS:
             getattr(dlg, loader)()
+            if dlg.btn_add.isHidden():
+                without_add.append(loader)  # nothing to add there
+                continue
             label = dlg.btn_add.text()
             self.assertNotIn(
                 "New", label, label
@@ -364,7 +368,8 @@ class TestPrimaryButtons(unittest.TestCase):
             self.assertEqual(
                 form.windowTitle(), label
             )  # the dialog is named as the button
-        self.assertEqual(len(seen), len(type(dlg).TABS), seen)
+        self.assertEqual(without_add, ["_load_server"])
+        self.assertEqual(len(seen), len(type(dlg).TABS) - len(without_add), seen)
         self.assertEqual(
             set(seen.values()), {"Create", "Publish", "Upload"}, seen
         )  # never the generic Save on a create

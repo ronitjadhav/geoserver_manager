@@ -53,6 +53,7 @@ from geoserver_manager.gui.tab_datastores import DatastoreTabMixin
 from geoserver_manager.gui.tab_gwc import GwcTabMixin
 from geoserver_manager.gui.tab_layergroups import LayerGroupTabMixin
 from geoserver_manager.gui.tab_layers import LayerTabMixin
+from geoserver_manager.gui.tab_server import ServerTabMixin
 from geoserver_manager.gui.tab_styles import StyleTabMixin
 from geoserver_manager.gui.tab_workspaces import WorkspaceTabMixin
 from geoserver_manager.gui.theme import status_colour
@@ -145,6 +146,7 @@ class GeoServerMainDialog(
     LayerGroupTabMixin,
     StyleTabMixin,
     GwcTabMixin,
+    ServerTabMixin,
 ):
     """Main dialog: a GeoServer resource browser."""
 
@@ -740,6 +742,7 @@ class GeoServerMainDialog(
         ("Layer Groups", "layer-groups", "_load_layer_groups"),
         ("Styles", "styles", "_load_styles"),
         ("Tile Cache", "tile-cache", "_load_gwc_layers"),
+        ("Server", "server", "_load_server"),
     )
 
     def _tab_help(self):
@@ -771,6 +774,9 @@ class GeoServerMainDialog(
             ),
             "Tile Cache": self.tr(
                 "What GeoWebCache caches: tiles per layer, gridset and format."
+            ),
+            "Server": self.tr(
+                "Settings of the whole server: contact, services, logging, catalog."
             ),
         }
 
