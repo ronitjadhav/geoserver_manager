@@ -165,6 +165,12 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   but recorded as `languageVersion 1.0.0`; and `GET {style}.sld` returns GeoServer's **1.0 rendition** of a
   stored 1.1 document, so the editor shows converted text and says so. Exporting or applying a style touches a
   live QGIS layer, so it happens on the GUI thread before any upload (invariant 9).
+- **Per-workspace services and the namespace URI** (row 61, measured on 2.28.5):
+  `/rest/services/{wfs|wcs|wmts}/workspaces/{ws}/settings.json` answers 404 without own settings; a `PUT`
+  creates them or merges into them; `DELETE` falls back to the global ones, as for WMS. A freshly created WFS
+  override has `maxFeatures` 0, not the global value, so the form prefills from the global settings. A `PUT` of
+  `{"namespace": {"uri": …}}` alone merges; a workspace rename keeps the URI; a URI another non-isolated
+  workspace uses is a 500 "Namespace with URI … already exists".
 - **Server-wide settings** (row 60, measured on 2.28.5): `…/services/{wms|wfs|wcs|wmts}/settings.json`
   merges a partial `PUT`, like the resources. But `/settings.json` (global), `/settings/contact.json` and
   `/logging.json` **replace** the stored object: a `PUT` of `proxyBaseUrl` alone wiped the contact and the

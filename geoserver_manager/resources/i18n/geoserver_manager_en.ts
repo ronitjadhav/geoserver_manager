@@ -3433,22 +3433,22 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="332" />
+        <location filename="../../gui/dlg_resource_form.py" line="334" />
         <source>Browse…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="468" />
+        <location filename="../../gui/dlg_resource_form.py" line="471" />
         <source>Close</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="500" />
+        <location filename="../../gui/dlg_resource_form.py" line="503" />
         <source>'{}' has nothing to choose from.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="502" />
+        <location filename="../../gui/dlg_resource_form.py" line="505" />
         <source>'{}' is required.</source>
         <translation type="unfinished" />
     </message>
@@ -4053,205 +4053,245 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
 </context><context>
     <name>WorkspaceTabMixin</name>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="375" />
-        <location filename="../../gui/tab_workspaces.py" line="35" />
+        <location filename="../../gui/tab_workspaces.py" line="543" />
+        <location filename="../../gui/tab_workspaces.py" line="40" />
         <source>Add a Workspace</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="36" />
+        <location filename="../../gui/tab_workspaces.py" line="41" />
         <source>Create a workspace to hold stores, layers and styles</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="48" />
+        <location filename="../../gui/tab_workspaces.py" line="53" />
         <source>Delete</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="89" />
-        <location filename="../../gui/tab_workspaces.py" line="54" />
+        <location filename="../../gui/tab_workspaces.py" line="94" />
+        <location filename="../../gui/tab_workspaces.py" line="59" />
         <source>Name</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="55" />
+        <location filename="../../gui/tab_workspaces.py" line="60" />
         <source>Default</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="60" />
+        <location filename="../../gui/tab_workspaces.py" line="65" />
         <source>Failed to load workspaces</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="95" />
+        <location filename="../../gui/tab_workspaces.py" line="100" />
+        <source>Namespace URI</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_workspaces.py" line="102" />
+        <source>http://{name}, if empty</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_workspaces.py" line="105" />
+        <source>What the workspace's features are qualified with in WFS and GML (xmlns). Unique, unless the workspace is isolated.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_workspaces.py" line="113" />
         <source>Isolated Workspace</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="98" />
+        <location filename="../../gui/tab_workspaces.py" line="116" />
         <source>Its layers are served only under the workspace's own URLs (…/{name}/wms), so another workspace may share its namespace URI</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="106" />
+        <location filename="../../gui/tab_workspaces.py" line="124" />
         <source>Default Workspace</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="111" />
+        <location filename="../../gui/tab_workspaces.py" line="129" />
         <source>This is GeoServer's default workspace. There is always exactly one and it cannot be unset. To change it, tick Default on another workspace.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="118" />
+        <location filename="../../gui/tab_workspaces.py" line="136" />
         <source>Make this GeoServer's default workspace (replaces the current one)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="131" />
+        <location filename="../../gui/tab_workspaces.py" line="155" />
         <source>WMS</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="135" />
+        <location filename="../../gui/tab_workspaces.py" line="159" />
         <source>Own WMS settings</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="138" />
+        <location filename="../../gui/tab_workspaces.py" line="162" />
         <source>Untick to fall back to GeoServer's global WMS settings. The workspace's own are then removed.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="146" />
+        <location filename="../../gui/tab_workspaces.py" line="347" />
+        <location filename="../../gui/tab_workspaces.py" line="170" />
         <source>Service enabled</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="149" />
+        <location filename="../../gui/tab_workspaces.py" line="173" />
         <source>Serve WMS for this workspace at all</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="155" />
+        <location filename="../../gui/tab_workspaces.py" line="353" />
+        <location filename="../../gui/tab_workspaces.py" line="179" />
         <source>Title</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="161" />
+        <location filename="../../gui/tab_workspaces.py" line="359" />
+        <location filename="../../gui/tab_workspaces.py" line="185" />
         <source>Abstract</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="167" />
+        <location filename="../../gui/tab_workspaces.py" line="365" />
+        <location filename="../../gui/tab_workspaces.py" line="191" />
         <source>Keywords</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="170" />
+        <location filename="../../gui/tab_workspaces.py" line="368" />
+        <location filename="../../gui/tab_workspaces.py" line="194" />
         <source>Comma separated</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="174" />
+        <location filename="../../gui/tab_workspaces.py" line="198" />
         <source>SRS list</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="177" />
+        <location filename="../../gui/tab_workspaces.py" line="201" />
         <source>EPSG codes without the prefix, comma separated (4326, 3857). Empty advertises every SRS GeoServer knows.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="185" />
+        <location filename="../../gui/tab_workspaces.py" line="209" />
         <source>Max rendering time (s)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="199" />
-        <location filename="../../gui/tab_workspaces.py" line="190" />
+        <location filename="../../gui/tab_workspaces.py" line="223" />
+        <location filename="../../gui/tab_workspaces.py" line="214" />
         <source>0 means no limit</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="194" />
+        <location filename="../../gui/tab_workspaces.py" line="218" />
         <source>Max rendering errors</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="203" />
+        <location filename="../../gui/tab_workspaces.py" line="227" />
         <source>Default locale</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="206" />
+        <location filename="../../gui/tab_workspaces.py" line="230" />
         <source>Language of the internationalised title and abstract, e.g. en</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="349" />
+        <location filename="../../gui/tab_workspaces.py" line="334" />
+        <source>Own {} settings</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_workspaces.py" line="339" />
+        <source>Untick to fall back to GeoServer's global settings. Ticked, the form starts from the global ones.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_workspaces.py" line="375" />
+        <source>Maximum features</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_workspaces.py" line="380" />
+        <source>Per GetFeature request</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_workspaces.py" line="515" />
         <source>Workspace '{}' already exists.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="365" />
+        <location filename="../../gui/tab_workspaces.py" line="533" />
         <source>Workspace '{}' saved, but it could not be made the default: {}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="376" />
+        <location filename="../../gui/tab_workspaces.py" line="544" />
         <source>A workspace groups stores, layers and styles under one name, which also prefixes its layers (workspace:layer).</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="383" />
+        <location filename="../../gui/tab_workspaces.py" line="551" />
         <source>Create</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="391" />
+        <location filename="../../gui/tab_workspaces.py" line="559" />
         <source>Failed to create workspace '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="396" />
+        <location filename="../../gui/tab_workspaces.py" line="564" />
         <source>Workspace '{}' created.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="411" />
+        <location filename="../../gui/tab_workspaces.py" line="584" />
         <source>Failed to load workspace details</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="429" />
+        <location filename="../../gui/tab_workspaces.py" line="605" />
         <source>Edit Workspace '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="432" />
-        <source>Rename it, toggle isolation, make it the default, or give it its own WMS settings. Save applies all of it at once.</source>
+        <location filename="../../gui/tab_workspaces.py" line="608" />
+        <source>Rename it, change its namespace URI, toggle isolation, make it the default, or give it its own WMS, WFS, WCS or WMTS settings. Save applies all of it at once.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="451" />
+        <location filename="../../gui/tab_workspaces.py" line="637" />
         <source>Failed to update workspace '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="456" />
+        <location filename="../../gui/tab_workspaces.py" line="642" />
         <source>Workspace '{}' updated.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="479" />
+        <location filename="../../gui/tab_workspaces.py" line="676" />
         <source>workspace</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_workspaces.py" line="485" />
+        <location filename="../../gui/tab_workspaces.py" line="682" />
         <source>%n workspace(s)</source>
         <translation>
             <numerusform>%n workspace</numerusform>
@@ -4259,7 +4299,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="487" />
+        <location filename="../../gui/tab_workspaces.py" line="684" />
         <source>Everything it contains is deleted too: datastores, coverage stores, cascaded stores, layers, layer groups and styles.</source>
         <translation type="unfinished" />
     </message>

@@ -16,6 +16,11 @@ from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 # be API. Keywords and the SRS list arrive wrapped as {"string": [...]}.
 _ABSTRACT = "abstrct"
 
+# The services a workspace can override besides WMS, which has a richer
+# group of its own. Measured on 2.28.5: GET is a 404 without own settings, a
+# PUT creates or merges them, DELETE falls back to the global ones.
+OTHER_SERVICES = ("wfs", "wcs", "wmts")
+
 
 # Every user-visible string in this file goes through translate() with this
 # file's own class as the context. self.tr() cannot: pylupdate extracts it
@@ -91,6 +96,19 @@ class WorkspaceTabMixin:
                 "required": True,
             },
             {
+                "key": "uri",
+                "label": translate("WorkspaceTabMixin", "Namespace URI"),
+                "type": "text",
+                "placeholder": translate(
+                    "WorkspaceTabMixin", "http://{name}, if empty"
+                ),
+                "help": translate(
+                    "WorkspaceTabMixin",
+                    "What the workspace's features are qualified with in WFS and GML "
+                    "(xmlns). Unique, unless the workspace is isolated.",
+                ),
+            },
+            {
                 "key": "isolated",
                 "label": translate("WorkspaceTabMixin", "Isolated Workspace"),
                 "type": "checkbox",
@@ -122,7 +140,13 @@ class WorkspaceTabMixin:
                 ),
             },
         ]
-        return fields + self._wms_fields() if with_wms else fields
+        if not with_wms:
+            return fields
+        return (
+            fields
+            + self._wms_fields()
+            + [f for service in OTHER_SERVICES for f in self._service_fields(service)]
+        )
 
     # -- WMS service settings --------------------------------------------------
 
@@ -299,6 +323,148 @@ class WorkspaceTabMixin:
         }
         self._raw_rest("put", path, json={"wms": settings})
 
+    # -- WFS, WCS and WMTS service settings -------------------------------------
+
+    def _service_fields(self, service):
+        """One service's group: whether the workspace overrides it, and how."""
+        group = service.upper()
+        fields = [
+            {
+                "key": f"{service}_own",
+                "label": translate("WorkspaceTabMixin", "Own {} settings").format(
+                    group
+                ),
+                "type": "checkbox",
+                "group": group,
+                "help": translate(
+                    "WorkspaceTabMixin",
+                    "Untick to fall back to GeoServer's global settings. Ticked, "
+                    "the form starts from the global ones.",
+                ),
+            },
+            {
+                "key": f"{service}_enabled",
+                "label": translate("WorkspaceTabMixin", "Service enabled"),
+                "type": "checkbox",
+                "group": group,
+            },
+            {
+                "key": f"{service}_title",
+                "label": translate("WorkspaceTabMixin", "Title"),
+                "type": "text",
+                "group": group,
+            },
+            {
+                "key": f"{service}_abstract",
+                "label": translate("WorkspaceTabMixin", "Abstract"),
+                "type": "textarea",
+                "group": group,
+            },
+            {
+                "key": f"{service}_keywords",
+                "label": translate("WorkspaceTabMixin", "Keywords"),
+                "type": "text",
+                "group": group,
+                "help": translate("WorkspaceTabMixin", "Comma separated"),
+            },
+        ]
+        if service == "wfs":
+            fields.append(
+                {
+                    "key": "wfs_max_features",
+                    "label": translate("WorkspaceTabMixin", "Maximum features"),
+                    "type": "spinbox",
+                    "min": 0,
+                    "max": 2147483647,
+                    "group": group,
+                    "help": translate("WorkspaceTabMixin", "Per GetFeature request"),
+                }
+            )
+        return fields
+
+    def _service_settings_path(self, service, workspace_name):
+        """TODO(#50): no per-workspace WFS/WCS/WMTS settings in the library
+        (row 61)."""
+        base = self.gs.rest_service.rest_endpoints.base_url
+        return f"{base}/services/{service}/workspaces/{workspace_name}/settings.json"
+
+    def _service_settings(self, service, workspace_name):
+        """(own settings or None, the global ones). Runs in a worker."""
+        base = self.gs.rest_service.rest_endpoints.base_url
+        response = self.gs.rest_service.rest_client.get(
+            self._service_settings_path(service, workspace_name)
+        )
+        own = response.json().get(service) if response.status_code == 200 else None
+        if response.status_code not in (200, 404):
+            raise RuntimeError(f"HTTP {response.status_code}: {service.upper()}")
+        overall = self._raw_rest(
+            "get", f"{base}/services/{service}/settings.json"
+        ).json()
+        return own, overall.get(service) or {}
+
+    @classmethod
+    def _service_form_values(cls, service, own, overall):
+        """Prefill for one service group. Pure.
+
+        Without own settings the fields show the global ones, so ticking
+        "Own settings" starts from what the workspace inherits: a fresh WFS
+        override would otherwise begin at maxFeatures 0.
+        """
+        settings = own if own is not None else overall
+        values = {
+            f"{service}_own": own is not None,
+            f"{service}_enabled": settings.get("enabled", True) is not False,
+            f"{service}_title": settings.get("title") or "",
+            f"{service}_abstract": settings.get(_ABSTRACT) or "",
+            f"{service}_keywords": cls._joined(settings.get("keywords")),
+        }
+        if service == "wfs":
+            values["wfs_max_features"] = int(settings.get("maxFeatures") or 0)
+        return values
+
+    def _on_service_own_changed(self, dlg, service, own):
+        for field in self._service_fields(service)[1:]:
+            dlg.set_field_visible(field["key"], own)
+
+    def _apply_service_settings(self, service, workspace_name, values, existed):
+        """Create, update or remove one workspace's own settings for a service."""
+        path = self._service_settings_path(service, workspace_name)
+        if not values[f"{service}_own"]:
+            if existed:
+                self._raw_rest("delete", path)
+            return
+        settings = {
+            "workspace": {"name": workspace_name},
+            "name": service.upper(),
+            "enabled": values[f"{service}_enabled"],
+            "title": values[f"{service}_title"],
+            _ABSTRACT: values[f"{service}_abstract"],
+            "keywords": {"string": self._split(values[f"{service}_keywords"])},
+        }
+        if service == "wfs":
+            settings["maxFeatures"] = values["wfs_max_features"]
+        # A partial PUT merges, and creates the settings when there are none.
+        self._raw_rest("put", path, json={service: settings})
+
+    # -- Namespace ---------------------------------------------------------------
+
+    def _namespace_path(self, workspace_name):
+        """TODO(#50): no namespace calls in the library (row 61)."""
+        base = self.gs.rest_service.rest_endpoints.base_url
+        return f"{base}/namespaces/{workspace_name}.json"
+
+    def _namespace_uri(self, workspace_name):
+        payload = self._raw_rest("get", self._namespace_path(workspace_name)).json()
+        return (payload.get("namespace") or {}).get("uri") or ""
+
+    def _put_namespace_uri(self, workspace_name, uri):
+        """Set the URI; a PUT of it alone merges (measured on 2.28.5)."""
+        self._raw_rest(
+            "put",
+            self._namespace_path(workspace_name),
+            json={"namespace": {"uri": uri}},
+        )
+
     def _default_workspace_name(self):
         """Name of GeoServer's default workspace, or None if it cannot be read.
 
@@ -351,6 +517,8 @@ class WorkspaceTabMixin:
                     ).format(name)
                 )
             self._check(self.gs.create_workspace(name, isolated=values["isolated"]))
+            if (values.get("uri") or "").strip():
+                self._put_namespace_uri(name, values["uri"].strip())
         else:
             # One PUT, rename or not (create_workspace would POST, get a 409,
             # then PUT).
@@ -407,12 +575,17 @@ class WorkspaceTabMixin:
                 self._check(self.gs.get_workspace(old_name)),
                 self._wms_settings(old_name),
                 self._default_workspace_name(),
+                self._namespace_uri(old_name),
+                {
+                    service: self._service_settings(service, old_name)
+                    for service in OTHER_SERVICES
+                },
             ),
             translate("WorkspaceTabMixin", "Failed to load workspace details"),
         )
         if fetched is None:
             return
-        detail, wms_settings, default_name = fetched
+        detail, wms_settings, default_name, uri, services = fetched
 
         is_default = default_name == old_name
         values = {
@@ -423,16 +596,20 @@ class WorkspaceTabMixin:
                 else False
             ),
             "set_default": is_default,
+            "uri": uri,
         }
         values.update(self._wms_form_values(wms_settings))
+        for service, (own, overall) in services.items():
+            values.update(self._service_form_values(service, own, overall))
         dlg = ResourceFormDialog(
             title=translate("WorkspaceTabMixin", "Edit Workspace '{}'").format(
                 old_name
             ),
             description=translate(
                 "WorkspaceTabMixin",
-                "Rename it, toggle isolation, make it the default, or give it its "
-                "own WMS settings. Save applies all of it at once.",
+                "Rename it, change its namespace URI, toggle isolation, make it "
+                "the default, or give it its own WMS, WFS, WCS or WMTS settings. "
+                "Save applies all of it at once.",
             ),
             fields=self._workspace_fields(is_default=is_default, with_wms=True),
             values=values,
@@ -441,13 +618,22 @@ class WorkspaceTabMixin:
         own = dlg.get_widget("wms_own")
         own.toggled.connect(lambda checked: self._on_wms_own_changed(dlg, checked))
         self._on_wms_own_changed(dlg, own.isChecked())
+        for service in OTHER_SERVICES:
+            box = dlg.get_widget(f"{service}_own")
+            box.toggled.connect(
+                lambda checked, service=service: self._on_service_own_changed(
+                    dlg, service, checked
+                )
+            )
+            self._on_service_own_changed(dlg, service, box.isChecked())
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         values = dlg.get_values()
         had_wms = wms_settings is not None
+        had = {service: own is not None for service, (own, _) in services.items()}
         if self._run_action(
-            lambda: self._save_workspace_and_wms(values, old_name, had_wms),
+            lambda: self._save_workspace_and_wms(values, old_name, had_wms, had, uri),
             translate("WorkspaceTabMixin", "Failed to update workspace '{}'").format(
                 values["name"]
             ),
@@ -460,14 +646,25 @@ class WorkspaceTabMixin:
             # Reachable from the datastore tab, so reload whatever is on screen
             self._reload_current_tab()
 
-    def _save_workspace_and_wms(self, values, old_name, had_wms):
-        """Save the workspace, then its WMS settings, in that order.
+    def _save_workspace_and_wms(
+        self, values, old_name, had_wms, had_services=None, old_uri=None
+    ):
+        """Save the workspace, then its namespace and services, in that order.
 
         A rename has to land first: the settings live under the workspace's
-        (new) name.
+        (new) name, and a rename keeps the URI.
         """
         self._save_workspace(values, old_name=old_name)
-        self._apply_wms_settings(values["name"], values, had_wms)
+        name = values["name"]
+        uri = (values.get("uri") or "").strip()
+        if old_uri is not None and uri and uri != old_uri:
+            self._put_namespace_uri(name, uri)
+        self._apply_wms_settings(name, values, had_wms)
+        for service in OTHER_SERVICES:
+            if f"{service}_own" in values:
+                self._apply_service_settings(
+                    service, name, values, (had_services or {}).get(service, False)
+                )
 
     def _delete_workspace(self, row_data):
         """Delete a single workspace after confirmation."""
