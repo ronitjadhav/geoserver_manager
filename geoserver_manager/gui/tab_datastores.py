@@ -17,15 +17,25 @@ _SHAPEFILE = "Shapefile"
 _SHAPEFILE_DIRECTORY = "Directory of spatial files (shapefiles)"
 _GEOPACKAGE = "GeoPackage"
 _WFS = "Web Feature Server (NG)"
-_SUPPORTED_TYPES = [
-    "PostGIS",
-    "PostGIS (JNDI)",
-    "PMTiles",
-    _SHAPEFILE,
-    _SHAPEFILE_DIRECTORY,
-    _GEOPACKAGE,
-    _WFS,
-]
+# The fields each of those types shows (_on_type_changed). Adding a type is
+# one entry here plus its save path.
+_TYPE_FIELDS = {
+    "PostGIS": ("pg_host", "pg_port", "pg_db", "pg_user", "pg_password", "pg_schema"),
+    "PostGIS (JNDI)": ("jndi_reference", "pg_schema"),
+    "PMTiles": ("pmtiles_url",),
+    _SHAPEFILE: ("file_url", "charset", "spatial_index"),
+    _SHAPEFILE_DIRECTORY: ("file_url", "charset"),  # no spatial index for a folder
+    _GEOPACKAGE: ("gpkg_database", "gpkg_read_only", "gpkg_expose_pk"),
+    _WFS: (
+        "wfs_url",
+        "wfs_user",
+        "wfs_password",
+        "wfs_timeout",
+        "wfs_max_features",
+        "wfs_lenient",
+    ),
+}
+_SUPPORTED_TYPES = list(_TYPE_FIELDS)
 
 # GeoServer prefixes every parameter of a cascaded WFS store with its factory.
 _WFS_KEY = "WFSDataStoreFactory:"
@@ -42,7 +52,10 @@ _GEOPACKAGE_DBTYPE = "geopkg"
 # Stands in for password-like values in the generic editor; never sent back as-is
 _MASKED = "••••"
 
-# Every field that belongs to one of those types (shown/hidden by _on_type_changed)
+# Every field that belongs to one of those types, in form order.
+_TYPE_SPECIFIC_FIELDS = tuple(
+    dict.fromkeys(key for keys in _TYPE_FIELDS.values() for key in keys)
+)
 _TYPE_SPECIFIC_FIELDS = (
     "pg_host",
     "pg_port",
@@ -175,6 +188,7 @@ class DatastoreTabMixin:
         :param edit_mode: editing an existing datastore. The workspace is
             fixed and the password has to be re-entered.
         """
+        connection = translate("DatastoreTabMixin", "Connection")
         fields = [
             {
                 "key": "name",
@@ -223,7 +237,7 @@ class DatastoreTabMixin:
                 "type": "text",
                 "required": True,
                 "placeholder": "localhost",
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
             },
             {
                 "key": "pg_port",
@@ -232,21 +246,21 @@ class DatastoreTabMixin:
                 "default": 5432,
                 "min": 1,
                 "max": 65535,
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
             },
             {
                 "key": "pg_db",
                 "label": translate("DatastoreTabMixin", "Database"),
                 "type": "text",
                 "required": True,
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
             },
             {
                 "key": "pg_user",
                 "label": translate("DatastoreTabMixin", "User"),
                 "type": "text",
                 "required": True,
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
             },
             {
                 "key": "pg_password",
@@ -254,7 +268,7 @@ class DatastoreTabMixin:
                 "type": "text",
                 "required": not edit_mode,
                 "echo_password": True,
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
                 "help": (
                     translate(
                         "DatastoreTabMixin", "Leave empty to keep the stored password"
@@ -268,7 +282,7 @@ class DatastoreTabMixin:
                 "label": translate("DatastoreTabMixin", "Schema"),
                 "type": "text",
                 "default": "public",
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
             },
             # --- JNDI fields ---
             {
@@ -278,7 +292,7 @@ class DatastoreTabMixin:
                 "required": True,
                 "placeholder": "java:comp/env/jdbc/mydb",
                 "visible": False,
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin", "JNDI name of the database connection pool"
                 ),
@@ -289,7 +303,7 @@ class DatastoreTabMixin:
                 "label": translate("DatastoreTabMixin", "Connection parameters"),
                 "type": "textarea",
                 "visible": False,
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "One 'key = value' per line, exactly as GeoServer stores them. "
@@ -305,7 +319,7 @@ class DatastoreTabMixin:
                 "required": True,
                 "placeholder": "file:///mnt/data/tiles.pmtiles",
                 "visible": False,
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "Path or URL to the PMTiles file (file://, s3://, gs://, http(s)://)",
@@ -319,7 +333,7 @@ class DatastoreTabMixin:
                 "required": True,
                 "visible": False,
                 "placeholder": "file:data/shapefiles/states.shp",
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "A path on the GeoServer machine: relative to its data "
@@ -335,7 +349,7 @@ class DatastoreTabMixin:
                 "placeholder": translate(
                     "DatastoreTabMixin", "Leave empty for GeoServer's default"
                 ),
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "How the .dbf attribute text is encoded: UTF-8, or "
@@ -348,7 +362,7 @@ class DatastoreTabMixin:
                 "type": "checkbox",
                 "default": True,
                 "visible": False,
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin", "Writes a .qix file next to the data, once"
                 ),
@@ -361,7 +375,7 @@ class DatastoreTabMixin:
                 "required": True,
                 "visible": False,
                 "placeholder": "file:data/ne/natural_earth.gpkg",
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "A path on the GeoServer machine. To publish a .gpkg from "
@@ -375,7 +389,7 @@ class DatastoreTabMixin:
                 "type": "checkbox",
                 "default": False,
                 "visible": False,
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "Recommended when nothing writes to the file: GeoServer "
@@ -388,7 +402,7 @@ class DatastoreTabMixin:
                 "type": "checkbox",
                 "default": False,
                 "visible": False,
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "Publish the tables' primary key as an attribute",
@@ -402,7 +416,7 @@ class DatastoreTabMixin:
                 "required": True,
                 "visible": False,
                 "placeholder": "https://example.com/geoserver/wfs?service=WFS&request=GetCapabilities",
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "The remote WFS's capabilities document. Its feature types can "
@@ -418,7 +432,7 @@ class DatastoreTabMixin:
                 "placeholder": translate(
                     "DatastoreTabMixin", "Leave empty for a public service"
                 ),
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
             },
             {
                 "key": "wfs_password",
@@ -426,7 +440,7 @@ class DatastoreTabMixin:
                 "type": "text",
                 "echo_password": True,
                 "visible": False,
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
                 "help": (
                     translate(
                         "DatastoreTabMixin", "Leave empty to keep the stored password"
@@ -443,7 +457,7 @@ class DatastoreTabMixin:
                 "min": 0,
                 "max": 3600000,
                 "visible": False,
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
             },
             {
                 "key": "wfs_max_features",
@@ -453,7 +467,7 @@ class DatastoreTabMixin:
                 "min": 0,
                 "max": 100000000,
                 "visible": False,
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
                 "help": translate("DatastoreTabMixin", "0 means no limit"),
             },
             {
@@ -462,7 +476,7 @@ class DatastoreTabMixin:
                 "type": "checkbox",
                 "default": True,
                 "visible": False,
-                "group": translate("DatastoreTabMixin", "Connection"),
+                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "Tolerate responses that do not match the remote's schema exactly",
@@ -549,42 +563,10 @@ class DatastoreTabMixin:
         return params
 
     def _on_type_changed(self, dlg, new_type):
-        """Show/hide form fields based on the selected datastore type."""
-        is_postgis = new_type == "PostGIS"
-        is_jndi = new_type == "PostGIS (JNDI)"
-        is_pmtiles = new_type == "PMTiles"
-
-        # PostGIS-only fields
-        for key in ["pg_host", "pg_port", "pg_db", "pg_user", "pg_password"]:
-            dlg.set_field_visible(key, is_postgis)
-
-        # pg_schema is shared by PostGIS and JNDI
-        dlg.set_field_visible("pg_schema", is_postgis or is_jndi)
-
-        # JNDI-only fields
-        dlg.set_field_visible("jndi_reference", is_jndi)
-
-        # PMTiles-only fields
-        dlg.set_field_visible("pmtiles_url", is_pmtiles)
-
-        # Shapefile and directory-of-shapefiles share the path and the charset;
-        # only a single-file store offers the spatial index.
-        is_shapefile = new_type == _SHAPEFILE
-        is_directory = new_type == _SHAPEFILE_DIRECTORY
-        dlg.set_field_visible("file_url", is_shapefile or is_directory)
-        dlg.set_field_visible("charset", is_shapefile or is_directory)
-        dlg.set_field_visible("spatial_index", is_shapefile)
-
-        # GeoPackage-only fields
-        is_geopackage = new_type == _GEOPACKAGE
-        for key in ("gpkg_database", "gpkg_read_only", "gpkg_expose_pk"):
-            dlg.set_field_visible(key, is_geopackage)
-
-        # Cascaded WFS fields
-        is_wfs = new_type == _WFS
+        """Show the form fields of the selected datastore type, hide the rest."""
+        wanted = _TYPE_FIELDS.get(new_type, ())
         for key in _TYPE_SPECIFIC_FIELDS:
-            if key.startswith("wfs_"):
-                dlg.set_field_visible(key, is_wfs)
+            dlg.set_field_visible(key, key in wanted)
 
     def _add_datastore(self):
         """Open a form dialog to create a new datastore."""
@@ -729,23 +711,18 @@ class DatastoreTabMixin:
                     description=description,
                 )
             )
-        elif ds_type in (_SHAPEFILE, _SHAPEFILE_DIRECTORY, _GEOPACKAGE):
-            self._check(
-                self.gs.create_datastore(
-                    workspace_name=ws,
-                    datastore_name=name,
-                    datastore_type=ds_type,
-                    connection_parameters=self._file_store_params(ds_type, values),
-                    description=description,
-                )
+        elif ds_type in (_SHAPEFILE, _SHAPEFILE_DIRECTORY, _GEOPACKAGE, _WFS):
+            params = (
+                self._wfs_params(values)
+                if ds_type == _WFS
+                else self._file_store_params(ds_type, values)
             )
-        elif ds_type == _WFS:
             self._check(
                 self.gs.create_datastore(
                     workspace_name=ws,
                     datastore_name=name,
                     datastore_type=ds_type,
-                    connection_parameters=self._wfs_params(values),
+                    connection_parameters=params,
                     description=description,
                 )
             )

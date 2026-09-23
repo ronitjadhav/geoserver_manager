@@ -345,17 +345,7 @@ class LayerTreeMenu:
     def _sld_body(dlg, style):
         """The SLD of a style named 'workspace:style' or 'style' (global)."""
         workspace, _, name = style.rpartition(":")
-        workspace = workspace or None
-        definition = dlg._check(dlg.gs.get_style_definition(name, workspace))
-        style_format = str((definition or {}).get("format") or "sld").lower()
-        if style_format != "sld":
-            # QGIS reads SLD only; refuse here rather than let it fail later.
-            raise ValueError(
-                translate(
-                    "LayerTreeMenu", "'{}' is a {} style. QGIS can only read SLD."
-                ).format(style, style_format.upper())
-            )
-        return dlg._style_body(name, workspace, "sld")
+        return dlg._sld_of(name, workspace or None, label=style)
 
     def apply_style(self, layer):
         """Load the matching server layer's style into this project layer."""

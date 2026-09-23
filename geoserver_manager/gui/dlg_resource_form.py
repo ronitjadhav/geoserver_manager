@@ -356,11 +356,8 @@ class ResourceFormDialog(QDialog):
             w.setStyleSheet(f"color: {hint_colour(self.palette())};")
             return w
 
-        # Fallback to text
-        w = QLineEdit()
-        if value:
-            w.setText(str(value))
-        return w
+        # A typo in a field spec must not become a silent text box.
+        raise ValueError(f"Unknown field type {ftype!r} for {key!r}")
 
     @staticmethod
     def _looks_read_only(widget):
@@ -398,8 +395,6 @@ class ResourceFormDialog(QDialog):
                 result[key] = widget.toPlainText().strip()
             elif ftype == "file":
                 result[key] = widget.path_edit.text().strip()
-            else:
-                result[key] = widget.text().strip()
         return result
 
     def set_field_visible(self, key, visible):
@@ -435,6 +430,15 @@ class ResourceFormDialog(QDialog):
         # form does not grow to show the rest.
         label.setMinimumHeight(pixmap.height())
         label.setToolTip(text)
+
+    def set_values(self, values):
+        """Fill text fields after the form opened: a viewer's picked entry."""
+        for key, value in values.items():
+            widget = self._widgets[key]
+            if isinstance(widget, QPlainTextEdit):
+                widget.setPlainText(value)
+            else:
+                widget.setText(value)
 
     def get_widget(self, key):
         """Return the widget for a field by key.
@@ -496,9 +500,7 @@ class ResourceFormDialog(QDialog):
                     reason = self.tr("'{}' has nothing to choose from.")
                 else:
                     reason = self.tr("'{}' is required.")
-                self._validation_label.setText(
-                    field.get("required_message") or reason.format(field["label"])
-                )
+                self._validation_label.setText(reason.format(field["label"]))
                 self._validation_label.show()
                 return
 

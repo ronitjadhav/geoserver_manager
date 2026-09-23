@@ -275,10 +275,7 @@ class GwcTabMixin:
         root = GwcTabMixin._parse_xml(xml_text)
 
         def number(tag):
-            try:
-                return int(root.findtext(tag) or 0)
-            except ValueError:
-                return 0
+            return _int_or_zero(root.findtext(tag))
 
         meta = [
             _int_or_zero(element.text)
@@ -369,15 +366,9 @@ class GwcTabMixin:
 
     def _save_gwc_layer(self, name, xml_text, values):
         """PUT the edited document back. Raises on a bad form or an HTTP error."""
-        document = self._gwc_xml_with_values(xml_text, values)
         # TODO(#50): no update of a cached layer in the library, and a JSON PUT
         # fails server-side ("Duplicate field mimeFormats"), so XML it is.
-        self._raw_rest(
-            "put",
-            self._gwc_layer_path(name, "xml"),
-            data=document.encode("utf-8"),
-            headers=_XML,
-        )
+        self._put_gwc_xml(name, self._gwc_xml_with_values(xml_text, values))
 
     def _create_gwc_layer_from_values(self, values):
         """Start caching the layer the form names. Raises when it is cached already."""
@@ -393,9 +384,13 @@ class GwcTabMixin:
         # as a degraded configuration: no formats, 0×0 meta-tiles, a single
         # gridset, no STYLES filter, after a needless configuration reload.
         # Workaround: PUT the XML document GeoServer itself would write.
-        document = self._gwc_xml_with_values(
-            _NEW_LAYER_XML.format(name=escape(name)), values
+        self._put_gwc_xml(
+            name,
+            self._gwc_xml_with_values(_NEW_LAYER_XML.format(name=escape(name)), values),
         )
+
+    def _put_gwc_xml(self, name, document):
+        """PUT one cached layer's XML document: the only write GWC takes whole."""
         self._raw_rest(
             "put",
             self._gwc_layer_path(name, "xml"),

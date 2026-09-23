@@ -236,26 +236,13 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
 
         # geoserver URL (not sensitive, stored in QgsSettings)
         url = url.strip()
-        parsed = urlparse(url)
-        if url and (parsed.username or parsed.password):
-            # user:pass@host would surface in the window title, the status
-            # line, every error banner and the persistent QGIS log.
-            self.log(
-                message=self.tr(
-                    "The URL must not carry a user name or password. The fields "
-                    "below do. URL not saved."
-                ),
-                log_level=Qgis.MessageLevel.Warning,
-                push=True,
-            )
-        elif url and not url.startswith(("http://", "https://")):
+        problem = self._url_problem(url) if url else None
+        if problem:
             # apply() cannot stop the options dialog from closing, so keep the
             # previous URL and warn: dropping out here would also discard the
             # credentials the user just typed.
             self.log(
-                message=self.tr(
-                    "GeoServer URL must start with http:// or https://. URL not saved."
-                ),
+                message=f"{problem} {self.tr('URL not saved.')}",
                 log_level=Qgis.MessageLevel.Warning,
                 push=True,
             )
@@ -305,24 +292,27 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
             push=True,
         )
 
+    def _url_problem(self, url):
+        """What is wrong with a GeoServer URL, or None. One check, two callers
+        (Save and Test connection), so their messages cannot drift apart."""
+        if not url.startswith(("http://", "https://")):
+            return self.tr("The GeoServer URL must start with http:// or https://.")
+        parsed = urlparse(url)
+        if parsed.username or parsed.password:
+            # user:pass@host would surface in the window title, the status
+            # line, every error banner and the persistent QGIS log.
+            return self.tr(
+                "Take the user name and password out of the URL: the fields "
+                "below carry them."
+            )
+        return None
+
     def test_connection(self) -> None:
         """Probe the server with the fields as typed, saved or not."""
         url = self.txt_gs_url.text().strip()
-        if not url.startswith(("http://", "https://")):
-            self._show_test_result(
-                self.tr("Enter a URL starting with http:// or https:// first."),
-                "error",
-            )
-            return
-        parsed = urlparse(url)
-        if parsed.username or parsed.password:
-            self._show_test_result(
-                self.tr(
-                    "Take the user name and password out of the URL. The fields "
-                    "below carry them."
-                ),
-                "error",
-            )
+        problem = self._url_problem(url)
+        if problem:
+            self._show_test_result(problem, "error")
             return
         auth = (self.txt_gs_username.text(), self.txt_gs_password.text())
         self._show_test_result(self.tr("Testing…"), "busy")

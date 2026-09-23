@@ -13,7 +13,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.toolbelt.payload import bbox_text
+from geoserver_manager.toolbelt.payload import bbox_text, keyword_list
 
 # GeoServer's own `type` values. The Type column carries them, and every
 # action reads the row's type to pick the WMS or the WMTS endpoint.
@@ -271,11 +271,7 @@ class CascadedStoreTabMixin:
     def _cascaded_layer_form_values(self, detail):
         """Prefill for the layer viewer, from the library's dict or GeoServer's
         raw payload; the keywords differ in shape between the two."""
-        keywords = detail.get("keywords") or []
-        if isinstance(keywords, dict):  # raw payload: {"string": [...]}
-            keywords = keywords.get("string") or []
-        if isinstance(keywords, str):
-            keywords = [keywords]
+        keywords = keyword_list(detail.get("keywords"))
         return {
             "native_name": detail.get("nativeName", ""),
             "title": str(detail.get("title") or ""),
@@ -317,24 +313,15 @@ class CascadedStoreTabMixin:
         )
         return fields
 
-    def _refill_cascaded_layer_detail(
-        self, dlg, workspace_name, store_name, kind, name
-    ):
-        """Show one cascaded layer's details in the viewer."""
-        if not name:
-            return
+    def _cascaded_layer_values(self, workspace_name, store_name, kind, name):
+        """The viewer's values for one cascaded layer; None once reported."""
         detail = self._fetch(
             lambda: self._cascaded_layer_detail(workspace_name, store_name, kind, name),
             translate("CascadedStoreTabMixin", "Failed to load layer '{}'").format(
                 name
             ),
         )
-        for key, value in self._cascaded_layer_form_values(detail or {}).items():
-            widget = dlg.get_widget(key)
-            if hasattr(widget, "setPlainText"):
-                widget.setPlainText(value)
-            else:
-                widget.setText(value)
+        return None if detail is None else self._cascaded_layer_form_values(detail)
 
     def _show_cascaded_layers(self, row_data):
         """List the store's cascaded layers and view one at a time."""
@@ -369,12 +356,12 @@ class CascadedStoreTabMixin:
             parent=self,
         )
         dlg.hide_save_button()
-        dlg.get_widget("layer").currentTextChanged.connect(
-            lambda name: self._refill_cascaded_layer_detail(
-                dlg, ws_name, store_name, kind, name
-            )
+        self._wire_picker(
+            dlg,
+            "layer",
+            names[0],
+            lambda name: self._cascaded_layer_values(ws_name, store_name, kind, name),
         )
-        self._refill_cascaded_layer_detail(dlg, ws_name, store_name, kind, names[0])
         dlg.exec()
 
     def _publish_cascaded_layer(self, row_data):

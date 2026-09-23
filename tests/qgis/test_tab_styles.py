@@ -512,10 +512,12 @@ class TestApplyStyleToQgis(unittest.TestCase):
 
     def test_a_css_style_is_refused_before_any_dialog(self):
         QgsProject.instance().addMapLayer(point_layer("towns"))
+        errors = []
+        self.dlg.show_error_message = errors.append  # the refusal names the format
         with patch.object(tab_styles, "ResourceFormDialog", Recording):
             self.dlg._apply_style_to_qgis(["generic", GLOBAL])  # the fake's CSS style
         self.assertEqual(Recording.opened, [])
-        self.assertIn("QGIS can only read SLD", self.messages["warning"][0])
+        self.assertIn("QGIS can only read SLD", errors[0])
 
     def test_an_empty_project_is_a_banner_not_a_dialog(self):
         with patch.object(tab_styles, "ResourceFormDialog", Recording):

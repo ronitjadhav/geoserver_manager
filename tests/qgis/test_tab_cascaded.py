@@ -227,6 +227,14 @@ REMOTE_ROW = ["remote", "topp", WMS, "Yes", CAPS]
 TILES_ROW = ["tiles", "sf", WMTS, "No", TILES]
 
 
+class TestViewerRead(unittest.TestCase):
+    def test_a_layer_that_cannot_be_read_leaves_the_viewer_alone(self):
+        """It filled blank fields after the error banner; now like Coverages."""
+        dlg = SyncDialog()
+        dlg._fetch = lambda action, failure, **kwargs: None
+        self.assertIsNone(dlg._cascaded_layer_values("topp", "store", "WMS", "x"))
+
+
 class TestListing(unittest.TestCase):
     def setUp(self):
         self.dlg = SyncDialog()

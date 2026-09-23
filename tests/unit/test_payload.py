@@ -64,3 +64,25 @@ class TestSmallOnes(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestKeywordsAndText(unittest.TestCase):
+    """One parser for every tab: the three copies it replaced disagreed."""
+
+    def test_every_keyword_shape_becomes_a_list(self):
+        from geoserver_manager.toolbelt.payload import keyword_list
+
+        self.assertEqual(keyword_list(["a", "b"]), ["a", "b"])  # the library
+        self.assertEqual(keyword_list({"string": ["a", "b"]}), ["a", "b"])  # REST
+        self.assertEqual(keyword_list({"string": "a"}), ["a"])  # one, bare
+        self.assertEqual(keyword_list(None), [])
+        self.assertEqual(keyword_list(""), [])
+
+    def test_text_is_one_line_with_languages_in_order(self):
+        from geoserver_manager.toolbelt.payload import text_of
+
+        self.assertEqual(text_of("Roads"), "Roads")
+        self.assertEqual(
+            text_of({"fr": "Routes", "en": "Roads"}), "en: Roads; fr: Routes"
+        )
+        self.assertEqual(text_of(None), "")

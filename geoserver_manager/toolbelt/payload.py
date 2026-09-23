@@ -30,6 +30,25 @@ def as_list(value):
     return [value] if isinstance(value, (dict, str)) else list(value)
 
 
+def keyword_list(value):
+    """A resource's keywords as a list of strings.
+
+    The library normalises them to a list, raw REST wraps them as
+    {"string": [...]}, and a single keyword comes back bare: a live server
+    showed all three.
+    """
+    if isinstance(value, dict):
+        value = value.get("string")
+    return [str(keyword) for keyword in as_list(value)]
+
+
+def text_of(value):
+    """A title or an abstract as one line: a string, or {language: text}."""
+    if isinstance(value, dict):
+        return "; ".join(f"{lang}: {text}" for lang, text in sorted(value.items()))
+    return "" if value is None else str(value)
+
+
 def name_of(item):
     """Name of a list entry: geoservercloud returns dicts, tolerate strings."""
     return item.get("name", str(item)) if isinstance(item, dict) else str(item)
