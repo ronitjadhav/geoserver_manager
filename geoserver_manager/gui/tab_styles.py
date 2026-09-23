@@ -148,11 +148,44 @@ class StyleTabMixin:
         if not isinstance(definition, dict):
             return ("-", "-")
         return (
-            str(definition.get("format") or "sld").lower(),
+            self._style_format(definition),
             self._language_version(definition) or "-",
         )
 
+    @staticmethod
+    def _style_format(definition):
+        """A style's format as GeoServer names it, in lower case; SLD if unsaid."""
+        definition = definition if isinstance(definition, dict) else {}
+        return str(definition.get("format") or "sld").lower()
+
     # -- Body ------------------------------------------------------------------
+
+    def _style_with_body(self, name, workspace_name):
+        """(definition, format, body) of one style. Runs in a worker."""
+        definition = self._check(self.gs.get_style_definition(name, workspace_name))
+        definition = definition if isinstance(definition, dict) else {}
+        style_format = self._style_format(definition)
+        return (
+            definition,
+            style_format,
+            self._style_body(name, workspace_name, style_format),
+        )
+
+    def _sld_of(self, name, workspace_name, label=None):
+        """A style's SLD, what QGIS reads; ValueError for any other format.
+
+        Refused here rather than handed to QGIS to fail on. Runs in a worker;
+        the layer tree's Apply style goes through it too.
+        """
+        definition = self._check(self.gs.get_style_definition(name, workspace_name))
+        style_format = self._style_format(definition)
+        if style_format != "sld":
+            raise ValueError(
+                translate(
+                    "StyleTabMixin", "'{}' is a {} style. QGIS can only read SLD."
+                ).format(label or name, style_format.upper())
+            )
+        return self._style_body(name, workspace_name, "sld")
 
     def _style_body(self, name, workspace_name, style_format):
         """The style document itself (SLD, CSS, …), as text.
@@ -325,18 +358,9 @@ class StyleTabMixin:
         """Open a style: definition read-only, body editable for SLD/MBStyle."""
         name, workspace_name = row_data[0], scope(row_data[1])
 
-        def fetch():
-            definition = self._check(self.gs.get_style_definition(name, workspace_name))
-            definition = definition if isinstance(definition, dict) else {}
-            style_format = str(definition.get("format") or "sld").lower()
-            return (
-                definition,
-                style_format,
-                self._style_body(name, workspace_name, style_format),
-            )
-
         fetched = self._fetch(
-            fetch, translate("StyleTabMixin", "Failed to load style '{}'").format(name)
+            lambda: self._style_with_body(name, workspace_name),
+            translate("StyleTabMixin", "Failed to load style '{}'").format(name),
         )
         if fetched is None:
             return
@@ -640,22 +664,8 @@ class StyleTabMixin:
         than handed over for QGIS to fail on.
         """
         name, workspace_name = row_data[0], scope(row_data[1])
-        fetched = self._fetch(
-            lambda: self._check(self.gs.get_style_definition(name, workspace_name)),
-            translate("StyleTabMixin", "Failed to load style '{}'").format(name),
-        )
-        if fetched is None:
-            return None
-        style_format = str((fetched or {}).get("format") or "sld").lower()
-        if style_format != "sld":
-            self.show_warning_message(
-                translate(
-                    "StyleTabMixin", "'{}' is a {} style. QGIS can only read SLD."
-                ).format(name, style_format.upper())
-            )
-            return None
         return self._fetch(
-            lambda: self._style_body(name, workspace_name, "sld"),
+            lambda: self._sld_of(name, workspace_name),
             translate("StyleTabMixin", "Failed to load the SLD of '{}'").format(name),
         )
 
@@ -724,21 +734,15 @@ class StyleTabMixin:
     def _save_style_to_disk(self, row_data):
         """Write a style's body to a file the user picks."""
         name, workspace_name = row_data[0], scope(row_data[1])
-        definition = self._fetch(
-            lambda: self._check(self.gs.get_style_definition(name, workspace_name)),
+        fetched = self._fetch(
+            lambda: self._style_with_body(name, workspace_name),
             translate("StyleTabMixin", "Failed to load style '{}'").format(name),
         )
-        if definition is None:
+        if fetched is None:
             return
-        style_format = str((definition or {}).get("format") or "sld").lower()
-        body = self._fetch(
-            lambda: self._style_body(name, workspace_name, style_format),
-            translate("StyleTabMixin", "Failed to load the body of '{}'").format(name),
-        )
-        if body is None:
-            return
+        definition, style_format, body = fetched
 
-        suggested = (definition or {}).get("filename") or f"{name}.{style_format}"
+        suggested = definition.get("filename") or f"{name}.{style_format}"
         path, _selected = QFileDialog.getSaveFileName(
             self,
             translate("StyleTabMixin", "Save style '{}'").format(name),

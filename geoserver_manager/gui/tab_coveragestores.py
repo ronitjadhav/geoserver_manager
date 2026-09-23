@@ -24,7 +24,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.toolbelt.payload import bbox_text
+from geoserver_manager.toolbelt.payload import bbox_text, keyword_list
 from geoserver_manager.toolbelt.qgis_export import (
     export_to_geotiff,
     geoserver_name,
@@ -264,7 +264,6 @@ class CoverageStoreTabMixin:
             "workspace": (detail.get("workspace") or {}).get("name", ""),
             "type": detail.get("type", ""),
             "url": detail.get("url", ""),
-            "enabled": str(detail.get("enabled", "")),
             "description": detail.get("description", ""),
             "coverages": "\n".join(published) or "-",
         }
@@ -351,19 +350,16 @@ class CoverageStoreTabMixin:
             for band in dimensions
             if isinstance(band, dict)
         )
-        keywords = (detail.get("keywords") or {}).get("string") or []
-        if isinstance(keywords, str):
-            keywords = [keywords]
+        keywords = keyword_list(detail.get("keywords"))
 
         return {
             "native_name": detail.get("nativeName", ""),
             "title": detail.get("title", ""),
             "srs": detail.get("srs", ""),
             "native_format": detail.get("nativeFormat", ""),
-            "enabled": str(detail.get("enabled", "")),
             "size": size,
             "bounds": bounds,
-            "keywords": ", ".join(str(keyword) for keyword in keywords),
+            "keywords": ", ".join(keywords),
             # The abstract is what the capabilities carry; "description" is
             # GeoServer's own "Generated from <file>" note on a configured
             # coverage, worth showing only when nobody wrote an abstract.
@@ -791,13 +787,7 @@ class CoverageStoreTabMixin:
         # create_coverage_store POSTs to the collection, and GeoServer answers
         # 409 for a name in use, but the message is clearer from here, and the
         # mosaic calls are PUTs, which overwrite the store instead.
-        if self._resource_exists(self.gs.get_coverage_store, ws_name, name):
-            raise ValueError(
-                translate(
-                    "CoverageStoreTabMixin",
-                    "Coverage store '{}' already exists in '{}'.",
-                ).format(name, ws_name)
-            )
+        self._refuse_existing_store(ws_name, name)
 
         if store_type == MOSAIC_DIRECTORY:
             self._check(
@@ -836,13 +826,7 @@ class CoverageStoreTabMixin:
 
         def check():
             self._require_safe_name(name)
-            if self._resource_exists(self.gs.get_coverage_store, ws_name, name):
-                raise ValueError(
-                    translate(
-                        "CoverageStoreTabMixin",
-                        "Coverage store '{}' already exists in '{}'.",
-                    ).format(name, ws_name)
-                )
+            self._refuse_existing_store(ws_name, name)
             return Path(values["zip"])
 
         source = self._fetch(check, failure)
@@ -866,14 +850,7 @@ class CoverageStoreTabMixin:
             {"configure": "none"},
             {"Content-Type": "application/zip", "Accept": "application/json"},
             created,
-            lambda _task: self._report_cancelled_upload(
-                translate("CoverageStoreTabMixin", "coverage store"),
-                translate("CoverageStoreTabMixin", "Coverage Stores"),
-                lambda: self._resource_exists(
-                    self.gs.get_coverage_store, ws_name, name
-                ),
-                name,
-            ),
+            self._store_upload_cancelled(ws_name, name),
         )
 
     def _publish_qgis_raster(self, values, layer=None, on_done=None):
@@ -960,17 +937,27 @@ class CoverageStoreTabMixin:
             {"configure": "first", "coverageName": name},
             {"Content-Type": "image/tiff"},
             published,
-            lambda _task: self._report_cancelled_upload(
-                translate("CoverageStoreTabMixin", "coverage store"),
-                translate("CoverageStoreTabMixin", "Coverage Stores"),
-                lambda: self._resource_exists(
-                    self.gs.get_coverage_store, ws_name, name
-                ),
-                name,
-            ),
+            self._store_upload_cancelled(ws_name, name),
             folder=folder,
             after=after,
             on_done=on_done,
+        )
+
+    def _refuse_existing_store(self, ws_name, name, hint=""):
+        """Raise when the store exists: its creators upsert, or PUT over it."""
+        if self._resource_exists(self.gs.get_coverage_store, ws_name, name):
+            message = translate(
+                "CoverageStoreTabMixin", "Coverage store '{}' already exists in '{}'."
+            ).format(name, ws_name)
+            raise ValueError(f"{message} {hint}".strip())
+
+    def _store_upload_cancelled(self, ws_name, name):
+        """The on_cancel of a store upload: say what the server was left with."""
+        return lambda _task: self._report_cancelled_upload(
+            translate("CoverageStoreTabMixin", "coverage store"),
+            translate("CoverageStoreTabMixin", "Coverage Stores"),
+            lambda: self._resource_exists(self.gs.get_coverage_store, ws_name, name),
+            name,
         )
 
     def _prepare_qgis_raster(self, ws_name, name, values, layer=None):
@@ -1001,16 +988,11 @@ class CoverageStoreTabMixin:
                     "uploaded as they are.",
                 ).format(layer.name())
             )
-        if not values.get("replace") and self._resource_exists(
-            self.gs.get_coverage_store, ws_name, name
-        ):
-            raise ValueError(
-                translate(
-                    "CoverageStoreTabMixin",
-                    "Coverage store '{}' already exists in '{}'.",
-                ).format(name, ws_name)
-                + " "
-                + translate("CoverageStoreTabMixin", "Tick Replace to overwrite it.")
+        if not values.get("replace"):
+            self._refuse_existing_store(
+                ws_name,
+                name,
+                translate("CoverageStoreTabMixin", "Tick Replace to overwrite it."),
             )
         source = local_geotiff_path(layer)
         if source is not None:
@@ -1047,8 +1029,7 @@ class CoverageStoreTabMixin:
             ),
             cascade=translate(
                 "CoverageStoreTabMixin",
-                "The delete recurses: the store, its coverages and the layers "
-                "published from them all go. The raster files themselves stay "
-                "on the server.\n\n",
+                "Its coverages and the layers published from them are deleted "
+                "too. The raster files stay on the server.",
             ),
         )

@@ -429,7 +429,7 @@ class TestSettingsExtras(unittest.TestCase):
         self.assertEqual(
             self.settings.geoserver_url, "http://old.example.org/geoserver"
         )
-        self.assertTrue(any("must not carry" in m for m in self.pushed), self.pushed)
+        self.assertTrue(any("out of the URL" in m for m in self.pushed), self.pushed)
         with patch("geoserver_manager.gui.dlg_settings.probe") as probe:
             self.page.test_connection()
         probe.assert_not_called()

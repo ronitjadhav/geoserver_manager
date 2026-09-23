@@ -13,7 +13,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.toolbelt.payload import bbox_text
+from geoserver_manager.toolbelt.payload import bbox_text, keyword_list
 
 # GeoServer's own `type` values. The Type column carries them, and every
 # action reads the row's type to pick the WMS or the WMTS endpoint.
@@ -271,11 +271,7 @@ class CascadedStoreTabMixin:
     def _cascaded_layer_form_values(self, detail):
         """Prefill for the layer viewer, from the library's dict or GeoServer's
         raw payload; the keywords differ in shape between the two."""
-        keywords = detail.get("keywords") or []
-        if isinstance(keywords, dict):  # raw payload: {"string": [...]}
-            keywords = keywords.get("string") or []
-        if isinstance(keywords, str):
-            keywords = [keywords]
+        keywords = keyword_list(detail.get("keywords"))
         return {
             "native_name": detail.get("nativeName", ""),
             "title": str(detail.get("title") or ""),

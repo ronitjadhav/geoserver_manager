@@ -20,7 +20,7 @@ from qgis.PyQt.QtWidgets import QApplication, QDialog, QMessageBox
 
 from geoserver_manager.gui.dlg_preview import LayerPreviewDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.toolbelt.payload import bbox_text
+from geoserver_manager.toolbelt.payload import bbox_text, keyword_list, text_of
 from geoserver_manager.toolbelt.qgis_export import (
     export_to_geopackage,
     geoserver_name,
@@ -197,11 +197,9 @@ class LayerTabMixin:
         layer; the workspace-less list is the one place they all appear.
         """
         payload = self._raw_rest("get", self._layers_url()).json()
-        layers = payload.get("layers") if isinstance(payload, dict) else None
-        layers = layers.get("layer") if isinstance(layers, dict) else None
-        if isinstance(layers, dict):  # a single layer is not a list
-            layers = [layers]
-        return sorted(self._name_of(layer) for layer in layers or [])
+        return sorted(
+            self._name_of(layer) for layer in self._unwrap(payload, "layers", "layer")
+        )
 
     def _layer_summary(self, qualified_name):
         """(type, store, default style) of one layer. Raises on HTTP errors.
@@ -259,11 +257,7 @@ class LayerTabMixin:
         # The library's FeatureType.asdict() normalises keywords to a list and
         # attributes to a list; raw REST wraps them ({"string": […]},
         # {"attribute": […]}). Accept both: a live server showed the difference.
-        keywords = detail.get("keywords") or []
-        if isinstance(keywords, dict):
-            keywords = keywords.get("string") or []
-        if isinstance(keywords, str):
-            keywords = [keywords]
+        keywords = keyword_list(detail.get("keywords"))
 
         bounds = bbox_text(detail.get("nativeBoundingBox")) or "-"
 
@@ -283,12 +277,6 @@ class LayerTabMixin:
             or "-"
         )
 
-        def as_text(value):
-            """title/abstract are a string, or a dict of translations."""
-            if isinstance(value, dict):
-                return "; ".join(f"{k}: {v}" for k, v in sorted(value.items()))
-            return value or ""
-
         return {
             "name": name,
             "native_name": detail.get("nativeName", ""),
@@ -298,8 +286,8 @@ class LayerTabMixin:
             "projection_policy": detail.get("projectionPolicy", ""),
             "enabled": bool(detail.get("enabled", True)),
             "advertised": bool(detail.get("advertised", True)),
-            "title": as_text(detail.get("title")),
-            "abstract": as_text(detail.get("abstract")),
+            "title": text_of(detail.get("title")),
+            "abstract": text_of(detail.get("abstract")),
             "keywords": ", ".join(str(k) for k in keywords),
             "bbox": bounds,
             "attributes": attribute_text,
@@ -432,11 +420,7 @@ class LayerTabMixin:
             workspace_name, datastore_name
         )
         payload = self._raw_rest("get", path, params={"list": "available"}).json()
-        listing = payload.get("list") if isinstance(payload, dict) else None
-        names = listing.get("string") if isinstance(listing, dict) else []
-        if isinstance(names, str):  # a single table comes back unwrapped
-            names = [names]
-        return sorted(names or [])
+        return sorted(self._unwrap(payload, "list", "string"))
 
     def _publish_fields(self, workspace_names):
         """Field definitions for the publish form; combos cascade at runtime."""
@@ -1599,7 +1583,7 @@ class LayerTabMixin:
             cascade=translate(
                 "LayerTabMixin",
                 "The published layer goes too; the table, file or remote layer "
-                "behind it is not touched. GeoServer refuses if a layer group "
-                "still uses the layer, remove it from the group first.\n\n",
+                "behind it is not touched. GeoServer refuses while a layer group "
+                "still uses the layer: remove it from the group first.",
             ),
         )

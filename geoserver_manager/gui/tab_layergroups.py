@@ -15,7 +15,7 @@ from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.scope import GLOBAL, scope
-from geoserver_manager.toolbelt.payload import bbox_text, unwrap
+from geoserver_manager.toolbelt.payload import bbox_text, text_of, unwrap
 
 # GeoServer's LayerGroupInfo.Mode enum. Spelled out rather than imported from
 # geoservercloud.models: the bundled wheels only reach sys.path once the plugin
@@ -209,13 +209,6 @@ class LayerGroupTabMixin:
 
     # -- View ------------------------------------------------------------------
 
-    @staticmethod
-    def _as_text(value):
-        """A GeoServer text field, which may be internationalised, as one line."""
-        if isinstance(value, dict):
-            return "; ".join(f"{lang}: {text}" for lang, text in value.items())
-        return "" if value is None else str(value)
-
     @classmethod
     def _group_form_values(cls, detail, name, workspace_label):
         """Prefill for the detail dialog. Pure, so it is unit-testable."""
@@ -232,11 +225,9 @@ class LayerGroupTabMixin:
             "name": name,
             "workspace": workspace_label,
             "mode": _mode_label(detail.get("mode", "")),
-            "title": cls._as_text(
-                detail.get("internationalTitle") or detail.get("title")
-            ),
+            "title": text_of(detail.get("internationalTitle") or detail.get("title")),
             # GeoServer stores the abstract under "abstractTxt".
-            "abstract": cls._as_text(
+            "abstract": text_of(
                 detail.get("internationalAbstract") or detail.get("abstractTxt")
             ),
             "layers": "\n".join(lines),
