@@ -341,7 +341,7 @@ class CoverageStoreTabMixin:
         detail, published = fetched
         before = self._coverage_store_form_values(detail, published)
         dlg = ResourceFormDialog(
-            title=translate("CoverageStoreTabMixin", "Coverage Store '{}'").format(
+            title=translate("CoverageStoreTabMixin", "Edit Coverage Store '{}'").format(
                 name
             ),
             fields=self._coverage_store_info_fields(),

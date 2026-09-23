@@ -61,7 +61,7 @@ from geoserver_manager.toolbelt.log_handler import PlgLogger
 from geoserver_manager.toolbelt.payload import as_list, name_of, unwrap
 from geoserver_manager.toolbelt.preferences import PlgOptionsManager
 from geoserver_manager.toolbelt.probe import probe
-from geoserver_manager.toolbelt.rest import raw_rest, summarise_body
+from geoserver_manager.toolbelt.rest import PartlySaved, raw_rest, summarise_body
 
 # Listing a nested resource needs one GET per parent plus one per item. Eight
 # parallel requests keep that bearable. They run inside a _FetchTask, so they
@@ -1488,6 +1488,11 @@ class GeoServerMainDialog(
         try:
             action()
             return True
+        except PartlySaved as e:
+            self.show_warning_message(str(e))
+            self.log(str(e), log_level=Qgis.MessageLevel.Warning)
+            self._reload_current_tab()
+            return False
         except _Abandoned:
             # The user pressed Cancel: they know, and there is nothing to report.
             return False

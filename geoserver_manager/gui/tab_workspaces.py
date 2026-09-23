@@ -11,6 +11,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.toolbelt.rest import PartlySaved
 
 # GeoServer spells the WMS abstract "abstrct" in its JSON, a typo old enough to
 # be API. Keywords and the SRS list arrive wrapped as {"string": [...]}.
@@ -395,12 +396,14 @@ class WorkspaceTabMixin:
     def _service_settings(self, service, workspace_name):
         """(own settings or None, the global ones). Runs in a worker."""
         base = self.gs.rest_service.rest_endpoints.base_url
-        response = self.gs.rest_service.rest_client.get(
-            self._service_settings_path(service, workspace_name)
+        path = self._service_settings_path(service, workspace_name)
+        # 404 means "no own settings": asked first, so any other failure of
+        # the read below carries GeoServer's reason.
+        own = (
+            self._raw_rest("get", path).json().get(service)
+            if self.gs.rest_service.resource_exists(path)
+            else None
         )
-        own = response.json().get(service) if response.status_code == 200 else None
-        if response.status_code not in (200, 404):
-            raise RuntimeError(f"HTTP {response.status_code}: {service.upper()}")
         overall = self._raw_rest(
             "get", f"{base}/services/{service}/settings.json"
         ).json()
@@ -526,7 +529,16 @@ class WorkspaceTabMixin:
                 )
             self._check(self.gs.create_workspace(name, isolated=values["isolated"]))
             if (values.get("uri") or "").strip():
-                self._put_namespace_uri(name, values["uri"].strip())
+                try:
+                    self._put_namespace_uri(name, values["uri"].strip())
+                except Exception as error:
+                    raise PartlySaved(
+                        translate(
+                            "WorkspaceTabMixin",
+                            "Workspace '{}' created, but its namespace URI could "
+                            "not be set: {}",
+                        ).format(name, self._error_text(error))
+                    ) from error
         else:
             # One PUT, rename or not (create_workspace would POST, get a 409,
             # then PUT).
@@ -686,14 +698,24 @@ class WorkspaceTabMixin:
         warning = self._save_workspace(values, old_name=old_name)
         name = values["name"]
         uri = (values.get("uri") or "").strip()
-        if old_uri is not None and uri and uri != old_uri:
-            self._put_namespace_uri(name, uri)
-        self._apply_wms_settings(name, values, had_wms)
-        for service in OTHER_SERVICES:
-            if f"{service}_own" in values:
-                self._apply_service_settings(
-                    service, name, values, (had_services or {}).get(service, False)
-                )
+        try:
+            if old_uri is not None and uri != old_uri:
+                # Emptied: back to GeoServer's own default, not left as it was.
+                self._put_namespace_uri(name, uri or f"http://{name}")
+            self._apply_wms_settings(name, values, had_wms)
+            for service in OTHER_SERVICES:
+                if f"{service}_own" in values:
+                    self._apply_service_settings(
+                        service, name, values, (had_services or {}).get(service, False)
+                    )
+        except Exception as error:
+            raise PartlySaved(
+                translate(
+                    "WorkspaceTabMixin",
+                    "Workspace '{}' saved, but its namespace or service settings "
+                    "were not: {}",
+                ).format(name, self._error_text(error))
+            ) from error
         return warning
 
     def _delete_workspace(self, row_data):

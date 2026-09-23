@@ -12,6 +12,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.toolbelt.rest import PartlySaved
 
 # Datastore types this form has dedicated fields for. Every other type still
 # opens in the generic "key = value" editor.
@@ -94,10 +95,26 @@ _TYPE_SPECIFIC_FIELDS = tuple(
 translate = QCoreApplication.translate
 
 
+# Words that make a parameter secret, matched on its letters only: cloud
+# range readers name theirs "…secret-access-key" or "…account.key".
+_SECRET_WORDS = (
+    "passwd",
+    "password",
+    "secret",
+    "token",
+    "accesskey",
+    "accountkey",
+    "apikey",
+    "credential",
+)
+
+
 def _is_secret(key):
-    """A parameter to mask: `passwd`, `WFSDataStoreFactory:PASSWORD`, a `…secret`
-    or `…token`, not `key`, which would hide "Expose primary keys"."""
-    return key.lower().endswith(("passwd", "password", "secret", "token"))
+    """A parameter to mask: `passwd`, `WFSDataStoreFactory:PASSWORD`, an access
+    or account key, a secret or a token; not a bare `key`, which would hide
+    "Expose primary keys"."""
+    letters = "".join(c for c in key.lower() if c.isalpha())
+    return any(word in letters for word in _SECRET_WORDS)
 
 
 def _as_int(value, default):
@@ -846,6 +863,9 @@ class DatastoreTabMixin:
             merged["pmtiles"] = values.get("pmtiles_url", "")
         elif ds_type in (_SHAPEFILE, _SHAPEFILE_DIRECTORY, _GEOPACKAGE):
             merged.update(self._file_store_params(ds_type, values))
+            if ds_type != _GEOPACKAGE and not (values.get("charset") or "").strip():
+                # Blank means "GeoServer's default": the merge kept the old one.
+                merged.pop("charset", None)
         elif ds_type == _WFS:
             params = self._wfs_params(values, conn_params)
             merged.update(params)
@@ -865,7 +885,8 @@ class DatastoreTabMixin:
             merged = self._merge_other_params(
                 merged, conn_params, ds_type, values["other_params"]
             )
-        if old_name and values["name"] != old_name:
+        renamed = bool(old_name and values["name"] != old_name)
+        if renamed:
             self._rename_datastore(values["workspace"], old_name, values["name"])
 
         # The form's own checkbox wins; without one (older callers, tests) the
@@ -876,18 +897,30 @@ class DatastoreTabMixin:
         if isinstance(enabled, str):  # .json gives a bool, but do not assume
             enabled = enabled.strip().lower() == "true"
 
-        self._check(
-            self.gs.create_datastore(
-                workspace_name=values["workspace"],
-                datastore_name=values["name"],
-                datastore_type=ds_type,
-                connection_parameters=merged,
-                # "" clears it; None would leave the key out of the PUT, and
-                # GeoServer keeps what it had (measured on 2.28.5).
-                description=values.get("description") or "",
-                enabled=bool(enabled),
+        try:
+            self._check(
+                self.gs.create_datastore(
+                    workspace_name=values["workspace"],
+                    datastore_name=values["name"],
+                    datastore_type=ds_type,
+                    connection_parameters=merged,
+                    # "" clears it; None would leave the key out of the PUT, and
+                    # GeoServer keeps what it had (measured on 2.28.5).
+                    description=values.get("description") or "",
+                    enabled=bool(enabled),
+                )
             )
-        )
+        except Exception as error:
+            if not renamed:
+                raise
+            # The table still showed the old name, whose row now answered 404.
+            raise PartlySaved(
+                translate(
+                    "DatastoreTabMixin",
+                    "Datastore renamed to '{}', but the rest of the edit was not "
+                    "saved: {}",
+                ).format(values["name"], self._error_text(error))
+            ) from error
 
     @staticmethod
     def _kept_port(stored, values):

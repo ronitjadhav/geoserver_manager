@@ -1200,6 +1200,8 @@ class LayerTabMixin:
         # The checks are reads: off the GUI thread (the export below is not).
         self._wait_for(lambda: self._refuse_vector_clash(ws_name, name, values))
 
+        # Before the export: a failure here used to leave the GeoPackage behind.
+        sld = layer_to_sld(layer) if values.get("with_style") else None
         # A CRS without an EPSG code would be published as UNKNOWN: the export
         # reprojects it to one GeoServer can declare (reprojection_target).
         folder = Path(tempfile.mkdtemp(prefix="gsm_publish_"))
@@ -1211,7 +1213,6 @@ class LayerTabMixin:
         except Exception:
             shutil.rmtree(folder, ignore_errors=True)
             raise
-        sld = layer_to_sld(layer) if values.get("with_style") else None
         upload_path = (
             f"{self.gs.rest_service.rest_endpoints.base_url}"
             f"/workspaces/{quote(ws_name, safe='')}/datastores/{quote(name, safe='')}"
@@ -1602,16 +1603,21 @@ class LayerTabMixin:
         values = dlg.get_values()
         # The export reads a live QGIS layer, so it happens here on the GUI
         # thread, before the upload (invariant 9).
-        layer = self._picked_layer(values)
+        picked = []
         sld = self._fetch(
-            lambda: layer_to_sld(layer),
+            # Resolved in here: a layer removed from the project since the form
+            # opened raised a traceback out of this handler.
+            lambda: layer_to_sld(
+                picked.append(self._picked_layer(values)) or picked[0]
+            ),
             translate("LayerTabMixin", "Could not export the symbology of '{}'").format(
-                layer.name()
+                values.get("qgis_layer", "")
             ),
             in_worker=False,
         )
         if sld is None:
             return
+        layer = picked[0]
 
         style_name = geoserver_name(values["style"])
         outcome = {}

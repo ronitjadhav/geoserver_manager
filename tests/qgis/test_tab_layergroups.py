@@ -339,7 +339,7 @@ class TestCreateLayerGroup(unittest.TestCase):
                 "name": "ws_group",
                 "workspace": "topp",
                 "mode": "NAMED",
-                "layers": "tasmania_roads\nne:coastlines",
+                "layers": "tasmania_roads\ntopp:states",
             }
         )
         (_verb, path, kwargs) = self.posted()[0]
@@ -348,8 +348,22 @@ class TestCreateLayerGroup(unittest.TestCase):
         self.assertEqual(group["workspace"], {"name": "topp"})
         self.assertEqual(
             [item["name"] for item in group["publishables"]["published"]],
-            ["topp:tasmania_roads", "ne:coastlines"],
+            ["topp:tasmania_roads", "topp:states"],
         )
+
+    def test_a_workspace_group_refuses_another_workspaces_layer(self):
+        # GeoServer answers a bare 500 for it, after the form has closed.
+        with self.assertRaises(ValueError) as caught:
+            self.dlg._create_layer_group_from_values(
+                {
+                    "name": "ws_group",
+                    "workspace": "topp",
+                    "mode": "NAMED",
+                    "layers": "tasmania_roads\nne:coastlines",
+                }
+            )
+        self.assertIn("ne:coastlines", str(caught.exception))
+        self.assertEqual(self.posted(), [])
 
     def test_a_style_per_layer_is_sent_parallel_to_the_layers(self):
         self.dlg._create_layer_group_from_values(

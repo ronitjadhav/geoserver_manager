@@ -17,6 +17,7 @@ import xml.etree.ElementTree as ElementTree
 from urllib.parse import quote
 from xml.sax.saxutils import escape
 
+from qgis.core import Qgis
 from qgis.PyQt import sip
 from qgis.PyQt.QtCore import QCoreApplication, QTimer
 from qgis.PyQt.QtWidgets import QDialog, QDialogButtonBox
@@ -253,6 +254,13 @@ class GwcTabMixin:
         ):
             if error is None:
                 published |= {f"{ws_name}:{self._name_of(item)}" for item in items}
+            else:
+                # In a worker, so logged: silent, its groups just went missing.
+                self.log(
+                    f"Tile cache: the layer groups of '{ws_name}' could not be "
+                    f"listed: {self._error_text(error)}",
+                    log_level=Qgis.MessageLevel.Warning,
+                )
         return sorted(published - set(self._gwc_layer_names()))
 
     @staticmethod
