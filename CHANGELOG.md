@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Edit a layer** instead of going to GeoServer's web interface: rename it,
+  change its title, abstract, keywords, SRS and projection policy, turn it
+  on or off, hide it from the capabilities, and filter it with CQL (vector
+  layers). Save sends only what changed; a rename carries the layer groups
+  and the tile cache along. Vector and raster layers; a cascaded layer stays
+  read-only, since GeoServer's REST API cannot edit one.
+- **Update from the data** (Layers tab): GeoServer re-reads the table or file
+  behind a layer and recomputes its bounds.
+- **Set style** also manages the other styles a layer offers to clients.
 - **Server profiles.** The settings page keeps several connections (dev,
   staging, prod…), each with its own credentials in the QGIS authentication
   database. With two or more, the dialog shows a list beside its status line

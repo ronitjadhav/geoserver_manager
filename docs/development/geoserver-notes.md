@@ -81,6 +81,16 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   carry **`dbtype: geopkg`** (that is how GeoServer picks the factory), and an empty `charset` is omitted
   rather than sent blank, because blank is not "use your default". GeoServer fills in `namespace` itself, and
   the edit merge keeps it along with everything else the form does not show.
+- **Editing a layer is one partial resource PUT** (row 53 of #50). Measured on 2.28.5: a
+  `PUT …/featuretypes/{ft}.json` or `…/coverages/{c}.json` with only some of title, abstract, keywords,
+  srs, projectionPolicy, enabled, advertised, cqlFilter and name merges and keeps the rest (bounds,
+  attributes, grid, bands). An empty title, abstract, keyword list or filter clears it. A rename carries
+  the layer groups that use the layer and its GWC layer along (the native name stays). `enabled` is the
+  resource's: `/rest/layers` ignores it. `?recalculate=nativebbox,latlonbbox` recomputes both boxes, and
+  `POST …/{ft|c}/reset` makes GeoServer re-read the source. The other allowed styles are the layer's
+  `styles` (the library's `update_layer` sends them; a workspace style as `ws:style`, an empty list
+  clears). **Cascaded WMS layers cannot be edited over REST**: any PUT on `…/wmslayers/{l}`, JSON, XML
+  or the document a GET returned, fails with `UnsupportedOperationException`.
 - **Publishing a table: send no bounding box** (row 52 of #50). The facade's `create_feature_type(epsg=…)`
   fills both boxes from a table of three EPSG codes, so it raises `KeyError` for any other code and gives
   those three a world extent. A POST without either box makes GeoServer compute both from the data
