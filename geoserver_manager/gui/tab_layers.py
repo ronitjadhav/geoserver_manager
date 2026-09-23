@@ -688,13 +688,140 @@ class LayerTabMixin:
             )
             self._load_layers()
 
+    def _publish_layers(self, layers):
+        """Publish several project layers into one workspace, one after another.
+
+        One small form (workspace, Replace, style) for all of them; each layer
+        keeps its own GeoServer-safe name. Only one upload runs at a time, so
+        each layer starts when the previous one has ended. A layer refused
+        before any request, or whose upload fails, is reported and skipped;
+        Cancel stops the batch, and the summary names what was published and
+        what was not.
+        """
+        names = [geoserver_name(layer.name()) for layer in layers]
+        clashes = sorted({name for name in names if names.count(name) > 1})
+        if clashes:
+            # Published one after another, the second would replace the first
+            # (with Replace) or be refused as existing (without it).
+            self.show_warning_message(
+                translate(
+                    "LayerTabMixin",
+                    "These layers would get the same GeoServer name: {}. "
+                    "Rename them in QGIS first.",
+                ).format(", ".join(clashes))
+            )
+            return
+        if not self._upload_slot_free():
+            return
+        workspace_names = self._fetch(
+            self._get_workspace_names,
+            translate("LayerTabMixin", "Failed to load the workspaces"),
+        )
+        if workspace_names is None:
+            return
+        if not workspace_names:
+            self.show_warning_message(
+                translate(
+                    "LayerTabMixin",
+                    "No workspaces available. Create a workspace first.",
+                )
+            )
+            return
+        fields = [
+            dict(field, visible=True)
+            for field in self._publish_fields(workspace_names)
+            if field["key"] in ("workspace", "replace", "with_style")
+        ]
+        listing = "\n".join(
+            f"  • {layer.name()} → {name}" for layer, name in zip(layers, names)
+        )
+        dlg = ResourceFormDialog(
+            title=translate("LayerTabMixin", "Publish %n Layer(s)", None, len(layers)),
+            description=translate(
+                "LayerTabMixin",
+                "Each layer is uploaded on its own, under the name shown: a vector "
+                "as a GeoPackage datastore, a raster as a GeoTIFF coverage store."
+                "\n\n{}",
+            ).format(listing),
+            fields=fields,
+            parent=self,
+            ok_label=translate("LayerTabMixin", "Publish"),
+        )
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        values = dlg.get_values()
+        queue = list(zip(layers, names))
+        published, failed = [], []
+
+        def summary(stopped):
+            left = [name for _layer, name in queue]
+            if not failed and not left:
+                self.show_success_message(
+                    translate(
+                        "LayerTabMixin", "%n layer(s) published.", None, len(published)
+                    )
+                )
+                return
+            parts = [
+                translate("LayerTabMixin", "Published: {}.").format(
+                    ", ".join(published) or "-"
+                )
+            ]
+            if failed:
+                parts.append(
+                    translate("LayerTabMixin", "Failed: {}.").format(", ".join(failed))
+                )
+            if stopped and left:
+                parts.append(
+                    translate("LayerTabMixin", "Not started: {}.").format(
+                        ", ".join(left)
+                    )
+                )
+            self.show_warning_message(" ".join(parts))
+
+        def next_layer():
+            if not queue:
+                summary(stopped=False)
+                return
+            layer, name = queue.pop(0)
+
+            def done(outcome):
+                if outcome == "cancelled":
+                    # The cancelled layer itself is reported by the upload.
+                    summary(stopped=True)
+                    return
+                (published if outcome == "done" else failed).append(name)
+                next_layer()
+
+            started = []
+            self._run_action(
+                lambda: started.append(
+                    self._publish_qgis_layer(
+                        {
+                            "workspace": values["workspace"],
+                            "name": layer.name(),
+                            "replace": values.get("replace"),
+                            "with_style": values.get("with_style"),
+                        },
+                        layer=layer,
+                        on_done=done,
+                    )
+                ),
+                translate("LayerTabMixin", "Failed to publish '{}'").format(name),
+            )
+            if started != [True]:
+                failed.append(name)
+                next_layer()
+
+        next_layer()
+
     def _publish_layer_from_values(self, values):
         """Publish from whichever source the form was filled for."""
         if values.get("source") == _SOURCE_QGIS:
             return self._publish_qgis_layer(values)
         return self._publish_table(values)
 
-    def _publish_qgis_layer(self, values):
+    def _publish_qgis_layer(self, values, layer=None, on_done=None):
         """Upload a QGIS layer and publish it: a GeoPackage datastore for a
         vector, a GeoTIFF coverage store for a raster.
 
@@ -711,17 +838,22 @@ class LayerTabMixin:
         follow on the GUI thread once it lands. A raster goes down the Coverage
         Stores tab's path (_publish_qgis_raster), the same Replace semantics.
 
+        `layer` overrides the form's pick (a batch hands each one in), and
+        `on_done(outcome)` runs once the upload has ended however it ended.
+        Returns True when an upload started, so a batch can tell a layer
+        refused before any request from one still on its way.
+
         TODO(#50): upstream as create_datastore_from_file(ws, name, path); the
         library can only create datastores from connection parameters, so the
         upload is a raw PUT of .../datastores/{name}/file.gpkg (row 28).
         """
         if not self._upload_slot_free():
-            return
+            return False
         ws_name = values["workspace"]
         name = geoserver_name(values["name"])
-        layer = self._picked_layer(values)
+        layer = layer or self._picked_layer(values)
         if isinstance(layer, QgsRasterLayer):
-            self._publish_qgis_raster(
+            return self._publish_qgis_raster(
                 {
                     "workspace": ws_name,
                     "name": values["name"],
@@ -730,8 +862,8 @@ class LayerTabMixin:
                     "abstract": values.get("abstract", ""),
                 },
                 layer=layer,
+                on_done=on_done,
             )
-            return
         require_crs(layer)
         if not values.get("replace"):
             for exists, message in (
@@ -807,7 +939,7 @@ class LayerTabMixin:
             # The user may have moved to another tab while it uploaded.
             self._reload_current_tab()
 
-        self._upload_file(
+        return self._upload_file(
             failure,
             self.gs.rest_service.rest_client,
             upload_path,
@@ -822,6 +954,7 @@ class LayerTabMixin:
                 name,
             ),
             folder=folder,
+            on_done=on_done,
         )
 
     def _make_datastore_read_only(self, workspace_name, name):

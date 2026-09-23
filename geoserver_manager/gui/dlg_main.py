@@ -520,7 +520,7 @@ class GeoServerMainDialog(
             "_side", failure_message, work, on_success, lambda task: None, quiet=True
         )
 
-    def _run_upload(self, failure_message, work, on_success, on_cancel):
+    def _run_upload(self, failure_message, work, on_success, on_cancel, on_done=None):
         """Stream a long PUT off the GUI thread, with progress and Cancel.
 
         `work(task)` runs in a worker: give it everything it needs as
@@ -549,6 +549,7 @@ class GeoServerMainDialog(
             on_success,
             on_cancel,
             busy_text=self.tr("Uploading…"),
+            on_done=on_done,
         )
         return True
 
@@ -561,13 +562,16 @@ class GeoServerMainDialog(
         on_cancel,
         busy_text=None,
         quiet=False,
+        on_done=None,
     ):
         """Park a _FetchTask in `slot` ("_task" or "_upload") and start it.
 
         The two slots never cancel each other. `finished` comes back on the
         GUI thread: a cancel (the user's, a superseding load's, or our own
         abort raised inside the worker) goes to on_cancel, an exception is
-        reported, anything else is on_success(result).
+        reported, anything else is on_success(result). `on_done(outcome)`
+        then runs once, with "done", "failed" or "cancelled", which is how a
+        batch of uploads knows when to start the next one.
         """
 
         def finished(task, ok, result, error):
@@ -594,16 +598,21 @@ class GeoServerMainDialog(
                 self._set_loading(self._loading())
             if task.isCanceled():
                 on_cancel(task)
-                return
-            if error is not None:
+                outcome = "cancelled"
+            elif error is not None:
                 detail = self._error_text(error)
                 self.show_error_message(f"{failure_message}: {detail}")
                 self.log(
                     f"{failure_message}: {detail}", log_level=Qgis.MessageLevel.Critical
                 )
-                return
-            if ok:
+                outcome = "failed"
+            elif ok:
                 on_success(result)
+                outcome = "done"
+            else:
+                outcome = "failed"
+            if on_done is not None:
+                on_done(outcome)
 
         task = _FetchTask(failure_message, work, finished)
         setattr(self, slot, task)
@@ -1644,6 +1653,7 @@ class GeoServerMainDialog(
         on_cancel,
         folder=None,
         after=None,
+        on_done=None,
     ):
         """Stream one file to a REST path through _run_upload.
 
@@ -1681,7 +1691,9 @@ class GeoServerMainDialog(
                 if folder is not None:
                     shutil.rmtree(folder, ignore_errors=True)
 
-        return self._run_upload(failure_message, work, on_success, on_cancel)
+        return self._run_upload(
+            failure_message, work, on_success, on_cancel, on_done=on_done
+        )
 
     def _report_cancelled_upload(self, kind, tab, exists, name):
         """Say what a cancelled upload left behind, measured on 2.28.5.

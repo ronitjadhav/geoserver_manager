@@ -82,9 +82,25 @@ class LayerTreeMenu:
             translate("LayerTreeMenu", "Apply style from GeoServer…"),
         )
         submenu.addSeparator()
+        # Several layers selected, the clicked one among them: publish them all.
+        selected = [
+            candidate
+            for candidate in self._view.selectedLayers()
+            if candidate.type() in _STYLEABLE
+        ]
+        targets = selected if len(selected) > 1 and layer in selected else [layer]
         publish = submenu.addAction(
             icon("publish-layer", submenu.palette(), for_menu=True),
-            translate("LayerTreeMenu", "Publish to GeoServer…"),
+            (
+                translate("LayerTreeMenu", "Publish to GeoServer…")
+                if len(targets) == 1
+                else translate(
+                    "LayerTreeMenu",
+                    "Publish %n layer(s) to GeoServer…",
+                    None,
+                    len(targets),
+                )
+            ),
         )
         if self._connected_dialog() is None:
             reason = translate(
@@ -105,7 +121,7 @@ class LayerTreeMenu:
             return
         push.triggered.connect(lambda: self.push_style(layer))
         pull.triggered.connect(lambda: self.apply_style(layer))
-        publish.triggered.connect(lambda: self.publish(layer))
+        publish.triggered.connect(lambda: self.publish(*targets))
 
     # -- Which server layer is this? -------------------------------------------
 
@@ -434,8 +450,9 @@ class LayerTreeMenu:
 
     # -- Publishing ---------------------------------------------------------------
 
-    def publish(self, layer):
-        """Open the main dialog's Publish form with this layer as the source.
+    def publish(self, layer, *more):
+        """Open the main dialog's Publish form with this layer as the source,
+        or its batch form when there are more layers.
 
         The dialog comes up on the Layers tab first. The upload reports its
         progress, its Cancel and its outcome there, and that is where the new
@@ -449,7 +466,10 @@ class LayerTreeMenu:
         dlg.activateWindow()
         loaders = [loader for _label, _icon, loader in dlg.TABS]
         dlg.navList.setCurrentRow(loaders.index("_load_layers"))
-        dlg._publish_layer(layer=layer)
+        if more:
+            dlg._publish_layers([layer, *more])
+        else:
+            dlg._publish_layer(layer=layer)
         return None
 
     # -- Plumbing ----------------------------------------------------------------

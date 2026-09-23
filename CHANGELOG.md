@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Publish to GeoServer…** in a layer's *GeoServer Manager* context menu.
   It opens the Publish form with that layer already chosen as the source,
   over the Layers tab where the upload reports its progress.
+- Several selected layers publish in one go: **Publish 3 layers to
+  GeoServer…** asks once for the workspace, *Replace* and the style, then
+  uploads them one after another. A failed layer is skipped, *Cancel* stops
+  the rest, and a summary names what was and was not published.
 - The documentation site was rebuilt: a landing page that shows the plugin,
   a modern theme with a dark mode, and pages for testing, packaging and
   documentation that describe this repository rather than the template it

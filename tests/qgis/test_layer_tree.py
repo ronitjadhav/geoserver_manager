@@ -269,6 +269,30 @@ class TestNotConnected(MenuCase):
         self.assertEqual(len(entries), 3)
         self.assertTrue(all(action.isEnabled() for action in entries))
 
+    def test_a_multi_selection_offers_to_publish_them_all(self):
+        self.dlg = connected_dialog(["topp:states"])
+        other = QgsVectorLayer("Point?crs=epsg:4326", "rivers", "memory")
+        QgsProject.instance().addMapLayer(other)
+        self.iface.view.setCurrentLayer(self.layer)
+        for node in (self.layer, other):
+            index = self.iface.view.node2index(
+                QgsProject.instance().layerTreeRoot().findLayer(node)
+            )
+            self.iface.view.selectionModel().select(
+                index, self.iface.view.selectionModel().SelectionFlag.Select
+            )
+        batches = []
+        self.dlg._publish_layers = batches.append
+        self.dlg._on_nav_changed = lambda index: None
+
+        submenu = self.submenu(self.build())
+        publish = [a for a in submenu.actions() if a.text()][2]
+        self.assertEqual(publish.text(), "Publish 2 layer(s) to GeoServer…")
+        publish.trigger()
+        self.assertEqual(len(batches), 1)
+        self.assertEqual({layer.name() for layer in batches[0]}, {"states", "rivers"})
+        self.dlg.hide()
+
     def test_publish_brings_the_dialog_up_on_the_layers_tab(self):
         """The upload reports into the dialog, so the dialog must be showing,
         and on the tab where the published layer will appear.

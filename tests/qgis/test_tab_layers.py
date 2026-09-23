@@ -854,6 +854,111 @@ class TestPublish(unittest.TestCase):
         self.assertEqual(form.get_widget("name").text(), "Rivieres")
 
 
+class TestBatchPublish(unittest.TestCase):
+    """Several project layers, one form, one upload after another (#40)."""
+
+    def setUp(self):
+        from qgis.core import QgsProject, QgsVectorLayer
+        from qgis.PyQt.QtWidgets import QDialog
+
+        from geoserver_manager.gui import tab_layers
+        from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+
+        class FakeGS:
+            def get_workspaces(self):
+                return ([{"name": "topp"}], 200)
+
+        self.dlg = SyncDialog()
+        self.dlg.gs = FakeGS()
+        self.warnings, self.successes, self.errors = [], [], []
+        self.dlg.show_warning_message = self.warnings.append
+        self.dlg.show_success_message = self.successes.append
+        self.dlg.show_error_message = self.errors.append
+        self.layers = [
+            QgsVectorLayer("Point?crs=epsg:4326", name, "memory")
+            for name in ("a", "b", "c")
+        ]
+        QgsProject.instance().addMapLayers(self.layers)
+        self.addCleanup(QgsProject.instance().removeAllMapLayers)
+        # Each call is parked with its on_done; a test ends it when it wants.
+        self.calls = []
+
+        def publish(values, layer=None, on_done=None):
+            self.calls.append((values, layer, on_done))
+            return True
+
+        self.dlg._publish_qgis_layer = publish
+
+        class Accepting(ResourceFormDialog):
+            def exec(inner):
+                return QDialog.DialogCode.Accepted
+
+        patcher = patch.object(tab_layers, "ResourceFormDialog", Accepting)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def finish(self, outcome):
+        self.calls[-1][2](outcome)
+
+    def test_one_upload_at_a_time_in_order(self):
+        self.dlg._publish_layers(self.layers)
+        self.assertEqual([layer.name() for _v, layer, _d in self.calls], ["a"])
+        self.finish("done")
+        self.assertEqual(len(self.calls), 2)
+        self.finish("done")
+        self.finish("done")
+        self.assertEqual(
+            [layer.name() for _v, layer, _d in self.calls], ["a", "b", "c"]
+        )
+        self.assertEqual(self.calls[0][0]["workspace"], "topp")
+        self.assertEqual(len(self.successes), 1)
+        self.assertTrue(self.successes[0].startswith("3 layer"))
+        self.assertEqual(self.warnings, [])
+
+    def test_a_failure_is_reported_and_the_next_layer_still_goes(self):
+        self.dlg._publish_layers(self.layers)
+        self.finish("done")
+        self.finish("failed")
+        self.finish("done")
+        self.assertEqual(len(self.calls), 3)
+        self.assertEqual(self.successes, [])
+        self.assertIn("Published: a, c.", self.warnings[-1])
+        self.assertIn("Failed: b.", self.warnings[-1])
+
+    def test_a_layer_refused_before_any_request_does_not_stall_the_batch(self):
+        def refuse_b(values, layer=None, on_done=None):
+            if layer.name() == "b":
+                raise ValueError("Layer 'b' already exists in 'topp'.")
+            self.calls.append((values, layer, on_done))
+            return True
+
+        self.dlg._publish_qgis_layer = refuse_b
+        self.dlg._publish_layers(self.layers)
+        self.finish("done")  # a; b is refused at once, so c starts
+        self.assertEqual(self.calls[-1][1].name(), "c")
+        self.finish("done")
+        self.assertIn("already exists", self.errors[0])
+        self.assertIn("Failed: b.", self.warnings[-1])
+
+    def test_cancel_stops_the_rest_and_says_what_did_not_start(self):
+        self.dlg._publish_layers(self.layers)
+        self.finish("done")
+        self.finish("cancelled")
+        self.assertEqual(len(self.calls), 2)  # c never started
+        self.assertIn("Published: a.", self.warnings[-1])
+        self.assertIn("Not started: c.", self.warnings[-1])
+
+    def test_two_layers_with_one_geoserver_name_are_refused_up_front(self):
+        from qgis.core import QgsProject, QgsVectorLayer
+
+        twin = QgsVectorLayer("Point?crs=epsg:4326", "A", "memory")
+        same = QgsVectorLayer("Point?crs=epsg:4326", "A", "memory")
+        QgsProject.instance().addMapLayers([twin, same])
+        self.dlg._publish_layers([twin, same])
+        self.assertEqual(self.calls, [])
+        self.assertIn("same GeoServer name: A", self.warnings[0])
+
+
 class TestSetLayerStyle(unittest.TestCase):
     """The default style is read from the layer and written through the library."""
 
