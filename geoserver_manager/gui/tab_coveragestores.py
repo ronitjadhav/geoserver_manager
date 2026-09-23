@@ -24,7 +24,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.toolbelt.payload import bbox_text, keyword_list
+from geoserver_manager.toolbelt.payload import bbox_text, changed, keyword_list
 from geoserver_manager.toolbelt.qgis_export import (
     export_to_geotiff,
     geoserver_name,
@@ -50,6 +50,14 @@ STORE_TYPES = (GEOTIFF, COG, MOSAIC_DIRECTORY, MOSAIC_ZIP, QGIS_RASTER)
 # library turns {"cogSettings": …} into GeoServer's {"@key": "CogSettings.Key"}
 # wrapper itself. Needs GeoServer's COG extension installed server-side.
 _COG_METADATA = {"cogSettings": {"rangeReaderSettings": "HTTP"}}
+
+# What the store edit form may change, as (form key, REST key).
+_STORE_EDITS = (
+    ("name", "name"),
+    ("url", "url"),
+    ("enabled", "enabled"),
+    ("description", "description"),
+)
 
 # Fields of the Add form that belong to one store type only.
 _TYPE_FIELDS = {
@@ -115,6 +123,16 @@ class CoverageStoreTabMixin:
                 translate(
                     "CoverageStoreTabMixin",
                     "Publish a coverage: make one of the store's rasters a layer.",
+                ),
+            ),
+            (
+                "update-from-source",
+                translate("CoverageStoreTabMixin", "Reset"),
+                self._reset_coverage_store,
+                translate(
+                    "CoverageStoreTabMixin",
+                    "Reset: GeoServer re-reads the store, after its file was "
+                    "replaced or a mosaic changed.",
                 ),
             ),
             (
@@ -222,26 +240,52 @@ class CoverageStoreTabMixin:
         )
 
     def _coverage_store_info_fields(self):
-        """Field definitions for the read-only store dialog."""
-        fields = [
-            {"key": key, "label": label, "type": "text", "read_only": True}
-            for key, label in (
-                ("name", translate("CoverageStoreTabMixin", "Name")),
-                ("workspace", translate("CoverageStoreTabMixin", "Workspace")),
-                ("type", translate("CoverageStoreTabMixin", "Type")),
-                ("url", translate("CoverageStoreTabMixin", "URL")),
-                ("enabled", translate("CoverageStoreTabMixin", "Enabled")),
-            )
-        ]
-        fields.append(
+        """The store edit form: what a partial PUT changes, then the coverages.
+
+        Measured on 2.28.5: the PUT merges (type and the rest stay), and a
+        rename keeps the coverages and their layers.
+        """
+        return [
+            {
+                "key": "name",
+                "label": translate("CoverageStoreTabMixin", "Name"),
+                "type": "text",
+                "required": True,
+            },
+            {
+                "key": "workspace",
+                "label": translate("CoverageStoreTabMixin", "Workspace"),
+                "type": "text",
+                "read_only": True,
+            },
+            {
+                "key": "type",
+                "label": translate("CoverageStoreTabMixin", "Type"),
+                "type": "text",
+                "read_only": True,
+            },
+            {
+                "key": "url",
+                "label": translate("CoverageStoreTabMixin", "URL"),
+                "type": "text",
+                "required": True,
+                "help": translate(
+                    "CoverageStoreTabMixin",
+                    "A path on the GeoServer machine (file:...) or a URL, as "
+                    "GeoServer reaches it.",
+                ),
+            },
+            {
+                "key": "enabled",
+                "label": translate("CoverageStoreTabMixin", "Enabled"),
+                "type": "checkbox",
+            },
             {
                 "key": "description",
                 "label": translate("CoverageStoreTabMixin", "Description"),
                 "type": "textarea",
-                "read_only": True,
-            }
-        )
-        fields.append(
+                "max_height": 72,
+            },
             {
                 "key": "coverages",
                 "label": translate("CoverageStoreTabMixin", "Published coverages"),
@@ -252,9 +296,8 @@ class CoverageStoreTabMixin:
                     "CoverageStoreTabMixin",
                     "Open the Coverages action for one coverage's details.",
                 ),
-            }
-        )
-        return fields
+            },
+        ]
 
     @staticmethod
     def _coverage_store_form_values(detail, published):
@@ -265,11 +308,12 @@ class CoverageStoreTabMixin:
             "type": detail.get("type", ""),
             "url": detail.get("url", ""),
             "description": detail.get("description", ""),
+            "enabled": bool(detail.get("enabled", True)),
             "coverages": "\n".join(published) or "-",
         }
 
     def _show_coverage_store_info(self, row_data):
-        """Open a coverage store, read-only."""
+        """Open a coverage store to edit its name, URL, state and description."""
         name, ws_name = row_data[0], row_data[1]
         fetched = self._fetch(
             lambda: (
@@ -283,24 +327,77 @@ class CoverageStoreTabMixin:
         if fetched is None:
             return
         detail, published = fetched
-
+        before = self._coverage_store_form_values(detail, published)
         dlg = ResourceFormDialog(
             title=translate("CoverageStoreTabMixin", "Coverage Store '{}'").format(
                 name
             ),
-            description=translate(
-                "CoverageStoreTabMixin",
-                "Read-only in this version. Edit it in GeoServer's web UI.",
-            ),
             fields=self._coverage_store_info_fields(),
-            values=dict(
-                self._coverage_store_form_values(detail, published),
-                enabled=self._yes_no(detail.get("enabled", True)),
-            ),
+            values=before,
             parent=self,
         )
-        dlg.hide_save_button()
-        dlg.exec()
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        after = dlg.get_values()
+        body = changed(before, after, _STORE_EDITS)
+        if not body:
+            return
+        if self._run_action(
+            lambda: self._wait_for(
+                lambda: self._save_coverage_store(ws_name, name, body)
+            ),
+            translate(
+                "CoverageStoreTabMixin", "Failed to save coverage store '{}'"
+            ).format(name),
+        ):
+            saved = after["name"]
+            self.show_success_message(
+                translate("CoverageStoreTabMixin", "Coverage store '{}' saved.").format(
+                    saved
+                )
+            )
+            self._warn_if_store_unreachable(
+                saved, lambda: self._fetch_list(self.gs.get_coverages, ws_name, saved)
+            )
+            self._load_coverage_stores()
+
+    def _save_coverage_store(self, ws_name, name, body):
+        """One merging PUT on the store. Raises on a bad or taken name.
+
+        TODO(#50): CoverageStore.put_payload() raises NotImplementedError and
+        there is no update in the library (row 23); a partial PUT merges
+        (measured on 2.28.5).
+        """
+        if "name" in body:
+            self._require_safe_name(body["name"])
+            self._refuse_existing_store(ws_name, body["name"])
+        if "url" in body and not str(body["url"]).strip():
+            raise ValueError(translate("CoverageStoreTabMixin", "A URL is required."))
+        path = self.gs.rest_service.rest_endpoints.coveragestore(
+            quote(ws_name, safe=""), quote(name, safe="")
+        )
+        self._raw_rest("put", path, json={"coverageStore": body})
+
+    def _reset_coverage_store(self, row_data):
+        """Make GeoServer re-read the store: a replaced file, a changed mosaic.
+
+        TODO(#50): no reset in the library (row 54): POST .../reset (measured).
+        """
+        name, ws_name = row_data[0], row_data[1]
+        path = self.gs.rest_service.rest_endpoints.coveragestore(
+            quote(ws_name, safe=""), quote(name, safe="")
+        )
+        if self._run_action(
+            lambda: self._wait_for(
+                lambda: self._raw_rest("post", path.removesuffix(".json") + "/reset")
+            ),
+            translate("CoverageStoreTabMixin", "Failed to reset '{}'").format(name),
+        ):
+            self.show_success_message(
+                translate(
+                    "CoverageStoreTabMixin", "'{}' reset: GeoServer re-reads it."
+                ).format(name)
+            )
 
     # -- Coverages -------------------------------------------------------------
 

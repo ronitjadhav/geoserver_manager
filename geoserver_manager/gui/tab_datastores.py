@@ -6,6 +6,8 @@ Datastore tab: load, create, edit, delete datastores.
 Used as a mixin for GeoServerMainDialog.
 """
 
+from urllib.parse import quote
+
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
@@ -121,6 +123,16 @@ class DatastoreTabMixin:
             translate("DatastoreTabMixin", "Workspace"): self._open_workspace_from_row
         }
         self._row_actions = [
+            (
+                "update-from-source",
+                translate("DatastoreTabMixin", "Reset"),
+                self._reset_datastore,
+                translate(
+                    "DatastoreTabMixin",
+                    "Reset: GeoServer re-reads the store, after its tables or "
+                    "files changed.",
+                ),
+            ),
             (
                 "delete",
                 translate("DatastoreTabMixin", "Delete"),
@@ -612,6 +624,7 @@ class DatastoreTabMixin:
                     values["name"]
                 )
             )
+            self._warn_if_reaches_nothing(values)
             self._load_datastores()
 
     def _show_generic_editor(self, dlg, ds_type):
@@ -939,7 +952,34 @@ class DatastoreTabMixin:
                     values["name"]
                 )
             )
+            self._warn_if_reaches_nothing(values)
             self._load_datastores()
+
+    def _warn_if_reaches_nothing(self, values):
+        """Listing the store's unpublished tables makes GeoServer connect: a
+        wrong host, password or path shows now, not at the first layer."""
+        ws, name = values["workspace"], values["name"]
+        self._warn_if_store_unreachable(name, lambda: self._available_tables(ws, name))
+
+    def _reset_datastore(self, row_data):
+        """Make GeoServer re-read the store: a changed schema, new tables, a
+        rotated password on the database side. TODO(#50): no reset in the
+        library (row 54): POST .../reset (measured on 2.28.5)."""
+        name, ws_name = row_data[0], row_data[1]
+        path = self.gs.rest_service.rest_endpoints.datastore(
+            quote(ws_name, safe=""), quote(name, safe="")
+        )
+        if self._run_action(
+            lambda: self._wait_for(
+                lambda: self._raw_rest("post", path.removesuffix(".json") + "/reset")
+            ),
+            translate("DatastoreTabMixin", "Failed to reset '{}'").format(name),
+        ):
+            self.show_success_message(
+                translate(
+                    "DatastoreTabMixin", "'{}' reset: GeoServer re-reads it."
+                ).format(name)
+            )
 
     def _delete_datastore(self, row_data):
         """Delete a single datastore after confirmation."""

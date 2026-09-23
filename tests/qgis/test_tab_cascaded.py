@@ -227,6 +227,40 @@ REMOTE_ROW = ["remote", "topp", WMS, "Yes", CAPS]
 TILES_ROW = ["tiles", "sf", WMTS, "No", TILES]
 
 
+class TestStoreEditBody(unittest.TestCase):
+    """What an edit of a cascaded store sends (rules measured on 2.28.5)."""
+
+    BEFORE = {
+        "capabilities_url": "http://a",
+        "enabled": True,
+        "user": "alice",
+        "password": "",
+        "max_connections": 6,
+        "read_timeout": 60,
+        "connect_timeout": 30,
+    }
+
+    def body(self, **after):
+        from geoserver_manager.gui.tab_cascaded import CascadedStoreTabMixin
+
+        return CascadedStoreTabMixin._cascaded_store_changes(
+            self.BEFORE, dict(self.BEFORE, **after)
+        )
+
+    def test_a_blank_password_is_left_out_which_keeps_it(self):
+        self.assertEqual(self.body(read_timeout=90), {"readTimeout": 90})
+
+    def test_a_typed_password_replaces_it(self):
+        self.assertEqual(self.body(password="new"), {"password": "new"})
+
+    def test_clearing_the_user_removes_authentication_with_nulls(self):
+        """An empty string is stored encrypted and breaks the store."""
+        self.assertEqual(self.body(user=""), {"user": None, "password": None})
+
+    def test_an_untouched_form_sends_nothing(self):
+        self.assertEqual(self.body(), {})
+
+
 class TestViewerRead(unittest.TestCase):
     def test_a_layer_that_cannot_be_read_leaves_the_viewer_alone(self):
         """It filled blank fields after the error banner; now like Coverages."""
@@ -301,6 +335,35 @@ class TestCreate(unittest.TestCase):
                 ("create_wmts_store", "sf", "new", TILES),
             ],
         )
+
+    def test_credentials_and_limits_follow_the_create_in_one_merging_put(self):
+        """An authenticated remote could not be cascaded at all before."""
+        sent = []
+        self.dlg._raw_rest = lambda method, path, **kw: sent.append((method, path, kw))
+        self.dlg._create_cascaded_store_from_values(
+            self.values(user="alice", password="s3cret", read_timeout=90)
+        )
+        ((method, path, kwargs),) = sent
+        self.assertEqual(method, "put")
+        self.assertIn("/wmsstores/new", path)
+        self.assertEqual(
+            kwargs["json"],
+            {"wmsStore": {"user": "alice", "readTimeout": 90, "password": "s3cret"}},
+        )
+
+    def test_a_plain_create_sends_no_second_request(self):
+        sent = []
+        self.dlg._raw_rest = lambda method, path, **kw: sent.append(method)
+        self.dlg._create_cascaded_store_from_values(
+            self.values(
+                user="",
+                password="",
+                max_connections=6,
+                read_timeout=60,
+                connect_timeout=30,
+            )
+        )
+        self.assertEqual(sent, [])
 
     def test_add_refuses_an_existing_name_of_either_kind(self):
         with self.assertRaises(ValueError):
@@ -444,7 +507,8 @@ class TestDelete(unittest.TestCase):
             [],
         )
         self.assertEqual(values["capabilities_url"], TILES)
-        self.assertEqual(values["enabled"], "No")  # a word, not Python's repr
+        self.assertIs(values["enabled"], False)  # the edit form's checkbox
+        self.assertEqual(values["password"], "")  # never shown (invariant 5)
         self.assertEqual(values["layers"], "-")
 
 

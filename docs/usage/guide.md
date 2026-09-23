@@ -103,6 +103,12 @@ know:
 - The password field is always blank. GeoServer only returns it encrypted.
   Leave it empty to keep the stored password, or type a new one.
 - Whatever the form does not show is kept as the server has it.
+- After a save, the plugin asks GeoServer to open the store. If it cannot (a
+  wrong host, password or path), a warning says so at once, with GeoServer's
+  reason.
+
+Row action: **Reset** makes GeoServer re-read the store, after its tables or
+files changed outside GeoServer.
 
 ## Coverage stores
 
@@ -131,9 +137,14 @@ store, the coverage and the layer in one request. Tick *Replace it if it
 already exists* to overwrite an earlier upload. A layer without an EPSG code
 is refused before anything is sent.
 
+**Click a name** to edit a store: its name, URL, description, and whether it
+is enabled. A rename keeps its coverages and layers. After a save, a warning
+says so at once if GeoServer cannot read the file.
+
 Row actions: **Coverages** lists the coverages a store publishes, with their
 details. **Publish a coverage** turns one it holds but does not publish yet
-into a layer.
+into a layer. **Reset** makes GeoServer re-read the store, after its file was
+replaced or a mosaic changed.
 
 ## Cascaded stores
 
@@ -141,14 +152,23 @@ A cascaded store shows another server's WMS or WMTS layers through your
 GeoServer.
 
 ```{figure} ../static/screenshots/cascaded-store-add.png
-:alt: The Add a Cascaded Store form, with name, workspace, type and GetCapabilities URL
+:alt: The Add a Cascaded Store form, with name, workspace, type and GetCapabilities URL, and a Connection tab
 :width: 420px
 
-Adding a cascaded store: the remote server's GetCapabilities URL is all it needs.
+Adding a cascaded store: the remote server's GetCapabilities URL, plus
+credentials on the *Connection* tab when it needs them.
 ```
 
 - **Add a Cascaded Store:** give it a name, pick the workspace and WMS or
-  WMTS, and paste the remote GetCapabilities URL.
+  WMTS, and paste the remote GetCapabilities URL. The *Connection* tab takes a
+  user name and password for a remote that asks for them, the number of
+  connections, and the timeouts.
+- **Click a name** to edit a store: its URL, credentials, limits, and whether
+  it is enabled. The password field is always blank: leave it empty to keep
+  it, type a new one to replace it, or clear the user name and the password
+  to stop authenticating. A cascaded store cannot be renamed (GeoServer
+  refuses). After a save, a warning says so at once if GeoServer cannot read
+  the remote capabilities.
 - **Publish a layer:** pick one of the layers the remote server advertises.
   GeoServer reads its title, SRS and bounds from the remote capabilities.
 - **Cascaded layers:** the layers already published from this store.

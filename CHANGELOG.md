@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Edit coverage stores and cascaded stores** instead of going to
+  GeoServer's web interface: a coverage store's name, URL, description and
+  state; a cascaded store's URL, credentials, connections, timeouts and
+  state. A cascaded store can be created with credentials too, so a remote
+  that asks for a login can be cascaded at all.
+- **A saved store is checked at once:** after a create or an edit, the
+  plugin asks GeoServer to open it, and a warning gives GeoServer's reason
+  when it cannot (a wrong host, password, path or URL).
+- **Reset** on datastores and coverage stores makes GeoServer re-read them.
 - **Edit a layer** instead of going to GeoServer's web interface: rename it,
   change its title, abstract, keywords, SRS and projection policy, turn it
   on or off, hide it from the capabilities, and filter it with CQL (vector
@@ -215,6 +224,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- Error banners read "HTTP 500: GeoServer's reason" instead of the
+  library's "500 Server Error: for url: <the whole request URL>".
 - Refusing a CSS or MBStyle style for QGIS (*Apply to a QGIS layer*) is an
   error banner now, with the same explanation, where it was a warning: the
   Styles tab and the layer tree share one SLD fetch.
