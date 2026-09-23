@@ -81,6 +81,11 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   carry **`dbtype: geopkg`** (that is how GeoServer picks the factory), and an empty `charset` is omitted
   rather than sent blank, because blank is not "use your default". GeoServer fills in `namespace` itself, and
   the edit merge keeps it along with everything else the form does not show.
+- **Publishing a table: send no bounding box** (row 52 of #50). The facade's `create_feature_type(epsg=…)`
+  fills both boxes from a table of three EPSG codes, so it raises `KeyError` for any other code and gives
+  those three a world extent. A POST without either box makes GeoServer compute both from the data
+  (measured on 2.28.5 with an EPSG:25832 PostGIS table), so the plugin posts the library's `FeatureType`
+  model without `epsg_code`.
 - **An emptied datastore description has to be sent as `""`.** The library leaves a `None` field out of the
   payload, and a PUT without `description` keeps the old one (measured on 2.28.5: "old text" survived a PUT
   with `description=None`, and `""` cleared it). The edit sends the form's value as it is, empty included.

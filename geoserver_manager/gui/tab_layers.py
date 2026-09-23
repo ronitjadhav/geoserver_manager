@@ -1033,15 +1033,27 @@ class LayerTabMixin:
                 )
             )
         keywords = [k.strip() for k in (values.get("keywords") or "").split(",")]
+        # TODO(#50): the facade's create_feature_type(epsg=...) fills both
+        # bounding boxes from utils.EPSG_BBOX, which knows 2056, 4326 and 3857
+        # only: any other code raised KeyError before a request was sent, and
+        # 4326 or 3857 published a world extent. The model without epsg_code
+        # sends no box, and GeoServer computes both from the data (measured on
+        # 2.28.5 with an EPSG:25832 table).
+        from geoservercloud.models.featuretype import FeatureType
+
         self._check(
-            self.gs.create_feature_type(
-                layer_name=table,
-                workspace_name=ws_name,
-                datastore_name=ds_name,
-                title=values.get("title") or None,
-                abstract=values.get("abstract") or None,
-                epsg=int(epsg),
-                keywords=[k for k in keywords if k],
+            self.gs.rest_service.create_feature_type(
+                FeatureType(
+                    name=table,
+                    native_name=table,
+                    workspace_name=ws_name,
+                    store_name=ds_name,
+                    srs=f"EPSG:{int(epsg)}",
+                    projection_policy="FORCE_DECLARED",
+                    title=values.get("title") or None,
+                    abstract=values.get("abstract") or None,
+                    keywords=[k for k in keywords if k] or None,
+                )
             )
         )
 

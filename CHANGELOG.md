@@ -288,6 +288,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- *Publish a Layer* from a table works for any EPSG code, and the layer gets
+  its real extent. It used to fail before sending anything for every code but
+  2056, 4326 and 3857 (a table in EPSG:25832, say), and gave those three a
+  world bounding box. GeoServer now computes both boxes from the data.
 - A batch delete is no longer stopped half way, without a word, by a tab
   switch or F5. Deletes run on their own, Cancel still stops them, and the
   table reloads only if you are still on the tab they started from.
