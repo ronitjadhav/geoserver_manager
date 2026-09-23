@@ -37,6 +37,7 @@ CONTEXTS = {
     "tab_layergroups.py": "LayerGroupTabMixin",
     "tab_styles.py": "StyleTabMixin",
     "tab_gwc.py": "GwcTabMixin",
+    "tab_server.py": "ServerTabMixin",
 }
 
 _CALL = re.compile(r"self\.tr\(")

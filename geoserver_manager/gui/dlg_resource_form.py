@@ -263,6 +263,8 @@ class ResourceFormDialog(QDialog):
                 w.setEchoMode(QLineEdit.EchoMode.Password)
             if value:
                 w.setText(str(value))
+                # From its start: a long title or URL opened on its tail.
+                w.setCursorPosition(0)
             placeholder = field.get("placeholder")
             if placeholder:
                 w.setPlaceholderText(placeholder)
@@ -439,6 +441,7 @@ class ResourceFormDialog(QDialog):
                 widget.setPlainText(value)
             else:
                 widget.setText(value)
+                widget.setCursorPosition(0)
 
     def get_widget(self, key):
         """Return the widget for a field by key.

@@ -212,6 +212,11 @@ def main():
                 ),
             ],
         ),
+        (
+            "server",
+            8,
+            [("server-service", lambda: dialog._show_server_section(row("WFS")))],
+        ),
     )
 
     # The first workspace, cite, has no datastore: pick one with tables.

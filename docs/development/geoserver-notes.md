@@ -165,6 +165,14 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   but recorded as `languageVersion 1.0.0`; and `GET {style}.sld` returns GeoServer's **1.0 rendition** of a
   stored 1.1 document, so the editor shows converted text and says so. Exporting or applying a style touches a
   live QGIS layer, so it happens on the GUI thread before any upload (invariant 9).
+- **Server-wide settings** (row 60, measured on 2.28.5): `…/services/{wms|wfs|wcs|wmts}/settings.json`
+  merges a partial `PUT`, like the resources. But `/settings.json` (global), `/settings/contact.json` and
+  `/logging.json` **replace** the stored object: a `PUT` of `proxyBaseUrl` alone wiped the contact and the
+  charset, one of `contactPerson` alone cleared the city, one of `level` alone turned standard-output logging
+  off. So `tab_server.py` reads them again, merges the form, and sends them whole. A `null` `proxyBaseUrl` unsets
+  it (`""` stores an empty one). The log is `GET /rest/resource/{location}`: served whole, gzip, no length, no
+  Range, so it is streamed and only its end kept. `POST /rest/reload` and `/rest/reset` answer 200 at once on
+  the sandbox. The web admin pages are `/web/wicket/bookmarkable/{class}` (a wrong class is a 404).
 - **Seeding** (row 59, measured on 2.28.5): `POST /gwc/rest/seed/{layer}.json` with a `seedRequest` (name,
   gridSetId, format, type seed/reseed/truncate, zoomStart/Stop, threadCount, optional `bounds.coords.double`
   and `parameters.entry[].string[key, value]`) answers 200 and starts `threadCount` tasks; an unknown gridset is

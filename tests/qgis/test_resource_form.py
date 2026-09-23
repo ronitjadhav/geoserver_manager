@@ -163,3 +163,16 @@ class TestResourceFormHeight(unittest.TestCase):
         needed = dlg.layout().totalHeightForWidth(dlg.width())
         self.assertGreaterEqual(dlg.height(), needed)
         dlg.close()
+
+
+class TestLongTextOpensAtItsStart(unittest.TestCase):
+    def test_a_long_value_shows_its_beginning(self):
+        # A long title or URL used to open scrolled to its end.
+        dlg = ResourceFormDialog(
+            title="t",
+            fields=[{"key": "url", "label": "URL", "type": "text"}],
+            values={"url": "http://example.org/" + "x" * 300},
+        )
+        self.assertEqual(dlg.get_widget("url").cursorPosition(), 0)
+        dlg.set_values({"url": "http://other.example.org/" + "y" * 300})
+        self.assertEqual(dlg.get_widget("url").cursorPosition(), 0)
