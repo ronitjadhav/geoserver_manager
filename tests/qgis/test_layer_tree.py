@@ -215,6 +215,7 @@ class TestWhereTheMenuAppears(MenuCase):
         labels = [action.text() for action in submenu.actions() if action.text()]
         self.assertEqual(labels[0], "Push style to GeoServer…")
         self.assertEqual(labels[1], "Apply style from GeoServer…")
+        self.assertEqual(labels[2], "Publish to GeoServer…")
 
     def test_a_group_gets_nothing(self):
         group = QgsProject.instance().layerTreeRoot().addGroup("a group")
@@ -234,9 +235,10 @@ class TestWhereTheMenuAppears(MenuCase):
 class TestNotConnected(MenuCase):
     def test_entries_are_disabled_and_say_why(self):
         submenu = self.submenu(self.build())
-        push, pull = submenu.actions()[0], submenu.actions()[1]
+        push, pull, publish = [a for a in submenu.actions() if a.text()][:3]
         self.assertFalse(push.isEnabled())
         self.assertFalse(pull.isEnabled())
+        self.assertFalse(publish.isEnabled())
         self.assertIn("Open GeoServer Manager first", push.toolTip())
 
     def test_an_entry_opens_the_plugin_instead(self):
@@ -256,15 +258,33 @@ class TestNotConnected(MenuCase):
         self.dlg = SyncDialog()
         self.menu.push_style(self.layer)
         self.menu.apply_style(self.layer)
-        self.assertEqual(len(self.texts()), 2)
+        self.menu.publish(self.layer)
+        self.assertEqual(len(self.texts()), 3)
         self.assertIn("Not connected", self.texts()[0])
 
     def test_entries_are_live_once_connected(self):
         self.dlg = connected_dialog(["topp:states"])
         submenu = self.submenu(self.build())
-        self.assertTrue(submenu.actions()[0].isEnabled())
-        self.assertTrue(submenu.actions()[1].isEnabled())
-        self.assertEqual(len(submenu.actions()), 2)
+        entries = [action for action in submenu.actions() if action.text()]
+        self.assertEqual(len(entries), 3)
+        self.assertTrue(all(action.isEnabled() for action in entries))
+
+    def test_publish_brings_the_dialog_up_on_the_layers_tab(self):
+        """The upload reports into the dialog, so the dialog must be showing,
+        and on the tab where the published layer will appear.
+        """
+        self.dlg = connected_dialog(["topp:states"])
+        self.dlg.navList.setCurrentRow(0)
+        opened_with = []
+        self.dlg._publish_layer = lambda layer=None: opened_with.append(layer)
+        self.dlg._on_nav_changed = lambda index: None  # no load in this test
+
+        self.menu.publish(self.layer)
+
+        self.assertTrue(self.dlg.isVisible())
+        self.assertEqual(self.dlg.navList.currentItem().text(), "Layers")
+        self.assertEqual(opened_with, [self.layer])
+        self.dlg.hide()
 
 
 class TestWhichServerLayer(unittest.TestCase):

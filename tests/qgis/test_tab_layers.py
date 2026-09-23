@@ -818,6 +818,41 @@ class TestPublish(unittest.TestCase):
         self.assertEqual(ds.count(), 0)
         self.assertEqual(table.count(), 0)
 
+    def test_the_layer_tree_can_preselect_a_project_layer(self):
+        """Publish to GeoServer on a layer opens the form on that layer, not on
+        the project's first one, with the name suggested from it.
+        """
+        from unittest.mock import patch
+
+        from qgis.core import QgsProject, QgsVectorLayer
+        from qgis.PyQt.QtWidgets import QDialog
+
+        from geoserver_manager.gui import tab_layers
+        from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+
+        first = QgsVectorLayer("Point?crs=epsg:4326", "cities", "memory")
+        clicked = QgsVectorLayer("LineString?crs=epsg:4326", "Rivières", "memory")
+        QgsProject.instance().addMapLayers([first, clicked])
+        self.addCleanup(QgsProject.instance().removeAllMapLayers)
+        opened = []
+
+        class Recording(ResourceFormDialog):
+            def exec(self):
+                opened.append(self)
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_layers, "ResourceFormDialog", Recording):
+            self.dlg._publish_layer(layer=clicked)
+
+        form = opened[0]
+        self.assertEqual(
+            form.get_widget("source").currentText(), tab_layers._SOURCE_QGIS
+        )
+        self.assertTrue(
+            form.get_widget("qgis_layer").currentText().startswith("Rivières")
+        )
+        self.assertEqual(form.get_widget("name").text(), "Rivieres")
+
 
 class TestSetLayerStyle(unittest.TestCase):
     """The default style is read from the layer and written through the library."""

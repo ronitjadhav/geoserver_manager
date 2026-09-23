@@ -297,9 +297,13 @@ Right-click a layer in the QGIS *Layers* panel to find the
   server layer. You confirm the target and the style name first.
 - **Apply style from GeoServer…** puts the server layer's style on the QGIS
   layer.
+- **Publish to GeoServer…** opens the plugin on the Layers tab, with the
+  *Publish a Layer* form set to this layer. Pick the workspace, check the
+  name, and publish. The upload shows its progress there, and the new layer
+  appears in the table when it lands.
 
-A layer loaded from the server is matched through its source. Any other layer
-is matched by name.
+For the two style entries, a layer loaded from the server is matched through
+its source. Any other layer is matched by name.
 
 ## Keyboard shortcuts
 
