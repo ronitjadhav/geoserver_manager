@@ -866,7 +866,7 @@ class CoverageStoreTabMixin:
             ),
         )
 
-    def _publish_qgis_raster(self, values, layer=None):
+    def _publish_qgis_raster(self, values, layer=None, on_done=None):
         """Upload a project raster as a GeoTIFF store and publish its coverage.
 
         One request does it all (measured on 2.28.5): GeoServer saves the file
@@ -889,7 +889,7 @@ class CoverageStoreTabMixin:
         .../coveragestores/{name}/file.geotiff (row 31).
         """
         if not self._upload_slot_free():
-            return
+            return False
         ws_name = values["workspace"]
         # Also the coverage's and the layer's name, so it has to be one a layer
         # can carry.
@@ -903,7 +903,7 @@ class CoverageStoreTabMixin:
             in_worker=False,  # a live QGIS layer, and a local export
         )
         if prepared is None:
-            return
+            return False
         source, folder = prepared
         client = self.gs.rest_service.rest_client
         endpoints = self.gs.rest_service.rest_endpoints
@@ -934,7 +934,7 @@ class CoverageStoreTabMixin:
             # The user may have moved to another tab while it uploaded.
             self._reload_current_tab()
 
-        self._upload_file(
+        return self._upload_file(
             failure,
             client,
             upload_path,
@@ -952,6 +952,7 @@ class CoverageStoreTabMixin:
             ),
             folder=folder,
             after=after,
+            on_done=on_done,
         )
 
     def _prepare_qgis_raster(self, ws_name, name, values, layer=None):

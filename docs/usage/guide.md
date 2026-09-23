@@ -301,6 +301,13 @@ Right-click a layer in the QGIS *Layers* panel to find the
   *Publish a Layer* form set to this layer. Pick the workspace, check the
   name, and publish. The upload shows its progress there, and the new layer
   appears in the table when it lands.
+- With several layers selected, the entry reads **Publish 3 layers to
+  GeoServer…**. One short form asks for the workspace, *Replace* and the
+  style, and lists the name each layer gets. The layers then upload one
+  after another. A layer that fails is reported and skipped. *Cancel* stops
+  the rest, and a closing message says what was published and what was not.
+  Two layers that would get the same GeoServer name are refused before
+  anything is sent: rename one in QGIS first.
 
 For the two style entries, a layer loaded from the server is matched through
 its source. Any other layer is matched by name.

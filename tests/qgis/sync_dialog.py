@@ -27,6 +27,7 @@ class SyncDialog(GeoServerMainDialog):
         on_cancel,
         busy_text=None,
         quiet=False,
+        on_done=None,
     ):
         # No task, so nothing to cancel and no progress to report: work() gets
         # None where the real dialog passes the running task. Both _run_in_task
@@ -36,5 +37,9 @@ class SyncDialog(GeoServerMainDialog):
         except Exception as e:
             detail = self._error_text(e)
             self.show_error_message(f"{failure_message}: {detail}")
+            if on_done is not None:
+                on_done("failed")
             return
         on_success(result)
+        if on_done is not None:
+            on_done("done")
