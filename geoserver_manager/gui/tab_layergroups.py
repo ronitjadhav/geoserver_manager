@@ -707,8 +707,10 @@ class LayerGroupTabMixin:
 
         values = dlg.get_values()
         if self._run_action(
-            lambda: self._create_layer_group_from_values(
-                values, layer_names, group_names
+            lambda: self._wait_for(
+                lambda: self._create_layer_group_from_values(
+                    values, layer_names, group_names
+                )
             ),
             translate("LayerGroupTabMixin", "Failed to create layer group '{}'").format(
                 values["name"]

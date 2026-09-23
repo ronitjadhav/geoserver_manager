@@ -843,7 +843,9 @@ class CoverageStoreTabMixin:
             self._upload_mosaic_zip(values)
             return
         if self._run_action(
-            lambda: self._create_coverage_store_from_values(values),
+            lambda: self._wait_for(
+                lambda: self._create_coverage_store_from_values(values)
+            ),
             translate(
                 "CoverageStoreTabMixin", "Failed to create coverage store '{}'"
             ).format(values["name"]),
@@ -868,8 +870,10 @@ class CoverageStoreTabMixin:
         if values["type"] != COG:
             return
         try:
-            detail = self._coverage_store_detail(values["workspace"], values["name"])
-        except Exception:  # best effort: the store itself is already created
+            detail = self._wait_for(
+                lambda: self._coverage_store_detail(values["workspace"], values["name"])
+            )
+        except Exception:  # best effort (or Cancel): the store is already created
             return
         if not (detail.get("metadata") or {}):
             self.show_warning_message(
@@ -1094,15 +1098,19 @@ class CoverageStoreTabMixin:
                     "uploaded as they are.",
                 ).format(layer.name())
             )
-        if not values.get("replace"):
-            self._refuse_existing_store(
-                ws_name,
-                name,
-                translate("CoverageStoreTabMixin", "Tick Replace to overwrite it."),
+
+        def refuse():  # reads: off the GUI thread
+            if not values.get("replace"):
+                self._refuse_existing_store(
+                    ws_name,
+                    name,
+                    translate("CoverageStoreTabMixin", "Tick Replace to overwrite it."),
+                )
+            self._refuse_layer_clash(
+                ws_name, name, values.get("replace"), "coverage", "GeoTIFF"
             )
-        self._refuse_layer_clash(
-            ws_name, name, values.get("replace"), "coverage", "GeoTIFF"
-        )
+
+        self._wait_for(refuse)
         source = local_geotiff_path(layer)
         if source is not None:
             return source, None

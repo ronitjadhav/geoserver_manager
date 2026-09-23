@@ -498,7 +498,15 @@ class GeoServerMainDialog(
                 self._announce_after_load = self.tr("Resources loaded.")
             self._on_nav_changed(self.navList.currentRow())
 
-        self._run_in_task(self.tr("Connection failed"), connect, connected)
+        def probe_cancelled(_task):
+            # Cancel on the probe: without this the status kept "Connecting…"
+            # and the old connection's rows stayed, with no client behind them.
+            self._set_status(self.tr("Not connected"), "error")
+            self._reset_table_state()
+
+        self._run_in_task(
+            self.tr("Connection failed"), connect, connected, on_cancel=probe_cancelled
+        )
 
     def _fill_profile_switcher(self):
         """The saved profiles next to the status line, the active one chosen.
@@ -647,16 +655,29 @@ class GeoServerMainDialog(
             # Free the slot even when the dialog is closing. A slot left
             # occupied is what kept a reopened dialog on "Cancel" for good.
             setattr(self, slot, None)
+            # An upload whose request completed before a late Cancel is done:
+            # reporting it cancelled told the user its data file was gone.
+            completed = getattr(task, "completed", False)
             if self._closing:
                 if error is not None:
                     self.log(
                         f"{failure_message}: {self._error_text(error)}",
                         log_level=Qgis.MessageLevel.Critical,
                     )
+                elif slot == "_upload" and (completed or not task.isCanceled()):
+                    # What runs on success (a layer's title, keywords and
+                    # style) needs the dialog, which is gone: say so.
+                    self.log(
+                        self.tr(
+                            "An upload finished after the dialog was closed. Its "
+                            "last steps (title, keywords, style) were not applied."
+                        ),
+                        log_level=Qgis.MessageLevel.Warning,
+                    )
                 return
             if not quiet:
                 self._set_loading(self._loading())
-            if task.isCanceled():
+            if task.isCanceled() and not completed:
                 on_cancel(task)
                 outcome = "cancelled"
             elif error is not None:
@@ -666,15 +687,20 @@ class GeoServerMainDialog(
                     f"{failure_message}: {detail}", log_level=Qgis.MessageLevel.Critical
                 )
                 outcome = "failed"
-            elif ok:
+            elif ok or completed:
                 on_success(result)
                 outcome = "done"
             else:
                 outcome = "failed"
+            if slot == "_task" and outcome != "done":
+                # Else a later, unrelated load showed "Resources loaded."
+                self._announce_after_load = None
             if on_done is not None:
                 on_done(outcome)
 
-        task = _FetchTask(failure_message, work, finished)
+        # The description is what QGIS's task bar shows while it runs: never
+        # the failure message ("Failed to load styles") of work going fine.
+        task = _FetchTask(busy_text or __title__, work, finished)
         setattr(self, slot, task)
         if not quiet:
             self._set_loading(True, busy_text)
@@ -1757,8 +1783,10 @@ class GeoServerMainDialog(
         verb = verb or self.tr("delete")
         done = done or self.tr("deleted")
 
+        # Shared with cancelled(): a Cancel after a failure used to drop it.
+        errors = []
+
         def delete_all(task):
-            errors = []
             for index, (label, delete_fn) in enumerate(labeled_deletes):
                 if task is not None and task.isCanceled():
                     break
@@ -1798,9 +1826,25 @@ class GeoServerMainDialog(
             reload_same_tab()
 
         def cancelled(_task):
-            self.show_warning_message(
-                self.tr("Cancelled. What was already done stays done.")
-            )
+            for label, detail in errors:
+                self.log(
+                    f"{verb} {kind} error ({label}): {detail}",
+                    log_level=Qgis.MessageLevel.Critical,
+                )
+            if errors:
+                self.show_error_message(
+                    self.tr(
+                        "Cancelled. What was already done stays done. Could not "
+                        "{verb}:\n{errors}"
+                    ).format(
+                        verb=verb,
+                        errors="\n".join(f"{label}: {d}" for label, d in errors),
+                    )
+                )
+            else:
+                self.show_warning_message(
+                    self.tr("Cancelled. What was already done stays done.")
+                )
             reload_same_tab()
 
         # The user may switch tabs while it runs; that tab loaded itself, and
@@ -1808,7 +1852,9 @@ class GeoServerMainDialog(
         started_on = self.navList.currentRow()
 
         def reload_same_tab():
-            if self.navList.currentRow() == started_on:
+            # Not while a Refresh probes: a load would cancel the probe, and
+            # the dialog stayed on "Connecting…" for good. Its landing loads.
+            if self.navList.currentRow() == started_on and self.gs is not None:
                 reload_fn()
 
         self._launch_task(
@@ -1891,6 +1937,8 @@ class GeoServerMainDialog(
                     )
                 if after is not None:
                     after(client)
+                if task is not None:
+                    task.completed = True  # a Cancel from now on comes too late
             finally:
                 if folder is not None:
                     shutil.rmtree(folder, ignore_errors=True)
@@ -1914,8 +1962,10 @@ class GeoServerMainDialog(
             anything it raises (a Refresh dropped the client) reads as unknown.
         """
         try:
-            kept = exists()
-        except Exception:  # the report must not fail the cancel
+            # Off the GUI thread: the user may have cancelled because the
+            # server stopped answering, and this read would freeze QGIS.
+            kept = self._wait_for(exists)
+        except Exception:  # the report must not fail the cancel (or Cancel)
             kept = None
         if kept:
             message = self.tr(

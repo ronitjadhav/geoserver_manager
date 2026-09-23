@@ -339,6 +339,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- The seed task list updates on a slow server too: it asked again every
+  2 seconds and dropped each answer that took longer, and a dead server
+  collected a new pending request each time. *Stop all* now says it worked.
+- A Cancel pressed just after an upload completed no longer reports it
+  cancelled, with a false "data file removed" warning.
+- An upload that finishes after the dialog was closed says in the QGIS log
+  which of its last steps were not applied.
+- A cancelled delete batch still reports the deletes that failed before it.
+- Cancelling the connection check says "Not connected" instead of staying on
+  "Connecting…" with the old rows; a delete that ends during a Refresh no
+  longer cancels the check.
+- A failed load no longer leaves a "Resources loaded." banner for later.
+- Saving a workspace, a datastore, a cascaded store, a coverage store or a
+  layer group, publishing, and pushing a style no longer freeze QGIS when the
+  server stops answering: their requests run off the GUI thread, with Cancel.
+- QGIS's task bar no longer labels running work "Failed to …".
 - A profile switch or a Refresh while a delete batch or an upload ran sent
   the rest of it to the other server. The connection now waits, and says so.
 - A resource whose name holds `/`, `?`, `#` or `%` (made outside the plugin)

@@ -506,7 +506,11 @@ class WorkspaceTabMixin:
         self._raw_rest("put", path, json=Workspace(new_name, isolated).put_payload())
 
     def _save_workspace(self, values, old_name=None):
-        """Create (old_name None) or update a workspace from form values."""
+        """Create (old_name None) or update a workspace from form values.
+
+        Runs in a worker (_wait_for), so it shows nothing: it returns the
+        warning to show once it is back, or None.
+        """
         name = values["name"]
         if old_name is None or name != old_name:
             # A new name goes into a REST path: refuse what a URL would eat.
@@ -533,13 +537,12 @@ class WorkspaceTabMixin:
             try:
                 self._set_default_workspace(name)
             except Exception as e:
-                self.show_warning_message(
-                    translate(
-                        "WorkspaceTabMixin",
-                        "Workspace '{}' saved, but it could not be made the default: {}",
-                    ).format(name, e)
-                )
                 self.log(f"Set default workspace error: {e}", Qgis.MessageLevel.Warning)
+                return translate(
+                    "WorkspaceTabMixin",
+                    "Workspace '{}' saved, but it could not be made the default: {}",
+                ).format(name, e)
+        return None
 
     def _add_workspace(self):
         """Open a form dialog to create a new workspace."""
@@ -558,8 +561,11 @@ class WorkspaceTabMixin:
             return
 
         values = dlg.get_values()
+        warning = []
         if self._run_action(
-            lambda: self._save_workspace(values),
+            lambda: warning.append(
+                self._wait_for(lambda: self._save_workspace(values))
+            ),
             translate("WorkspaceTabMixin", "Failed to create workspace '{}'").format(
                 values["name"]
             ),
@@ -569,6 +575,8 @@ class WorkspaceTabMixin:
                     values["name"]
                 )
             )
+            if warning[0]:
+                self.show_warning_message(warning[0])
             self._load_workspaces()
 
     def _show_workspace_info(self, row_data):
@@ -643,8 +651,16 @@ class WorkspaceTabMixin:
         values = dlg.get_values()
         had_wms = wms_settings is not None
         had = {service: own is not None for service, (own, _) in services.items()}
+        warning = []
         if self._run_action(
-            lambda: self._save_workspace_and_wms(values, old_name, had_wms, had, uri),
+            # Up to ten requests: in a worker, so a hung server cannot freeze QGIS.
+            lambda: warning.append(
+                self._wait_for(
+                    lambda: self._save_workspace_and_wms(
+                        values, old_name, had_wms, had, uri
+                    )
+                )
+            ),
             translate("WorkspaceTabMixin", "Failed to update workspace '{}'").format(
                 values["name"]
             ),
@@ -654,6 +670,8 @@ class WorkspaceTabMixin:
                     values["name"]
                 )
             )
+            if warning[0]:
+                self.show_warning_message(warning[0])
             # Reachable from the datastore tab, so reload whatever is on screen
             self._reload_current_tab()
 
@@ -665,7 +683,7 @@ class WorkspaceTabMixin:
         A rename has to land first: the settings live under the workspace's
         (new) name, and a rename keeps the URI.
         """
-        self._save_workspace(values, old_name=old_name)
+        warning = self._save_workspace(values, old_name=old_name)
         name = values["name"]
         uri = (values.get("uri") or "").strip()
         if old_uri is not None and uri and uri != old_uri:
@@ -676,6 +694,7 @@ class WorkspaceTabMixin:
                 self._apply_service_settings(
                     service, name, values, (had_services or {}).get(service, False)
                 )
+        return warning
 
     def _delete_workspace(self, row_data):
         """Delete a single workspace after confirmation."""

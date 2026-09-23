@@ -216,6 +216,33 @@ class LayerTabMixin:
             self._name_of(layer) for layer in self._unwrap(payload, "layers", "layer")
         )
 
+    def _refuse_vector_clash(self, ws_name, name, values):
+        """Refuse a vector upload onto a store or layer it would not own."""
+        if not values.get("replace"):
+            for exists, message in (
+                (
+                    self._resource_exists(self.gs.get_datastore, ws_name, name),
+                    translate(
+                        "LayerTabMixin", "Datastore '{}' already exists in '{}'."
+                    ),
+                ),
+                (
+                    self._resource_exists(
+                        self.gs.get_feature_type, ws_name, name, name
+                    ),
+                    translate("LayerTabMixin", "Layer '{}' already exists in '{}'."),
+                ),
+            ):
+                if exists:
+                    raise ValueError(
+                        message.format(name, ws_name)
+                        + " "
+                        + translate("LayerTabMixin", "Tick Replace to overwrite it.")
+                    )
+        self._refuse_layer_clash(
+            ws_name, name, values.get("replace"), "data", "GeoPackage"
+        )
+
     def _refuse_layer_clash(self, ws_name, name, replace, kind, store_type):
         """Refuse an upload that would land on another store's layer.
 
@@ -990,7 +1017,7 @@ class LayerTabMixin:
             return
         published = values["table"]
         if self._run_action(
-            lambda: self._publish_table(values),
+            lambda: self._wait_for(lambda: self._publish_table(values)),
             translate("LayerTabMixin", "Failed to publish '{}'").format(published),
         ):
             self.show_success_message(
@@ -1170,30 +1197,8 @@ class LayerTabMixin:
                 on_done=on_done,
             )
         require_crs(layer)
-        if not values.get("replace"):
-            for exists, message in (
-                (
-                    self._resource_exists(self.gs.get_datastore, ws_name, name),
-                    translate(
-                        "LayerTabMixin", "Datastore '{}' already exists in '{}'."
-                    ),
-                ),
-                (
-                    self._resource_exists(
-                        self.gs.get_feature_type, ws_name, name, name
-                    ),
-                    translate("LayerTabMixin", "Layer '{}' already exists in '{}'."),
-                ),
-            ):
-                if exists:
-                    raise ValueError(
-                        message.format(name, ws_name)
-                        + " "
-                        + translate("LayerTabMixin", "Tick Replace to overwrite it.")
-                    )
-        self._refuse_layer_clash(
-            ws_name, name, values.get("replace"), "data", "GeoPackage"
-        )
+        # The checks are reads: off the GUI thread (the export below is not).
+        self._wait_for(lambda: self._refuse_vector_clash(ws_name, name, values))
 
         # A CRS without an EPSG code would be published as UNKNOWN: the export
         # reprojects it to one GeoServer can declare (reprojection_target).
@@ -1225,7 +1230,7 @@ class LayerTabMixin:
                 )
                 return
 
-            def finish():
+            def server_side():
                 # Best effort: the data is published at this point, so a
                 # failure to set a performance flag belongs in the log, not in
                 # the user's face.
@@ -1237,6 +1242,9 @@ class LayerTabMixin:
                         log_level=Qgis.MessageLevel.Warning,
                     )
                 self._set_feature_type_metadata(ws_name, name, values)
+
+            def finish():
+                self._wait_for(server_side)  # requests, off the GUI thread
                 if sld is not None:
                     self._push_qgis_style(name, ws_name, sld, name, True)
 
@@ -1652,23 +1660,30 @@ class LayerTabMixin:
         defaultStyle gets "workspace:style"; a bare name there would resolve
         to a global style of the same name instead.
         """
-        exists = self._resource_exists(
-            self.gs.get_style_definition, style_name, workspace_name
+        # The requests run off the GUI thread; only the question stays on it.
+        exists = self._wait_for(
+            lambda: self._resource_exists(
+                self.gs.get_style_definition, style_name, workspace_name
+            )
         )
         if exists and not self._confirm_replace_style(style_name, workspace_name):
             return False
-        if exists:
-            self._put_sld_body(style_name, workspace_name, sld)
-        else:
-            # One request: a definition created first stayed behind, empty,
-            # when GeoServer refused the body (StyleTabMixin._create_style).
-            self._create_style(style_name, workspace_name, "sld", sld)
-        if set_default:
-            self._check(
-                self.gs.set_default_layer_style(
-                    layer_name, workspace_name, f"{workspace_name}:{style_name}"
+
+        def write():
+            if exists:
+                self._put_sld_body(style_name, workspace_name, sld)
+            else:
+                # One request: a definition created first stayed behind,
+                # empty, when GeoServer refused the body (_create_style).
+                self._create_style(style_name, workspace_name, "sld", sld)
+            if set_default:
+                self._check(
+                    self.gs.set_default_layer_style(
+                        layer_name, workspace_name, f"{workspace_name}:{style_name}"
+                    )
                 )
-            )
+
+        self._wait_for(write)
         return True
 
     def _confirm_replace_style(self, style_name, workspace_name):
