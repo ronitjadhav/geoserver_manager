@@ -606,8 +606,12 @@ class LayerTabMixin:
             except Exception as e:
                 self.log(f"Could not list tables of {workspace}/{datastore}: {e}")
 
-    def _publish_layer(self):
-        """Open the publish form: pick workspace, datastore and table."""
+    def _publish_layer(self, layer=None):
+        """Open the publish form: pick workspace, datastore and table.
+
+        :param layer: a project layer to preselect as the source, which is how
+            the layer tree's *Publish to GeoServer* entry opens this form.
+        """
         workspace_names = self._fetch(
             self._get_workspace_names,
             translate("LayerTabMixin", "Failed to load the workspaces"),
@@ -649,6 +653,17 @@ class LayerTabMixin:
         )
         self._refill_publish_combos(dlg)
         self._on_publish_source_changed(dlg, _SOURCE_TABLE)
+        if layer is not None:
+            # The layer first: switching the source prefills the name from
+            # whichever layer the combo shows at that moment.
+            labels = [
+                label
+                for label, candidate in styleable_project_layers()
+                if candidate is layer
+            ]
+            if labels:
+                dlg.get_widget("qgis_layer").setCurrentText(labels[0])
+            dlg.get_widget("source").setCurrentText(_SOURCE_QGIS)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 

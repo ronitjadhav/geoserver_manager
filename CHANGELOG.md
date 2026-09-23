@@ -149,6 +149,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Publish to GeoServer…** in a layer's *GeoServer Manager* context menu.
+  It opens the Publish form with that layer already chosen as the source,
+  over the Layers tab where the upload reports its progress.
 - The documentation site was rebuilt: a landing page that shows the plugin,
   a modern theme with a dark mode, and pages for testing, packaging and
   documentation that describe this repository rather than the template it

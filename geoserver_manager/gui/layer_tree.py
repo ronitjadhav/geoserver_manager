@@ -81,11 +81,16 @@ class LayerTreeMenu:
             icon("apply-style", submenu.palette(), for_menu=True),
             translate("LayerTreeMenu", "Apply style from GeoServer…"),
         )
+        submenu.addSeparator()
+        publish = submenu.addAction(
+            icon("publish-layer", submenu.palette(), for_menu=True),
+            translate("LayerTreeMenu", "Publish to GeoServer…"),
+        )
         if self._connected_dialog() is None:
             reason = translate(
                 "LayerTreeMenu", "Not connected. Open GeoServer Manager first"
             )
-            for action in (push, pull):
+            for action in (push, pull, publish):
                 action.setEnabled(False)
                 action.setToolTip(reason)
             submenu.addSeparator()
@@ -100,6 +105,7 @@ class LayerTreeMenu:
             return
         push.triggered.connect(lambda: self.push_style(layer))
         pull.triggered.connect(lambda: self.apply_style(layer))
+        publish.triggered.connect(lambda: self.publish(layer))
 
     # -- Which server layer is this? -------------------------------------------
 
@@ -424,6 +430,26 @@ class LayerTreeMenu:
                 ),
                 Qgis.MessageLevel.Warning,
             )
+        return None
+
+    # -- Publishing ---------------------------------------------------------------
+
+    def publish(self, layer):
+        """Open the main dialog's Publish form with this layer as the source.
+
+        The dialog comes up on the Layers tab first. The upload reports its
+        progress, its Cancel and its outcome there, and that is where the new
+        layer appears; a form over a hidden dialog would report into nothing.
+        """
+        dlg = self._connected_dialog()
+        if dlg is None:
+            return self._say_not_connected()
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+        loaders = [loader for _label, _icon, loader in dlg.TABS]
+        dlg.navList.setCurrentRow(loaders.index("_load_layers"))
+        dlg._publish_layer(layer=layer)
         return None
 
     # -- Plumbing ----------------------------------------------------------------
