@@ -15,6 +15,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   plugin asks GeoServer to open it, and a warning gives GeoServer's reason
   when it cannot (a wrong host, password, path or URL).
 - **Reset** on datastores and coverage stores makes GeoServer re-read them.
+- **Workspaces:** set the namespace URI, and give a workspace its own WFS,
+  WCS and WMTS settings (on or off, title, abstract, keywords; WFS maximum
+  features), as it already could for WMS. New own settings start from the
+  global ones.
 - **Server tab:** the contact details, the global settings (proxy base URL,
   character set, decimals, verbosity), each service's settings (on or off,
   title, abstract, keywords; WFS maximum features) with its capabilities URL,

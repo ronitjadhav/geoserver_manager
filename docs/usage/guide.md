@@ -48,13 +48,15 @@ A workspace groups stores, layers and styles, like a folder.
 :width: 100%
 ```
 
-- **Add a Workspace:** give it a name. Optionally make it isolated or the
-  default.
-- **Click a name** to edit it: rename it, change isolation, make it the
-  default, or give it its own WMS service settings on the *WMS* tab.
+- **Add a Workspace:** give it a name, and optionally its namespace URI (the
+  one WFS and GML qualify its features with; `http://name` otherwise). Make
+  it isolated or the default if needed.
+- **Click a name** to edit it: rename it, change its namespace URI or its
+  isolation, make it the default, or give it service settings of its own on
+  the *WMS*, *WFS*, *WCS* and *WMTS* tabs.
 
 ```{figure} ../static/screenshots/workspace-edit.png
-:alt: The Edit Workspace form, with the name, the isolation and default checkboxes, and a WMS tab
+:alt: The Edit Workspace form, with the name, namespace URI, isolation and default checkboxes, and WMS, WFS, WCS and WMTS tabs
 :width: 420px
 
 Editing a workspace.
@@ -62,8 +64,9 @@ Editing a workspace.
 
 GeoServer always has exactly one default workspace. So on the current default,
 the box is read-only: make another workspace the default instead. Unticking
-*Own WMS settings* removes them, and the workspace uses the global WMS
-settings again.
+*Own settings* on a service's tab removes them, and the workspace uses the
+global ones again. Ticked on a workspace that had none, the fields start from
+the global settings, which the *Server* tab edits.
 
 ## Datastores
 

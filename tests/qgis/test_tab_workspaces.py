@@ -9,6 +9,7 @@ Usage from the repo root folder:
 """
 
 # standard library
+import sys
 from unittest.mock import patch
 
 from qgis.PyQt.QtWidgets import QDialog
@@ -18,7 +19,12 @@ from qgis.testing import start_app, unittest
 from geoserver_manager.gui import tab_workspaces
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.tab_workspaces import WorkspaceTabMixin
+from geoserver_manager.toolbelt.dependencies import BUNDLED_WHLS
 from tests.qgis.sync_dialog import SyncDialog
+
+for _whl in BUNDLED_WHLS:  # conftest does this under pytest; unittest needs it too
+    if str(_whl) not in sys.path:
+        sys.path.insert(0, str(_whl))
 
 start_app()
 
@@ -68,6 +74,21 @@ class FakeGS:
                 outer.calls.append(("GET", path, kwargs))
                 if path.endswith("/workspaces/default.json"):
                     return Response({"workspace": {"name": "topp"}})
+                if path == "/rest/services/wfs/workspaces/ne/settings.json":
+                    return Response(
+                        {"wfs": {"title": "NE features", "maxFeatures": 50}}
+                    )
+                if "/workspaces/" in path and path.startswith(
+                    ("/rest/services/wfs", "/rest/services/wcs", "/rest/services/wmts")
+                ):
+                    return Response("No such settings", 404)
+                if path == "/rest/services/wfs/settings.json":
+                    return Response(
+                        {"wfs": {"title": "Global WFS", "maxFeatures": 1000000}}
+                    )
+                if path.startswith("/rest/namespaces/"):
+                    name = path.rsplit("/", 1)[1][: -len(".json")]
+                    return Response({"namespace": {"uri": f"http://{name}.org"}})
                 return Response({"wms": NE_WMS})
 
             def put(inner, path, **kwargs):
@@ -290,7 +311,7 @@ class TestWorkspaceDialog(unittest.TestCase):
     def test_creating_a_workspace_offers_no_wms_group(self):
         # The settings can only be PUT once the workspace exists.
         keys = [field["key"] for field in self.dlg._workspace_fields()]
-        self.assertEqual(keys, ["name", "isolated", "set_default"])
+        self.assertEqual(keys, ["name", "uri", "isolated", "set_default"])
         with_wms = [field["key"] for field in self.dlg._workspace_fields(with_wms=True)]
         self.assertIn("wms_own", with_wms)
 
@@ -305,3 +326,81 @@ class TestWorkspaceDialog(unittest.TestCase):
 # ################################
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNamespaceAndOtherServices(unittest.TestCase):
+    """Measured on 2.28.5: per-workspace WFS/WCS/WMTS settings behave like
+    WMS (404 without, PUT creates or merges, DELETE falls back), and a PUT of
+    the namespace URI alone merges."""
+
+    def setUp(self):
+        Recording.opened.clear()
+        self.dlg = SyncDialog()
+        self.dlg.gs = FakeGS()
+        self.dlg.show_error_message = lambda text: self.fail(f"unexpected: {text}")
+        self.dlg.show_success_message = lambda text: None
+
+    def open_for(self, workspace_name):
+        with patch.object(tab_workspaces, "ResourceFormDialog", Recording):
+            self.dlg._show_workspace_info([workspace_name])
+        return Recording.opened[-1]
+
+    def calls(self, verb):
+        return [call for call in self.dlg.gs.calls if call[0] == verb]
+
+    def test_own_settings_are_prefilled_and_shown(self):
+        form = self.open_for("ne")
+        self.assertEqual(form.get_widget("uri").text(), "http://ne.org")
+        self.assertTrue(form.get_widget("wfs_own").isChecked())
+        self.assertEqual(form.get_widget("wfs_title").text(), "NE features")
+        self.assertEqual(form.get_widget("wfs_max_features").value(), 50)
+        self.assertFalse(form.get_widget("wcs_own").isChecked())
+        self.assertIn("wcs_title", form._hidden_keys)
+
+    def test_without_own_settings_the_form_starts_from_the_global_ones(self):
+        # A fresh WFS override would otherwise start at maxFeatures 0.
+        form = self.open_for("topp")
+        self.assertFalse(form.get_widget("wfs_own").isChecked())
+        self.assertEqual(form.get_widget("wfs_title").text(), "Global WFS")
+        self.assertEqual(form.get_widget("wfs_max_features").value(), 1000000)
+
+    def save(self, workspace_name, had, **changes):
+        values = {"name": workspace_name, "isolated": False, "set_default": False}
+        values.update({"uri": "http://ne.org", "wms_own": False})
+        for service in tab_workspaces.OTHER_SERVICES:
+            values.update(
+                {
+                    f"{service}_own": False,
+                    f"{service}_enabled": True,
+                    f"{service}_title": "",
+                    f"{service}_abstract": "",
+                    f"{service}_keywords": "",
+                }
+            )
+        values["wfs_max_features"] = 0
+        values.update(changes)
+        self.dlg._save_workspace_and_wms(
+            values, workspace_name, False, had, "http://ne.org"
+        )
+
+    def test_ticking_own_puts_them_and_unticking_deletes_them(self):
+        self.save("topp", {}, wcs_own=True, wcs_title="Coverages", wcs_keywords="a, b")
+        (put,) = [c for c in self.calls("PUT") if "/services/" in c[1]]
+        self.assertEqual(put[1], "/rest/services/wcs/workspaces/topp/settings.json")
+        self.assertEqual(put[2]["json"]["wcs"]["title"], "Coverages")
+        self.assertEqual(put[2]["json"]["wcs"]["keywords"], {"string": ["a", "b"]})
+        self.dlg.gs.calls.clear()
+        self.save("ne", {"wfs": True})
+        self.assertEqual(
+            [c[1] for c in self.calls("DELETE")],
+            ["/rest/services/wfs/workspaces/ne/settings.json"],
+        )
+
+    def test_a_changed_uri_is_put_and_an_unchanged_one_is_not(self):
+        self.save("ne", {})
+        self.assertFalse([c for c in self.calls("PUT") if "/namespaces/" in c[1]])
+        self.save("ne", {}, uri="http://example.org/ne")
+        (put,) = [c for c in self.calls("PUT") if "/namespaces/" in c[1]]
+        self.assertEqual(
+            put[2]["json"], {"namespace": {"uri": "http://example.org/ne"}}
+        )
