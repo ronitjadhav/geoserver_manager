@@ -889,6 +889,12 @@ class TestBackgroundLoading(unittest.TestCase):
             def get_plg_settings(inner):
                 return Settings()
 
+            def get_profiles(inner):
+                return []
+
+            def active_profile_name(inner):
+                return ""
+
             def get_value_from_key(inner, *args, **kwargs):
                 return None
 
@@ -1475,6 +1481,12 @@ class TestConnectionGuard(unittest.TestCase):
             def get_plg_settings(inner):
                 return Settings()
 
+            def get_profiles(inner):
+                return []
+
+            def active_profile_name(inner):
+                return ""
+
             def get_value_from_key(inner, *args, **kwargs):
                 return None
 
@@ -1497,6 +1509,69 @@ class TestConnectionGuard(unittest.TestCase):
         self.assertIsNone(self.dlg.gs)
         self.assertFalse(self.dlg.btn_add.isEnabled())
         self.assertFalse(self.dlg.btn_delete_selected.isEnabled())
+
+
+class TestProfileSwitcher(unittest.TestCase):
+    """The saved profiles next to the status line (#47)."""
+
+    def setUp(self):
+        outer = self
+        self.activated, self.refreshed = [], []
+
+        class Profiles:
+            profiles = [{"name": "dev"}]
+            active = "dev"
+
+            def get_profiles(inner):
+                return [dict(p) for p in inner.profiles]
+
+            def active_profile_name(inner):
+                return inner.active
+
+            def activate_profile(inner, profile):
+                outer.activated.append(profile["name"])
+                inner.active = profile["name"]
+
+            def get_plg_settings(inner):
+                from geoserver_manager.toolbelt.preferences import PlgSettingsStructure
+
+                return PlgSettingsStructure()
+
+            def get_value_from_key(inner, *args, **kwargs):
+                return None
+
+            def set_value_from_key(inner, *args, **kwargs):
+                return True
+
+        self.prefs = Profiles()
+        self.dlg = SyncDialog()
+        self.dlg.plg_settings = self.prefs
+        self.dlg._build_client = lambda settings: None  # no probe in these tests
+
+    def test_one_profile_shows_no_switcher(self):
+        self.dlg.refresh_ui()
+        self.assertTrue(self.dlg.cmb_profile.isHidden())
+
+    def test_two_profiles_show_it_on_the_active_one(self):
+        self.prefs.profiles = [{"name": "dev"}, {"name": "prod"}]
+        self.prefs.active = "prod"
+        self.dlg.refresh_ui()
+        self.assertFalse(self.dlg.cmb_profile.isHidden())
+        self.assertEqual(self.dlg.cmb_profile.currentText(), "prod")
+        self.assertEqual(self.activated, [])  # filling it switches nothing
+
+    def test_choosing_one_activates_it_and_reconnects(self):
+        self.prefs.profiles = [{"name": "dev"}, {"name": "prod"}]
+        self.dlg.refresh_ui()
+        refresh = self.dlg.refresh_ui
+        self.dlg.refresh_ui = lambda show_message=False: (
+            self.refreshed.append(show_message),
+            refresh(show_message),
+        )
+        self.dlg.cmb_profile.textActivated.emit("prod")
+        self.assertEqual(self.activated, ["prod"])
+        self.assertEqual(self.refreshed, [True])
+        self.assertEqual(self.dlg.cmb_profile.currentText(), "prod")
 
 
 class TestReadsOffTheGuiThread(unittest.TestCase):

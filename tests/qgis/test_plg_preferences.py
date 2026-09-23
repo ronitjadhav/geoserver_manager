@@ -95,6 +95,95 @@ class TestPlgPreferences(unittest.TestCase):
             self.assertEqual(settings.debug_mode, False)
 
 
+class TestServerProfiles(unittest.TestCase):
+    """Saved connections (#47), stored in this test profile's QgsSettings."""
+
+    KEYS = (
+        "geoserver_url",
+        "geoserver_auth_cfg_id",
+        "geoserver_verify_tls",
+        "profiles",
+        "active_profile",
+    )
+
+    def setUp(self):
+        from qgis.core import QgsSettings
+
+        from geoserver_manager.__about__ import __title__
+
+        self.settings = QgsSettings()
+        self.group = __title__
+        self.kept = {k: self.settings.value(f"{__title__}/{k}") for k in self.KEYS}
+        for key in self.KEYS:
+            self.settings.remove(f"{__title__}/{key}")
+        self.addCleanup(self.restore)
+
+    def restore(self):
+        for key, value in self.kept.items():
+            self.settings.remove(f"{self.group}/{key}")
+            if value is not None:
+                self.settings.setValue(f"{self.group}/{key}", value)
+
+    def test_nothing_saved_means_no_profile(self):
+        self.assertEqual(PlgOptionsManager.get_profiles(), [])
+        self.assertEqual(PlgOptionsManager.active_profile_name(), "")
+
+    def test_a_connection_saved_before_profiles_becomes_the_first(self):
+        old = PlgSettingsStructure(
+            geoserver_url="https://gs.example.org/geoserver",
+            geoserver_auth_cfg_id="abc1234",
+            geoserver_verify_tls=False,
+        )
+        PlgOptionsManager.save_from_object(old)
+        self.assertEqual(
+            PlgOptionsManager.get_profiles(),
+            [
+                {
+                    "name": "gs.example.org",
+                    "url": "https://gs.example.org/geoserver",
+                    "auth_cfg_id": "abc1234",
+                    "verify_tls": False,
+                }
+            ],
+        )
+        self.assertEqual(PlgOptionsManager.active_profile_name(), "gs.example.org")
+
+    def test_activating_a_profile_is_what_everything_else_reads(self):
+        dev = {
+            "name": "dev",
+            "url": "http://localhost:8080/geoserver",
+            "auth_cfg_id": "dev0001",
+            "verify_tls": True,
+        }
+        prod = {
+            "name": "prod",
+            "url": "https://prod.example.org/geoserver",
+            "auth_cfg_id": "prd0001",
+            "verify_tls": False,
+        }
+        PlgOptionsManager.save_profiles([dev, prod])
+        PlgOptionsManager.activate_profile(prod)
+
+        current = PlgOptionsManager.get_plg_settings()
+        self.assertEqual(current.geoserver_url, prod["url"])
+        self.assertEqual(current.geoserver_auth_cfg_id, "prd0001")
+        self.assertIs(current.geoserver_verify_tls, False)
+        self.assertEqual(PlgOptionsManager.active_profile_name(), "prod")
+        self.assertEqual(
+            [p["name"] for p in PlgOptionsManager.get_profiles()], ["dev", "prod"]
+        )
+
+    def test_no_active_profile_is_not_configured(self):
+        PlgOptionsManager.activate_profile(None)
+        current = PlgOptionsManager.get_plg_settings()
+        self.assertFalse(current.has_credentials())
+        self.assertEqual(PlgOptionsManager.active_profile_name(), "")
+
+    def test_a_damaged_list_reads_as_empty_instead_of_raising(self):
+        PlgOptionsManager.set_value_from_key("profiles", "[{not json")
+        self.assertEqual(PlgOptionsManager.get_profiles(), [])
+
+
 # ############################################################################
 # ####### Stand-alone run ########
 # ################################

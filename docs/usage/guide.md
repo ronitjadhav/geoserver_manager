@@ -21,7 +21,8 @@ The Layers tab of a connected dialog.
   The rest sit in the **More** menu (or **Actions**, when every action is in
   the menu).
 - **Bottom:** page buttons, then *Refresh*, *Settings* and the connection
-  status.
+  status. With two or more saved profiles, a list beside the status switches
+  to another server and reloads the open tab.
 
 Working with a list:
 

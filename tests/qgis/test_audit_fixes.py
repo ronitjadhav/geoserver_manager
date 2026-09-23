@@ -68,6 +68,12 @@ class Prefs:
     def get_plg_settings(self):
         return Settings()
 
+    def get_profiles(self):
+        return []
+
+    def active_profile_name(self):
+        return ""
+
     def get_value_from_key(self, *args, **kwargs):
         return None
 
@@ -333,6 +339,18 @@ class FakeManager:
 
     def save_from_object(self, settings):
         pass
+
+    def get_profiles(self):
+        return []
+
+    def save_profiles(self, profiles):
+        pass
+
+    def active_profile_name(self):
+        return ""
+
+    def set_value_from_key(self, key, value):
+        return True
 
 
 class TestSettingsExtras(unittest.TestCase):

@@ -80,13 +80,15 @@ For a development install, see [Development](#development) below.
 
 | Field | Notes |
 | :---- | :---- |
+| Profile | one saved connection per server (dev, staging, prod…): *Add…* and *Remove*; saving makes the shown one active |
 | Base URL | e.g. `https://example.com/geoserver`, must start with `http://` or `https://` |
 | Username / Password | stored encrypted via `QgsAuthManager`; QGIS asks for its master password |
 | Verify the server's TLS certificate | on by default; untick only for a private CA or a self-signed certificate you trust |
 | Test connection | probes the server with the fields as typed, without saving them |
 
 Then open the plugin from the toolbar. The status line shows the connected
-server and its version; connection, authentication and HTTP problems are
+server and its version; with two or more profiles, a list beside it switches
+server and reloads the open tab; connection, authentication and HTTP problems are
 reported in the dialog's message bar and in the QGIS log panel (*GeoServer
 Manager* tab). Over plain `http://` to a remote host the password travels
 unencrypted; the plugin says so once, when saving.

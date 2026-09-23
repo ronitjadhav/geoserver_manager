@@ -10,7 +10,8 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 - [x] Encrypted credential storage via QgsAuthManager
 - [x] Live connection verification on dialog open
 - [x] GeoServer version display in status bar
-- [ ] Multiple server profiles (save/switch connections)
+- [x] Multiple server profiles: saved on the settings page, switched from the
+      dialog's status line, one set of credentials each
 
 ## Workspaces
 

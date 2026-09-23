@@ -13,7 +13,7 @@ Open *Settings → Options → GeoServer Manager*. You can also use the
 *Settings* entry of the plugin menu.
 
 ```{figure} ../static/screenshots/settings.png
-:alt: The settings page, with fields for the base URL, username and password, a TLS checkbox and a Test connection button
+:alt: The settings page, with a profile list, fields for the base URL, username and password, a TLS checkbox and a Test connection button
 :width: 560px
 
 The settings page, inside the QGIS options.
@@ -30,6 +30,13 @@ in a project file. QGIS may ask for its master password the first time.
 :::{tip}
 Leave **Verify the server's TLS certificate** ticked. Untick it only for a
 private or self-signed certificate that you trust.
+:::
+
+:::{tip}
+More than one GeoServer? Click **Add…** next to **Profile**, name the new
+profile, and fill in its fields. Each profile keeps its own credentials.
+Once there are two, the dialog shows a list next to its status line to
+switch between them.
 :::
 
 ## 3. Open the dialog

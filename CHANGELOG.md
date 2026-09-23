@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Server profiles.** The settings page keeps several connections (dev,
+  staging, prod…), each with its own credentials in the QGIS authentication
+  database. With two or more, the dialog shows a list beside its status line
+  that switches server and reloads the open tab. A connection saved before
+  profiles existed becomes the first profile, named after its host.
 - **Publish to GeoServer…** in a layer's *GeoServer Manager* context menu.
   It opens the Publish form with that layer already chosen as the source,
   over the Layers tab where the upload reports its progress.

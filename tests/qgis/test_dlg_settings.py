@@ -89,6 +89,22 @@ class FakeSettingsManager:
     def save_from_object(self, settings):
         self.saved.append(settings)
 
+    # Profiles: none until the first save makes one (#47).
+    profiles = ()
+    values = None
+
+    def get_profiles(self):
+        return [dict(profile) for profile in self.profiles]
+
+    def save_profiles(self, profiles):
+        self.profiles = [dict(profile) for profile in profiles]
+
+    def active_profile_name(self):
+        return (self.values or {}).get("active_profile", "")
+
+    def set_value_from_key(self, key, value):
+        self.values = {**(self.values or {}), key: value}
+
 
 class TestApplyWarnsAndStillSaves(unittest.TestCase):
     """The real apply(), driven against stubs: it must warn *and* save."""
@@ -98,6 +114,7 @@ class TestApplyWarnsAndStillSaves(unittest.TestCase):
         self.settings = FakeSettings()
         self.manager = FakeSettingsManager(self.settings)
         self.page.plg_settings = self.manager
+        self.page.load_settings()  # the profiles of the fake, not of this machine
         self.pushed = []
         self.page.log = lambda message, log_level=None, push=False, **kw: (
             self.pushed.append((message, log_level, push))
@@ -160,6 +177,122 @@ class TestApplyWarnsAndStillSaves(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestProfiles(unittest.TestCase):
+    """Several saved connections on the settings page (#47)."""
+
+    def setUp(self):
+        from geoserver_manager.toolbelt.preferences import PlgSettingsStructure
+
+        # QgsAuthManager, in memory: auth config id -> (user, password).
+        self.store = {"idA": ("ua", "pa")}
+
+        def get_credentials(inner):
+            return self.store.get(inner.geoserver_auth_cfg_id, ("", ""))
+
+        def save_credentials(inner, username, password):
+            auth_id = inner.geoserver_auth_cfg_id or f"id{len(self.store)}"
+            self.store[auth_id] = (username, password)
+            return auth_id
+
+        def remove_credentials(inner):
+            self.store.pop(inner.geoserver_auth_cfg_id, None)
+            inner.geoserver_auth_cfg_id = ""
+
+        for name, fn in (
+            ("get_credentials", get_credentials),
+            ("save_credentials", save_credentials),
+            ("remove_credentials", remove_credentials),
+        ):
+            patcher = patch.object(PlgSettingsStructure, name, fn)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        self.settings = PlgSettingsStructure(
+            geoserver_url="https://a.example.org/geoserver", geoserver_auth_cfg_id="idA"
+        )
+        self.manager = FakeSettingsManager(self.settings)
+        self.manager.profiles = [
+            {
+                "name": "A",
+                "url": "https://a.example.org/geoserver",
+                "auth_cfg_id": "idA",
+                "verify_tls": True,
+            }
+        ]
+        self.manager.values = {"active_profile": "A"}
+        self.page = ConfigOptionsPage(None)
+        self.page.plg_settings = self.manager
+        self.page.log = lambda *args, **kwargs: None
+        self.page.load_settings()
+
+    def add(self, name):
+        with patch(
+            "geoserver_manager.gui.dlg_settings.QInputDialog.getText",
+            return_value=(name, True),
+        ):
+            self.page._add_profile()
+
+    def test_the_active_profile_is_shown_with_its_credentials(self):
+        self.assertEqual(self.page.cmb_profile.currentText(), "A")
+        self.assertEqual(self.page.txt_gs_url.text(), "https://a.example.org/geoserver")
+        self.assertEqual(self.page.txt_gs_username.text(), "ua")
+
+    def test_two_profiles_round_trip_and_edits_survive_a_switch(self):
+        self.add("B")
+        self.assertEqual(self.page.txt_gs_url.text(), "")  # a new profile starts empty
+        self.page.txt_gs_url.setText("https://b.example.org/geoserver")
+        self.page.txt_gs_username.setText("ub")
+        self.page.txt_gs_password.setText("pb")
+        self.page.cmb_profile.setCurrentText("A")  # B's edits are kept, not saved
+        self.page.txt_gs_url.setText("https://a2.example.org/geoserver")
+        self.page.apply()
+
+        a, b = self.manager.profiles
+        self.assertEqual(a["url"], "https://a2.example.org/geoserver")
+        self.assertEqual(b["url"], "https://b.example.org/geoserver")
+        self.assertNotEqual(b["auth_cfg_id"], "idA")  # its own credentials
+        self.assertEqual(self.store[b["auth_cfg_id"]], ("ub", "pb"))
+        self.assertEqual(self.store["idA"], ("ua", "pa"))
+        # The shown profile is the one the dialog connects to now.
+        self.assertEqual(self.manager.values["active_profile"], "A")
+        self.assertEqual(
+            self.settings.geoserver_url, "https://a2.example.org/geoserver"
+        )
+
+    def test_saving_another_profile_makes_it_active_with_its_own_auth(self):
+        self.add("B")
+        self.page.txt_gs_url.setText("https://b.example.org/geoserver")
+        self.page.txt_gs_username.setText("ub")
+        self.page.txt_gs_password.setText("pb")
+        self.page.apply()
+        self.assertEqual(self.manager.values["active_profile"], "B")
+        self.assertEqual(self.settings.geoserver_url, "https://b.example.org/geoserver")
+        self.assertNotEqual(self.settings.geoserver_auth_cfg_id, "idA")
+        self.assertEqual(self.store["idA"], ("ua", "pa"))  # A was not overwritten
+
+    def test_a_duplicate_name_is_refused(self):
+        self.add("A")
+        self.assertEqual(len(self.page._profiles), 1)
+        self.assertIn("already exists", self.page.lbl_test_result.text())
+
+    def test_removing_the_last_profile_leaves_not_configured(self):
+        self.page._remove_profile()
+        self.assertFalse(self.page.cmb_profile.isEnabled())
+        self.assertIn("Saving creates one", self.page.cmb_profile.currentText())
+        self.assertEqual(self.store["idA"], ("ua", "pa"))  # nothing gone before Save
+        self.page.apply()
+        self.assertEqual(self.manager.profiles, [])
+        self.assertEqual(self.manager.values["active_profile"], "")
+        self.assertEqual(self.settings.geoserver_url, "")
+        self.assertNotIn("idA", self.store)
+
+    def test_cancel_keeps_a_removed_profile(self):
+        self.page._remove_profile()
+        self.page.load_settings()  # what reopening the page does after Cancel
+        self.assertEqual(self.page.cmb_profile.currentText(), "A")
+        self.assertIn("idA", self.store)
 
 
 class TestTestConnection(unittest.TestCase):
