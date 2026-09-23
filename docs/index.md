@@ -18,7 +18,7 @@ project, and bring what the server has back in as WMS, WFS or WMTS.
 :link: usage/installation
 :link-type: doc
 
-Get the plugin into QGIS, from a release zip or from the development feed.
+Get the plugin into QGIS from the development feed, until the first release.
 :::
 
 :::{grid-item-card} {octicon}`rocket;1.5em` Quick start

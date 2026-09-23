@@ -144,7 +144,7 @@ python -m pytest tests/unit
 QT_QPA_PLATFORM=offscreen python -m pytest tests/qgis
 # after changing any user-visible string (needs pip install PyQt6); test_i18n fails otherwise
 python scripts/update_translations.py
-# build the zip qgis-plugin-ci would release (~125 KB, 23 files)
+# build the zip qgis-plugin-ci would release (~250 KB, 65 files)
 qgis-plugin-ci package 0.1.0 --allow-uncommitted-changes && rm geoserver_manager.0.1.0.zip
 ```
 

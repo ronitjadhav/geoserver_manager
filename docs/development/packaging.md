@@ -13,7 +13,7 @@ python -m pip install -U -r requirements/packaging.txt
 qgis-plugin-ci package latest
 ```
 
-Expect around 125 KB. If it is suddenly megabytes, the bundled
+Expect around 250 KB and 65 files. If it is suddenly megabytes, the bundled
 `geoservercloud` wheel was replaced with the upstream one: the shipped copy
 has the 15 MB of acceptance-test fixtures stripped out, which takes it from
 16 MB to 49 KB. Strip the new wheel the same way on every version bump, and

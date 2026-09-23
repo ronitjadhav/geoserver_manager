@@ -4,149 +4,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## Unreleased
 
-### Changed
-
-- The documentation has a quick start, and the user guide is rewritten in
-  plainer words with a screenshot of every tab and main form. The capture
-  script grabs them all from the sandbox, so they stay current.
-
-### Fixed
-
-- Counts read naturally: "3 workspaces deleted" instead of "3 workspace(s)
-  deleted", in the delete confirmations, their result banners and the
-  "could not be listed" warning. Each locale gets its own plural forms,
-  French included. A failed batch delete now says "Could not delete:",
-  followed by each item and its reason.
-- Opening a form, a detail view, a preview or *Add to QGIS* no longer
-  freezes QGIS when the server is slow or gone. Each of those reads now runs
-  in a worker thread. After 0.3 s a *Waiting for GeoServer* box appears, and
-  its *Cancel* works; before, QGIS hung for up to the library's 120 s
-  timeout. The Publish form's datastore and table pickers work the same way.
-- A form whose description or help text wraps opens tall enough to show it.
-  On a high-DPI screen the rows were squeezed and the help text cut off.
-- The style dialog shows the whole legend. It arrives after the dialog opens,
-  and only its first row used to fit.
-- A workspace, datastore or layer-group name with `/`, `?`, `#` or `%` is
-  refused before any request: `requests` would have sent
-  `datastores/a#b.json` as `datastores/a` (another store's path), and a
-  global layer group's raw path is URL-quoted.
-- The *Isolated Workspace* help described something else; it says what
-  isolation does (layers served only under the workspace's own URLs, so
-  another workspace may share the namespace URI). The workspace delete
-  confirmation lists coverage stores and cascaded stores among what goes.
-- A layer-group line naming a layer the server does not have is refused
-  with that name, instead of coming back as GeoServer's HTTP error.
-- Editing a workspace without renaming it is one PUT; it used to POST,
-  collect a 409 and PUT.
-- A style, cascaded store, cascaded layer or tile-cache name with `/`, `?`,
-  `#` or `%` is refused before any request, and names the server already
-  holds are URL-quoted on their way into this plugin's REST paths:
-  `requests` sent `styles/a#b.json` as `styles/a`, a different style.
-- The style dialog's legend picks its context layer from the style's own
-  workspace listing instead of the whole server's layer list.
-- The cascaded-layers dialog was a viewer whose primary button, Enter,
-  deleted the selected layer. It is a viewer; a cascaded layer is deleted
-  from the Layers tab, like any other.
-- A coverage store or a published coverage could be given a name with `/`,
-  `?`, `#` or `%`, which `requests` then read as part of the URL: the request
-  went to a *different* resource. Such names are refused before any request,
-  and a workspace name is quoted in the browser preview's URL.
-- Two project layers with the same name and kind showed as one entry in the
-  pickers, and the second always resolved to the first, so the wrong layer's
-  data or symbology went up. Duplicates carry the tail of their layer id.
-- *Push style from QGIS* (Layers tab and layer tree) and a publish with its
-  style replaced an existing server style without a word, and every layer
-  sharing that style changed. It asks first: "Style 'x' already exists in
-  'ws'. Replace it? Every layer that uses it will render differently." Keeping
-  it is reported as such, not as an upload.
-- *Publish a Layer → A layer from this QGIS project* listed raster layers and
-  then tried to write them as a GeoPackage. A raster picked there now goes the
-  way the Coverage Stores tab sends it (a GeoTIFF, uploaded and published as
-  a coverage) with the same *Replace* rule; the form says which kind becomes
-  what. A WMS or XYZ raster, which has no file to send, is refused in words.
-- An ImageMosaic *properties ZIP* was read into memory and sent under the
-  wait cursor; it streams in a task like the other uploads, with progress and
-  Cancel. All three uploads share one helper (`_upload_file`) and one cancel
-  report.
-- Starting a second upload while one ran exported the layer first, minutes
-  for a big raster, then refused and left the exported file in the temp
-  folder. It refuses before exporting.
-
-- The Layers tab listed only the feature types it found by walking the
-  datastores, so a raster layer (including one just published from QGIS)
-  and a cascaded WMS or WMTS layer never appeared there. It now shows
-  GeoServer's own layer list, every type included, with the type, the store
-  and the default style; the detail view, *Add to QGIS* (no WFS for a raster
-  or a cascaded layer), *Preview in a browser* and *Delete* follow the type.
-- Acting on a table while the plugin was reconnecting crashed with
-  `AttributeError: 'NoneType' object has no attribute 'get_workspaces'`. A
-  refresh drops the connection immediately and re-probes in the background, so
-  the rows and buttons on screen briefly belonged to a client that was gone.
-  The header buttons are now disabled for that moment, and anything still
-  clickable (row actions, link cells) says "Not connected to GeoServer" and
-  does nothing.
-- The generic connection-parameter editor masked only a key *named*
-  `password`, so a WFS store's `WFSDataStoreFactory:PASSWORD` showed its
-  ciphertext. Any key ending in `password` or `passwd` is masked now.
-- About one string in seven never reached the translation files: `pylupdate5`
-  silently skips a `translate()` call that black wrapped onto several lines, or
-  whose text is written as adjacent literals. Extraction now uses `pylupdate6`
-  (`scripts/update_translations.py`), and a test checks every string in the
-  code against the `.ts`.
-
-### Changed
-
-- Row actions now keep frequent controls visible and put secondary actions in
-  labelled More or Actions menus. Destructive actions appear last, separated
-  from other menu entries. Larger click targets, palette-based hover and focus
-  states, and keyboard access make the thin custom icons easier to use.
-
-- Refined the thin icon family for small controls: fuller brush tips, larger
-  chain links, separate full-height style-transfer arrows and a clearer cache
-  eraser. The 1.2-unit stroke weight is unchanged.
-- All plugin icons now use custom SVG artwork: navigation, row actions,
-  settings, help and layer-tree actions. Thin strokes and shared symbols keep
-  them consistent. Preview, publish, style transfer and cache operations have
-  distinct symbols; colours follow light, dark, selected and disabled states.
-  Row buttons also have accessible names.
-- A central icon registry tracks custom artwork and pending fallbacks, with
-  checks for missing or unregistered icons. A short style guide keeps future
-  additions consistent. The visual gallery is generated locally on demand;
-  generated previews and inventories are not tracked in the repository.
-
-- Layer-group modes read as GeoServer's web admin names them (Single,
-  Opaque Container, Named Tree, Container Tree, Earth Observation Tree)
-  in the table, the detail and the create form, which also explains what
-  an Opaque Container is. The first column of the Workspaces, Datastores
-  and Layer Groups tables is *Name*; the datastore form lists Name,
-  Workspace, Type like every other form; Enabled cells read Yes / No.
-- Styles, Cascaded Stores and Tile Cache: the first column is *Name*, an
-  *Enabled* cell reads Yes / No rather than Python's `True` / `False`, and
-  the style row actions say what they do: *Save to disk* (the body, whatever
-  its format, not only SLD) and a tooltip on *Apply to a QGIS layer* that
-  names the layer tree's *Apply style from GeoServer* as the same thing from
-  the other end. The style editor's description says what Save does.
-- Layers tab: the row actions read *Add to QGIS · Preview · Preview in a
-  browser · Set style · Push style from QGIS · Delete*: the in-QGIS preview
-  before the browser one, "Push style from QGIS" instead of "Style from QGIS"
-  (the same word the layer tree uses), and every icon-only button has a
-  tooltip saying what it does and how it differs from its neighbour; the
-  Coverage Stores tab likewise. The first column is "Name" on both tabs.
-- *Add to QGIS* proposes WFS for a vector layer (the features themselves) and
-  WMS for the rest; the WMTS URI no longer carries a `crs=EPSG:4326` that made
-  QGIS reproject every EPSG:900913 tile on the fly (measured).
-- *Publish a table*: the declared SRS has no default any more (4326 was
-  usually wrong for a projected table), and must be an EPSG number; the help
-  says where to look it up.
-- A coverage store's *Enabled* reads Yes / No instead of True / False; its
-  read-only note no longer blames GeoServer's REST API (which does update
-  stores) for what is a library gap: "Read-only in this version. Edit it in
-  GeoServer's web UI."
-- Editing a PostGIS store no longer demands the password again: leave the
-  field empty to keep the stored one, type to replace it. GeoServer accepts
-  its own encrypted value back (measured, a store still connected after the
-  round trip), so re-typing bought nothing but friction.
-
 ### Added
 
 - **Publish to GeoServer…** in a layer's *GeoServer Manager* context menu.
@@ -338,7 +195,151 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - `docker-compose.yml`: a throwaway GeoServer 2.28.5 plus PostGIS for local
   development and for testing the library contract against a real server.
 
+### Changed
+
+- The documentation has a quick start, and the user guide is rewritten in
+  plainer words with a screenshot of every tab and main form. The capture
+  script grabs them all from the sandbox, so they stay current.
+
+- Row actions now keep frequent controls visible and put secondary actions in
+  labelled More or Actions menus. Destructive actions appear last, separated
+  from other menu entries. Larger click targets, palette-based hover and focus
+  states, and keyboard access make the thin custom icons easier to use.
+
+- Refined the thin icon family for small controls: fuller brush tips, larger
+  chain links, separate full-height style-transfer arrows and a clearer cache
+  eraser. The 1.2-unit stroke weight is unchanged.
+- All plugin icons now use custom SVG artwork: navigation, row actions,
+  settings, help and layer-tree actions. Thin strokes and shared symbols keep
+  them consistent. Preview, publish, style transfer and cache operations have
+  distinct symbols; colours follow light, dark, selected and disabled states.
+  Row buttons also have accessible names.
+- A central icon registry tracks custom artwork and pending fallbacks, with
+  checks for missing or unregistered icons. A short style guide keeps future
+  additions consistent. The visual gallery is generated locally on demand;
+  generated previews and inventories are not tracked in the repository.
+
+- Layer-group modes read as GeoServer's web admin names them (Single,
+  Opaque Container, Named Tree, Container Tree, Earth Observation Tree)
+  in the table, the detail and the create form, which also explains what
+  an Opaque Container is. The first column of the Workspaces, Datastores
+  and Layer Groups tables is *Name*; the datastore form lists Name,
+  Workspace, Type like every other form; Enabled cells read Yes / No.
+- Styles, Cascaded Stores and Tile Cache: the first column is *Name*, an
+  *Enabled* cell reads Yes / No rather than Python's `True` / `False`, and
+  the style row actions say what they do: *Save to disk* (the body, whatever
+  its format, not only SLD) and a tooltip on *Apply to a QGIS layer* that
+  names the layer tree's *Apply style from GeoServer* as the same thing from
+  the other end. The style editor's description says what Save does.
+- Layers tab: the row actions read *Add to QGIS · Preview · Preview in a
+  browser · Set style · Push style from QGIS · Delete*: the in-QGIS preview
+  before the browser one, "Push style from QGIS" instead of "Style from QGIS"
+  (the same word the layer tree uses), and every icon-only button has a
+  tooltip saying what it does and how it differs from its neighbour; the
+  Coverage Stores tab likewise. The first column is "Name" on both tabs.
+- *Add to QGIS* proposes WFS for a vector layer (the features themselves) and
+  WMS for the rest; the WMTS URI no longer carries a `crs=EPSG:4326` that made
+  QGIS reproject every EPSG:900913 tile on the fly (measured).
+- *Publish a table*: the declared SRS has no default any more (4326 was
+  usually wrong for a projected table), and must be an EPSG number; the help
+  says where to look it up.
+- A coverage store's *Enabled* reads Yes / No instead of True / False; its
+  read-only note no longer blames GeoServer's REST API (which does update
+  stores) for what is a library gap: "Read-only in this version. Edit it in
+  GeoServer's web UI."
+- Editing a PostGIS store no longer demands the password again: leave the
+  field empty to keep the stored one, type to replace it. GeoServer accepts
+  its own encrypted value back (measured, a store still connected after the
+  round trip), so re-typing bought nothing but friction.
+
+- The bundled `geoservercloud` wheel is stripped of its acceptance-test
+  fixtures: 16 MB -> 49 KB.
+- The datastore list fetches store details in parallel (~5x faster) and caches
+  workspace names between dialogs.
+
 ### Fixed
+
+- Counts read naturally: "3 workspaces deleted" instead of "3 workspace(s)
+  deleted", in the delete confirmations, their result banners and the
+  "could not be listed" warning. Each locale gets its own plural forms,
+  French included. A failed batch delete now says "Could not delete:",
+  followed by each item and its reason.
+- Opening a form, a detail view, a preview or *Add to QGIS* no longer
+  freezes QGIS when the server is slow or gone. Each of those reads now runs
+  in a worker thread. After 0.3 s a *Waiting for GeoServer* box appears, and
+  its *Cancel* works; before, QGIS hung for up to the library's 120 s
+  timeout. The Publish form's datastore and table pickers work the same way.
+- A form whose description or help text wraps opens tall enough to show it.
+  On a high-DPI screen the rows were squeezed and the help text cut off.
+- The style dialog shows the whole legend. It arrives after the dialog opens,
+  and only its first row used to fit.
+- A workspace, datastore or layer-group name with `/`, `?`, `#` or `%` is
+  refused before any request: `requests` would have sent
+  `datastores/a#b.json` as `datastores/a` (another store's path), and a
+  global layer group's raw path is URL-quoted.
+- The *Isolated Workspace* help described something else; it says what
+  isolation does (layers served only under the workspace's own URLs, so
+  another workspace may share the namespace URI). The workspace delete
+  confirmation lists coverage stores and cascaded stores among what goes.
+- A layer-group line naming a layer the server does not have is refused
+  with that name, instead of coming back as GeoServer's HTTP error.
+- Editing a workspace without renaming it is one PUT; it used to POST,
+  collect a 409 and PUT.
+- A style, cascaded store, cascaded layer or tile-cache name with `/`, `?`,
+  `#` or `%` is refused before any request, and names the server already
+  holds are URL-quoted on their way into this plugin's REST paths:
+  `requests` sent `styles/a#b.json` as `styles/a`, a different style.
+- The style dialog's legend picks its context layer from the style's own
+  workspace listing instead of the whole server's layer list.
+- The cascaded-layers dialog was a viewer whose primary button, Enter,
+  deleted the selected layer. It is a viewer; a cascaded layer is deleted
+  from the Layers tab, like any other.
+- A coverage store or a published coverage could be given a name with `/`,
+  `?`, `#` or `%`, which `requests` then read as part of the URL: the request
+  went to a *different* resource. Such names are refused before any request,
+  and a workspace name is quoted in the browser preview's URL.
+- Two project layers with the same name and kind showed as one entry in the
+  pickers, and the second always resolved to the first, so the wrong layer's
+  data or symbology went up. Duplicates carry the tail of their layer id.
+- *Push style from QGIS* (Layers tab and layer tree) and a publish with its
+  style replaced an existing server style without a word, and every layer
+  sharing that style changed. It asks first: "Style 'x' already exists in
+  'ws'. Replace it? Every layer that uses it will render differently." Keeping
+  it is reported as such, not as an upload.
+- *Publish a Layer → A layer from this QGIS project* listed raster layers and
+  then tried to write them as a GeoPackage. A raster picked there now goes the
+  way the Coverage Stores tab sends it (a GeoTIFF, uploaded and published as
+  a coverage) with the same *Replace* rule; the form says which kind becomes
+  what. A WMS or XYZ raster, which has no file to send, is refused in words.
+- An ImageMosaic *properties ZIP* was read into memory and sent under the
+  wait cursor; it streams in a task like the other uploads, with progress and
+  Cancel. All three uploads share one helper (`_upload_file`) and one cancel
+  report.
+- Starting a second upload while one ran exported the layer first, minutes
+  for a big raster, then refused and left the exported file in the temp
+  folder. It refuses before exporting.
+
+- The Layers tab listed only the feature types it found by walking the
+  datastores, so a raster layer (including one just published from QGIS)
+  and a cascaded WMS or WMTS layer never appeared there. It now shows
+  GeoServer's own layer list, every type included, with the type, the store
+  and the default style; the detail view, *Add to QGIS* (no WFS for a raster
+  or a cascaded layer), *Preview in a browser* and *Delete* follow the type.
+- Acting on a table while the plugin was reconnecting crashed with
+  `AttributeError: 'NoneType' object has no attribute 'get_workspaces'`. A
+  refresh drops the connection immediately and re-probes in the background, so
+  the rows and buttons on screen briefly belonged to a client that was gone.
+  The header buttons are now disabled for that moment, and anything still
+  clickable (row actions, link cells) says "Not connected to GeoServer" and
+  does nothing.
+- The generic connection-parameter editor masked only a key *named*
+  `password`, so a WFS store's `WFSDataStoreFactory:PASSWORD` showed its
+  ciphertext. Any key ending in `password` or `passwd` is masked now.
+- About one string in seven never reached the translation files: `pylupdate5`
+  silently skips a `translate()` call that black wrapped onto several lines, or
+  whose text is written as adjacent literals. Extraction now uses `pylupdate6`
+  (`scripts/update_translations.py`), and a test checks every string in the
+  code against the `.ts`.
 
 - The workspace-name list used by the datastore forms was cached and survived a
   Refresh on the Workspaces tab, so a workspace created elsewhere showed in the
@@ -378,14 +379,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Editing a PostGIS datastore no longer sends GeoServer's encrypted password
   back as the new password; it has to be re-entered.
 
-### Changed
-
-- The bundled `geoservercloud` wheel is stripped of its acceptance-test
-  fixtures: 16 MB -> 49 KB.
-- The datastore list fetches store details in parallel (~5x faster) and caches
-  workspace names between dialogs.
-
 ## 0.1.0 - 2026-03-27
 
 - First release
 - Generated with the [QGIS Plugins templater](https://oslandia.gitlab.io/qgis/template-qgis-plugin/)
+- Placeholder, never released: packaging needs one version here. The first
+  real release will replace this entry.

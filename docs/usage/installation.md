@@ -2,14 +2,16 @@
 
 ## Released version
 
-The plugin is not on the official QGIS plugins repository yet. Download the
-latest `geoserver_manager.*.zip` from the
-[releases page](https://github.com/ronitjadhav/geoserver_manager/releases) and
-install it with *Plugins → Manage and Install Plugins → Install from ZIP*.
+There is no release yet, so the plugin is not on the official QGIS plugins
+repository and the
+[releases page](https://github.com/ronitjadhav/geoserver_manager/releases) is
+empty. Until then, install the
+[development version](#latest-development-version) below.
 
-Once it is published, it will be available at
-<https://plugins.qgis.org/plugins/geoserver_manager/> and installable directly
-from the plugins manager.
+Once released, it will be at
+<https://plugins.qgis.org/plugins/geoserver_manager/> and install directly from
+the plugins manager. A release zip will also be on the releases page, for
+*Plugins → Manage and Install Plugins → Install from ZIP*.
 
 ### Using this plugin with QGIS Deployment Toolbelt (QDT)
 
