@@ -165,6 +165,14 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   but recorded as `languageVersion 1.0.0`; and `GET {style}.sld` returns GeoServer's **1.0 rendition** of a
   stored 1.1 document, so the editor shows converted text and says so. Exporting or applying a style touches a
   live QGIS layer, so it happens on the GUI thread before any upload (invariant 9).
+- **Seeding** (row 59, measured on 2.28.5): `POST /gwc/rest/seed/{layer}.json` with a `seedRequest` (name,
+  gridSetId, format, type seed/reseed/truncate, zoomStart/Stop, threadCount, optional `bounds.coords.double`
+  and `parameters.entry[].string[key, value]`) answers 200 and starts `threadCount` tasks; an unknown gridset is
+  a 500 naming it, a zoom beyond the published range is accepted. `GET` of the same path lists the tasks as
+  `[tiles done, tiles total, seconds left, task id, state]` (state -1 aborted, 0 pending, 1 running, 2 done; -1
+  for a count not made yet). A form `POST` of `kill_all=all` to `/seed/{layer}` stops them and answers GWC's HTML
+  seed page. A gridSubset's `zoomStart`/`zoomStop` (published levels) and `min`/`maxCachedLevel`, and
+  `parameterFilters` of any kind, survive an XML `PUT`; a misspelt filter element is a bare 500 naming it.
 - **Other style formats, rename and usage** (row 58, measured on 2.28.5): CSS, YSLD and MBStyle each need their
   extension; without it GeoServer answers 500 "No such style handler". Their bodies read and write at
   `{style}.css` / `.ysld` / `.mbstyle` with their own content types, and a new one is created by a `POST` to the
