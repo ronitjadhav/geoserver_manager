@@ -84,7 +84,10 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 - [x] Publish a QGIS raster layer as a coverage store: written to a GeoTIFF
       (or sent as it is) and uploaded; GeoServer creates the store and
       publishes the coverage in one request
-- [ ] Batch upload multiple layers
+- [x] Batch upload multiple layers: select them in the layer tree, one form,
+      uploaded one after another
+- [x] Publish from the layer tree: *Publish to GeoServer…* in a layer's context
+      menu opens the form on that layer
 - [x] Upload associated SLD style with layer (and make it the layer's default)
 - [x] Overwrite existing layer option
 - [x] CRS validation & auto-reprojection: a layer without a CRS is refused
@@ -108,8 +111,9 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
       configuration (meta-tiling, expiry, gutter)
 - [x] Publish / un-publish layer to GWC: add a layer to the cache, truncate
       its tiles, stop caching it
-- [ ] Create custom gridsets (the picker lists the server's; creating one is
-      an XML PUT the library's `create_gridset()` only knows for three EPSG codes)
+- [ ] Create custom gridsets, [#85](https://github.com/ronitjadhav/geoserver_manager/issues/85)
+      (the picker lists the server's; creating one is an XML PUT the library's
+      `create_gridset()` only knows for three EPSG codes)
 
 ## User & Role Management
 
