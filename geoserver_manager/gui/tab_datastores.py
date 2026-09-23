@@ -978,6 +978,7 @@ class DatastoreTabMixin:
                 for row in selected_rows
             ],
             self._load_datastores,
+            lambda n: translate("DatastoreTabMixin", "%n datastore(s)", None, n),
             # _do_delete_datastore sends recurse=true
             cascade=translate(
                 "DatastoreTabMixin", "Every layer published from it is deleted too."

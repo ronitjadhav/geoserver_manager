@@ -75,7 +75,7 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   | `_cancel_load(user=False)` | stop the running load; `user=True` is the Cancel button, which also explains itself in a banner |
   | `_fan_out(fn, items, task=None) -> [(result, error)]` | parallel per-item GETs; a failing item yields `(None, exc)` instead of aborting. With the task: progress per item, and a cancel stops the loop |
   | `_report_partial_failures([(label, exc)])` | one warning banner + log lines for what a listing could not fetch |
-  | `_delete_many(kind, [(label, fn)], reload_fn, cascade=…, verb=…, done=…)` | confirm + run in a task with progress + report one or many deletions; `verb`/`done` for a tab whose action is not a delete ("stop caching" / "removed from the cache") |
+  | `_delete_many(kind, [(label, fn)], reload_fn, counted, cascade=…, verb=…, done=…)` | confirm + run in a task with progress + report one or many deletions; `counted` is the tab's `n -> translate(ctx, "%n layer(s)", None, n)`, so each locale gets its plural forms ([translations](translation.md)); `verb`/`done` for a tab whose action is not a delete ("stop caching" / "removed from the cache") |
   | `_require_safe_name(name)` | every Add form, before any request: refuses `/ ? # %` and edge spaces; `requests` sends `datastores/a#b.json` as `datastores/a` |
   | `_yes_no(value)` | a boolean cell, translated, never Python's `True` / `False` |
   | `_unwrap` / `_as_list` / `_name_of` | GeoServer's collection shapes, from `toolbelt/payload.py`; no tab keeps its own copy |

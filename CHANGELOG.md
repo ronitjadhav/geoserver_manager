@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- Counts read naturally: "3 workspaces deleted" instead of "3 workspace(s)
+  deleted", in the delete confirmations, their result banners and the
+  "could not be listed" warning. Each locale gets its own plural forms,
+  French included. A failed batch delete now says "Could not delete:",
+  followed by each item and its reason.
 - Opening a form, a detail view, a preview or *Add to QGIS* no longer
   freezes QGIS when the server is slow or gone. Each of those reads now runs
   in a worker thread. After 0.3 s a *Waiting for GeoServer* box appears, and

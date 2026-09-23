@@ -1425,6 +1425,7 @@ class LayerTabMixin:
                 for row in selected_rows
             ],
             self._load_layers,
+            lambda n: translate("LayerTabMixin", "%n layer(s)", None, n),
             # Every resource delete sends recurse=true, which removes the
             # published layer, but GeoServer refuses outright while a layer
             # group still references it (verified against 2.28.5).

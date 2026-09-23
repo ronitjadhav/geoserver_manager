@@ -200,6 +200,7 @@ class TestConfirmationVerbs(unittest.TestCase):
             self.asked.append(text)
             return QMessageBox.StandardButton.Yes
 
+        kwargs.setdefault("counted", lambda n: f"{n} things")
         with patch.object(QMessageBox, "warning", staticmethod(warning)):
             self.dlg._delete_many(*args, **kwargs)
 
@@ -237,6 +238,20 @@ class TestConfirmationVerbs(unittest.TestCase):
         self.assertEqual(len(self.banners), 1)
         self.assertIn("a: HTTP 403: referenced by layer group 'x'", self.banners[0])
 
+    def test_several_resources_are_counted_by_the_tab_not_with_s(self):
+        """Issue #60: "3 workspace(s)" cannot be right in any locale; each tab
+        hands in its own plural string, translated with the count.
+        """
+        self.ask(
+            "workspace",
+            [("a", lambda: None), ("b", lambda: None), ("c", lambda: None)],
+            lambda: None,
+            counted=lambda n: f"{n} workspaces",
+        )
+        self.assertIn("delete 3 workspaces?", self.asked[0])
+        self.assertEqual(self.banners, ["3 workspaces deleted."])
+        self.assertNotIn("(s)", self.asked[0] + self.banners[0])
+
 
 class TestDeletesRunInATask(unittest.TestCase):
     def test_the_requests_leave_the_gui_thread(self):
@@ -245,7 +260,10 @@ class TestDeletesRunInATask(unittest.TestCase):
         dlg._confirm_delete = lambda *args, **kwargs: True
         reloaded = []
         dlg._delete_many(
-            "style", [("a", lambda: time.sleep(0.2))], lambda: reloaded.append(1)
+            "style",
+            [("a", lambda: time.sleep(0.2))],
+            lambda: reloaded.append(1),
+            lambda n: f"{n} styles",
         )
         self.assertIsNotNone(dlg._task)  # still running when the call returned
         self.assertTrue(spin_until(lambda: reloaded == [1]))

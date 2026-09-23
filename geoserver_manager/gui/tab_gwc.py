@@ -691,6 +691,7 @@ class GwcTabMixin:
                 for row in selected_rows
             ],
             self._load_gwc_layers,
+            lambda n: translate("GwcTabMixin", "%n layer(s)", None, n),
             verb=translate("GwcTabMixin", "stop caching"),
             done=translate("GwcTabMixin", "removed from the cache"),
             cascade=translate(

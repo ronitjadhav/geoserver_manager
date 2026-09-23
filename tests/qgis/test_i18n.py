@@ -214,6 +214,34 @@ class TestRuntimeContext(unittest.TestCase):
         )
 
 
+class TestPluralForms(unittest.TestCase):
+    """Issue #60: a count goes through Qt's plural forms, never "(s)".
+
+    With no translation, Qt only fills in %n, so "%n layer(s)" would reach an
+    English user as "3 layer(s)". The English .ts therefore carries the two
+    English forms, and every locale carries all of its own.
+    """
+
+    def test_every_plural_is_finished_in_every_shipped_locale(self):
+        for path in sorted(I18N.glob("*.ts")):
+            plurals = [
+                message
+                for message in ElementTree.parse(path).iter("message")
+                if message.get("numerus") == "yes"
+            ]
+            self.assertTrue(plurals, f"{path.name}: no plural at all")
+            for message in plurals:
+                source = message.find("source").text
+                translation = message.find("translation")
+                forms = [form.text or "" for form in translation.iter("numerusform")]
+                with self.subTest(locale=path.name, source=source):
+                    self.assertNotEqual(translation.get("type"), "unfinished")
+                    self.assertEqual(len(forms), 2)
+                    for form in forms:
+                        self.assertIn("%n", form)
+                        self.assertNotIn("(s)", form)
+
+
 class TestShippedFrenchLocale(unittest.TestCase):
     """The locale that proves the pipeline end to end."""
 

@@ -770,6 +770,7 @@ class StyleTabMixin:
                 for row in selected_rows
             ],
             self._load_styles,
+            lambda n: translate("StyleTabMixin", "%n style(s)", None, n),
             cascade=translate(
                 "StyleTabMixin",
                 "The style file is removed from the server too, and layers that used "

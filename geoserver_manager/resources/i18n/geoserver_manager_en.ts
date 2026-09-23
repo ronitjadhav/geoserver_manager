@@ -261,8 +261,16 @@
         <source>cascaded store</source>
         <translation type="unfinished" />
     </message>
+    <message numerus="yes">
+        <location filename="../../gui/tab_cascaded.py" line="660" />
+        <source>%n cascaded store(s)</source>
+        <translation>
+            <numerusform>%n cascaded store</numerusform>
+            <numerusform>%n cascaded stores</numerusform>
+        </translation>
+    </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="661" />
+        <location filename="../../gui/tab_cascaded.py" line="664" />
         <source>Every cascaded layer published from it is deleted too; the remote server is not touched.</source>
         <translation type="unfinished" />
     </message>
@@ -678,8 +686,16 @@
         <source>Tick Replace to overwrite it.</source>
         <translation type="unfinished" />
     </message>
-    <message>
+    <message numerus="yes">
         <location filename="../../gui/tab_coveragestores.py" line="1026" />
+        <source>%n coverage store(s)</source>
+        <translation>
+            <numerusform>%n coverage store</numerusform>
+            <numerusform>%n coverage stores</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../../gui/tab_coveragestores.py" line="1029" />
         <source>The delete recurses: the store, its coverages and the layers published from them all go. The raster files themselves stay on the server.
 
 </source>
@@ -1026,8 +1042,16 @@
         <source>datastore</source>
         <translation type="unfinished" />
     </message>
+    <message numerus="yes">
+        <location filename="../../gui/tab_datastores.py" line="981" />
+        <source>%n datastore(s)</source>
+        <translation>
+            <numerusform>%n datastore</numerusform>
+            <numerusform>%n datastores</numerusform>
+        </translation>
+    </message>
     <message>
-        <location filename="../../gui/tab_datastores.py" line="982" />
+        <location filename="../../gui/tab_datastores.py" line="983" />
         <source>Every layer published from it is deleted too.</source>
         <translation type="unfinished" />
     </message>
@@ -1152,7 +1176,7 @@
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1619" />
+        <location filename="../../gui/dlg_main.py" line="1631" />
         <location filename="../../gui/dlg_main.py" line="542" />
         <source>An upload is already running. Wait for it or cancel it.</source>
         <translation type="unfinished" />
@@ -1304,87 +1328,90 @@
         <source>Waiting for GeoServer…</source>
         <translation type="unfinished" />
     </message>
-    <message>
+    <message numerus="yes">
         <location filename="../../gui/dlg_main.py" line="1478" />
-        <source>{count} item(s) could not be listed: {names}. Details in the QGIS log (GeoServer Manager tab).</source>
-        <translation type="unfinished" />
+        <source>%n item(s) could not be listed: {names}. Details in the QGIS log (GeoServer Manager tab).</source>
+        <translation>
+            <numerusform>%n item could not be listed: {names}. Details in the QGIS log (GeoServer Manager tab).</numerusform>
+            <numerusform>%n items could not be listed: {names}. Details in the QGIS log (GeoServer Manager tab).</numerusform>
+        </translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1540" />
-        <location filename="../../gui/dlg_main.py" line="1494" />
+        <location filename="../../gui/dlg_main.py" line="1553" />
+        <location filename="../../gui/dlg_main.py" line="1498" />
         <source>delete</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1497" />
+        <location filename="../../gui/dlg_main.py" line="1501" />
         <source>Are you sure you want to {verb} {subject}?</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1501" />
-        <source>Are you sure you want to {verb} {count} {kind}(s)?
+        <location filename="../../gui/dlg_main.py" line="1505" />
+        <source>Are you sure you want to {verb} {things}?
 
 {items}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1510" />
+        <location filename="../../gui/dlg_main.py" line="1513" />
         <source>This action cannot be undone.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1513" />
+        <location filename="../../gui/dlg_main.py" line="1516" />
         <source>Please confirm</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1541" />
+        <location filename="../../gui/dlg_main.py" line="1554" />
         <source>deleted</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1564" />
-        <source>Failed to {verb} some {kind}(s):
+        <location filename="../../gui/dlg_main.py" line="1577" />
+        <source>Could not {verb}:
 {errors}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1572" />
+        <location filename="../../gui/dlg_main.py" line="1584" />
         <source>{kind} '{name}' {done}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1578" />
-        <source>{count} {kind}(s) {done}.</source>
+        <location filename="../../gui/dlg_main.py" line="1590" />
+        <source>{things} {done}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1586" />
+        <location filename="../../gui/dlg_main.py" line="1598" />
         <source>Cancelled. What was already done stays done.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1591" />
+        <location filename="../../gui/dlg_main.py" line="1603" />
         <source>{verb} failed</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1595" />
+        <location filename="../../gui/dlg_main.py" line="1607" />
         <source>Working…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1693" />
+        <location filename="../../gui/dlg_main.py" line="1705" />
         <source>Upload of '{name}' cancelled. GeoServer kept the {kind} and its layer but had already removed their data file. Upload it again with Replace ticked, or delete the {kind}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1699" />
+        <location filename="../../gui/dlg_main.py" line="1711" />
         <source>Upload of '{name}' cancelled. Check the {tab} tab for what was left.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1703" />
+        <location filename="../../gui/dlg_main.py" line="1715" />
         <source>Upload of '{name}' cancelled. Nothing was left on the server.</source>
         <translation type="unfinished" />
     </message>
@@ -1747,18 +1774,26 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <source>layer</source>
         <translation type="unfinished" />
     </message>
-    <message>
+    <message numerus="yes">
         <location filename="../../gui/tab_gwc.py" line="694" />
+        <source>%n layer(s)</source>
+        <translation>
+            <numerusform>%n layer</numerusform>
+            <numerusform>%n layers</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../../gui/tab_gwc.py" line="695" />
         <source>stop caching</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="695" />
+        <location filename="../../gui/tab_gwc.py" line="696" />
         <source>removed from the cache</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="696" />
+        <location filename="../../gui/tab_gwc.py" line="697" />
         <source>The cached tiles and the cache configuration are removed; the layer itself stays published and can be added to the cache again.</source>
         <translation type="unfinished" />
     </message>
@@ -1985,8 +2020,16 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <source>layer group</source>
         <translation type="unfinished" />
     </message>
-    <message>
+    <message numerus="yes">
         <location filename="../../gui/tab_layergroups.py" line="616" />
+        <source>%n layer group(s)</source>
+        <translation>
+            <numerusform>%n layer group</numerusform>
+            <numerusform>%n layer groups</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="617" />
         <source>Only the group goes away. The layers it published stay. GeoServer refuses if another layer group contains this one.</source>
         <translation type="unfinished" />
     </message>
@@ -2546,8 +2589,16 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <source>layer</source>
         <translation type="unfinished" />
     </message>
+    <message numerus="yes">
+        <location filename="../../gui/tab_layers.py" line="1428" />
+        <source>%n layer(s)</source>
+        <translation>
+            <numerusform>%n layer</numerusform>
+            <numerusform>%n layers</numerusform>
+        </translation>
+    </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1431" />
+        <location filename="../../gui/tab_layers.py" line="1432" />
         <source>The published layer goes too; the table, file or remote layer behind it is not touched. GeoServer refuses if a layer group still uses the layer, remove it from the group first.
 
 </source>
@@ -3069,8 +3120,16 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <source>style</source>
         <translation type="unfinished" />
     </message>
-    <message>
+    <message numerus="yes">
         <location filename="../../gui/tab_styles.py" line="773" />
+        <source>%n style(s)</source>
+        <translation>
+            <numerusform>%n style</numerusform>
+            <numerusform>%n styles</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../../gui/tab_styles.py" line="774" />
         <source>The style file is removed from the server too, and layers that used it fall back to GeoServer's default style.</source>
         <translation type="unfinished" />
     </message>
@@ -3279,8 +3338,16 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <source>workspace</source>
         <translation type="unfinished" />
     </message>
+    <message numerus="yes">
+        <location filename="../../gui/tab_workspaces.py" line="484" />
+        <source>%n workspace(s)</source>
+        <translation>
+            <numerusform>%n workspace</numerusform>
+            <numerusform>%n workspaces</numerusform>
+        </translation>
+    </message>
     <message>
-        <location filename="../../gui/tab_workspaces.py" line="485" />
+        <location filename="../../gui/tab_workspaces.py" line="486" />
         <source>Everything it contains is deleted too: datastores, coverage stores, cascaded stores, layers, layer groups and styles.</source>
         <translation type="unfinished" />
     </message>
