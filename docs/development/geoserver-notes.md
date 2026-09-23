@@ -224,6 +224,14 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   abstract as `abstract`, which GeoServer drops (its key is `abstractTxt`, which the model also fails to read).
   Hence `tab_layergroups.py` builds its own payload and GETs the group itself; it still uses the facade for the
   per-workspace listing and delete.
+- **Editing a layer group** (row 57, measured on 2.28.5): a partial `PUT` merges. A new `publishables` list
+  needs a `styles` list of the same length (`""` for a layer's default), or it is refused; a group holding a
+  nested group needs `styles` even on a create (HTTP 500 without). GeoServer **never recomputes the bounds on a
+  PUT**: a new layer list keeps the old box, and `"bounds": null` stores a zero one, so the plugin sends the
+  union of the members' lon/lat boxes (`_group_bounds`). A name GeoServer does not know is **dropped with a
+  200**, so every line is checked first. A rename is forbidden (403). An EO group needs `rootLayer` and
+  `rootLayerStyle`, and cannot leave EO mode: JSON null, `""`, `{}` and an empty XML element are all refused.
+  A workspace group can only hold that workspace's layers. A group may share a layer's qualified name.
 - The bundled wheel is the upstream 0.8.5 with `geoserver_acceptance_tests/` removed (15 MB of fixtures):
   16 MB → 49 KB. On a version bump, strip the new wheel the same way. The procedure is in
   `toolbelt/dependencies.py` and the `release-plugin` skill. `GSC_REQUIRED` pins the version;

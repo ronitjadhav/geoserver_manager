@@ -182,7 +182,17 @@ def main():
                 ("layer-preview", None),
             ],
         ),
-        ("layer-groups", 5, [("layer-group-add", dialog._add_layer_group)]),
+        (
+            "layer-groups",
+            5,
+            [
+                ("layer-group-add", dialog._add_layer_group),
+                (
+                    "layer-group-edit",
+                    lambda: dialog._show_layer_group_info(row("tasmania")),
+                ),
+            ],
+        ),
         (
             "styles",
             6,
@@ -203,6 +213,8 @@ def main():
     # The first workspace, cite, has no datastore: pick one with tables.
     prepare = {
         "layer-publish": lambda f: f.get_widget("workspace").setCurrentText("sf"),
+        # The layers and their styles are what an edit is mostly about.
+        "layer-group-edit": lambda f: f._tabs.setCurrentIndex(1),
     }
 
     wanted = set(args.only or [])

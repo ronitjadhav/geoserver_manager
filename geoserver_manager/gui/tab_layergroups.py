@@ -1,7 +1,7 @@
 #! python3  # noqa: E265
 
 """
-Layer Groups tab: list, view, create, delete layer groups.
+Layer Groups tab: list, create, edit, delete layer groups.
 
 Used as a mixin for GeoServerMainDialog. `_layer_uri()` comes from LayerTabMixin
 through the shared dialog class; the global-or-workspace scope is `gui.scope`.
@@ -9,7 +9,13 @@ through the shared dialog class; the global-or-workspace scope is `gui.scope`.
 
 from urllib.parse import quote
 
-from qgis.core import QgsProject, QgsRasterLayer
+from qgis.core import (
+    QgsCoordinateReferenceSystem,
+    QgsCoordinateTransform,
+    QgsProject,
+    QgsRasterLayer,
+    QgsRectangle,
+)
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
@@ -26,6 +32,14 @@ MODES = ("SINGLE", "OPAQUE_CONTAINER", "NAMED", "CONTAINER", "EO")
 # First entry of the layer picker. Picking a layer always *changes* the combo's
 # text this way, so the same layer can be appended twice in a row.
 _PICK = "(pick a layer)"
+
+# The collection of each layer type's resources, reachable by workspace alone.
+_RESOURCE_COLLECTIONS = {
+    "VECTOR": "featuretypes",
+    "RASTER": "coverages",
+    "WMS": "wmslayers",
+    "WMTS": "wmtslayers",
+}
 
 
 # Every user-visible string in this file goes through translate() with this
@@ -207,19 +221,16 @@ class LayerGroupTabMixin:
             for style in styles
         ]
 
-    # -- View ------------------------------------------------------------------
+    # -- View and edit ---------------------------------------------------------
 
     @classmethod
     def _group_form_values(cls, detail, name, workspace_label):
-        """Prefill for the detail dialog. Pure, so it is unit-testable."""
+        """Prefill for the edit dialog, in the form's own layer syntax. Pure."""
         styles = cls._group_styles(detail)
         lines = []
-        for index, (layer_name, kind) in enumerate(cls._group_layers(detail)):
-            notes = [] if kind == "layer" else [kind]
+        for index, (layer_name, _kind) in enumerate(cls._group_layers(detail)):
             style = styles[index] if index < len(styles) else ""
-            if style:
-                notes.append(f"style {style}")
-            lines.append(layer_name + (f"  ({', '.join(notes)})" if notes else ""))
+            lines.append(f"{layer_name} = {style}" if style else layer_name)
 
         return {
             "name": name,
@@ -230,87 +241,298 @@ class LayerGroupTabMixin:
             "abstract": text_of(
                 detail.get("internationalAbstract") or detail.get("abstractTxt")
             ),
+            # A group GeoServer has never re-saved has no flags: both default on.
+            "enabled": detail.get("enabled", True) is not False,
+            "advertised": detail.get("advertised", True) is not False,
             "layers": "\n".join(lines),
+            "root_layer": (detail.get("rootLayer") or {}).get("name", ""),
+            "root_style": (detail.get("rootLayerStyle") or {}).get("name", ""),
             "bounds": bbox_text(detail.get("bounds")),
         }
 
-    def _group_info_fields(self):
-        """Field definitions for the read-only detail dialog."""
-        read_only_text = [
-            ("name", translate("LayerGroupTabMixin", "Name")),
-            ("workspace", translate("LayerGroupTabMixin", "Workspace")),
-            ("mode", translate("LayerGroupTabMixin", "Mode")),
-            ("title", translate("LayerGroupTabMixin", "Title")),
-            ("bounds", translate("LayerGroupTabMixin", "Bounds")),
-        ]
-        fields = [
-            {"key": key, "label": label, "type": "text", "read_only": True}
-            for key, label in read_only_text
-        ]
-        fields.append(
-            {
-                "key": "abstract",
-                "label": translate("LayerGroupTabMixin", "Abstract"),
-                "type": "textarea",
-                "read_only": True,
-            }
-        )
-        fields.append(
-            {
-                "key": "layers",
-                "label": translate("LayerGroupTabMixin", "Layers"),
-                "type": "textarea",
-                "read_only": True,
-                "group": translate("LayerGroupTabMixin", "Layers"),
-                "help": translate(
-                    "LayerGroupTabMixin",
-                    "In drawing order: the first line is at the bottom.",
-                ),
-            }
-        )
-        return fields
-
     def _show_layer_group_info(self, row_data):
-        """Open a layer group, read-only."""
+        """Open a layer group to edit it."""
         name, workspace_label = row_data[0], row_data[1]
-        detail = self._fetch(
-            lambda: self._group_detail(name, scope(workspace_label)),
+        fetched = self._fetch(
+            lambda: (
+                self._group_detail(name, scope(workspace_label)),
+                self._all_layer_names(),
+                self._all_group_names(),
+            ),
             translate("LayerGroupTabMixin", "Failed to load layer group '{}'").format(
                 name
             ),
         )
-        if detail is None:
+        if fetched is None:
             return
+        detail, layer_names, group_names = fetched
+        before = self._group_form_values(detail, name, workspace_label)
+        own = f"{scope(workspace_label)}:{name}" if scope(workspace_label) else name
 
         dlg = ResourceFormDialog(
             title=translate("LayerGroupTabMixin", "Layer Group '{}'").format(name),
             description=translate(
                 "LayerGroupTabMixin",
-                "Read-only. To change it, delete it and create it again.",
+                "GeoServer cannot rename a layer group. When the layers change, "
+                "the plugin recomputes the group's bounds.",
             ),
-            fields=self._group_info_fields(),
-            values=self._group_form_values(detail, name, workspace_label),
+            fields=self._group_fields(
+                [workspace_label],
+                layer_names + [group for group in group_names if group != own],
+                layer_names,
+                edit_mode=True,
+            ),
+            values=before,
             parent=self,
+            ok_label=translate("LayerGroupTabMixin", "Save"),
         )
-        dlg.get_widget("layers").setMaximumHeight(300)
-        dlg.hide_save_button()
-        dlg.exec()
+        self._wire_group_form(dlg)
+        if detail.get("mode") == "EO":
+            # GeoServer refuses every way of clearing the root layer (measured
+            # on 2.28.5), so an Earth Observation group cannot change mode.
+            dlg.get_widget("mode").setEnabled(False)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        after = dlg.get_values()
+        saved = self._fetch(
+            lambda: self._save_layer_group(
+                name, scope(workspace_label), before, after, layer_names, group_names
+            ),
+            translate("LayerGroupTabMixin", "Failed to update layer group '{}'").format(
+                name
+            ),
+        )
+        if saved:
+            self.show_success_message(
+                translate("LayerGroupTabMixin", "Layer group '{}' updated.").format(
+                    name
+                )
+            )
+            self._load_layer_groups()
+
+    @staticmethod
+    def _group_changes(before, after):
+        """(body, layers changed) for a partial PUT of the edited fields. Pure.
+
+        The layer list is only compared here: it needs the server's names to
+        become publishables, see _save_layer_group.
+        """
+        body = {}
+        for key, target in (
+            ("title", "title"),
+            ("abstract", "abstractTxt"),
+            ("enabled", "enabled"),
+            ("advertised", "advertised"),
+        ):
+            if after.get(key) != before.get(key):
+                body[target] = after.get(key)
+        if _mode_from_label(after["mode"]) != _mode_from_label(before["mode"]):
+            body["mode"] = _mode_from_label(after["mode"])
+        before_layers = LayerGroupTabMixin._parse_group_layers(before["layers"], None)
+        after_layers = LayerGroupTabMixin._parse_group_layers(after["layers"], None)
+        return body, before_layers != after_layers
+
+    def _save_layer_group(
+        self, name, workspace_name, before, after, known_layers, known_groups
+    ):
+        """PUT what changed. False when nothing did. Runs in a worker thread.
+
+        TODO(#50): no update_layer_group() in the library (row 57). GeoServer
+        merges a partial PUT, but a new layer list needs a style per entry,
+        and it keeps the old bounds, so they are recomputed here.
+        """
+        body, layers_changed = self._group_changes(before, after)
+        mode = _mode_from_label(after["mode"])
+        if layers_changed:
+            published, styles = self._group_publishables(
+                after["layers"], workspace_name, known_layers, known_groups
+            )
+            body["publishables"] = {"published": published}
+            # A new list with fewer styles than entries is refused.
+            body["styles"] = {"style": [{"name": s} if s else "" for s in styles]}
+            body["bounds"] = self._group_bounds(published)
+        if mode == "EO" and (
+            layers_changed
+            or "mode" in body
+            or (after["root_layer"], after["root_style"])
+            != (before["root_layer"], before["root_style"])
+        ):
+            body.update(self._eo_root(after, known_layers))
+        if not body:
+            return False
+        self._raw_rest(
+            "put", self._group_path(name, workspace_name), json={"layerGroup": body}
+        )
+        return True
+
+    def _group_publishables(self, text, workspace_name, known_layers, known_groups):
+        """The layer list as GeoServer publishables, and the styles beside it.
+
+        GeoServer drops a name it does not know, answering 200, so every line
+        is checked here. A name is a layer first, then a group.
+        ponytail: a group named like a layer cannot be listed; GeoServer allows
+        it, add a marker to the syntax when someone needs it.
+        """
+        layers, styles = self._parse_group_layers(text, workspace_name)
+        if not layers:
+            raise ValueError(
+                translate("LayerGroupTabMixin", "List at least one layer.")
+            )
+        published = []
+        for layer in layers:
+            if known_layers is None or layer in known_layers:
+                published.append({"@type": "layer", "name": layer})
+            elif layer in known_groups or layer.partition(":")[2] in known_groups:
+                # A global group is listed bare, even from a workspace group.
+                if layer not in known_groups:
+                    layer = layer.partition(":")[2]
+                published.append({"@type": "layerGroup", "name": layer})
+            else:
+                raise ValueError(
+                    translate(
+                        "LayerGroupTabMixin",
+                        "No layer or group named '{}' on the server. Pick it from "
+                        "the list, or qualify it as workspace:layer.",
+                    ).format(layer)
+                )
+        self._check_styles_exist(styles)
+        return published, styles
+
+    def _eo_root(self, values, known_layers):
+        """rootLayer and rootLayerStyle of an Earth Observation group.
+
+        GeoServer requires both. A blank style takes the root layer's default.
+        """
+        root = (values.get("root_layer") or "").strip()
+        if not root or root == _PICK:
+            raise ValueError(
+                translate(
+                    "LayerGroupTabMixin",
+                    "An Earth Observation group needs a root layer.",
+                )
+            )
+        if known_layers is not None and root not in known_layers:
+            raise ValueError(
+                translate(
+                    "LayerGroupTabMixin", "No layer named '{}' on the server."
+                ).format(root)
+            )
+        style = (values.get("root_style") or "").strip() or self._layer_summary(root)[2]
+        if style == "-":  # _layer_summary's "none", a cascaded layer's case
+            raise ValueError(
+                translate(
+                    "LayerGroupTabMixin",
+                    "Root layer '{}' has no default style: type one.",
+                ).format(root)
+            )
+        self._check_styles_exist([style])
+        return {
+            "rootLayer": {"@type": "layer", "name": root},
+            "rootLayerStyle": {"name": style},
+        }
+
+    def _group_bounds(self, published):
+        """The union of the publishables' extents, in EPSG:4326.
+
+        GeoServer computes it on a create but never on a PUT (a new layer list
+        keeps the old box, and "bounds": null stores a zero one). Layers give
+        their lon/lat box; a nested group gives its own, in any CRS.
+        """
+        wgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
+        total = None
+        for item in published:
+            if item["@type"] == "layerGroup":
+                workspace_name, _, bare = item["name"].rpartition(":")
+                box = self._group_detail(bare, workspace_name or None).get("bounds")
+            else:
+                box = self._layer_lonlat_box(item["name"])
+            rect = self._box_in(box or {}, wgs84)
+            if rect is None:
+                continue
+            if total is None:
+                total = rect
+            else:
+                total.combineExtentWith(rect)
+        if total is None:
+            raise ValueError(
+                translate(
+                    "LayerGroupTabMixin",
+                    "None of the layers has bounds, so the group would have none.",
+                )
+            )
+        return {
+            "minx": total.xMinimum(),
+            "miny": total.yMinimum(),
+            "maxx": total.xMaximum(),
+            "maxy": total.yMaximum(),
+            "crs": "EPSG:4326",
+        }
+
+    def _layer_lonlat_box(self, qualified_name):
+        """A layer's latLonBoundingBox, read from its resource by workspace."""
+        layer = self._raw_rest("get", self._layers_url(qualified_name)).json()
+        layer = layer.get("layer") or {}
+        collection = _RESOURCE_COLLECTIONS.get(layer.get("type"), "featuretypes")
+        workspace_name, _, _ = qualified_name.rpartition(":")
+        resource = (layer.get("resource") or {}).get("name") or qualified_name
+        path = "{}/workspaces/{}/{}/{}.json".format(
+            self.gs.rest_service.rest_endpoints.base_url,
+            quote(workspace_name, safe=""),
+            collection,
+            quote(resource.rpartition(":")[2], safe=""),
+        )
+        payload = self._raw_rest("get", path).json()
+        body = next(iter(payload.values()), {}) if isinstance(payload, dict) else {}
+        return body.get("latLonBoundingBox")
+
+    @staticmethod
+    def _box_in(box, target):
+        """A GeoServer bbox as a QgsRectangle in the target CRS; None if empty."""
+        try:
+            rect = QgsRectangle(
+                float(box["minx"]),
+                float(box["miny"]),
+                float(box["maxx"]),
+                float(box["maxy"]),
+            )
+        except (KeyError, TypeError, ValueError):
+            return None
+        if rect.isEmpty():
+            return None
+        crs = box.get("crs")
+        crs = crs.get("$") if isinstance(crs, dict) else crs
+        source = QgsCoordinateReferenceSystem(crs or "EPSG:4326")
+        if not source.isValid() or source == target:
+            return rect
+        return QgsCoordinateTransform(
+            source, target, QgsProject.instance()
+        ).transformBoundingBox(rect)
 
     # -- Create ----------------------------------------------------------------
 
-    def _group_fields(self, workspace_names, layer_names):
-        """Field definitions for the create dialog."""
-        return [
+    def _group_fields(
+        self, workspace_names, pickable, root_layers=None, edit_mode=False
+    ):
+        """Field definitions for the create and the edit dialog.
+
+        :param pickable: what the picker offers: layers, then groups.
+        :param root_layers: the layers an Earth Observation root can be;
+            what the picker offers when not given.
+        """
+        fields = [
             {
                 "key": "name",
                 "label": translate("LayerGroupTabMixin", "Name"),
                 "type": "text",
-                "required": True,
+                "required": not edit_mode,
+                "read_only": edit_mode,
             },
             {
                 "key": "workspace",
                 "label": translate("LayerGroupTabMixin", "Workspace"),
-                "type": "combo",
+                "type": "text" if edit_mode else "combo",
+                "read_only": edit_mode,
                 "options": [GLOBAL] + list(workspace_names),
                 "help": translate(
                     "LayerGroupTabMixin",
@@ -345,9 +567,12 @@ class LayerGroupTabMixin:
                 "key": "pick",
                 "label": translate("LayerGroupTabMixin", "Add a layer"),
                 "type": "combo",
-                "options": [_PICK] + list(layer_names),
+                "options": [_PICK] + list(pickable),
                 "group": translate("LayerGroupTabMixin", "Layers"),
-                "help": translate("LayerGroupTabMixin", "Appends to the list below"),
+                "help": translate(
+                    "LayerGroupTabMixin",
+                    "Appends to the list below; the groups come after the layers",
+                ),
             },
             {
                 "key": "layers",
@@ -360,13 +585,78 @@ class LayerGroupTabMixin:
                 ),
                 "help": translate(
                     "LayerGroupTabMixin",
-                    "One layer per line, in drawing order: the first line is "
-                    "drawn first, at the bottom. Reorder by editing the text. "
-                    'Add "= style" to a line to publish that layer with a '
+                    "One layer or group per line, in drawing order: the first "
+                    "line is drawn first, at the bottom. Reorder by editing the "
+                    'text. Add "= style" to a line to publish that layer with a '
                     "style other than its own default.",
                 ),
             },
+            {
+                "key": "root_layer",
+                "label": translate("LayerGroupTabMixin", "Root layer"),
+                "type": "combo",
+                "options": [_PICK]
+                + list(pickable if root_layers is None else root_layers),
+                "visible": False,
+                "group": translate("LayerGroupTabMixin", "Layers"),
+                "help": translate(
+                    "LayerGroupTabMixin",
+                    "What an Earth Observation group draws when it is requested "
+                    "as a whole",
+                ),
+            },
+            {
+                "key": "root_style",
+                "label": translate("LayerGroupTabMixin", "Root layer style"),
+                "type": "text",
+                "visible": False,
+                "group": translate("LayerGroupTabMixin", "Layers"),
+                "placeholder": translate("LayerGroupTabMixin", "Its default style"),
+            },
         ]
+        if edit_mode:
+            fields[3:3] = [
+                {
+                    "key": "enabled",
+                    "label": translate("LayerGroupTabMixin", "Enabled"),
+                    "type": "checkbox",
+                    "default": True,
+                },
+                {
+                    "key": "advertised",
+                    "label": translate("LayerGroupTabMixin", "Advertised"),
+                    "type": "checkbox",
+                    "default": True,
+                    "help": translate(
+                        "LayerGroupTabMixin",
+                        "Listed in the capabilities. Off, the group is still "
+                        "served to whoever names it.",
+                    ),
+                },
+            ]
+            fields.append(
+                {
+                    "key": "bounds",
+                    "label": translate("LayerGroupTabMixin", "Bounds"),
+                    "type": "text",
+                    "read_only": True,
+                }
+            )
+        return fields
+
+    def _wire_group_form(self, dlg):
+        """Connect the picker, and show the root fields for Earth Observation."""
+        dlg.get_widget("pick").currentTextChanged.connect(
+            lambda choice: self._append_group_layer(dlg, choice)
+        )
+
+        def show_root(label):
+            for key in ("root_layer", "root_style"):
+                dlg.set_field_visible(key, _mode_from_label(label) == "EO")
+
+        mode = dlg.get_widget("mode")
+        mode.currentTextChanged.connect(show_root)
+        show_root(mode.currentText())
 
     def _append_group_layer(self, dlg, choice):
         """Append the picked layer to the ordered list, then reset the picker."""
@@ -375,15 +665,28 @@ class LayerGroupTabMixin:
         dlg.get_widget("layers").appendPlainText(choice)
         dlg.get_widget("pick").setCurrentIndex(0)  # re-fires with _PICK, ignored above
 
+    def _all_group_names(self):
+        """Every group's name as a publishable spells it: bare when global,
+        "workspace:group" otherwise. Raises on HTTP errors."""
+        names = list(self._global_group_names())
+        for ws_name in self._get_workspace_names():
+            groups = self._fetch_list(self.gs.get_layer_groups, ws_name)
+            names.extend(f"{ws_name}:{self._name_of(group)}" for group in groups)
+        return names
+
     def _add_layer_group(self):
         """Create a layer group from picked or pasted layer names."""
         fetched = self._fetch(
-            lambda: (self._get_workspace_names(), self._all_layer_names()),
+            lambda: (
+                self._get_workspace_names(),
+                self._all_layer_names(),
+                self._all_group_names(),
+            ),
             translate("LayerGroupTabMixin", "Failed to load the workspaces and layers"),
         )
         if fetched is None:
             return
-        workspace_names, layer_names = fetched
+        workspace_names, layer_names, group_names = fetched
 
         dlg = ResourceFormDialog(
             title=translate("LayerGroupTabMixin", "Create a Layer Group"),
@@ -392,19 +695,21 @@ class LayerGroupTabMixin:
                 "Publish several layers as one. GeoServer computes the group's "
                 "bounds from the layers it contains.",
             ),
-            fields=self._group_fields(workspace_names, layer_names),
+            fields=self._group_fields(
+                workspace_names, layer_names + group_names, layer_names
+            ),
             parent=self,
             ok_label=translate("LayerGroupTabMixin", "Create"),
         )
-        dlg.get_widget("pick").currentTextChanged.connect(
-            lambda choice: self._append_group_layer(dlg, choice)
-        )
+        self._wire_group_form(dlg)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         values = dlg.get_values()
         if self._run_action(
-            lambda: self._create_layer_group_from_values(values, layer_names),
+            lambda: self._create_layer_group_from_values(
+                values, layer_names, group_names
+            ),
             translate("LayerGroupTabMixin", "Failed to create layer group '{}'").format(
                 values["name"]
             ),
@@ -455,39 +760,31 @@ class LayerGroupTabMixin:
                     ).format(reference)
                 )
 
-    def _create_layer_group_from_values(self, values, known_layers=None):
+    def _create_layer_group_from_values(
+        self, values, known_layers=None, known_groups=()
+    ):
         """POST a new layer group, refusing to overwrite an existing one.
 
         :param known_layers: the server's layer names, as the form's picker
-            listed them; a typed line naming none of them is refused here,
-            by line, instead of coming back as GeoServer's HTTP error.
+            listed them; a typed line naming none of them, or none of
+            known_groups, is refused here, by line, instead of GeoServer
+            dropping it.
 
         TODO(#50): upstream: create_layer_group() cannot express any of this:
         it has no global scope, it qualifies every layer with the group's own
         workspace (so no group spanning workspaces, and no nested group), it
         replaces the bounds with a world bbox read from a three-entry EPSG
-        table (a KeyError for any other code), and it sends the abstract under
-        "abstract", which GeoServer silently drops.
+        table (a KeyError for any other code), it sends the abstract under
+        "abstract", which GeoServer silently drops, and it has no root layer.
         """
         name = values["name"]
         self._require_safe_name(name)
         workspace_name = scope(values["workspace"])
-        layers, styles = self._parse_group_layers(values["layers"], workspace_name)
-        if not layers:
-            raise ValueError(
-                translate("LayerGroupTabMixin", "List at least one layer.")
-            )
-        if known_layers is not None:
-            unknown = [layer for layer in layers if layer not in known_layers]
-            if unknown:
-                raise ValueError(
-                    translate(
-                        "LayerGroupTabMixin",
-                        "No layer named '{}' on the server. Pick it from the list, "
-                        "or qualify it as workspace:layer.",
-                    ).format(unknown[0])
-                )
-        self._check_styles_exist(styles)
+        published, styles = self._group_publishables(
+            values["layers"], workspace_name, known_layers, known_groups
+        )
+        mode = _mode_from_label(values["mode"])
+        root = self._eo_root(values, known_layers) if mode == "EO" else {}
         if self.gs.rest_service.resource_exists(self._group_path(name, workspace_name)):
             raise ValueError(
                 translate(
@@ -495,21 +792,17 @@ class LayerGroupTabMixin:
                 ).format(name, values["workspace"] or GLOBAL)
             )
 
-        group = {
-            "name": name,
-            "mode": _mode_from_label(values["mode"]),
-            "publishables": {
-                "published": [{"@type": "layer", "name": layer} for layer in layers]
-            },
-        }
+        group = {"name": name, "mode": mode, "publishables": {"published": published}}
+        group.update(root)
         if workspace_name:
             group["workspace"] = {"name": workspace_name}
         if values.get("title"):
             group["title"] = values["title"]
         if values.get("abstract"):
             group["abstractTxt"] = values["abstract"]
-        if any(styles):
+        if any(styles) or any(item["@type"] != "layer" for item in published):
             # "" is how GeoServer itself spells "this layer's own default style".
+            # With a nested group and no styles, GeoServer fails (HTTP 500).
             group["styles"] = {
                 "style": [{"name": style} if style else "" for style in styles]
             }

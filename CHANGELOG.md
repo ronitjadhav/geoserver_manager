@@ -15,6 +15,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   plugin asks GeoServer to open it, and a warning gives GeoServer's reason
   when it cannot (a wrong host, password, path or URL).
 - **Reset** on datastores and coverage stores makes GeoServer re-read them.
+- **Edit a layer group**: its mode, title, abstract, layers, order and
+  styles, its enabled and advertised flags, and an Earth Observation root
+  layer. Its bounds are recomputed when the layers change, since GeoServer
+  keeps the old ones. A group can now nest other groups, and an Earth
+  Observation group can be created (it needs a root layer).
 - **Rename a datastore**: its feature types, layers, layer groups and tile
   cache follow. Its other connection parameters (pool, timeouts, Loose
   bbox...) are editable on the new *Advanced* tab.

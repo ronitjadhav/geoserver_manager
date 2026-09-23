@@ -264,8 +264,10 @@ A layer group publishes several layers as one.
 ```
 
 **Create a Layer Group:** give it a name, title, abstract and mode. Then add
-the layers in order on the *Layers* tab, each with its style. GeoServer works
-out the bounds.
+the layers in order on the *Layers* tab, each with its style. A line can also
+name another group, to nest it. GeoServer works out the bounds. An *Earth
+Observation Tree* also needs a root layer, and its style (the layer's default
+when left blank).
 
 ```{figure} ../static/screenshots/layer-group-add.png
 :alt: The Create a Layer Group form, with name, workspace, mode, title and abstract
@@ -273,8 +275,21 @@ out the bounds.
 ```
 
 The *Workspace* column shows `(global)` for a group that belongs to no
-workspace. **Add to QGIS** loads a group as a WMS layer. The details dialog is
-read-only: to change a group, delete it and create it again.
+workspace. **Add to QGIS** loads a group as a WMS layer.
+
+**Click a name** to edit a group: its mode, title, abstract, layers, order
+and styles, whether it is enabled and advertised, and an Earth Observation
+group's root layer. When the layers change, the plugin recomputes the group's
+bounds, which GeoServer does not do on an edit. Two things GeoServer does not
+allow: renaming a group, and taking an Earth Observation group out of that
+mode.
+
+```{figure} ../static/screenshots/layer-group-edit.png
+:alt: Editing the tasmania layer group, its Layers tab listing the layers in drawing order with their styles
+:width: 420px
+
+One line per layer or group, bottom first; `= style` overrides a layer's own.
+```
 
 ## Styles
 

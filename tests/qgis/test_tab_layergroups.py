@@ -63,6 +63,16 @@ ROADS_GROUP = {
 }
 
 
+EO_GROUP = {
+    "name": "eo_group",
+    "mode": "EO",
+    "publishables": {"published": {"@type": "layer", "name": "nurc:mosaic"}},
+    "styles": {"style": ""},
+    "rootLayer": {"name": "topp:tasmania_roads"},
+    "rootLayerStyle": {"name": "simple_roads"},
+}
+
+
 # ############################################################################
 # ########## Fakes ###############
 # ################################
@@ -94,6 +104,10 @@ class FakeGS:
             def post(inner, path, **kwargs):
                 outer.calls.append(("POST", path, kwargs))
                 return Response({}, 201)
+
+            def put(inner, path, **kwargs):
+                outer.calls.append(("PUT", path, kwargs))
+                return Response({})
 
             def delete(inner, path, **kwargs):
                 outer.calls.append(("DELETE", path, kwargs))
@@ -128,6 +142,7 @@ class FakeGS:
                     "layerGroup": [
                         {"name": "solo", "href": "…"},
                         {"name": "tasmania", "href": "…"},
+                        {"name": "eo_group", "href": "…"},
                     ]
                 }
             }
@@ -137,7 +152,7 @@ class FakeGS:
                     "layer": [{"name": "topp:tasmania_roads"}, {"name": "nurc:mosaic"}]
                 }
             }
-        for group in (TASMANIA, SOLO, ROADS_GROUP):
+        for group in (TASMANIA, SOLO, ROADS_GROUP, EO_GROUP):
             if path.endswith(f"/layergroups/{group['name']}.json"):
                 return {"layerGroup": group}
         raise AssertionError(f"unexpected GET {path}")
@@ -197,6 +212,7 @@ class TestLayerGroupsTab(unittest.TestCase):
             self.dlg._all_rows,
             [
                 # GeoServer's own words for the modes, not the enum
+                ["eo_group", GLOBAL, "Earth Observation Tree", "1"],
                 ["solo", GLOBAL, "Named Tree", "1"],
                 ["tasmania", GLOBAL, "Single", "2"],
                 ["roads_group", "topp", "Container Tree", "1"],
@@ -207,7 +223,9 @@ class TestLayerGroupsTab(unittest.TestCase):
     def test_one_unreadable_workspace_keeps_the_rest(self):
         self.dlg.gs = FakeGS(broken_workspace="topp")
         self.dlg._load_layer_groups()
-        self.assertEqual([row[0] for row in self.dlg._all_rows], ["solo", "tasmania"])
+        self.assertEqual(
+            [row[0] for row in self.dlg._all_rows], ["eo_group", "solo", "tasmania"]
+        )
         self.assertEqual(len(self.warnings), 1)
         self.assertIn("topp", self.warnings[0])
 
@@ -229,7 +247,7 @@ class TestGroupDetail(unittest.TestCase):
             values["layers"].splitlines(),
             [
                 "topp:tasmania_state_boundaries",
-                "topp:tasmania_roads  (style simple_roads)",
+                "topp:tasmania_roads = simple_roads",
             ],
         )
         self.assertIn("143.83, -43.64 → 148.47, -39.57", values["bounds"])
@@ -237,7 +255,8 @@ class TestGroupDetail(unittest.TestCase):
 
     def test_a_single_publishable_and_a_nested_group_are_not_lost(self):
         values = LayerGroupTabMixin._group_form_values(SOLO, "solo", GLOBAL)
-        self.assertEqual(values["layers"].splitlines(), ["tasmania  (layerGroup)"])
+        # The edit form's own syntax: a group is named like a layer.
+        self.assertEqual(values["layers"].splitlines(), ["tasmania"])
         self.assertEqual(values["bounds"], "")
         self.assertEqual(values["abstract"], "")
 
@@ -247,14 +266,31 @@ class TestGroupDetail(unittest.TestCase):
         )
         self.assertEqual(values["title"], "en: Roads; fr: Routes")
 
-    def test_dialog_is_read_only(self):
+    def test_the_dialog_edits_everything_but_the_name(self):
+        # GeoServer answers 403 to a layer group rename.
         dlg = SyncDialog()
         dlg.gs = FakeGS()
         with patch.object(tab_layergroups, "ResourceFormDialog", Recording):
             dlg._show_layer_group_info(["tasmania", GLOBAL])
         form = Recording.opened[-1]
-        self.assertTrue(form.get_widget("layers").isReadOnly())
+        self.assertFalse(form.get_widget("layers").isReadOnly())
+        self.assertTrue(form.get_widget("mode").isEnabled())
         self.assertTrue(form.get_widget("name").isReadOnly())  # copyable, not greyed
+        # The group itself is not offered as one of its own members.
+        pick = form.get_widget("pick")
+        offered = [pick.itemText(i) for i in range(pick.count())]
+        self.assertIn("solo", offered)
+        self.assertNotIn("tasmania", offered)
+
+    def test_an_earth_observation_group_keeps_its_mode(self):
+        # Every way of clearing the root layer is refused by GeoServer.
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        with patch.object(tab_layergroups, "ResourceFormDialog", Recording):
+            dlg._show_layer_group_info(["eo_group", GLOBAL])
+        form = Recording.opened[-1]
+        self.assertFalse(form.get_widget("mode").isEnabled())
+        self.assertIn("root_layer", form.get_values())
 
 
 class TestCreateLayerGroup(unittest.TestCase):
@@ -400,6 +436,156 @@ class TestCreateLayerGroup(unittest.TestCase):
             dlg.get_values()["layers"].splitlines(), ["b:two", "b:two", "a:one"]
         )
         self.assertEqual(dlg.get_widget("pick").currentIndex(), 0)
+
+
+class TestEditLayerGroup(unittest.TestCase):
+    """Measured on 2.28.5: a partial PUT merges, a new layer list needs one
+    style per entry, and the bounds are never recomputed on a PUT."""
+
+    LAYERS = ["topp:tasmania_roads", "nurc:mosaic"]
+    GROUPS = ["solo", "tasmania", "topp:roads_group"]
+
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.dlg.gs = FakeGS()
+        self.before = LayerGroupTabMixin._group_form_values(
+            TASMANIA, "tasmania", GLOBAL
+        )
+
+    def save(self, **changes):
+        after = dict(self.before, **changes)
+        with patch.object(
+            LayerGroupTabMixin, "_group_bounds", return_value={"crs": "EPSG:4326"}
+        ) as bounds:
+            saved = self.dlg._save_layer_group(
+                "tasmania", None, self.before, after, self.LAYERS, self.GROUPS
+            )
+        puts = [call for call in self.dlg.gs.calls if call[0] == "PUT"]
+        return saved, puts, bounds
+
+    def test_a_title_edit_sends_only_the_title(self):
+        saved, puts, bounds = self.save(title="Tassie", enabled=False)
+        self.assertTrue(saved)
+        ((_verb, path, kwargs),) = puts
+        self.assertEqual(path, "/rest/layergroups/tasmania.json")
+        self.assertEqual(
+            kwargs["json"], {"layerGroup": {"title": "Tassie", "enabled": False}}
+        )
+        bounds.assert_not_called()
+
+    def test_nothing_changed_sends_nothing(self):
+        saved, puts, _bounds = self.save(layers=self.before["layers"] + "\n\n")
+        self.assertFalse(saved)
+        self.assertEqual(puts, [])
+
+    def test_new_layers_carry_a_style_each_and_fresh_bounds(self):
+        _saved, puts, bounds = self.save(layers="nurc:mosaic\nsolo")
+        group = puts[0][2]["json"]["layerGroup"]
+        self.assertEqual(
+            group["publishables"]["published"],
+            [
+                {"@type": "layer", "name": "nurc:mosaic"},
+                {"@type": "layerGroup", "name": "solo"},
+            ],
+        )
+        self.assertEqual(group["styles"], {"style": ["", ""]})
+        self.assertEqual(group["bounds"], {"crs": "EPSG:4326"})
+        bounds.assert_called_once()
+
+    def test_an_unknown_name_is_refused_since_geoserver_drops_it(self):
+        with self.assertRaises(ValueError) as caught:
+            self.save(layers="topp:tasmania_roads\nno_such_group")
+        self.assertIn("no_such_group", str(caught.exception))
+        self.assertEqual([call for call in self.dlg.gs.calls if call[0] == "PUT"], [])
+
+    def test_turning_into_earth_observation_sends_the_root(self):
+        _saved, puts, _bounds = self.save(
+            mode="Earth Observation Tree",
+            root_layer="topp:tasmania_roads",
+            root_style="simple_roads",
+        )
+        group = puts[0][2]["json"]["layerGroup"]
+        self.assertEqual(group["mode"], "EO")
+        self.assertEqual(
+            group["rootLayer"], {"@type": "layer", "name": "topp:tasmania_roads"}
+        )
+        self.assertEqual(group["rootLayerStyle"], {"name": "simple_roads"})
+
+    def test_earth_observation_needs_a_root_layer(self):
+        with self.assertRaises(ValueError):
+            self.save(mode="Earth Observation Tree", root_layer="(pick a layer)")
+
+    def test_a_projected_box_is_reprojected_to_lon_lat(self):
+        # spearfish, as GeoServer stores it: EPSG:26713, UTM zone 13N.
+        rect = LayerGroupTabMixin._box_in(
+            {
+                "minx": 589425.9,
+                "maxx": 609518.7,
+                "miny": 4913959.2,
+                "maxy": 4928082.9,
+                "crs": {"@class": "projected", "$": "EPSG:26713"},
+            },
+            tab_layergroups.QgsCoordinateReferenceSystem("EPSG:4326"),
+        )
+        self.assertAlmostEqual(rect.xMinimum(), -103.87, places=1)
+        self.assertAlmostEqual(rect.yMaximum(), 44.5, places=1)
+
+    def test_a_zero_box_counts_as_no_box(self):
+        # What GeoServer stores after "bounds": null.
+        self.assertIsNone(
+            LayerGroupTabMixin._box_in(
+                {"minx": 0, "maxx": 0, "miny": 0, "maxy": 0},
+                tab_layergroups.QgsCoordinateReferenceSystem("EPSG:4326"),
+            )
+        )
+
+
+class TestCreateNestedAndEarthObservation(unittest.TestCase):
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.dlg.gs = FakeGS()
+
+    def create(self, **values):
+        base = {"name": "g", "workspace": GLOBAL, "mode": "Single"}
+        self.dlg._create_layer_group_from_values(
+            dict(base, **values), ["topp:tasmania_roads"], ["tasmania"]
+        )
+        return [c for c in self.dlg.gs.calls if c[0] == "POST"][0][2]["json"][
+            "layerGroup"
+        ]
+
+    def test_a_nested_group_is_sent_with_its_type_and_styles(self):
+        # Without styles, GeoServer answers 500 for a group holding a group.
+        group = self.create(layers="tasmania\ntopp:tasmania_roads")
+        self.assertEqual(
+            [item["@type"] for item in group["publishables"]["published"]],
+            ["layerGroup", "layer"],
+        )
+        self.assertEqual(group["styles"], {"style": ["", ""]})
+
+    def test_a_blank_root_style_takes_the_root_layers_default(self):
+        with patch.object(
+            self.dlg, "_layer_summary", return_value=("VECTOR", "s", "simple_roads")
+        ):
+            group = self.create(
+                mode="Earth Observation Tree",
+                layers="topp:tasmania_roads",
+                root_layer="topp:tasmania_roads",
+                root_style="",
+            )
+        self.assertEqual(group["rootLayerStyle"], {"name": "simple_roads"})
+
+    def test_a_root_layer_without_a_default_style_asks_for_one(self):
+        # A cascaded layer has no default style: "-" is no style name.
+        with patch.object(self.dlg, "_layer_summary", return_value=("WMS", "s", "-")):
+            with self.assertRaises(ValueError) as caught:
+                self.create(
+                    mode="Earth Observation Tree",
+                    layers="topp:tasmania_roads",
+                    root_layer="topp:tasmania_roads",
+                    root_style="",
+                )
+        self.assertIn("no default style", str(caught.exception))
 
 
 class TestDeleteAndAddToQgis(unittest.TestCase):
