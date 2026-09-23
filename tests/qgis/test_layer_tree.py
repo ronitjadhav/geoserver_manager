@@ -515,11 +515,12 @@ class TestApply(MenuCase):
             self.dlg.requests[-1][1].endswith("/workspaces/topp/styles/pophatch.sld")
         )
 
-    def test_a_css_style_is_refused_before_qgis_chokes_on_it(self):
+    def test_a_css_style_arrives_as_geoservers_own_sld(self):
+        # GET .sld on a CSS style returns GeoServer's conversion (2.28.5).
         self.formats = {"population": "css"}
         self.apply()
-        self.assertEqual(self.applied, [])
-        self.assertIn("QGIS can only read SLD", self.texts()[-1])
+        self.assertEqual(self.applied, [(self.layer, "<StyledLayerDescriptor/>")])
+        self.assertTrue(self.dlg.requests[-1][1].endswith("/styles/population.sld"))
 
     def test_a_layer_without_styles_is_said(self):
         self.styles_by_layer = {"topp:states": (None, [])}

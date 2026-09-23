@@ -302,14 +302,21 @@ Styles decide how GeoServer draws a layer.
 
 **Upload a Style** takes its definition from one of three sources:
 
-- **Paste SLD:** paste the XML.
-- **From file:** an `.sld`, an `.mbstyle`, or a `.zip` with an SLD and its
-  images.
+- **Paste:** paste the document, and pick its format: SLD, CSS, YSLD or
+  MBStyle.
+- **From file:** an `.sld`, `.css`, `.ysld`, `.mbstyle`, or a `.zip` with an
+  SLD and its images.
 - **From a QGIS layer:** the layer's symbology, exported as SLD.
+
+CSS, YSLD and MBStyle need their GeoServer extension. Without it, GeoServer
+refuses the style and the message says so.
 
 **Click a name** to view the style, with the legend GeoServer draws for it.
 The dialog opens on the *Definition* tab: edit it and save to replace the
-style on the server. The *Details* tab holds its format, version and legend.
+style on the server. If GeoServer cannot read it, the message gives the
+line and column. The *Details* tab holds its format, version and legend,
+and its name: rename a style there, and the layers and groups using it keep
+it.
 
 ```{figure} ../static/screenshots/style-edit.png
 :alt: The style dialog for the population style, open on its SLD definition, with a Details tab beside it
@@ -318,9 +325,17 @@ style on the server. The *Details* tab holds its format, version and legend.
 A style opens on its definition; the legend is on the *Details* tab.
 ```
 
-Row actions: **Apply to a QGIS layer** puts the server's style on a project
-layer. **Save to disk** saves the definition. **Delete** removes the style and its
-file; layers that used it fall back to GeoServer's default style.
+Row actions:
+
+- **Apply to a QGIS layer** puts the server's style on a project layer. A
+  CSS or YSLD style arrives as GeoServer converts it to SLD.
+- **Save to disk** saves the definition.
+- **Copy** makes a new style from the same definition, under another name or
+  in another workspace.
+- **Used by** lists the layers and layer groups that use the style, before
+  you edit or delete it.
+- **Delete** removes the style and its file; layers that used it fall back
+  to GeoServer's default style.
 
 ## Tile cache
 

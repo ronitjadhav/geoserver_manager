@@ -8,6 +8,7 @@ that reports its progress and stops when asked.
 No QGIS import: the unit suite runs this on a plain Python.
 """
 
+import html
 import re
 
 
@@ -24,6 +25,12 @@ def summarise_body(text, limit=300):
     if not text:
         return ""
     if text.startswith("<"):
+        # Tomcat's page carries GeoServer's reason as its "Message" line
+        # ("Invalid style: … (line 1, column 18)"); the title only says 400.
+        message = re.search(r"<b>Message</b>(.*?)</p>", text, re.I | re.S)
+        if message and message.group(1).strip():
+            text = " ".join(html.unescape(message.group(1)).split())
+            return text[:limit]
         title = re.search(r"<title>(.*?)</title>", text, re.I | re.S)
         text = title.group(1) if title else re.sub(r"<[^>]+>", " ", text)
         text = " ".join(text.split())

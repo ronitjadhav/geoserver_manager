@@ -24,6 +24,20 @@ class TestSummariseBody(unittest.TestCase):
             summarise_body(page), "HTTP Status 500 – Internal Server Error"
         )
 
+    def test_a_tomcat_page_with_a_message_gives_geoservers_reason(self):
+        # As GeoServer 2.28.5 answers a CSS style that does not parse.
+        page = (
+            "<!doctype html><html><head><title>HTTP Status 400 – Bad Request</title>"
+            '</head><body><h1>HTTP Status 400 – Bad Request</h1><hr class="line" />'
+            "<p><b>Type</b> Status Report</p><p><b>Message</b> Invalid style:"
+            "Unexpected end of input, expected &#39;}&#39; (line 1, column 18)</p>"
+            "<p><b>Description</b> The server cannot or will not process</p>"
+        )
+        self.assertEqual(
+            summarise_body(page),
+            "Invalid style:Unexpected end of input, expected '}' (line 1, column 18)",
+        )
+
     def test_an_ogc_exception_report_keeps_its_words(self):
         xml = '<?xml version="1.0"?>\n<ServiceExceptionReport><ServiceException code="LayerNotDefined">Could not find layer x</ServiceException></ServiceExceptionReport>'
         self.assertIn("Could not find layer x", summarise_body(xml))

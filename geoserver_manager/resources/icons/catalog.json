@@ -193,6 +193,13 @@
       "purpose": "A counterclockwise arrow restores the default settings.",
       "status": "custom",
       "asset": "icons/reset-settings.svg"
+    },
+    "copy-style": {
+      "label": "Copy a style",
+      "category": "Style actions",
+      "purpose": "A sheet in front of another, the front one with two accent lines: the style copied under a new name or into another workspace.",
+      "status": "custom",
+      "asset": "icons/copy-style.svg"
     }
   }
 }
