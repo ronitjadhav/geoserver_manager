@@ -168,3 +168,23 @@ class TestRowActions(unittest.TestCase):
         self.assertEqual(
             self.menu().palette().color(QPalette.ColorRole.Window), QColor("#232629")
         )
+
+
+class TestActionsColumnWidth(unittest.TestCase):
+    def test_the_column_fits_buttons_a_theme_makes_wider(self):
+        # A regression guard: in QGIS the buttons were clipped to the header's
+        # width. Offscreen that never reproduced, so this passes on the old
+        # code too; it pins the fix's contract, not the original trigger.
+        dialog = SyncDialog()
+        self.addCleanup(dialog.close)
+        dialog.setStyleSheet("QPushButton { font-size: 30px; }")
+        dialog._row_actions = [("delete", "Delete", lambda row: None)]
+        dialog._setup_table(["Name", dialog.actions_column_label()])
+        dialog._populate_rows([["roads"], ["rivers"]])
+        dialog.show()
+        QApplication.processEvents()
+        table = dialog.resultsTable
+        self.assertGreaterEqual(
+            table.horizontalHeader().sectionSize(1),
+            table.cellWidget(0, 1).sizeHint().width(),
+        )

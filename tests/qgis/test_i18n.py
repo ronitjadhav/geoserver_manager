@@ -201,9 +201,7 @@ class TestRuntimeContext(unittest.TestCase):
         columns = ["Name", self.dlg.actions_column_label()]
         self.dlg._setup_table(columns)
         header = self.dlg.resultsTable.horizontalHeader()
-        self.assertEqual(
-            header.sectionResizeMode(1), QHeaderView.ResizeMode.ResizeToContents
-        )
+        self.assertEqual(header.sectionResizeMode(1), QHeaderView.ResizeMode.Fixed)
         self.assertEqual(header.sectionResizeMode(0), QHeaderView.ResizeMode.Stretch)
 
     def test_a_mixin_string_survives_a_translator_that_knows_nothing(self):

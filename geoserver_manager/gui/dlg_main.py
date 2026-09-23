@@ -904,7 +904,10 @@ class GeoServerMainDialog(
         actions = self.actions_column_label()
         for i in range(len(columns)):
             if columns[i] == actions:
-                header.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
+                # Sized to its buttons in _show_page, once they exist. With
+                # ResizeToContents, a real QGIS clipped them to the header's
+                # width; offscreen it never did, so the trigger is not known.
+                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Fixed)
             else:
                 header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
         self._show_sort_indicator()
@@ -1044,6 +1047,20 @@ class GeoServerMainDialog(
                 self.resultsTable.setCellWidget(
                     row_idx, data_col_count, self._make_action_widget(values)
                 )
+
+        if self._row_actions:
+            widgets = (
+                self.resultsTable.cellWidget(row, data_col_count)
+                for row in range(len(page_rows))
+            )
+            header = self.resultsTable.horizontalHeader()
+            header.resizeSection(
+                data_col_count,
+                max(
+                    [header.sectionSizeHint(data_col_count)]
+                    + [widget.sizeHint().width() for widget in widgets if widget]
+                ),
+            )
 
         # Update pagination controls
         self.lbl_page_number.setText(str(self._current_page + 1))
