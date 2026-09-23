@@ -1023,6 +1023,9 @@ class CoverageStoreTabMixin:
                 for row in selected_rows
             ],
             self._load_coverage_stores,
+            lambda n: translate(
+                "CoverageStoreTabMixin", "%n coverage store(s)", None, n
+            ),
             cascade=translate(
                 "CoverageStoreTabMixin",
                 "The delete recurses: the store, its coverages and the layers "

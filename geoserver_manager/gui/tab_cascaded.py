@@ -657,6 +657,9 @@ class CascadedStoreTabMixin:
                 for row in selected_rows
             ],
             self._load_cascaded_stores,
+            lambda n: translate(
+                "CascadedStoreTabMixin", "%n cascaded store(s)", None, n
+            ),
             # both library deletes send recurse=true
             cascade=translate(
                 "CascadedStoreTabMixin",

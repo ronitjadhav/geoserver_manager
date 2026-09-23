@@ -613,6 +613,7 @@ class LayerGroupTabMixin:
                 for row in selected_rows
             ],
             self._load_layer_groups,
+            lambda n: translate("LayerGroupTabMixin", "%n layer group(s)", None, n),
             cascade=translate(
                 "LayerGroupTabMixin",
                 "Only the group goes away. The layers it published stay. "

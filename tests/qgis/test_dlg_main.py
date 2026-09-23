@@ -700,7 +700,9 @@ class TestErrorText(unittest.TestCase):
                 500, "Unable to delete layer referenced by layer group 'x'"
             )
 
-        dlg._delete_many("layer", [("ws/ds/l", boom)], lambda: None)
+        dlg._delete_many(
+            "layer", [("ws/ds/l", boom)], lambda: None, lambda n: f"{n} layers"
+        )
         self.assertEqual(len(errors), 1)
         self.assertIn("layer group 'x'", errors[0])
 

@@ -481,6 +481,7 @@ class WorkspaceTabMixin:
                 for row in selected_rows
             ],
             self._load_workspaces,
+            lambda n: translate("WorkspaceTabMixin", "%n workspace(s)", None, n),
             # delete_workspace() sends recurse=true
             cascade=translate(
                 "WorkspaceTabMixin",

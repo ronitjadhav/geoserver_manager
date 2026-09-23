@@ -1476,16 +1476,20 @@ class GeoServerMainDialog(
             shown += ", …"
         self.show_warning_message(
             self.tr(
-                "{count} item(s) could not be listed: {names}. Details in the "
-                "QGIS log (GeoServer Manager tab)."
-            ).format(count=len(failures), names=shown)
+                "%n item(s) could not be listed: {names}. Details in the "
+                "QGIS log (GeoServer Manager tab).",
+                None,
+                len(failures),
+            ).format(names=shown)
         )
 
-    def _confirm_delete(self, kind, labels, cascade="", verb=None):
+    def _confirm_delete(self, kind, labels, cascade="", verb=None, counted=None):
         """Ask before acting on one or more resources of one kind.
 
         :param kind: human-readable type (e.g. "workspace"), or "" for none.
         :param labels: names of the resources about to be acted on.
+        :param counted: n -> "%n workspace(s)" in the tab's own context, with
+            the count passed to translate(); required for more than one label.
         :param cascade: what else the action takes with it. Both delete
             paths send recurse=true, so the user has to be told.
         :param verb: the action, "delete" by default; the Tile Cache tab
@@ -1499,11 +1503,10 @@ class GeoServerMainDialog(
             )
         else:
             question = self.tr(
-                "Are you sure you want to {verb} {count} {kind}(s)?\n\n{items}"
+                "Are you sure you want to {verb} {things}?\n\n{items}"
             ).format(
                 verb=verb,
-                count=len(labels),
-                kind=kind,
+                things=counted(len(labels)),
                 items="\n".join(f"  • {label}" for label in labels),
             )
         # The separator lives here, so a translation cannot glue the sentences.
@@ -1518,11 +1521,21 @@ class GeoServerMainDialog(
         return reply == QMessageBox.StandardButton.Yes
 
     def _delete_many(
-        self, kind, labeled_deletes, reload_fn, cascade="", verb=None, done=None
+        self,
+        kind,
+        labeled_deletes,
+        reload_fn,
+        counted,
+        cascade="",
+        verb=None,
+        done=None,
     ):
         """Confirm and run one or more deletions in a task, then reload the table.
 
         :param kind: human-readable resource type (e.g. "workspace").
+        :param counted: n -> "%n workspace(s)", translated with the count in the
+            tab's own context, so each locale gets its own plural forms (#60).
+            Built from a noun and "(s)" here, French would read "3 couche(s)".
         :param labeled_deletes: list of (label, zero-arg callable) pairs.
         :param reload_fn: called afterwards to refresh the table.
         :param cascade: sentence naming what else goes, for the confirmation.
@@ -1535,7 +1548,7 @@ class GeoServerMainDialog(
         if not labeled_deletes:
             return
         labels = [label for label, _ in labeled_deletes]
-        if not self._confirm_delete(kind, labels, cascade, verb=verb):
+        if not self._confirm_delete(kind, labels, cascade, verb=verb, counted=counted):
             return
         verb = verb or self.tr("delete")
         done = done or self.tr("deleted")
@@ -1561,9 +1574,8 @@ class GeoServerMainDialog(
                 )
             if errors:
                 self.show_error_message(
-                    self.tr("Failed to {verb} some {kind}(s):\n{errors}").format(
+                    self.tr("Could not {verb}:\n{errors}").format(
                         verb=verb,
-                        kind=kind,
                         errors="\n".join(f"{label}: {d}" for label, d in errors),
                     )
                 )
@@ -1575,8 +1587,8 @@ class GeoServerMainDialog(
                 )
             else:
                 self.show_success_message(
-                    self.tr("{count} {kind}(s) {done}.").format(
-                        count=len(labels), kind=kind, done=done
+                    self.tr("{things} {done}.").format(
+                        things=counted(len(labels)), done=done
                     )
                 )
             reload_fn()
