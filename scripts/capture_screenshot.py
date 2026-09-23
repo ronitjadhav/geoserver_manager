@@ -205,7 +205,11 @@ def main():
                 (
                     "tile-cache-edit",
                     lambda: dialog._show_gwc_layer_info(row("topp:states")),
-                )
+                ),
+                (
+                    "tile-cache-seed",
+                    lambda: dialog._seed_gwc_layer(row("topp:states")),
+                ),
             ],
         ),
     )

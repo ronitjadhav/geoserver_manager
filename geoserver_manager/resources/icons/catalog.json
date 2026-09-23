@@ -200,6 +200,20 @@
       "purpose": "A sheet in front of another, the front one with two accent lines: the style copied under a new name or into another workspace.",
       "status": "custom",
       "asset": "icons/copy-style.svg"
+    },
+    "seed-cache": {
+      "label": "Seed or truncate",
+      "category": "Tile cache actions",
+      "purpose": "A grid of tiles with one slot being added: render (or drop) a layer's tiles for a gridset, format and zoom range.",
+      "status": "custom",
+      "asset": "icons/seed-cache.svg"
+    },
+    "seed-tasks": {
+      "label": "Seeding tasks",
+      "category": "Tile cache actions",
+      "purpose": "Two progress bars: the seed and truncate tasks GeoWebCache is running for a layer.",
+      "status": "custom",
+      "asset": "icons/seed-tasks.svg"
     }
   }
 }

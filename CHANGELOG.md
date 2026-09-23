@@ -15,6 +15,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   plugin asks GeoServer to open it, and a warning gives GeoServer's reason
   when it cannot (a wrong host, password, path or URL).
 - **Reset** on datastores and coverage stores makes GeoServer re-read them.
+- **Seed, reseed and truncate** part of a layer's tile cache: one gridset,
+  format and zoom range, optionally one area or one parameter value. A task
+  list follows the progress and can stop the tasks.
+- **Zoom levels and parameter filters** of a cached layer are editable: a
+  gridset line takes `= 0-12`, and the filters (STYLES, CQL_FILTER, TIME...)
+  are edited as GeoWebCache's XML.
 - **CSS and YSLD styles** can be created, edited and copied, like SLD and
   MBStyle (each needs its GeoServer extension). *Apply to a QGIS layer*
   reads any format, through GeoServer's own conversion to SLD.

@@ -294,20 +294,25 @@ class TestDocument(unittest.TestCase):
             {
                 "name": "topp:states",
                 "enabled": True,
-                "gridsets": "EPSG:4326\nEPSG:900913",
+                # The first gridset has published zoom levels 0-12.
+                "gridsets": "EPSG:4326 = 0-12\nEPSG:900913",
                 "formats": "image/png\nimage/jpeg",
                 "meta_width": 4,
                 "meta_height": 4,
                 "expire_cache": 0,
                 "expire_clients": 0,
                 "gutter": 0,
+                "filters": (
+                    "<styleParameterFilter>\n  <key>STYLES</key>\n"
+                    "  <defaultValue />\n</styleParameterFilter>"
+                ),
             },
         )
 
     def test_saving_rewrites_only_what_the_form_owns(self):
         values = {
             "enabled": False,
-            "gridsets": "EPSG:4326\nWebMercatorQuad\n\nEPSG:4326",
+            "gridsets": "EPSG:4326 = 0-12\nWebMercatorQuad\n\nEPSG:4326",
             "formats": "image/png",
             "meta_width": 3,
             "meta_height": 3,
@@ -323,8 +328,10 @@ class TestDocument(unittest.TestCase):
             [s.findtext("gridSetName") for s in root.findall("gridSubsets/gridSubset")],
             ["EPSG:4326", "WebMercatorQuad"],
         )
-        # the kept gridset keeps its zoom bounds; the new one is bare
+        # the kept gridset keeps its zoom bounds (the first line naming it
+        # wins); the new one is bare
         self.assertEqual(root.find("gridSubsets/gridSubset").findtext("zoomStop"), "12")
+        self.assertIsNone(root.findall("gridSubsets/gridSubset")[1].find("zoomStop"))
         self.assertEqual(
             [s.text for s in root.findall("mimeFormats/string")], ["image/png"]
         )
@@ -340,6 +347,52 @@ class TestDocument(unittest.TestCase):
         self.assertEqual(
             root.findtext("parameterFilters/styleParameterFilter/key"), "STYLES"
         )
+
+    def test_a_zoom_range_is_written_and_a_plain_line_clears_it(self):
+        base = {"formats": "image/png"}
+        root = ElementTree.fromstring(
+            GwcTabMixin._gwc_xml_with_values(
+                STATES_XML, dict(base, gridsets="EPSG:4326 = 3-9\nEPSG:900913 = 0-18")
+            )
+        )
+        subsets = root.findall("gridSubsets/gridSubset")
+        self.assertEqual(
+            [(s.findtext("zoomStart"), s.findtext("zoomStop")) for s in subsets],
+            [("3", "9"), ("0", "18")],
+        )
+        root = ElementTree.fromstring(
+            GwcTabMixin._gwc_xml_with_values(
+                STATES_XML, dict(base, gridsets="EPSG:4326")
+            )
+        )
+        self.assertIsNone(root.find("gridSubsets/gridSubset/zoomStart"))
+
+    def test_a_bad_zoom_range_is_refused(self):
+        for line in ("EPSG:4326 = 12", "EPSG:4326 = 9-3", "EPSG:4326 = a-b"):
+            with self.assertRaises(ValueError, msg=line):
+                GwcTabMixin._gwc_xml_with_values(
+                    STATES_XML, {"formats": "image/png", "gridsets": line}
+                )
+
+    def test_parameter_filters_are_replaced_from_their_xml(self):
+        values = {
+            "gridsets": "EPSG:4326",
+            "formats": "image/png",
+            "filters": (
+                "<stringParameterFilter><key>CQL_FILTER</key><defaultValue/>"
+                "<values><string>A=1</string></values></stringParameterFilter>"
+            ),
+        }
+        root = ElementTree.fromstring(
+            GwcTabMixin._gwc_xml_with_values(STATES_XML, values)
+        )
+        self.assertEqual(
+            [f.tag for f in root.find("parameterFilters")], ["stringParameterFilter"]
+        )
+        with self.assertRaises(ValueError):
+            GwcTabMixin._gwc_xml_with_values(
+                STATES_XML, dict(values, filters="<stringParameterFilter>")
+            )
 
     def test_an_empty_gridset_or_format_list_is_refused(self):
         values = {"gridsets": "", "formats": "image/png"}
@@ -459,6 +512,8 @@ class TestActions(unittest.TestCase):
         )
         values = form.get_values()
         self.assertEqual(values["gridsets"], "EPSG:4326\nEPSG:900913")
+        # the template's STYLES filter shows, so an untouched form keeps it
+        self.assertIn("<key>STYLES</key>", values["filters"])
         self.assertEqual(values["formats"], "image/png\nimage/jpeg")
         self.assertEqual((values["meta_width"], values["meta_height"]), (4, 4))
         # the picker appends to the textarea and resets itself
@@ -489,7 +544,7 @@ class TestActions(unittest.TestCase):
         self.assertEqual(form.windowTitle(), "Tile cache of 'topp:states'")
         values = form.get_values()
         self.assertEqual(values["name"], "topp:states")
-        self.assertEqual(values["gridsets"], "EPSG:4326\nEPSG:900913")
+        self.assertEqual(values["gridsets"], "EPSG:4326 = 0-12\nEPSG:900913")
         self.assertTrue(values["enabled"])
         ok = QDialogButtonBox.StandardButton.Ok
         self.assertEqual(form._button_box.button(ok).text(), "Save")  # an edit
@@ -517,3 +572,105 @@ class TestNamesInPaths(unittest.TestCase):
                 {"layer": "topp/roads", "gridsets": "EPSG:4326", "formats": "image/png"}
             )
         self.assertEqual([c for c in self.dlg.gs.calls if c[0] == "PUT"], [])
+
+
+class TestSeed(unittest.TestCase):
+    """Measured on 2.28.5: POST /gwc/rest/seed/{layer}.json starts the task;
+    GET lists [done, total, seconds left, id, state] per task."""
+
+    VALUES = {
+        "type": "Truncate",
+        "gridset": "EPSG:4326",
+        "format": "image/png",
+        "zoom_start": 2,
+        "zoom_stop": 6,
+        "threads": 3,
+        "bounds": "",
+        "parameters": "",
+    }
+
+    def test_the_request_names_everything_gwc_needs(self):
+        request = GwcTabMixin._seed_request("topp:states", self.VALUES)
+        self.assertEqual(
+            request,
+            {
+                "seedRequest": {
+                    "name": "topp:states",
+                    "gridSetId": "EPSG:4326",
+                    "format": "image/png",
+                    "type": "truncate",
+                    "zoomStart": 2,
+                    "zoomStop": 6,
+                    "threadCount": 3,
+                }
+            },
+        )
+
+    def test_an_area_and_parameters_narrow_the_task(self):
+        values = dict(
+            self.VALUES, bounds="-125, 24 -66,50", parameters="STYLES = population"
+        )
+        request = GwcTabMixin._seed_request("topp:states", values)["seedRequest"]
+        self.assertEqual(request["bounds"], {"coords": {"double": [-125, 24, -66, 50]}})
+        self.assertEqual(
+            request["parameters"], {"entry": [{"string": ["STYLES", "population"]}]}
+        )
+
+    def test_a_bad_area_or_zoom_order_is_refused(self):
+        for bad in (
+            {"bounds": "1, 2, 3"},
+            {"bounds": "5, 0, 1, 1"},
+            {"bounds": "a, b, c, d"},
+            {"zoom_start": 7, "zoom_stop": 3},
+        ):
+            with self.assertRaises(ValueError, msg=bad):
+                GwcTabMixin._seed_request("topp:states", dict(self.VALUES, **bad))
+
+    def test_the_task_list_reads_as_sentences(self):
+        text = GwcTabMixin._seed_tasks_text(
+            {"long-array-array": [[656, 992290, 860, 4, 1], [-1, 130, -1, 1, 0]]}
+        )
+        self.assertEqual(
+            text.splitlines(),
+            [
+                "Task 4: running, 656 of 992290 tiles, about 860 s left",
+                "Task 1: pending, counting the tiles",
+            ],
+        )
+        self.assertEqual(
+            GwcTabMixin._seed_tasks_text({"long-array-array": []}),
+            "No task running for this layer.",
+        )
+
+    def test_the_form_starts_the_task_then_opens_the_monitor(self):
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        values = dict(self.VALUES, type="Seed")
+
+        class Accepting(ResourceFormDialog):
+            def exec(inner):
+                return QDialog.DialogCode.Accepted
+
+            def get_values(inner):
+                return values
+
+        with (
+            patch.object(tab_gwc, "ResourceFormDialog", Accepting),
+            patch.object(dlg, "_show_seed_tasks") as monitor,
+        ):
+            dlg._seed_gwc_layer(STATES_ROW)
+        posts = [call for call in dlg.gs.calls if call[0] == "POST"]
+        self.assertEqual(posts[0][1], "/gwc/rest/seed/topp:states.json")
+        self.assertEqual(posts[0][2]["json"]["seedRequest"]["type"], "seed")
+        monitor.assert_called_once_with(STATES_ROW)
+
+    def test_a_failed_read_is_shown_in_the_monitor_not_raised(self):
+        dlg = SyncDialog()
+
+        class Client:
+            def get(inner, path, **kwargs):
+                return Response("boom", 500, text="boom")
+
+        self.assertEqual(
+            dlg._read_seed_tasks(Client(), "/gwc/rest/seed/x.json"), "HTTP 500: boom"
+        )

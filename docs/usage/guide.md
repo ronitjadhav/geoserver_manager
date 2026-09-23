@@ -347,7 +347,10 @@ The tile cache (GeoWebCache) stores map tiles so they are drawn only once.
 ```
 
 **Click a name** to change how a layer is cached: on or off, its gridsets and
-its image formats. Meta-tiling, gutter and expiry are on the *Advanced* tab.
+its image formats. Add `= 0-12` to a gridset line to serve only those zoom
+levels. Meta-tiling, gutter and expiry are on the *Advanced* tab. The
+*Parameter filters* tab holds GeoWebCache's filters as XML: which STYLES,
+CQL_FILTER or TIME values get a cache of their own.
 
 ```{figure} ../static/screenshots/tile-cache-edit.png
 :alt: The tile cache settings of topp:states, with the enabled checkbox, gridsets and formats
@@ -356,12 +359,26 @@ its image formats. Meta-tiling, gutter and expiry are on the *Advanced* tab.
 
 Row actions:
 
-- **Truncate** (the eraser) deletes the cached tiles. They are drawn again
-  when someone asks for them.
+- **Seed or truncate…** renders the missing tiles (*Seed*), renders them all
+  again (*Reseed*) or deletes them (*Truncate*), for one gridset, format and
+  zoom range. On the *Advanced* tab, limit it to an area, or to one
+  parameter value such as `STYLES = population`. GeoWebCache runs it in the
+  background, and the task list opens.
+- **Tasks** shows the layer's running tasks, refreshed every two seconds,
+  with how many tiles are done. *Stop all* ends them.
+- **Truncate** (the eraser) deletes all the cached tiles, in every gridset
+  and format. They are drawn again when someone asks for them.
 - **Remove from cache** (the minus) stops caching the layer. The layer itself
   stays published.
 
 **Add a Layer to the Cache** offers the layers and groups not cached yet.
+
+```{figure} ../static/screenshots/tile-cache-seed.png
+:alt: The Seed or Truncate form for topp:states, with task, gridset, format, zoom levels and threads
+:width: 420px
+
+Each zoom level has four times the tiles of the one before.
+```
 
 ## From the layer tree
 

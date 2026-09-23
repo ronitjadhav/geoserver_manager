@@ -17,12 +17,14 @@ import xml.etree.ElementTree as ElementTree
 from urllib.parse import quote
 from xml.sax.saxutils import escape
 
-from qgis.PyQt.QtCore import QCoreApplication
-from qgis.PyQt.QtWidgets import QDialog
+from qgis.PyQt import sip
+from qgis.PyQt.QtCore import QCoreApplication, QTimer
+from qgis.PyQt.QtWidgets import QDialog, QDialogButtonBox
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.scope import GLOBAL
 from geoserver_manager.toolbelt.payload import as_list
+from geoserver_manager.toolbelt.rest import raw_rest
 
 _XML = {"Content-Type": "application/xml"}
 
@@ -50,6 +52,15 @@ _NEW_LAYER_XML = (
 # extracted at all (pylupdate only understands a literal context), hence the
 # repetition.
 translate = QCoreApplication.translate
+
+
+def _seed_types():
+    """The seed form's task choices, as shown, mapped to GWC's seedRequest type."""
+    return {
+        translate("GwcTabMixin", "Seed"): "seed",
+        translate("GwcTabMixin", "Reseed"): "reseed",
+        translate("GwcTabMixin", "Truncate"): "truncate",
+    }
 
 
 def _int_or_zero(text):
@@ -84,6 +95,25 @@ class GwcTabMixin:
             translate("GwcTabMixin", "Workspace"): self._open_workspace_from_row
         }
         self._row_actions = [
+            (
+                "seed-cache",
+                translate("GwcTabMixin", "Seed or truncate…"),
+                self._seed_gwc_layer,
+                translate(
+                    "GwcTabMixin",
+                    "Render, re-render or delete tiles for one gridset, format and "
+                    "zoom range, optionally in one area",
+                ),
+            ),
+            (
+                "seed-tasks",
+                translate("GwcTabMixin", "Tasks"),
+                self._show_seed_tasks,
+                translate(
+                    "GwcTabMixin",
+                    "The seed and truncate tasks GeoWebCache is running for the layer",
+                ),
+            ),
             (
                 "clear-cache",
                 translate("GwcTabMixin", "Truncate"),
@@ -263,6 +293,32 @@ class GwcTabMixin:
         return lines
 
     @staticmethod
+    def _gridset_line(line):
+        """(name, (start, stop) or None) of a gridset line "EPSG:4326 = 2-10".
+
+        The range is the published zoom levels (zoomStart / zoomStop).
+        ponytail: the cached levels (min/maxCachedLevel) are left as they are;
+        add them to the syntax when someone needs to cache less than is served.
+        """
+        name, _, zoom = line.partition("=")
+        name, zoom = name.strip(), zoom.strip()
+        if not zoom:
+            return name, None
+        start, dash, stop = zoom.partition("-")
+        try:
+            levels = (int(start), int(stop))
+        except ValueError:
+            levels = None
+        if not dash or levels is None or not 0 <= levels[0] <= levels[1]:
+            raise ValueError(
+                translate(
+                    "GwcTabMixin",
+                    "'{}': write the zoom levels as first-last, e.g. 0-12.",
+                ).format(line)
+            )
+        return name, levels
+
+    @staticmethod
     def _parse_xml(xml_text):
         if isinstance(xml_text, str):
             # fromstring() refuses a str that carries an encoding declaration
@@ -285,7 +341,7 @@ class GwcTabMixin:
             "name": root.findtext("name") or "",
             "enabled": (root.findtext("enabled") or "true").strip().lower() == "true",
             "gridsets": "\n".join(
-                element.findtext("gridSetName") or ""
+                GwcTabMixin._gridset_text(element)
                 for element in root.findall("gridSubsets/gridSubset")
             ),
             "formats": "\n".join(
@@ -296,17 +352,43 @@ class GwcTabMixin:
             "expire_cache": number("expireCache"),
             "expire_clients": number("expireClients"),
             "gutter": number("gutter"),
+            "filters": GwcTabMixin._filters_text(root),
         }
+
+    @staticmethod
+    def _filters_text(root):
+        """The parameter filters as indented XML, one element after another."""
+        parts = []
+        for element in root.findall("parameterFilters/*"):
+            element.tail = None
+            ElementTree.indent(element)
+            parts.append(ElementTree.tostring(element, encoding="unicode"))
+        return "\n".join(parts)
+
+    @staticmethod
+    def _gridset_text(element):
+        """One gridSubset as a form line, with its zoom range when it has one."""
+        name = element.findtext("gridSetName") or ""
+        start, stop = element.findtext("zoomStart"), element.findtext("zoomStop")
+        if start is None or stop is None:
+            return name
+        return f"{name} = {start.strip()}-{stop.strip()}"
 
     @staticmethod
     def _gwc_xml_with_values(xml_text, values):
         """The document with the form's fields written into it. Pure.
 
-        Everything the form does not model (the id, the parameter filters, a
-        gridset's zoom bounds and extent) stays as GeoServer wrote it: a kept
-        gridset keeps its element, only new ones are created bare.
+        Everything the form does not model (the id, a gridset's extent and
+        cached levels) stays as GeoServer wrote it: a kept gridset keeps its
+        element, only new ones are created bare. A line without a zoom range
+        clears the gridset's; the filters are replaced only when the form
+        has them.
         """
-        gridsets = GwcTabMixin._lines(values.get("gridsets"))
+        # One subset per gridset, the first line naming it winning.
+        gridsets = {}
+        for line in GwcTabMixin._lines(values.get("gridsets")):
+            name, levels = GwcTabMixin._gridset_line(line)
+            gridsets.setdefault(name, levels)
         formats = GwcTabMixin._lines(values.get("formats"))
         if not gridsets:
             raise ValueError(
@@ -343,13 +425,23 @@ class GwcTabMixin:
             for element in root.findall("gridSubsets/gridSubset")
         }
         subsets = []
-        for name in gridsets:
+        for name, levels in gridsets.items():
             element = kept.get(name)
             if element is None:
                 element = ElementTree.Element("gridSubset")
                 element.append(leaf("gridSetName", name))
+            for tag in ("zoomStart", "zoomStop"):
+                for old in element.findall(tag):
+                    element.remove(old)
+            if levels is not None:
+                element.append(leaf("zoomStart", str(levels[0])))
+                element.append(leaf("zoomStop", str(levels[1])))
             subsets.append(element)
         replace_children("gridSubsets", subsets)
+        if "filters" in values:
+            replace_children(
+                "parameterFilters", GwcTabMixin._parse_filters(values["filters"])
+            )
         replace_children(
             "metaWidthHeight",
             [
@@ -361,6 +453,26 @@ class GwcTabMixin:
         child("expireClients").text = str(int(values.get("expire_clients", 0)))
         child("gutter").text = str(int(values.get("gutter", 0)))
         return ElementTree.tostring(root, encoding="unicode")
+
+    @staticmethod
+    def _parse_filters(text):
+        """The parameter-filter elements of the form's XML text. Pure.
+
+        Kept as XML: GeoWebCache has several filter kinds (style, string,
+        regex, float, integer), each with its own fields, and GeoServer
+        answers a misspelt one with a bare 500 naming only the element.
+        """
+        try:
+            wrapper = ElementTree.fromstring(
+                f"<parameterFilters>{text or ''}</parameterFilters>"
+            )
+        except ElementTree.ParseError as error:
+            raise ValueError(
+                translate(
+                    "GwcTabMixin", "The parameter filters are not valid XML: {}"
+                ).format(error)
+            ) from None
+        return list(wrapper)
 
     # -- Writes ---------------------------------------------------------------
 
@@ -466,7 +578,8 @@ class GwcTabMixin:
                 "required": True,
                 "help": translate(
                     "GwcTabMixin",
-                    "One per line: the tile grids the layer is cached in.",
+                    "One per line: the tile grids the layer is cached in. Add "
+                    '"= 0-12" to a line to serve only those zoom levels.',
                 ),
             },
             {
@@ -541,6 +654,20 @@ class GwcTabMixin:
                 "help": translate(
                     "GwcTabMixin",
                     "Sent to browsers and QGIS as Cache-Control; 0 sends none.",
+                ),
+            },
+            {
+                "key": "filters",
+                "label": translate("GwcTabMixin", "Parameter filters"),
+                "type": "textarea",
+                "code": True,
+                "group": translate("GwcTabMixin", "Parameter filters"),
+                "min_height": 200,
+                "help": translate(
+                    "GwcTabMixin",
+                    "Which request parameters get a cache of their own (STYLES, "
+                    "CQL_FILTER, TIME...), as GeoWebCache's XML. A value no filter "
+                    "allows is not cached.",
                 ),
             },
         ]
@@ -629,15 +756,12 @@ class GwcTabMixin:
                 "requested.",
             ),
             fields=self._gwc_fields(gridset_names, layer_names=candidates),
+            # From the template the create writes, so its STYLES filter shows
+            # in the form and an untouched form keeps it.
             values={
-                "enabled": True,
+                **self._gwc_form_values(_NEW_LAYER_XML.format(name="")),
                 "gridsets": "\n".join(DEFAULT_GRIDSETS),
                 "formats": "\n".join(DEFAULT_FORMATS),
-                "meta_width": 4,
-                "meta_height": 4,
-                "gutter": 0,
-                "expire_cache": 0,
-                "expire_clients": 0,
             },
             parent=self,
             ok_label=translate("GwcTabMixin", "Create"),
@@ -657,6 +781,280 @@ class GwcTabMixin:
                 translate("GwcTabMixin", "'{}' is now cached.").format(values["layer"])
             )
             self._load_gwc_layers()
+
+    # -- Seed, reseed, truncate -------------------------------------------------
+
+    def _seed_path(self, name, ext=".json"):
+        """GWC's seed endpoint for one cached layer."""
+        return f"{self._gwc_base()}/seed/{quote(name, safe=':')}{ext}"
+
+    @staticmethod
+    def _seed_request(name, values):
+        """The seedRequest document for the form's values. Pure.
+
+        TODO(#50): the library has no seed call (row 59). Measured on 2.28.5:
+        GWC answers 200 and starts `threadCount` tasks; an unknown gridset is
+        a 500 naming it.
+        """
+        start, stop = int(values["zoom_start"]), int(values["zoom_stop"])
+        if start > stop:
+            raise ValueError(
+                translate("GwcTabMixin", "The first zoom level is after the last.")
+            )
+        request = {
+            "name": name,
+            "gridSetId": values["gridset"],
+            "format": values["format"],
+            "type": _seed_types()[values["type"]],
+            "zoomStart": start,
+            "zoomStop": stop,
+            "threadCount": int(values["threads"]),
+        }
+        bounds = (values.get("bounds") or "").strip()
+        if bounds:
+            try:
+                coords = [float(part) for part in bounds.replace(",", " ").split()]
+            except ValueError:
+                coords = []
+            if len(coords) != 4 or coords[0] >= coords[2] or coords[1] >= coords[3]:
+                raise ValueError(
+                    translate(
+                        "GwcTabMixin",
+                        "Write the area as minx, miny, maxx, maxy, in the "
+                        "gridset's own units.",
+                    )
+                )
+            request["bounds"] = {"coords": {"double": coords}}
+        parameters = [
+            line.partition("=") for line in GwcTabMixin._lines(values.get("parameters"))
+        ]
+        if parameters:
+            request["parameters"] = {
+                "entry": [
+                    {"string": [key.strip(), value.strip()]}
+                    for key, _, value in parameters
+                ]
+            }
+        return {"seedRequest": request}
+
+    @staticmethod
+    def _seed_tasks_text(payload):
+        """GWC's task list as one line per task. Pure.
+
+        Each task is [tiles done, tiles total, seconds left, id, state]; GWC
+        writes -1 for a count it has not made yet.
+        """
+        tasks = (payload or {}).get("long-array-array") or []
+        if not tasks:
+            return translate("GwcTabMixin", "No task running for this layer.")
+        states = {
+            -1: translate("GwcTabMixin", "aborted"),
+            0: translate("GwcTabMixin", "pending"),
+            1: translate("GwcTabMixin", "running"),
+            2: translate("GwcTabMixin", "done"),
+        }
+        lines = []
+        for done, total, left, task_id, state in tasks:
+            progress = (
+                translate("GwcTabMixin", "{} of {} tiles").format(done, total)
+                if total >= 0 and done >= 0
+                else translate("GwcTabMixin", "counting the tiles")
+            )
+            eta = (
+                translate("GwcTabMixin", ", about {} s left").format(left)
+                if left > 0
+                else ""
+            )
+            lines.append(
+                translate("GwcTabMixin", "Task {}: {}, {}{}").format(
+                    task_id, states.get(state, state), progress, eta
+                )
+            )
+        return "\n".join(lines)
+
+    def _seed_fields(self, gridsets, formats):
+        """Field definitions for the seed form."""
+        return [
+            {
+                "key": "type",
+                "label": translate("GwcTabMixin", "Task"),
+                "type": "combo",
+                "options": list(_seed_types()),
+                "help": translate(
+                    "GwcTabMixin",
+                    "Seed renders the missing tiles, Reseed renders them all again, "
+                    "Truncate deletes them",
+                ),
+            },
+            {
+                "key": "gridset",
+                "label": translate("GwcTabMixin", "Gridset"),
+                "type": "combo",
+                "options": list(gridsets),
+            },
+            {
+                "key": "format",
+                "label": translate("GwcTabMixin", "Format"),
+                "type": "combo",
+                "options": list(formats),
+            },
+            {
+                "key": "zoom_start",
+                "label": translate("GwcTabMixin", "From zoom level"),
+                "type": "spinbox",
+                "min": 0,
+                "max": 40,
+                "default": 0,
+            },
+            {
+                "key": "zoom_stop",
+                "label": translate("GwcTabMixin", "To zoom level"),
+                "type": "spinbox",
+                "min": 0,
+                "max": 40,
+                "default": 8,
+                "help": translate(
+                    "GwcTabMixin",
+                    "Each level has four times the tiles of the one before: the "
+                    "task list shows the total once GeoWebCache has counted it",
+                ),
+            },
+            {
+                "key": "threads",
+                "label": translate("GwcTabMixin", "Threads"),
+                "type": "spinbox",
+                "min": 1,
+                "max": 32,
+                "default": 2,
+            },
+            {
+                "key": "bounds",
+                "label": translate("GwcTabMixin", "Only this area"),
+                "type": "text",
+                "placeholder": translate("GwcTabMixin", "minx, miny, maxx, maxy"),
+                "group": translate("GwcTabMixin", "Advanced"),
+                "help": translate(
+                    "GwcTabMixin",
+                    "In the gridset's own units. Empty: the layer's whole extent.",
+                ),
+            },
+            {
+                "key": "parameters",
+                "label": translate("GwcTabMixin", "Parameters"),
+                "type": "textarea",
+                "placeholder": "STYLES = population",
+                "group": translate("GwcTabMixin", "Advanced"),
+                "help": translate(
+                    "GwcTabMixin",
+                    "One 'KEY = value' per line, for the tiles of one parameter "
+                    "filter value. Empty: the default tiles.",
+                ),
+            },
+        ]
+
+    def _seed_gwc_layer(self, row_data):
+        """Seed, reseed or truncate part of a layer's cache, then watch it."""
+        name = row_data[0]
+        xml_text = self._fetch(
+            lambda: self._gwc_layer_xml(name),
+            translate("GwcTabMixin", "Failed to load the tile cache of '{}'").format(
+                name
+            ),
+        )
+        if xml_text is None:
+            return
+        current = self._gwc_form_values(xml_text)
+        gridsets = [
+            self._gridset_line(line)[0] for line in self._lines(current["gridsets"])
+        ]
+        dlg = ResourceFormDialog(
+            title=translate("GwcTabMixin", "Seed or Truncate '{}'").format(name),
+            description=translate(
+                "GwcTabMixin",
+                "GeoWebCache runs the task in the background; the task list "
+                "opens next and shows its progress.",
+            ),
+            fields=self._seed_fields(gridsets, self._lines(current["formats"])),
+            parent=self,
+            ok_label=translate("GwcTabMixin", "Start"),
+        )
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        values = dlg.get_values()
+        if self._run_action(
+            lambda: self._raw_rest(
+                "post", self._seed_path(name), json=self._seed_request(name, values)
+            ),
+            translate("GwcTabMixin", "Failed to start the task on '{}'").format(name),
+        ):
+            self._show_seed_tasks(row_data)
+
+    def _read_seed_tasks(self, client, path):
+        """The task list as text, or why it could not be read. Runs in a worker.
+
+        The error comes back as text, not raised: the monitor polls every 2 s,
+        and a banner each time would bury the message bar.
+        """
+        try:
+            return self._seed_tasks_text(raw_rest(client, "get", path).json())
+        except Exception as error:  # noqa: BLE001 (shown in the dialog)
+            return self._error_text(error)
+
+    def _show_seed_tasks(self, row_data):
+        """The layer's running tasks, refreshed every 2 s, with Stop all."""
+        name = row_data[0]
+        client = self.gs.rest_service.rest_client
+        path = self._seed_path(name)
+        dlg = ResourceFormDialog(
+            title=translate("GwcTabMixin", "Tasks of '{}'").format(name),
+            fields=[
+                {
+                    "key": "tasks",
+                    "label": translate("GwcTabMixin", "Tasks"),
+                    "type": "textarea",
+                    "read_only": True,
+                    "wide": True,
+                }
+            ],
+            values={"tasks": translate("GwcTabMixin", "Asking GeoWebCache…")},
+            parent=self,
+        )
+        dlg.hide_save_button()
+        stop = dlg._button_box.addButton(
+            translate("GwcTabMixin", "Stop all"),
+            QDialogButtonBox.ButtonRole.ActionRole,
+        )
+        stop.clicked.connect(
+            lambda: self._run_action(
+                lambda: self._raw_rest(
+                    "post", self._seed_path(name, ""), data={"kill_all": "all"}
+                ),
+                translate("GwcTabMixin", "Failed to stop the tasks on '{}'").format(
+                    name
+                ),
+            )
+        )
+
+        def read(_task):
+            return self._read_seed_tasks(client, path)
+
+        def landed(text):
+            if not sip.isdeleted(dlg) and dlg.isVisible():
+                dlg.get_widget("tasks").setPlainText(text)
+
+        timer = QTimer(dlg)
+        timer.setInterval(2000)
+        timer.timeout.connect(
+            lambda: self._run_quietly(
+                translate("GwcTabMixin", "Failed to read the tasks"), read, landed
+            )
+        )
+        timer.start()
+        self._run_quietly(
+            translate("GwcTabMixin", "Failed to read the tasks"), read, landed
+        )
+        dlg.exec()
+        timer.stop()
 
     # -- Truncate / remove ----------------------------------------------------
 
