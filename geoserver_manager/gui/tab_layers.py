@@ -20,7 +20,7 @@ from qgis.PyQt.QtWidgets import QApplication, QDialog, QMessageBox
 
 from geoserver_manager.gui.dlg_preview import LayerPreviewDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.toolbelt.payload import bbox_text, keyword_list, text_of
+from geoserver_manager.toolbelt.payload import bbox_text, keyword_list, text_of, unwrap
 from geoserver_manager.toolbelt.qgis_export import (
     export_to_geopackage,
     geoserver_name,
@@ -32,6 +32,9 @@ from geoserver_manager.toolbelt.sld import (
     project_layer_by_label,
     styleable_project_layers,
 )
+
+# The projection policies GeoServer knows, as its REST API spells them.
+_PROJECTION_POLICIES = ("FORCE_DECLARED", "REPROJECT_TO_DECLARED", "NONE")
 
 # How a GeoServer layer can be brought into QGIS. WFS gives the actual features
 # (editable, stylable in QGIS); WMS/WMTS give rendered images. WMTS goes through
@@ -134,6 +137,17 @@ class LayerTabMixin:
                     "LayerTabMixin",
                     "Push style from QGIS: upload a project layer's symbology as "
                     "a new server style and make it this layer's default.",
+                ),
+            ),
+            (
+                "update-from-source",
+                translate("LayerTabMixin", "Update from the data"),
+                self._update_layer_from_source,
+                translate(
+                    "LayerTabMixin",
+                    "Update from the data: GeoServer re-reads the table or file "
+                    "behind the layer (its columns, a replaced file) and "
+                    "recomputes its bounds.",
                 ),
             ),
             (
@@ -246,9 +260,8 @@ class LayerTabMixin:
     def _layer_form_values(row_data, detail):
         """Prefill for the detail view, from what GeoServer returned.
 
-        A feature type carries far more than the plugin can safely edit (see
-        _show_layer_info), so this is a view: the interesting fields, flattened
-        for display.
+        The same for a feature type and a coverage: the fields the edit form
+        shows, flattened, and the read-only details beside them.
         """
         # A row is [name, workspace, type, store, default style].
         name, ws_name, ds_name = row_data[0], row_data[1], row_data[3]
@@ -289,54 +302,142 @@ class LayerTabMixin:
             "title": text_of(detail.get("title")),
             "abstract": text_of(detail.get("abstract")),
             "keywords": ", ".join(str(k) for k in keywords),
+            "cql_filter": detail.get("cqlFilter") or "",
             "bbox": bounds,
             "attributes": attribute_text,
         }
 
-    def _layer_fields(self):
-        """Field definitions for the feature-type detail view (all read-only)."""
-        # Sentence case, like the raster and cascaded views beside it; Enabled
-        # and Advertised read Yes / No there too (set in _show_layer_info).
-        text = [
-            ("name", translate("LayerTabMixin", "Layer name")),
+    def _layer_fields(self, kind=VECTOR):
+        """The layer edit form: what GeoServer lets a partial PUT change on the
+        resource first, read-only details on the Data tab.
+
+        Every field on the first tab was measured to merge on 2.28.5 (feature
+        types and coverages alike); the CQL filter exists for vectors only.
+        """
+        data = translate("LayerTabMixin", "Data")
+        fields = [
+            {
+                "key": "name",
+                "label": translate("LayerTabMixin", "Layer name"),
+                "type": "text",
+                "required": True,
+                "help": translate(
+                    "LayerTabMixin",
+                    "Renaming keeps the data: GeoServer updates the layer groups "
+                    "and the tile cache that use it. Clients that ask for the old "
+                    "name stop finding it.",
+                ),
+            },
+            {
+                "key": "title",
+                "label": translate("LayerTabMixin", "Title"),
+                "type": "text",
+            },
+            {
+                "key": "abstract",
+                "label": translate("LayerTabMixin", "Abstract"),
+                "type": "textarea",
+                "max_height": 72,
+            },
+            {
+                "key": "keywords",
+                "label": translate("LayerTabMixin", "Keywords"),
+                "type": "text",
+                "placeholder": translate("LayerTabMixin", "Comma-separated"),
+            },
+            {
+                "key": "srs",
+                "label": translate("LayerTabMixin", "SRS (EPSG code)"),
+                "type": "text",
+                "required": True,
+                "help": translate(
+                    "LayerTabMixin",
+                    "The SRS GeoServer declares for the layer. Changing it "
+                    "recomputes the bounds.",
+                ),
+            },
+            {
+                "key": "projection_policy",
+                "label": translate("LayerTabMixin", "Projection policy"),
+                "type": "combo",
+                "options": list(_PROJECTION_POLICIES),
+                "help": translate(
+                    "LayerTabMixin",
+                    "FORCE_DECLARED uses the declared SRS as it is; "
+                    "REPROJECT_TO_DECLARED reprojects from the data's own; NONE "
+                    "keeps the data's own.",
+                ),
+            },
+            {
+                "key": "enabled",
+                "label": translate("LayerTabMixin", "Enabled"),
+                "type": "checkbox",
+                "help": translate(
+                    "LayerTabMixin",
+                    "Off: GeoServer stops serving the layer, and keeps it.",
+                ),
+            },
+            {
+                "key": "advertised",
+                "label": translate("LayerTabMixin", "Advertised"),
+                "type": "checkbox",
+                "help": translate(
+                    "LayerTabMixin",
+                    "Off: it is left out of the capabilities, but still served to "
+                    "whoever names it.",
+                ),
+            },
+        ]
+        if kind == VECTOR:
+            fields.append(
+                {
+                    "key": "cql_filter",
+                    "label": translate("LayerTabMixin", "CQL filter"),
+                    "type": "text",
+                    "placeholder": translate(
+                        "LayerTabMixin", "Optional, e.g. pop > 1000"
+                    ),
+                    "help": translate(
+                        "LayerTabMixin",
+                        "Only features matching it are served. Empty for all.",
+                    ),
+                }
+            )
+        details = [
             ("native_name", translate("LayerTabMixin", "Native name")),
             ("workspace", translate("LayerTabMixin", "Workspace")),
-            ("datastore", translate("LayerTabMixin", "Datastore")),
-            ("srs", translate("LayerTabMixin", "SRS")),
-            ("projection_policy", translate("LayerTabMixin", "Projection policy")),
-            ("title", translate("LayerTabMixin", "Title")),
-            ("abstract", translate("LayerTabMixin", "Abstract")),
-            ("keywords", translate("LayerTabMixin", "Keywords")),
-            ("enabled", translate("LayerTabMixin", "Enabled")),
-            ("advertised", translate("LayerTabMixin", "Advertised")),
+            ("datastore", translate("LayerTabMixin", "Store")),
+            ("bbox", translate("LayerTabMixin", "Native bounding box")),
         ]
-        fields = [
+        if kind == RASTER:
+            details += [
+                ("native_format", translate("LayerTabMixin", "Native format")),
+                ("size", translate("LayerTabMixin", "Size in pixels")),
+            ]
+        fields += [
             {
                 "key": key,
                 "label": label,
-                # An abstract is prose: one line cut it off after a few words.
-                "type": "textarea" if key == "abstract" else "text",
-                "max_height": 72,  # a few lines, not a gap under a short one
-                "read_only": True,
-            }
-            for key, label in text
-        ]
-        fields += [
-            {
-                "key": "bbox",
-                "label": translate("LayerTabMixin", "Native bounding box"),
                 "type": "text",
                 "read_only": True,
-                "group": translate("LayerTabMixin", "Data"),
-            },
-            {
-                "key": "attributes",
-                "label": translate("LayerTabMixin", "Attributes"),
-                "type": "textarea",
-                "read_only": True,
-                "group": translate("LayerTabMixin", "Data"),
-            },
+                "group": data,
+            }
+            for key, label in details
         ]
+        if kind in (VECTOR, RASTER):
+            fields.append(
+                {
+                    "key": "attributes" if kind == VECTOR else "bands",
+                    "label": (
+                        translate("LayerTabMixin", "Attributes")
+                        if kind == VECTOR
+                        else translate("LayerTabMixin", "Bands")
+                    ),
+                    "type": "textarea",
+                    "read_only": True,
+                    "group": data,
+                }
+            )
         return fields
 
     def _layer_resource(self, row_data):
@@ -354,15 +455,14 @@ class LayerTabMixin:
         )
 
     def _show_layer_info(self, row_data):
-        """Open a read-only view of one layer's resource, whatever its type.
+        """Open a layer: an edit form for a vector or a raster, a view for a
+        cascaded layer.
 
-        The vector view is this tab's own; the coverage and cascaded-layer
-        views are borrowed from the Coverage Stores and Cascaded Stores tabs,
-        minus their picker. View-only on purpose: the library's create_*
-        helpers upsert from a handful of arguments, so saving through them
-        would drop everything the form does not model, exactly the
-        destruction the datastore merge exists to avoid. Editing needs an
-        update that merges; tracked in #50.
+        Save sends one partial PUT with only what changed: GeoServer merges it
+        (measured on 2.28.5), so everything the form does not show stays as it
+        is. A cascaded layer stays a view: GeoServer 2.28.5 answers any PUT on a
+        cascaded WMS layer with UnsupportedOperationException, JSON, XML and
+        the very document a GET returned alike.
         """
         detail = self._fetch(
             lambda: self._layer_resource(row_data),
@@ -372,40 +472,189 @@ class LayerTabMixin:
             return
         detail = detail if isinstance(detail, dict) else {}
         name, ws_name, kind, store = row_data[0], row_data[1], row_data[2], row_data[3]
-        if kind == RASTER:
-            fields = [f for f in self._coverage_fields([]) if f["key"] != "coverage"]
-            # A boolean cell reads Yes / No, translated, never True / False.
-            values = dict(
-                self._coverage_form_values(detail),
-                enabled=self._yes_no(detail.get("enabled", True)),
+        if kind in (WMS, WMTS):
+            dlg = ResourceFormDialog(
+                title=translate("LayerTabMixin", "Layer '{}'").format(name),
+                description=translate(
+                    "LayerTabMixin",
+                    "Cascaded through {type} store {ws}/{store}. Read-only: "
+                    "GeoServer's REST API cannot change a cascaded layer, its web "
+                    "UI can.",
+                ).format(type=kind, ws=ws_name, store=store),
+                fields=[
+                    f for f in self._cascaded_layer_fields([]) if f["key"] != "layer"
+                ],
+                values=self._cascaded_layer_form_values(detail),
+                parent=self,
             )
-            origin = translate("LayerTabMixin", "Coverage of store {ws}/{store}.")
-        elif kind in (WMS, WMTS):
-            fields = [f for f in self._cascaded_layer_fields([]) if f["key"] != "layer"]
-            values = self._cascaded_layer_form_values(detail)
-            origin = translate(
-                "LayerTabMixin", "Cascaded through {type} store {ws}/{store}."
-            )
-        else:
-            fields = self._layer_fields()
-            values = self._layer_form_values(row_data, detail)
-            for key in ("enabled", "advertised"):
-                values[key] = self._yes_no(values[key])
-            origin = translate("LayerTabMixin", "Published from {ws}/{store}.")
+            dlg.hide_save_button()
+            dlg.exec()
+            return
 
+        values = self._layer_form_values(row_data, detail)
+        if kind == RASTER:
+            coverage = self._coverage_form_values(detail)
+            values.update(
+                native_format=coverage.get("native_format", ""),
+                size=coverage.get("size", ""),
+                bands=coverage.get("bands", ""),
+            )
+        before = dict(values)
         dlg = ResourceFormDialog(
             title=translate("LayerTabMixin", "Layer '{}'").format(name),
-            description=origin.format(ws=ws_name, store=store, type=kind)
-            + " "
-            + translate(
-                "LayerTabMixin", "Read-only here. GeoServer's web UI can change it."
-            ),
-            fields=fields,
+            description=translate(
+                "LayerTabMixin", "Published from {ws}/{store}."
+            ).format(ws=ws_name, store=store),
+            fields=self._layer_fields(kind),
             values=values,
             parent=self,
         )
-        dlg.hide_save_button()
-        dlg.exec()
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        after = dlg.get_values()
+        if self._layer_changes(before, after, kind)[0] is None:
+            return  # nothing changed: no request
+        if self._run_action(
+            # In the worker, behind the waiting box: a slow server must not
+            # freeze QGIS on Save either.
+            lambda: self._wait_for(lambda: self._save_layer(row_data, before, after)),
+            translate("LayerTabMixin", "Failed to save layer '{}'").format(name),
+        ):
+            self.show_success_message(
+                translate("LayerTabMixin", "Layer '{}' saved.").format(after["name"])
+            )
+            self._load_layers()
+
+    @staticmethod
+    def _layer_changes(before, after, kind):
+        """(body, recalculate) for a partial resource PUT, or (None, False).
+
+        Only the fields that changed go out, in GeoServer's own spelling; an
+        emptied title, abstract, keyword list or filter is sent empty, which
+        clears it (measured). A changed SRS or projection policy recomputes
+        the bounds in the same request. Pure, so the mapping is testable.
+        """
+
+        def keywords(text):
+            return [word.strip() for word in (text or "").split(",") if word.strip()]
+
+        def srs(text):
+            code = str(text or "").strip().upper().removeprefix("EPSG:")
+            return f"EPSG:{code}"
+
+        body = {}
+        for key, rest_key in (
+            ("name", "name"),
+            ("title", "title"),
+            ("abstract", "abstract"),
+            ("projection_policy", "projectionPolicy"),
+            ("enabled", "enabled"),
+            ("advertised", "advertised"),
+        ):
+            if after.get(key) != before.get(key):
+                body[rest_key] = after.get(key)
+        if kind == VECTOR and (after.get("cql_filter") or "") != (
+            before.get("cql_filter") or ""
+        ):
+            body["cqlFilter"] = after.get("cql_filter") or ""
+        if keywords(after.get("keywords")) != keywords(before.get("keywords")):
+            body["keywords"] = {"string": keywords(after.get("keywords"))}
+        if srs(after.get("srs")) != srs(before.get("srs")):
+            body["srs"] = srs(after.get("srs"))
+        recalculate = "srs" in body or "projectionPolicy" in body
+        return (body or None), recalculate
+
+    def _resource_path(self, workspace_name, kind, store, name):
+        """REST path of the resource behind a vector or raster layer, quoted."""
+        endpoints = self.gs.rest_service.rest_endpoints
+        segments = [quote(part, safe="") for part in (workspace_name, store, name)]
+        if kind == RASTER:
+            return endpoints.coverage(*segments)
+        return endpoints.featuretype(*segments)
+
+    def _save_layer(self, row_data, before, after):
+        """Validate, then PUT what changed on the layer's resource.
+
+        TODO(#50): no update_feature_type() or update_coverage() in the
+        library (row 53). create_feature_type() upserts by the *new* name, so a
+        rename would POST a second layer, and it knows no cqlFilter; coverages
+        have no update at all. Workaround: one merging PUT on the resource.
+        """
+        _name, ws_name, kind, store = row_data[0], row_data[1], row_data[2], row_data[3]
+        body, recalculate = self._layer_changes(before, after, kind)
+        if body is None:
+            return
+        if "name" in body:
+            self._require_safe_name(body["name"])
+            base = self.gs.rest_service.rest_endpoints.base_url
+            qualified = "{}:{}".format(ws_name, body["name"])
+            taken = f"{base}/layers/{quote(qualified, safe=':')}.json"
+            try:
+                self._raw_rest("get", taken)
+            except RuntimeError:
+                pass  # free (404)
+            else:
+                raise ValueError(
+                    translate(
+                        "LayerTabMixin", "Layer '{}' already exists in '{}'."
+                    ).format(body["name"], ws_name)
+                )
+        if "srs" in body and not body["srs"].removeprefix("EPSG:").isdigit():
+            raise ValueError(
+                translate(
+                    "LayerTabMixin",
+                    "The SRS must be an EPSG code number, such as 3857 or 4326.",
+                )
+            )
+        wrapper = "coverage" if kind == RASTER else "featureType"
+        self._raw_rest(
+            "put",
+            self._resource_path(ws_name, kind, store, before["name"]),
+            json={wrapper: body},
+            params={"recalculate": "nativebbox,latlonbbox"} if recalculate else None,
+        )
+
+    def _update_layer_from_source(self, row_data):
+        """Re-read the data behind a layer, then recompute its bounds.
+
+        After the table gained a column or the file was replaced: GeoServer
+        keeps the resource's schema cached until reset. TODO(#50): neither
+        call is in the library (row 53): POST .../reset, then a PUT with
+        ?recalculate=nativebbox,latlonbbox (both measured on 2.28.5).
+        """
+        name, ws_name, kind, store = row_data[0], row_data[1], row_data[2], row_data[3]
+        if kind not in (VECTOR, RASTER):
+            self.show_warning_message(
+                translate(
+                    "LayerTabMixin",
+                    "'{}' is a cascaded layer: GeoServer's REST API cannot update "
+                    "it, its web UI can.",
+                ).format(name)
+            )
+            return
+        path = self._resource_path(ws_name, kind, store, name)
+        wrapper = "coverage" if kind == RASTER else "featureType"
+
+        def update():
+            self._raw_rest("post", path.removesuffix(".json") + "/reset")
+            self._raw_rest(
+                "put",
+                path,
+                json={wrapper: {"name": name}},
+                params={"recalculate": "nativebbox,latlonbbox"},
+            )
+
+        if self._run_action(
+            lambda: self._wait_for(update),
+            translate("LayerTabMixin", "Failed to update '{}' from its data").format(
+                name
+            ),
+        ):
+            self.show_success_message(
+                translate(
+                    "LayerTabMixin", "'{}' re-read from its data, bounds recomputed."
+                ).format(name)
+            )
 
     # -- Publish --------------------------------------------------------------
 
@@ -1059,8 +1308,8 @@ class LayerTabMixin:
 
     # -- Default style --------------------------------------------------------
 
-    def _layer_default_style(self, workspace_name, name):
-        """The layer's current default style name, or None if unreadable.
+    def _layer_styles(self, workspace_name, name):
+        """(default style, [other styles]) of a layer; (None, []) if unreadable.
 
         TODO(#50): upstream: the facade has set_default_layer_style() but no
         get_layer(); rest_service.get_layer() exists and is used here directly.
@@ -1068,9 +1317,16 @@ class LayerTabMixin:
         try:
             layer = self._check(self.gs.rest_service.get_layer(workspace_name, name))
         except Exception:
-            return None
+            return None, []
         info = layer.asdict() if hasattr(layer, "asdict") else layer
-        return info.get("defaultStyle") if isinstance(info, dict) else None
+        if not isinstance(info, dict):
+            return None, []
+        others = (
+            unwrap(info, "styles", "style")
+            if isinstance(info.get("styles"), dict)
+            else (info.get("styles") or [])
+        )
+        return info.get("defaultStyle"), [self._name_of(s) for s in others]
 
     def _style_choices(self, workspace_name):
         """Styles a layer in this workspace may use: global ones and its workspace's.
@@ -1085,27 +1341,33 @@ class LayerTabMixin:
         return sorted(choices)
 
     def _set_layer_style(self, row_data):
-        """Pick the default style for one layer."""
+        """Pick the default style of one layer, and the other styles it offers.
+
+        The other styles are what a client may ask for with STYLES=; GeoServer
+        lists them in the capabilities. Both go out only when they changed:
+        the default through set_default_layer_style(), the others through
+        rest_service.update_layer(), whose layer PUT replaces the list
+        (measured on 2.28.5; an empty list clears it).
+        """
         name, ws_name = row_data[0], row_data[1]
         fetched = self._fetch(
             lambda: (
                 self._style_choices(ws_name),
-                self._layer_default_style(ws_name, name),
+                self._layer_styles(ws_name, name),
             ),
             translate("LayerTabMixin", "Failed to load styles for '{}'").format(name),
         )
         if fetched is None:
             return
-        choices, current = fetched
+        choices, (current, others) = fetched
         if current and current not in choices:
             choices.insert(0, current)
 
         dlg = ResourceFormDialog(
-            title=translate("LayerTabMixin", "Default style for '{}'").format(name),
+            title=translate("LayerTabMixin", "Styles of '{}'").format(name),
             description=translate(
                 "LayerTabMixin",
-                "Global styles and the styles of workspace '{}'. Other styles the "
-                "layer may use stay as they are.",
+                "Global styles and the styles of workspace '{}'.",
             ).format(ws_name),
             fields=[
                 {
@@ -1115,25 +1377,86 @@ class LayerTabMixin:
                     "options": choices,
                     "default": current,
                     "required": True,
-                }
+                },
+                {
+                    "key": "others",
+                    "label": translate("LayerTabMixin", "Other styles"),
+                    "type": "textarea",
+                    "default": "\n".join(others),
+                    "help": translate(
+                        "LayerTabMixin",
+                        "One per line: the styles a client may also ask for. "
+                        "Empty for none.",
+                    ),
+                },
+                {
+                    "key": "add_other",
+                    "label": translate("LayerTabMixin", "Add a style"),
+                    "type": "combo",
+                    "options": [""] + choices,
+                    "help": translate("LayerTabMixin", "Appends to the list above."),
+                },
             ],
             parent=self,
-            ok_label=translate("LayerTabMixin", "Set style"),
+            ok_label=translate("LayerTabMixin", "Set styles"),
         )
+        self._wire_style_picker(dlg)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
-        style = dlg.get_values()["style"]
-        if style == current:
-            return
-        if self._run_action(
-            lambda: self._check(self.gs.set_default_layer_style(name, ws_name, style)),
-            translate("LayerTabMixin", "Failed to set the style of '{}'").format(name),
-        ):
-            self.show_success_message(
-                translate("LayerTabMixin", "'{}' now uses style '{}'.").format(
-                    name, style
+        values = dlg.get_values()
+        style = values["style"]
+        wanted = [
+            line.strip() for line in values["others"].splitlines() if line.strip()
+        ]
+        wanted = list(dict.fromkeys(s for s in wanted if s != style))  # no repeats
+        unknown = [s for s in wanted if s not in choices]
+        if unknown:
+            self.show_error_message(
+                translate("LayerTabMixin", "No style named {} on the server.").format(
+                    ", ".join(f"'{s}'" for s in unknown)
                 )
             )
+            return
+        if style == current and sorted(wanted) == sorted(others):
+            return
+
+        def save():
+            if style != current:
+                self._check(self.gs.set_default_layer_style(name, ws_name, style))
+            if sorted(wanted) != sorted(others):
+                from geoservercloud.models.layer import Layer
+
+                self._check(
+                    self.gs.rest_service.update_layer(
+                        Layer(name=name, styles=[{"name": s} for s in wanted]), ws_name
+                    )
+                )
+
+        if self._run_action(
+            lambda: self._wait_for(save),
+            translate("LayerTabMixin", "Failed to set the styles of '{}'").format(name),
+        ):
+            self.show_success_message(
+                translate("LayerTabMixin", "Styles of '{}' saved.").format(name)
+            )
+            self._load_layers()
+
+    @staticmethod
+    def _wire_style_picker(dlg):
+        """Picking a style appends it to the other styles, then resets."""
+        combo, text = dlg.get_widget("add_other"), dlg.get_widget("others")
+
+        def append(picked):
+            if not picked:
+                return
+            lines = [line for line in text.toPlainText().splitlines() if line.strip()]
+            if picked not in lines:
+                text.setPlainText("\n".join(lines + [picked]))
+            combo.blockSignals(True)
+            combo.setCurrentIndex(0)
+            combo.blockSignals(False)
+
+        combo.currentTextChanged.connect(append)
 
     # -- Style from QGIS -------------------------------------------------------
 

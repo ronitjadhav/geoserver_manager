@@ -124,6 +124,13 @@
       "status": "custom",
       "asset": "icons/push-style.svg"
     },
+    "update-from-source": {
+      "label": "Update from the data",
+      "category": "Layer actions",
+      "purpose": "A clockwise arrow around a small database: GeoServer re-reads the data behind a layer and recomputes its bounds.",
+      "status": "custom",
+      "asset": "icons/update-from-source.svg"
+    },
     "apply-style": {
       "label": "Apply style to QGIS",
       "category": "Styles",

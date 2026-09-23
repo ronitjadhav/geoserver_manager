@@ -422,8 +422,8 @@ class TestEveryLayerType(unittest.TestCase):
         self.assertEqual(form.get_widget("srs").text(), "EPSG:26713")
         self.assertIn("GRAY_INDEX", form.get_widget("bands").toPlainText())
         self.assertIsNone(form.get_widget("coverage"))  # the picker stays home
-        # A boolean reads Yes / No, never Python's True / False.
-        self.assertIn(form.get_widget("enabled").text(), ("Yes", "No"))
+        self.assertIsNone(form.get_widget("cql_filter"))  # a vector's only
+        self.assertTrue(form.get_widget("enabled").isChecked())  # editable now
 
     def test_a_cascaded_layer_shows_its_remote_details(self):
         form = self.opened(self.dlg._show_layer_info, self.rows["roads_cascade"])
@@ -437,8 +437,8 @@ class TestEveryLayerType(unittest.TestCase):
         form = self.opened(self.dlg._show_layer_info, self.rows["tasmania_roads"])
         self.assertIn("the_geom", form.get_widget("attributes").toPlainText())
         self.assertEqual(form.get_widget("datastore").text(), "taz_shapes")
-        # Yes / No like the other views, and an abstract with room for prose.
-        self.assertEqual(form.get_widget("enabled").text(), "Yes")
+        # Editable flags, and an abstract with room for prose.
+        self.assertTrue(form.get_widget("enabled").isChecked())
         self.assertTrue(hasattr(form.get_widget("abstract"), "toPlainText"))
 
     def test_add_to_qgis_offers_wfs_only_for_vectors(self):
@@ -1018,6 +1018,169 @@ class TestBatchPublish(unittest.TestCase):
         self.assertIn("same GeoServer name: A", self.warnings[0])
 
 
+class TestEditLayer(unittest.TestCase):
+    """Wave 1: a layer is edited here, not in GeoServer's web UI."""
+
+    BEFORE = {
+        "name": "roads",
+        "title": "Roads",
+        "abstract": "",
+        "keywords": "a, b",
+        "srs": "EPSG:4326",
+        "projection_policy": "FORCE_DECLARED",
+        "enabled": True,
+        "advertised": True,
+        "cql_filter": "",
+    }
+
+    def changes(self, kind=tab_layers.VECTOR, **after):
+        return GeoServerMainDialog._layer_changes(
+            self.BEFORE, dict(self.BEFORE, **after), kind
+        )
+
+    def test_an_untouched_form_sends_nothing(self):
+        self.assertEqual(self.changes(), (None, False))
+        # the same keywords written differently are the same keywords
+        self.assertEqual(self.changes(keywords="a,b "), (None, False))
+
+    def test_only_what_changed_goes_out_in_geoservers_spelling(self):
+        body, recalc = self.changes(
+            name="main_roads", title="", advertised=False, cql_filter="type = 'A'"
+        )
+        self.assertEqual(
+            body,
+            {
+                "name": "main_roads",
+                "title": "",
+                "advertised": False,
+                "cqlFilter": "type = 'A'",
+            },
+        )
+        self.assertFalse(recalc)
+
+    def test_emptied_keywords_are_sent_empty_which_clears_them(self):
+        body, _ = self.changes(keywords="")
+        self.assertEqual(body, {"keywords": {"string": []}})
+
+    def test_a_new_srs_is_normalised_and_recomputes_the_bounds(self):
+        body, recalc = self.changes(srs="25832")
+        self.assertEqual(body, {"srs": "EPSG:25832"})
+        self.assertTrue(recalc)
+        _body, recalc = self.changes(projection_policy="REPROJECT_TO_DECLARED")
+        self.assertTrue(recalc)
+
+    def test_a_raster_has_no_cql_filter(self):
+        self.assertEqual(self.changes(tab_layers.RASTER, cql_filter="x"), (None, False))
+
+    def dialog(self, taken=()):
+        dlg = SyncDialog()
+        dlg.gs = _EditFakeGS()
+        sent = []
+
+        def raw_rest(method, path, **kwargs):
+            sent.append((method, path, kwargs))
+            if method == "get":
+                if any(path.endswith(f":{name}.json") for name in taken):
+                    return None
+                raise RuntimeError("HTTP 404")
+            return None
+
+        dlg._raw_rest = raw_rest
+        return dlg, sent
+
+    def test_save_is_one_merging_put_on_the_resource(self):
+        dlg, sent = self.dialog()
+        row = ["roads", "topp", tab_layers.VECTOR, "pg", "line"]
+        dlg._save_layer(row, self.BEFORE, dict(self.BEFORE, title="Main", srs="3857"))
+        ((method, path, kwargs),) = sent
+        self.assertEqual(method, "put")
+        self.assertEqual(
+            path, "/rest/workspaces/topp/datastores/pg/featuretypes/roads.json"
+        )
+        self.assertEqual(
+            kwargs["json"], {"featureType": {"title": "Main", "srs": "EPSG:3857"}}
+        )
+        self.assertEqual(kwargs["params"], {"recalculate": "nativebbox,latlonbbox"})
+
+    def test_a_raster_saves_under_coverage(self):
+        dlg, sent = self.dialog()
+        row = ["dem", "sf", tab_layers.RASTER, "sfdem", "raster"]
+        dlg._save_layer(
+            row,
+            dict(self.BEFORE, name="dem"),
+            dict(self.BEFORE, name="dem", enabled=False),
+        )
+        ((_m, path, kwargs),) = sent
+        self.assertEqual(
+            path, "/rest/workspaces/sf/coveragestores/sfdem/coverages/dem.json"
+        )
+        self.assertEqual(kwargs["json"], {"coverage": {"enabled": False}})
+        self.assertIsNone(kwargs["params"])
+
+    def test_a_rename_to_a_taken_name_is_refused_before_the_put(self):
+        dlg, sent = self.dialog(taken=("streets",))
+        with self.assertRaises(ValueError) as ctx:
+            dlg._save_layer(
+                ["roads", "topp", tab_layers.VECTOR, "pg", "line"],
+                self.BEFORE,
+                dict(self.BEFORE, name="streets"),
+            )
+        self.assertIn("already exists", str(ctx.exception))
+        self.assertEqual([m for m, _p, _k in sent], ["get"])
+
+    def test_a_bad_srs_is_refused_before_the_put(self):
+        dlg, sent = self.dialog()
+        with self.assertRaises(ValueError):
+            dlg._save_layer(
+                ["roads", "topp", tab_layers.VECTOR, "pg", "line"],
+                self.BEFORE,
+                dict(self.BEFORE, srs="Lambert"),
+            )
+        self.assertEqual(sent, [])
+
+    def test_update_from_the_data_resets_then_recomputes(self):
+        dlg, sent = self.dialog()
+        dlg.show_success_message = lambda text: None
+        dlg._update_layer_from_source(
+            ["roads", "topp", tab_layers.VECTOR, "pg", "line"]
+        )
+        self.assertEqual(
+            [(m, p) for m, p, _k in sent],
+            [
+                (
+                    "post",
+                    "/rest/workspaces/topp/datastores/pg/featuretypes/roads/reset",
+                ),
+                ("put", "/rest/workspaces/topp/datastores/pg/featuretypes/roads.json"),
+            ],
+        )
+        self.assertEqual(sent[1][2]["params"], {"recalculate": "nativebbox,latlonbbox"})
+
+    def test_update_from_the_data_says_why_not_for_a_cascaded_layer(self):
+        dlg, sent = self.dialog()
+        warnings = []
+        dlg.show_warning_message = warnings.append
+        dlg._update_layer_from_source(["tiles", "topp", tab_layers.WMTS, "wmts", "-"])
+        self.assertEqual(sent, [])
+        self.assertIn("cascaded", warnings[0])
+
+
+class _EditFakeGS:
+    class rest_service:
+        class rest_endpoints:
+            base_url = "/rest"
+
+            @staticmethod
+            def featuretype(ws, ds, name):
+                return f"/rest/workspaces/{ws}/datastores/{ds}/featuretypes/{name}.json"
+
+            @staticmethod
+            def coverage(ws, cs, name):
+                return (
+                    f"/rest/workspaces/{ws}/coveragestores/{cs}/coverages/{name}.json"
+                )
+
+
 class TestSetLayerStyle(unittest.TestCase):
     """The default style is read from the layer and written through the library."""
 
@@ -1026,19 +1189,30 @@ class TestSetLayerStyle(unittest.TestCase):
         outer = self
         self.set_calls = []
 
+        self.update_calls = []
+
         class LayerModel:
             def asdict(inner):
-                return {"name": "tasmania_roads", "defaultStyle": "simple_roads"}
+                return {
+                    "name": "tasmania_roads",
+                    "defaultStyle": "simple_roads",
+                    "styles": {"style": [{"name": "population"}]},
+                }
 
         class Rest:
             def get_layer(inner, ws, name):
                 return (LayerModel(), 200)
+
+            def update_layer(inner, layer, ws):
+                outer.update_calls.append((ws, layer.put_payload()["layer"]))
+                return ("", 200)
 
         class GS(FakeGS):
             def __init__(inner):
                 super().__init__()
                 # keep the base's client and endpoints; add the layer getter
                 inner.rest_service.get_layer = Rest().get_layer
+                inner.rest_service.update_layer = Rest().update_layer
 
             def get_styles(inner, workspace_name=None):
                 if workspace_name is None:
@@ -1060,9 +1234,72 @@ class TestSetLayerStyle(unittest.TestCase):
         )
 
     def test_current_default_is_read_from_the_layer(self):
+        default, others = self.dlg._layer_styles("topp", "tasmania_roads")
+        self.assertEqual(default, "simple_roads")
+        self.assertEqual(others, ["population"])
+
+    def run_form(self, **edits):
+        from unittest.mock import patch
+
+        from qgis.PyQt.QtWidgets import QDialog
+
+        from geoserver_manager.gui import tab_layers
+        from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+
+        opened = []
+
+        class Editing(ResourceFormDialog):
+            def exec(inner):
+                opened.append(inner)
+                for key, value in edits.items():
+                    widget = inner.get_widget(key)
+                    if hasattr(widget, "setPlainText"):
+                        widget.setPlainText(value)
+                    else:
+                        widget.setCurrentText(value)
+                return QDialog.DialogCode.Accepted
+
+        with patch.object(tab_layers, "ResourceFormDialog", Editing):
+            self.dlg._set_layer_style(
+                ["tasmania_roads", "topp", "VECTOR", "taz_shapes", "simple_roads"]
+            )
+        return opened[0]
+
+    def test_the_other_styles_are_listed_and_written_through_the_library(self):
+        form = self.run_form(others="population\ntopp:roads_ws")
+        self.assertEqual(self.set_calls, [])  # the default did not change
         self.assertEqual(
-            self.dlg._layer_default_style("topp", "tasmania_roads"), "simple_roads"
+            self.update_calls,
+            [
+                (
+                    "topp",
+                    {
+                        "name": "tasmania_roads",
+                        "styles": {
+                            "style": [{"name": "population"}, {"name": "topp:roads_ws"}]
+                        },
+                    },
+                )
+            ],
         )
+        self.assertIn("population", form.get_widget("others").toPlainText())
+
+    def test_the_picker_appends_to_the_list(self):
+        form = self.run_form(add_other="topp:roads_ws")
+        self.assertEqual(
+            form.get_widget("others").toPlainText(), "population\ntopp:roads_ws"
+        )
+
+    def test_an_unknown_style_is_refused_and_nothing_is_written(self):
+        errors = []
+        self.dlg.show_error_message = errors.append
+        self.run_form(others="no_such_style")
+        self.assertIn("no_such_style", errors[0])
+        self.assertEqual((self.set_calls, self.update_calls), ([], []))
+
+    def test_an_unchanged_form_writes_nothing(self):
+        self.run_form()
+        self.assertEqual((self.set_calls, self.update_calls), ([], []))
 
     def test_dialog_preselects_the_current_style(self):
         from unittest.mock import patch
@@ -1121,6 +1358,7 @@ class TestSetLayerStyle(unittest.TestCase):
                 "Preview in a browser",
                 "Set style",
                 "Push style from QGIS",
+                "Update from the data",
                 "Delete",
             ],
         )

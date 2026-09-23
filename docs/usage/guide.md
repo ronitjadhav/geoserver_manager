@@ -190,8 +190,9 @@ instead, because rasters are uploaded as they are: reproject it in QGIS first.
 | Layers with a plus | **Add to QGIS** | Load the layer as WMS, WMTS or (for a vector) WFS. The password never lands in the project file. |
 | Eye | **Preview** | Show the layer on a map inside QGIS, without adding it to the project. |
 | Browser with an arrow | **Preview in a browser** | Open GeoServer's own preview page on the layer's extent. |
-| Brush | **Set style** | Pick the default style from the server's styles. |
+| Brush | **Set style** | Pick the default style, and the other styles a client may ask for. |
 | Brush with an up arrow | **Push style from QGIS** | Upload a project layer's symbology and make it the default. |
+| Arrow around a database | **Update from the data** | After the table gained a column or the file was replaced: GeoServer re-reads the data and recomputes the bounds. |
 | Bin | **Delete** | Remove the layer, after confirmation. |
 
 The first two are buttons; the rest are in the **More** menu.
@@ -203,15 +204,31 @@ The first two are buttons; the rest are in the **More** menu.
 **Preview**: drag to pan, scroll to zoom, click a feature for its attributes.
 ```
 
-### Layer details
+### Edit a layer
 
-Click a layer's name to see its details. They are read-only here; change them
-in GeoServer's web interface.
+Click a layer's name to edit it. The first tab holds what you can change:
+
+- **Layer name**: renaming keeps the data, and GeoServer updates the layer
+  groups and the tile cache that use it. Clients that ask for the old name
+  stop finding it.
+- **Title**, **Abstract** and **Keywords**: what the capabilities show.
+- **SRS** and **Projection policy**: changing either recomputes the bounds.
+- **Enabled**: off stops GeoServer serving the layer, and keeps it.
+- **Advertised**: off leaves it out of the capabilities, but it is still
+  served to whoever names it.
+- **CQL filter** (vector layers): only matching features are served.
+
+*Save* sends only what you changed, so everything else the layer has stays as
+it is. The *Data* tab shows the native name, store, bounds and attributes (or
+a raster's size and bands).
 
 ```{figure} ../static/screenshots/layer-details.png
-:alt: The details of the states layer, with its native name, workspace, datastore, SRS and title
+:alt: The edit form of the states layer, with its name, title, abstract, keywords, SRS, projection policy and the enabled and advertised flags
 :width: 420px
 ```
+
+A cascaded layer stays read-only: GeoServer's REST API cannot change one, so
+its web interface is the place for that.
 
 ## Layer groups
 
