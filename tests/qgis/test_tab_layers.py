@@ -13,6 +13,7 @@ Usage from the repo root folder:
 
 # standard library
 import shutil
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -23,7 +24,12 @@ from qgis.testing import start_app, unittest
 from geoserver_manager.gui import tab_layers
 from geoserver_manager.gui.dlg_main import GeoServerMainDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.toolbelt.dependencies import BUNDLED_WHLS
 from tests.qgis.sync_dialog import SyncDialog
+
+for _whl in BUNDLED_WHLS:  # conftest does this under pytest; unittest needs it too
+    if str(_whl) not in sys.path:
+        sys.path.insert(0, str(_whl))
 
 start_app()
 
@@ -687,16 +693,17 @@ class PublishFakeGS(FakeGS):
             rest_client = Client()
             rest_endpoints = Endpoints()
 
+            def create_feature_type(inner, feature_type):
+                # What GeoServer would receive: the real model's payload.
+                outer.created.append(feature_type.post_payload()["featureType"])
+                return ("", 201)
+
         self.rest_service = Rest()
 
     def get_feature_type(self, ws, ds, name):
         if name == "plugin_demo":
             return ("<html>Not Found</html>", 404)  # free
         return ({"name": name}, 200)  # taken
-
-    def create_feature_type(self, **kwargs):
-        self.created.append(kwargs)
-        return ("", 201)
 
 
 class TestPublish(unittest.TestCase):
@@ -759,7 +766,7 @@ class TestPublish(unittest.TestCase):
                 "keywords": "",
             }
         )
-        self.assertEqual(self.dlg.gs.created[-1]["epsg"], 3857)
+        self.assertEqual(self.dlg.gs.created[-1]["srs"], "EPSG:3857")
 
     def test_publish_sends_what_the_form_collected(self):
         self.dlg._publish_table(
@@ -774,13 +781,31 @@ class TestPublish(unittest.TestCase):
             }
         )
         sent = self.dlg.gs.created[0]
-        self.assertEqual(sent["layer_name"], "plugin_demo")
-        self.assertEqual(sent["workspace_name"], "topp")
-        self.assertEqual(sent["datastore_name"], "pg")
-        self.assertEqual(sent["epsg"], 2056)
+        self.assertEqual(sent["name"], "plugin_demo")
+        self.assertEqual(sent["store"], {"name": "topp:pg"})
+        self.assertEqual(sent["srs"], "EPSG:2056")
         self.assertEqual(sent["title"], "Demo")
-        self.assertIsNone(sent["abstract"])  # empty stays None, not ""
-        self.assertEqual(sent["keywords"], ["a", "b", "c"])
+        self.assertNotIn("abstract", sent)  # empty is not sent, not ""
+        self.assertEqual(sent["keywords"], {"string": ["a", "b", "c"]})
+
+    def test_any_epsg_code_publishes_and_geoserver_computes_the_extent(self):
+        """The library's own call raised KeyError for any code but 2056, 4326
+        and 3857, and gave those a world bounding box."""
+        self.dlg._publish_table(
+            {
+                "workspace": "topp",
+                "datastore": "pg",
+                "table": "plugin_demo",
+                "epsg": 25832,
+                "title": "",
+                "abstract": "",
+                "keywords": "",
+            }
+        )
+        sent = self.dlg.gs.created[0]
+        self.assertEqual(sent["srs"], "EPSG:25832")
+        self.assertNotIn("nativeBoundingBox", sent)
+        self.assertNotIn("latLonBoundingBox", sent)
 
     def test_publish_refuses_an_existing_layer(self):
         with self.assertRaises(ValueError) as ctx:
