@@ -949,7 +949,21 @@ class TestBackgroundLoading(unittest.TestCase):
         task = self.dlg._task
         self.dlg.close()
 
-        spin_until(lambda: task.isCanceled() and self.dlg._task is task)
+        # Wait for the task itself to end. Waiting for it to be cancelled *and*
+        # still parked in the slot timed out (20 s) whenever it had finished and
+        # freed the slot first, which is the normal case.
+        from qgis.core import QgsTask
+
+        done = (QgsTask.TaskStatus.Complete, QgsTask.TaskStatus.Terminated)
+
+        def ended():
+            try:
+                return task.status() in done
+            except RuntimeError:  # the task manager deleted it: it has ended
+                return True
+
+        spin_until(ended, timeout_ms=5000)
+        self.assertTrue(ended())
         self.assertTrue(self.dlg._closing)
         self.assertEqual(self.dlg._all_rows, [])
         self.assertEqual(self.warnings, [])  # not even a banner

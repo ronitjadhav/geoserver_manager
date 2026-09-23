@@ -28,8 +28,9 @@ one of them unnecessary usually has not understood it yet. The
    trip, and stopped doing so with a wrong plaintext). So on edit the field is blank. Blank means **keep** (the stored
    value is sent back) and typed means **replace**. The encryption is randomised: the same plaintext saves as a
    different `crypt1:` value every time, so ciphertexts cannot be compared.
-6. **No rename for datastores** (`name` is read-only in edit mode). A rename would upsert: duplicate the
-   store, or overwrite whatever holds the new name.
+6. **A datastore rename is one PUT on the old path.** Saving through `create_datastore` under the new name
+   would upsert: duplicate the store, or overwrite whatever holds the new name. `_rename_datastore` refuses a
+   taken name before any request, then the save goes to the new name.
 7. **Delete confirmations name the cascade.** Both delete paths send `recurse=true`.
 8. **`isVisible()` lies on inactive tab pages.** `ResourceFormDialog` tracks hidden fields in
    `_hidden_keys`; validation uses that, not Qt, and switches to the tab holding the offending field.
