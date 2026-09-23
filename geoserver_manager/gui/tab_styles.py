@@ -17,6 +17,7 @@ from qgis.PyQt.QtWidgets import QDialog, QFileDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.scope import GLOBAL, scope
+from geoserver_manager.toolbelt.payload import unwrap
 from geoserver_manager.toolbelt.sld import (
     SLD_1_0,
     apply_sld_to_layer,
@@ -30,11 +31,27 @@ from geoserver_manager.toolbelt.sld import (
 # Styles live either globally or inside a workspace; the label for the global
 # scope and the mapping back to None are shared with layer groups (gui.scope).
 
-# Formats whose body the library can PUT back (rest_service.create_style).
-# Anything else (css, …) is shown read-only.
-_EDITABLE_FORMATS = ("sld", "mbstyle")
+# The content type GeoServer reads each format's body in. CSS, YSLD and
+# MBStyle need their GeoServer extension; without it GeoServer answers "No such
+# style handler", which the banner shows as it is.
+_CONTENT_TYPES = {
+    "sld": SLD_1_0,
+    "css": "application/vnd.geoserver.geocss+css",
+    "ysld": "application/vnd.geoserver.ysld+yaml",
+    "mbstyle": "application/vnd.geoserver.mbstyle+json",
+}
+_EDITABLE_FORMATS = tuple(_CONTENT_TYPES)
+# A file's format, from its extension; .zip stays the library's job.
+_FORMAT_OF_SUFFIX = {
+    ".sld": "sld",
+    ".css": "css",
+    ".ysld": "ysld",
+    ".yaml": "ysld",
+    ".mbstyle": "mbstyle",
+    ".json": "mbstyle",
+}
 
-_SOURCE_PASTE = "Paste SLD"
+_SOURCE_PASTE = "Paste"
 _SOURCE_FILE = "From file"
 _SOURCE_QGIS = "From a QGIS layer"
 
@@ -84,6 +101,25 @@ class StyleTabMixin:
                 translate(
                     "StyleTabMixin",
                     "Write the style's body (SLD, CSS or MBStyle) to a file",
+                ),
+            ),
+            (
+                "copy-style",
+                translate("StyleTabMixin", "Copy"),
+                self._copy_style,
+                translate(
+                    "StyleTabMixin",
+                    "Copy the style under another name, or into another workspace",
+                ),
+            ),
+            (
+                # Not browse-resources: that one is a quick button in the row.
+                "layers",
+                translate("StyleTabMixin", "Used by"),
+                self._show_style_users,
+                translate(
+                    "StyleTabMixin",
+                    "The layers and layer groups that use this style",
                 ),
             ),
             (
@@ -172,19 +208,12 @@ class StyleTabMixin:
         )
 
     def _sld_of(self, name, workspace_name, label=None):
-        """A style's SLD, what QGIS reads; ValueError for any other format.
+        """A style's SLD, what QGIS reads. Runs in a worker.
 
-        Refused here rather than handed to QGIS to fail on. Runs in a worker;
-        the layer tree's Apply style goes through it too.
+        A CSS, YSLD or MBStyle style comes back as GeoServer's own conversion:
+        its `.sld` path renders any format as SLD (measured on 2.28.5). The
+        layer tree's Apply style goes through here too.
         """
-        definition = self._check(self.gs.get_style_definition(name, workspace_name))
-        style_format = self._style_format(definition)
-        if style_format != "sld":
-            raise ValueError(
-                translate(
-                    "StyleTabMixin", "'{}' is a {} style. QGIS can only read SLD."
-                ).format(label or name, style_format.upper())
-            )
         return self._style_body(name, workspace_name, "sld")
 
     def _style_body(self, name, workspace_name, style_format):
@@ -208,10 +237,20 @@ class StyleTabMixin:
         if style_format == "sld":
             self._put_sld_body(name, workspace_name, body)
             return
-        self._check(
-            self.gs.rest_service.create_style(
-                name, body.encode("utf-8"), workspace_name, format=style_format
+        if style_format == "mbstyle":
+            self._check(
+                self.gs.rest_service.create_style(
+                    name, body.encode("utf-8"), workspace_name, format=style_format
+                )
             )
+            return
+        # TODO(#50): create_style() knows no CSS or YSLD content type, and
+        # fails with UnboundLocalError on them (row 58).
+        self._raw_rest(
+            "put",
+            self._style_path(name, workspace_name, style_format),
+            data=body.encode("utf-8"),
+            headers={"Content-Type": _CONTENT_TYPES[style_format]},
         )
 
     def _put_sld_body(self, name, workspace_name, sld):
@@ -289,7 +328,8 @@ class StyleTabMixin:
                     if editable
                     else translate(
                         "StyleTabMixin",
-                        "Read-only: only SLD and MBStyle bodies can be saved here.",
+                        "Read-only: only SLD, CSS, YSLD and MBStyle bodies can be "
+                        "saved here.",
                     )
                 ),
             },
@@ -298,7 +338,11 @@ class StyleTabMixin:
                 "group": translate("StyleTabMixin", "Details"),
                 "label": translate("StyleTabMixin", "Style Name"),
                 "type": "text",
-                "read_only": True,
+                "required": True,
+                "help": translate(
+                    "StyleTabMixin",
+                    "Renaming keeps every layer and group that uses the style.",
+                ),
             },
             {
                 "key": "workspace",
@@ -397,15 +441,49 @@ class StyleTabMixin:
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
-        new_body = dlg.get_values()["body"]
-        if new_body == body.strip():
+        values = dlg.get_values()
+        new_body, new_name = values["body"], values["name"].strip()
+        if new_body == body.strip() and new_name == name:
             return
+
+        def save():
+            if new_body != body.strip():
+                self._save_style_body(name, workspace_name, style_format, new_body)
+            if new_name != name:
+                self._rename_style(name, workspace_name, new_name)
+
         if self._run_action(
-            lambda: self._save_style_body(name, workspace_name, style_format, new_body),
+            save,
             translate("StyleTabMixin", "Failed to save style '{}'").format(name),
         ):
             self.show_success_message(
-                translate("StyleTabMixin", "Style '{}' saved.").format(name)
+                translate("StyleTabMixin", "Style '{}' saved.").format(new_name)
+            )
+            if new_name != name:
+                self._load_styles()
+
+    def _rename_style(self, name, workspace_name, new_name):
+        """Rename a style in place. Layers and groups keep using it.
+
+        Measured on 2.28.5: a PUT of the new name on the definition renames the
+        style and its references follow, since GeoServer links them by id.
+        TODO(#50): no rename in the library (row 58).
+        """
+        self._require_safe_name(new_name)
+        self._refuse_taken_style(new_name, workspace_name)
+        self._raw_rest(
+            "put",
+            self._style_path(name, workspace_name, "json"),
+            json={"style": {"name": new_name}},
+        )
+
+    def _refuse_taken_style(self, name, workspace_name):
+        """Raise when the scope already has a style of that name."""
+        if self._resource_exists(self.gs.get_style_definition, name, workspace_name):
+            raise ValueError(
+                translate("StyleTabMixin", "Style '{}' already exists in {}.").format(
+                    name, workspace_name or GLOBAL
+                )
             )
 
     # -- Legend ----------------------------------------------------------------
@@ -531,12 +609,23 @@ class StyleTabMixin:
                 "options": [_SOURCE_PASTE, _SOURCE_FILE, _SOURCE_QGIS],
             },
             {
+                "key": "format",
+                "label": translate("StyleTabMixin", "Format"),
+                "type": "combo",
+                "options": [style_format.upper() for style_format in _CONTENT_TYPES],
+                "help": translate(
+                    "StyleTabMixin",
+                    "CSS, YSLD and MBStyle need their GeoServer extension",
+                ),
+            },
+            {
                 "key": "sld",
-                "label": translate("StyleTabMixin", "SLD"),
+                "label": translate("StyleTabMixin", "Style"),
                 "type": "textarea",
                 "required": True,
+                "code": True,
                 "placeholder": translate(
-                    "StyleTabMixin", "Paste the SLD document here"
+                    "StyleTabMixin", "Paste the style document here"
                 ),
             },
             {
@@ -545,10 +634,14 @@ class StyleTabMixin:
                 "type": "file",
                 "required": True,
                 "visible": False,
-                "filter": "Styles (*.sld *.zip *.mbstyle);;All files (*)",
+                "filter": (
+                    "Styles (*.sld *.zip *.css *.ysld *.yaml *.mbstyle *.json);;"
+                    "All files (*)"
+                ),
                 "help": translate(
                     "StyleTabMixin",
-                    ".sld, a .zip with an SLD and its resources, or .mbstyle",
+                    ".sld, a .zip with an SLD and its resources, .css, .ysld or "
+                    ".mbstyle",
                 ),
             },
             {
@@ -568,6 +661,7 @@ class StyleTabMixin:
 
     def _on_style_source_changed(self, dlg, source):
         dlg.set_field_visible("sld", source == _SOURCE_PASTE)
+        dlg.set_field_visible("format", source == _SOURCE_PASTE)
         dlg.set_field_visible("file", source == _SOURCE_FILE)
         dlg.set_field_visible("qgis_layer", source == _SOURCE_QGIS)
 
@@ -583,8 +677,8 @@ class StyleTabMixin:
             title=translate("StyleTabMixin", "Upload a Style"),
             description=translate(
                 "StyleTabMixin",
-                "Create a style from an SLD you paste, a file you pick, or the "
-                "symbology of a layer in this QGIS project.",
+                "Create a style from a document you paste, a file you pick, or "
+                "the symbology of a layer in this QGIS project.",
             ),
             fields=self._upload_fields(workspace_names),
             parent=self,
@@ -615,31 +709,47 @@ class StyleTabMixin:
         name, workspace_name = values["name"].strip(), scope(values["workspace"])
         self._require_safe_name(name)
         # create_style_* upsert (and rewrite the definition's filename)
-        if self._resource_exists(self.gs.get_style_definition, name, workspace_name):
-            raise ValueError(
-                translate("StyleTabMixin", "Style '{}' already exists in {}.").format(
-                    name, values["workspace"] or GLOBAL
-                )
-            )
+        self._refuse_taken_style(name, workspace_name)
         source = values.get("source")
         if source == _SOURCE_FILE:
             path = Path(values["file"])
-            if path.suffix.lower() != ".sld":
-                # A .zip carries an SLD plus its resources and an .mbstyle is
-                # not SLD at all: both are the library's job, untouched.
+            style_format = _FORMAT_OF_SUFFIX.get(path.suffix.lower())
+            if style_format is None:
+                # A .zip carries an SLD plus its resources: the library's job.
                 self._check(
                     self.gs.create_style_from_file(name, str(path), workspace_name)
                 )
                 return
-            self._create_sld_style(
-                name, workspace_name, path.read_text(encoding="utf-8")
+            self._create_style(
+                name, workspace_name, style_format, path.read_text(encoding="utf-8")
             )
         elif source == _SOURCE_QGIS:
             self._create_sld_style(
                 name, workspace_name, layer_to_sld(self._picked_layer(values))
             )
         else:
-            self._create_sld_style(name, workspace_name, values["sld"])
+            style_format = (values.get("format") or "sld").lower()
+            self._create_style(name, workspace_name, style_format, values["sld"])
+
+    def _create_style(self, name, workspace_name, style_format, body):
+        """Create a style of any format from its body.
+
+        TODO(#50): create_style_from_string() is SLD 1.0 only (row 58). Other
+        formats POST to the collection with their content type, which creates
+        the definition and the body at once; a PUT would be refused (400).
+        """
+        if style_format == "sld":
+            self._create_sld_style(name, workspace_name, body)
+            return
+        collection = self._style_path(name, workspace_name, "json")
+        collection = collection.rsplit("/", 1)[0] + ".json"
+        self._raw_rest(
+            "post",
+            collection,
+            params={"name": name},
+            data=body.encode("utf-8"),
+            headers={"Content-Type": _CONTENT_TYPES[style_format]},
+        )
 
     def _create_sld_style(self, name, workspace_name, sld):
         """Create the style definition, then upload the body as its version."""
@@ -658,10 +768,9 @@ class StyleTabMixin:
     # -- QGIS <-> GeoServer ----------------------------------------------------
 
     def _sld_for_qgis(self, row_data):
-        """One style's SLD body, or None once the reason has been reported.
+        """One style's SLD, or None once the reason has been reported.
 
-        QGIS reads SLD only, so a CSS or MBStyle style is refused here rather
-        than handed over for QGIS to fail on.
+        QGIS reads SLD only; any other format comes as GeoServer converts it.
         """
         name, workspace_name = row_data[0], scope(row_data[1])
         return self._fetch(
@@ -764,6 +873,154 @@ class StyleTabMixin:
                     name, Path(path).name
                 )
             )
+
+    # -- Copy and usage --------------------------------------------------------
+
+    def _copy_style(self, row_data):
+        """Copy a style under a new name, in its own or another workspace."""
+        name, workspace_name = row_data[0], scope(row_data[1])
+        workspace_names = self._fetch(
+            self._get_workspace_names,
+            translate("StyleTabMixin", "Failed to load the workspaces"),
+        )
+        if workspace_names is None:
+            return
+        dlg = ResourceFormDialog(
+            title=translate("StyleTabMixin", "Copy Style '{}'").format(name),
+            description=translate(
+                "StyleTabMixin",
+                "A new style with the same definition. Layers keep the original.",
+            ),
+            fields=[
+                {
+                    "key": "name",
+                    "label": translate("StyleTabMixin", "New name"),
+                    "type": "text",
+                    "required": True,
+                    "default": f"{name}_copy",
+                },
+                {
+                    "key": "workspace",
+                    "label": translate("StyleTabMixin", "Workspace"),
+                    "type": "combo",
+                    "options": [GLOBAL] + list(workspace_names),
+                    "default": row_data[1],
+                },
+            ],
+            parent=self,
+            ok_label=translate("StyleTabMixin", "Copy"),
+        )
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        values = dlg.get_values()
+        target, target_ws = values["name"].strip(), scope(values["workspace"])
+        if self._run_action(
+            lambda: self._copy_style_to(name, workspace_name, target, target_ws),
+            translate("StyleTabMixin", "Failed to copy style '{}'").format(name),
+        ):
+            self.show_success_message(
+                translate("StyleTabMixin", "Style '{}' copied to '{}'.").format(
+                    name, target
+                )
+            )
+            self._load_styles()
+
+    def _copy_style_to(self, name, workspace_name, target, target_ws):
+        """Create `target` from the body of `name`, in the same format."""
+        self._require_safe_name(target)
+        self._refuse_taken_style(target, target_ws)
+        _definition, style_format, body = self._style_with_body(name, workspace_name)
+        if style_format not in _CONTENT_TYPES:
+            raise ValueError(
+                translate("StyleTabMixin", "A {} style cannot be copied here.").format(
+                    style_format.upper()
+                )
+            )
+        self._create_style(target, target_ws, style_format, body)
+
+    def _show_style_users(self, row_data):
+        """List the layers and layer groups that use a style."""
+        name, workspace_name = row_data[0], scope(row_data[1])
+        users = self._fetch(
+            lambda: self._style_users(name, workspace_name),
+            translate("StyleTabMixin", "Failed to find what uses '{}'").format(name),
+        )
+        if users is None:
+            return
+        dlg = ResourceFormDialog(
+            title=translate("StyleTabMixin", "What Uses '{}'").format(name),
+            description=(
+                translate(
+                    "StyleTabMixin",
+                    "Editing the style changes all of these. Deleting it moves "
+                    "the layers to GeoServer's default style.",
+                )
+                if users
+                else translate("StyleTabMixin", "No layer or group uses this style.")
+            ),
+            fields=[
+                {
+                    "key": "users",
+                    "label": translate("StyleTabMixin", "Used by"),
+                    "type": "textarea",
+                    "read_only": True,
+                }
+            ],
+            values={"users": "\n".join(users)},
+            parent=self,
+        )
+        dlg.hide_save_button()
+        dlg.exec()
+
+    def _style_users(self, name, workspace_name):
+        """Every layer and group using the style, with how. Runs in a worker.
+
+        GeoServer has no endpoint for this, so every layer and group is read:
+        one GET each, fanned out. A layer names a workspace style "ws:name".
+        """
+        reference = f"{workspace_name}:{name}" if workspace_name else name
+        users = []
+        layers = self._all_layer_names()
+        for layer, (payload, error) in zip(
+            layers,
+            self._fan_out(
+                lambda qualified: self._raw_rest("get", self._layers_url(qualified))
+                .json()
+                .get("layer", {}),
+                layers,
+                None,
+            ),
+        ):
+            if error:
+                # Said, not skipped: a short list would read as "safe to edit".
+                users.append(
+                    translate("StyleTabMixin", "{} (could not be read: {})").format(
+                        layer, self._error_text(error)
+                    )
+                )
+                continue
+            payload = payload or {}
+            if (payload.get("defaultStyle") or {}).get("name") == reference:
+                users.append(
+                    translate("StyleTabMixin", "{} (default style)").format(layer)
+                )
+            elif reference in (
+                style.get("name")
+                for style in unwrap(payload, "styles", "style")
+                if isinstance(style, dict)
+            ):
+                users.append(
+                    translate("StyleTabMixin", "{} (other style)").format(layer)
+                )
+        for group in self._all_group_names():
+            group_ws, _, bare = group.rpartition(":")
+            detail = self._group_detail(bare, group_ws or None)
+            root = (detail.get("rootLayerStyle") or {}).get("name")
+            if reference in self._group_styles(detail) or root == reference:
+                users.append(
+                    translate("StyleTabMixin", "{} (layer group)").format(group)
+                )
+        return users
 
     # -- Delete ----------------------------------------------------------------
 

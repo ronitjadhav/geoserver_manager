@@ -9,6 +9,7 @@ Usage from the repo root folder:
 """
 
 # standard library
+import tempfile
 from unittest.mock import patch
 
 from qgis.core import QgsProject
@@ -57,6 +58,10 @@ class FakeGS:
 
             def put(inner, path, **kwargs):
                 outer.calls.append(("PUT", path, kwargs))
+                return Response()
+
+            def post(inner, path, **kwargs):
+                outer.calls.append(("POST", path, kwargs))
                 return Response()
 
             def delete(inner, path, **kwargs):
@@ -198,13 +203,23 @@ class TestStylesTab(unittest.TestCase):
             self.dlg.gs.calls[-1], ("PUT-body", "population", None, "sld", b"<sld/>")
         )
 
-    def test_css_dialog_is_read_only(self):
+    def test_a_css_style_is_editable_and_renamable(self):
         with patch.object(tab_styles, "ResourceFormDialog", Recording):
             self.dlg._show_style_info(["generic", GLOBAL])
         form = Recording.opened[0]
-        self.assertTrue(form.get_widget("body").isReadOnly())
-        self.assertTrue(
+        self.assertFalse(form.get_widget("body").isReadOnly())
+        self.assertFalse(form.get_widget("name").isReadOnly())
+        self.assertFalse(
             form._button_box.button(QDialogButtonBox.StandardButton.Ok).isHidden()
+        )
+
+    def test_a_css_body_is_put_with_its_own_content_type(self):
+        # The library's create_style() has no CSS content type at all.
+        self.dlg._save_style_body("generic", None, "css", "* { stroke: red; }")
+        verb, path, kwargs = self.dlg.gs.calls[-1]
+        self.assertEqual((verb, path), ("PUT", "/rest/styles/generic.css"))
+        self.assertEqual(
+            kwargs["headers"], {"Content-Type": "application/vnd.geoserver.geocss+css"}
         )
 
     def test_upload_from_a_string_sends_the_body_with_its_own_content_type(self):
@@ -212,7 +227,7 @@ class TestStylesTab(unittest.TestCase):
             {
                 "name": "brand_new",
                 "workspace": GLOBAL,
-                "source": "Paste SLD",
+                "source": "Paste",
                 "sld": SLD,
             }
         )
@@ -269,7 +284,7 @@ class TestStylesTab(unittest.TestCase):
                 {
                     "name": "population",
                     "workspace": GLOBAL,
-                    "source": "Paste SLD",
+                    "source": "Paste",
                     "sld": SLD,
                 }
             )
@@ -510,14 +525,14 @@ class TestApplyStyleToQgis(unittest.TestCase):
         self.assertEqual(target.renderer().symbol().color().name(), "#ff0000")
         self.assertIn("towns", self.messages["success"][0])
 
-    def test_a_css_style_is_refused_before_any_dialog(self):
+    def test_a_css_style_is_read_as_geoservers_sld_rendition(self):
         QgsProject.instance().addMapLayer(point_layer("towns"))
-        errors = []
-        self.dlg.show_error_message = errors.append  # the refusal names the format
         with patch.object(tab_styles, "ResourceFormDialog", Recording):
             self.dlg._apply_style_to_qgis(["generic", GLOBAL])  # the fake's CSS style
-        self.assertEqual(Recording.opened, [])
-        self.assertIn("QGIS can only read SLD", errors[0])
+        self.assertEqual(len(Recording.opened), 1)
+        self.assertIn(
+            "/rest/styles/generic.sld", [call[1] for call in self.dlg.gs.calls]
+        )
 
     def test_an_empty_project_is_a_banner_not_a_dialog(self):
         with patch.object(tab_styles, "ResourceFormDialog", Recording):
@@ -839,7 +854,7 @@ class TestNamesInPaths(unittest.TestCase):
                     {
                         "name": bad,
                         "workspace": GLOBAL,
-                        "source": "Paste SLD",
+                        "source": "Paste",
                         "sld": SLD,
                     }
                 )
@@ -863,3 +878,113 @@ class TestWording(unittest.TestCase):
         self.assertNotIn("Save as SLD", labels)
         tooltips = [action[3] for action in dlg._row_actions if len(action) > 3]
         self.assertTrue(any("layer tree" in tip for tip in tooltips), tooltips)
+
+
+class TestRenameCopyAndUsage(unittest.TestCase):
+    """Measured on 2.28.5: a PUT of the name renames a style and its users
+    follow; other formats are created by a POST with their content type."""
+
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.dlg.gs = FakeGS()
+
+    def calls(self, verb):
+        return [call for call in self.dlg.gs.calls if call[0] == verb]
+
+    def test_a_rename_is_a_put_of_the_name(self):
+        self.dlg._rename_style("population", None, "new_population")
+        ((_verb, path, kwargs),) = self.calls("PUT")
+        self.assertEqual(path, "/rest/styles/population.json")
+        self.assertEqual(kwargs["json"], {"style": {"name": "new_population"}})
+
+    def test_a_rename_onto_a_taken_name_sends_nothing(self):
+        with self.assertRaises(ValueError):
+            self.dlg._rename_style("population", None, "generic")
+        self.assertEqual(self.calls("PUT"), [])
+
+    def test_a_pasted_css_style_is_posted_with_its_content_type(self):
+        self.dlg._create_style_from_values(
+            {
+                "name": "new_css",
+                "workspace": GLOBAL,
+                "source": "Paste",
+                "format": "CSS",
+                "sld": "* { stroke: red; }",
+            }
+        )
+        ((_verb, path, kwargs),) = self.calls("POST")
+        self.assertEqual(path, "/rest/styles.json")
+        self.assertEqual(kwargs["params"], {"name": "new_css"})
+        self.assertEqual(
+            kwargs["headers"], {"Content-Type": "application/vnd.geoserver.geocss+css"}
+        )
+
+    def test_a_ysld_file_is_read_as_ysld(self):
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".yaml", delete=False, encoding="utf-8"
+        ) as handle:
+            handle.write("feature-styles: []")
+        self.dlg._create_style_from_values(
+            {
+                "name": "new_ysld",
+                "workspace": "topp",
+                "source": "From file",
+                "file": handle.name,
+            }
+        )
+        ((_verb, path, kwargs),) = self.calls("POST")
+        self.assertEqual(path, "/rest/workspaces/topp/styles.json")
+        self.assertEqual(
+            kwargs["headers"], {"Content-Type": "application/vnd.geoserver.ysld+yaml"}
+        )
+
+    def test_a_copy_keeps_the_format_and_lands_in_the_target_workspace(self):
+        self.dlg._copy_style_to("generic", None, "new_generic", "topp")
+        ((_verb, path, kwargs),) = self.calls("POST")
+        self.assertEqual(path, "/rest/workspaces/topp/styles.json")
+        self.assertEqual(kwargs["params"], {"name": "new_generic"})
+        self.assertIn("geocss", kwargs["headers"]["Content-Type"])
+
+    def test_a_copy_onto_a_taken_name_sends_nothing(self):
+        with self.assertRaises(ValueError):
+            self.dlg._copy_style_to("generic", None, "population", None)
+        self.assertEqual(self.calls("POST"), [])
+
+    def test_users_are_found_by_default_other_style_and_group(self):
+        layers = {
+            "topp:roads": {"defaultStyle": {"name": "topp:roads_style"}},
+            "topp:rivers": {
+                "defaultStyle": {"name": "line"},
+                "styles": {"style": {"name": "topp:roads_style"}},
+            },
+            "sf:streams": {"defaultStyle": {"name": "roads_style"}},  # global one
+        }
+
+        class Reply:
+            def __init__(self, payload):
+                self.payload = payload
+
+            def json(self):
+                return {"layer": self.payload}
+
+        def raw_rest(_verb, path, **_kwargs):
+            qualified = path.rsplit("/", 1)[1][: -len(".json")]
+            if qualified == "ne:broken":
+                raise RuntimeError("HTTP 500: boom")
+            return Reply(layers[qualified])
+
+        self.dlg._raw_rest = raw_rest
+        self.dlg._layers_url = lambda qualified: f"/rest/layers/{qualified}.json"
+        self.dlg._all_layer_names = lambda: [*layers, "ne:broken"]
+        self.dlg._all_group_names = lambda: ["tasmania"]
+        self.dlg._group_detail = lambda name, ws: {
+            "styles": {"style": ["", {"name": "topp:roads_style"}]}
+        }
+        users = self.dlg._style_users("roads_style", "topp")
+        self.assertEqual(
+            users[:2], ["topp:roads (default style)", "topp:rivers (other style)"]
+        )
+        # A layer that could not be read is said, never silently skipped.
+        self.assertIn("ne:broken (could not be read", users[2])
+        self.assertEqual(users[3], "tasmania (layer group)")
+        self.assertEqual(len(users), 4)

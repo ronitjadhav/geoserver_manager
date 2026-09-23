@@ -15,6 +15,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   plugin asks GeoServer to open it, and a warning gives GeoServer's reason
   when it cannot (a wrong host, password, path or URL).
 - **Reset** on datastores and coverage stores makes GeoServer re-read them.
+- **CSS and YSLD styles** can be created, edited and copied, like SLD and
+  MBStyle (each needs its GeoServer extension). *Apply to a QGIS layer*
+  reads any format, through GeoServer's own conversion to SLD.
+- **Rename a style**, keeping the layers and groups that use it. **Copy** a
+  style under a new name or into another workspace. **Used by** lists the
+  layers and groups that use a style.
 - **Edit a layer group**: its mode, title, abstract, layers, order and
   styles, its enabled and advertised flags, and an Earth Observation root
   layer. Its bounds are recomputed when the layers change, since GeoServer
@@ -318,6 +324,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- An error GeoServer reports on its HTML error page now shows GeoServer's
+  reason ("Invalid style: … (line 1, column 18)") instead of only the
+  page's title, which says nothing more than the status code.
+- The row *Actions* button is no longer clipped to its column header's width
+  in QGIS.
 - *Publish a Layer* from a table works for any EPSG code, and the layer gets
   its real extent. It used to fail before sending anything for every code but
   2056, 4326 and 3857 (a table in EPSG:25832, say), and gave those three a

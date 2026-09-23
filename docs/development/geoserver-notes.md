@@ -165,6 +165,15 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   but recorded as `languageVersion 1.0.0`; and `GET {style}.sld` returns GeoServer's **1.0 rendition** of a
   stored 1.1 document, so the editor shows converted text and says so. Exporting or applying a style touches a
   live QGIS layer, so it happens on the GUI thread before any upload (invariant 9).
+- **Other style formats, rename and usage** (row 58, measured on 2.28.5): CSS, YSLD and MBStyle each need their
+  extension; without it GeoServer answers 500 "No such style handler". Their bodies read and write at
+  `{style}.css` / `.ysld` / `.mbstyle` with their own content types, and a new one is created by a `POST` to the
+  collection with `?name=` (a `PUT` is refused, 400). `GET {style}.sld` returns any format **converted to SLD**,
+  which is how *Apply to a QGIS layer* reads a CSS or YSLD style. A bad body gets a 400 whose Tomcat page
+  carries the parser's reason in its "Message" line, which `summarise_body` keeps; a well-formed but
+  meaningless SLD is accepted, even with `validate=true`. A `PUT` of `name` renames a style, and the layers and
+  groups using it follow (they link by id; a layer names a workspace style `ws:name`). There is no endpoint
+  listing a style's users, so *Used by* reads every layer and group.
 - **Workspace WMS settings** (rows 25–26 of #50): `WmsSettings` models none of the service metadata
   (`title`, `abstrct`, `keywords`, `srs`, …) and there is no delete, so `tab_workspaces.py` GETs, PUTs and
   DELETEs the settings path itself. GeoServer facts behind that code: the abstract's JSON key is **`abstrct`**;
