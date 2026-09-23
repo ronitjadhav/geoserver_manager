@@ -131,8 +131,9 @@ store, the coverage and the layer in one request. Tick *Replace it if it
 already exists* to overwrite an earlier upload. A layer without an EPSG code
 is refused before anything is sent.
 
-Row actions: **Coverages** lists what a store contains. **Publish a coverage**
-turns one of them into a layer.
+Row actions: **Coverages** lists the coverages a store publishes, with their
+details. **Publish a coverage** turns one it holds but does not publish yet
+into a layer.
 
 ## Cascaded stores
 
@@ -140,14 +141,14 @@ A cascaded store shows another server's WMS or WMTS layers through your
 GeoServer.
 
 ```{figure} ../static/screenshots/cascaded-store-add.png
-:alt: The Add a Cascaded Store form, with type, workspace, name and capabilities URL
+:alt: The Add a Cascaded Store form, with name, workspace, type and GetCapabilities URL
 :width: 420px
 
 Adding a cascaded store: the remote server's GetCapabilities URL is all it needs.
 ```
 
-- **Add a Cascaded Store:** pick WMS or WMTS, the workspace, a name and the
-  remote GetCapabilities URL.
+- **Add a Cascaded Store:** give it a name, pick the workspace and WMS or
+  WMTS, and paste the remote GetCapabilities URL.
 - **Publish a layer:** pick one of the layers the remote server advertises.
   GeoServer reads its title, SRS and bounds from the remote capabilities.
 - **Cascaded layers:** the layers already published from this store.
@@ -178,8 +179,9 @@ Publishing a table. The *Table* list only offers tables not published yet.
 
 The upload runs as a QGIS task. The task bar shows its progress, and the
 *Refresh* button turns into *Cancel*. The layer name is made safe for
-GeoServer first: spaces and accents become `_`. A layer whose CRS has no EPSG
-code is reprojected to EPSG:4326 on the way.
+GeoServer first: spaces and accents become `_`. A vector whose CRS has no EPSG
+code is reprojected to EPSG:4326 on the way. A raster in such a CRS is refused
+instead, because rasters are uploaded as they are: reproject it in QGIS first.
 
 ### Row actions
 
@@ -250,18 +252,19 @@ Styles decide how GeoServer draws a layer.
 - **From a QGIS layer:** the layer's symbology, exported as SLD.
 
 **Click a name** to view the style, with the legend GeoServer draws for it.
-Edit the definition on the *Style* tab and save to replace it on the server.
+The dialog opens on the *Definition* tab: edit it and save to replace the
+style on the server. The *Details* tab holds its format, version and legend.
 
 ```{figure} ../static/screenshots/style-edit.png
-:alt: The style dialog for the population style, with its format, SLD version, file and rendered legend
+:alt: The style dialog for the population style, open on its SLD definition, with a Details tab beside it
 :width: 420px
 
-A style, with the legend as GeoServer renders it.
+A style opens on its definition; the legend is on the *Details* tab.
 ```
 
 Row actions: **Apply to a QGIS layer** puts the server's style on a project
-layer. **Save to disk** saves the definition. **Delete** removes the style;
-GeoServer refuses while a layer still uses it.
+layer. **Save to disk** saves the definition. **Delete** removes the style and its
+file; layers that used it fall back to GeoServer's default style.
 
 ## Tile cache
 

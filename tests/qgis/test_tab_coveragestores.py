@@ -260,6 +260,13 @@ class TestCoverageStoresTab(unittest.TestCase):
         )
         self.assertEqual(failures, [])
 
+    def test_add_without_workspaces_says_so_before_the_form(self):
+        self.dlg._get_workspace_names = lambda: []
+        with patch.object(tab_coveragestores, "ResourceFormDialog", Recording):
+            self.dlg._add_coverage_store()
+        self.assertEqual(Recording.opened, [])
+        self.assertIn("Create a workspace first", self.warnings[0])
+
     def test_a_coverage_that_cannot_be_read_leaves_the_viewer_alone(self):
         """After the error banner, blank fields must not claim Enabled: Yes."""
         self.dlg.show_error_message = lambda text: None

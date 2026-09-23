@@ -27,7 +27,11 @@ from geoserver_manager.toolbelt.qgis_export import (
     reprojection_target,
     require_crs,
 )
-from geoserver_manager.toolbelt.sld import layer_to_sld, styleable_project_layers
+from geoserver_manager.toolbelt.sld import (
+    layer_to_sld,
+    project_layer_by_label,
+    styleable_project_layers,
+)
 
 # How a GeoServer layer can be brought into QGIS. WFS gives the actual features
 # (editable, stylable in QGIS); WMS/WMTS give rendered images. WMTS goes through
@@ -303,37 +307,36 @@ class LayerTabMixin:
 
     def _layer_fields(self):
         """Field definitions for the feature-type detail view (all read-only)."""
+        # Sentence case, like the raster and cascaded views beside it; Enabled
+        # and Advertised read Yes / No there too (set in _show_layer_info).
         text = [
-            ("name", translate("LayerTabMixin", "Layer Name")),
-            ("native_name", translate("LayerTabMixin", "Native Name")),
+            ("name", translate("LayerTabMixin", "Layer name")),
+            ("native_name", translate("LayerTabMixin", "Native name")),
             ("workspace", translate("LayerTabMixin", "Workspace")),
             ("datastore", translate("LayerTabMixin", "Datastore")),
             ("srs", translate("LayerTabMixin", "SRS")),
-            ("projection_policy", translate("LayerTabMixin", "Projection Policy")),
+            ("projection_policy", translate("LayerTabMixin", "Projection policy")),
             ("title", translate("LayerTabMixin", "Title")),
             ("abstract", translate("LayerTabMixin", "Abstract")),
             ("keywords", translate("LayerTabMixin", "Keywords")),
+            ("enabled", translate("LayerTabMixin", "Enabled")),
+            ("advertised", translate("LayerTabMixin", "Advertised")),
         ]
         fields = [
-            {"key": key, "label": label, "type": "text", "read_only": True}
+            {
+                "key": key,
+                "label": label,
+                # An abstract is prose: one line cut it off after a few words.
+                "type": "textarea" if key == "abstract" else "text",
+                "max_height": 72,  # a few lines, not a gap under a short one
+                "read_only": True,
+            }
             for key, label in text
         ]
         fields += [
             {
-                "key": "enabled",
-                "label": translate("LayerTabMixin", "Enabled"),
-                "type": "checkbox",
-                "read_only": True,
-            },
-            {
-                "key": "advertised",
-                "label": translate("LayerTabMixin", "Advertised"),
-                "type": "checkbox",
-                "read_only": True,
-            },
-            {
                 "key": "bbox",
-                "label": translate("LayerTabMixin", "Native Bounding Box"),
+                "label": translate("LayerTabMixin", "Native bounding box"),
                 "type": "text",
                 "read_only": True,
                 "group": translate("LayerTabMixin", "Data"),
@@ -398,6 +401,8 @@ class LayerTabMixin:
         else:
             fields = self._layer_fields()
             values = self._layer_form_values(row_data, detail)
+            for key in ("enabled", "advertised"):
+                values[key] = self._yes_no(values[key])
             origin = translate("LayerTabMixin", "Published from {ws}/{store}.")
 
         dlg = ResourceFormDialog(
@@ -473,11 +478,14 @@ class LayerTabMixin:
             },
             {
                 "key": "epsg",
-                "label": translate("LayerTabMixin", "Declared SRS (EPSG code)"),
+                # Short: the longest label sets the width of the label column
+                # for the whole form, and this one squeezed every combo.
+                "label": translate("LayerTabMixin", "SRS (EPSG code)"),
                 "type": "text",
                 "required": True,
                 "placeholder": translate("LayerTabMixin", "e.g. 3857"),
-                "group": translate("LayerTabMixin", "Metadata"),
+                # Required, so on the first tab: on Metadata it bounced the
+                # user there after Publish.
                 "help": translate(
                     "LayerTabMixin",
                     "The SRS GeoServer declares for the layer: the table's own, as "
@@ -529,8 +537,9 @@ class LayerTabMixin:
                 "visible": False,
                 "help": translate(
                     "LayerTabMixin",
-                    "Also the name of the datastore and of the table inside it. "
-                    "Anything a WFS type name cannot carry is replaced.",
+                    "Also the name of the store it creates (and, for a vector, of "
+                    "the table inside it). Anything a layer name cannot carry is "
+                    "replaced.",
                 ),
             },
             {
@@ -569,7 +578,18 @@ class LayerTabMixin:
         ):
             dlg.set_field_visible(key, key in wanted)
         if source == _SOURCE_QGIS:
-            self._prefill_publish_name(dlg, dlg.get_widget("qgis_layer").currentText())
+            self._on_publish_layer_picked(
+                dlg, dlg.get_widget("qgis_layer").currentText()
+            )
+
+    def _on_publish_layer_picked(self, dlg, label):
+        """Suggest the name, and hide what a raster ignores (its symbology)."""
+        self._prefill_publish_name(dlg, label)
+        try:
+            raster = isinstance(project_layer_by_label(label), QgsRasterLayer)
+        except ValueError:  # nothing picked, or the layer left the project
+            raster = False
+        dlg.set_field_visible("with_style", not raster)
 
     @staticmethod
     def _prefill_publish_name(dlg, label):
@@ -653,7 +673,7 @@ class LayerTabMixin:
             lambda source: self._on_publish_source_changed(dlg, source)
         )
         dlg.get_widget("qgis_layer").currentTextChanged.connect(
-            lambda label: self._prefill_publish_name(dlg, label)
+            lambda label: self._on_publish_layer_picked(dlg, label)
         )
         self._refill_publish_combos(dlg)
         self._on_publish_source_changed(dlg, _SOURCE_TABLE)

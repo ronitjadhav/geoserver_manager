@@ -76,6 +76,54 @@ class TestResourceFormDialog(unittest.TestCase):
         self.assertTrue(dlg.result())
 
 
+class TestReadOnlyAndWideFields(unittest.TestCase):
+    """Review of 2026-09-23: read-only boxes looked editable, and a style's
+    definition sat squeezed beside its label."""
+
+    def test_a_read_only_box_reads_as_text(self):
+        from qgis.PyQt.QtWidgets import QPlainTextEdit
+
+        dlg = ResourceFormDialog(
+            title="t",
+            fields=[
+                {"key": "srs", "label": "SRS", "type": "text", "read_only": True},
+                {
+                    "key": "abstract",
+                    "label": "Abstract",
+                    "type": "textarea",
+                    "read_only": True,
+                },
+                {"key": "name", "label": "Name", "type": "text"},
+            ],
+        )
+        self.assertFalse(dlg.get_widget("srs").hasFrame())
+        self.assertEqual(
+            dlg.get_widget("abstract").frameShape(), QPlainTextEdit.Shape.NoFrame
+        )
+        self.assertTrue(dlg.get_widget("name").hasFrame())  # editable stays a box
+
+    def test_a_wide_code_field_spans_the_form_without_wrapping(self):
+        from qgis.PyQt.QtWidgets import QPlainTextEdit
+
+        dlg = ResourceFormDialog(
+            title="t",
+            fields=[
+                {
+                    "key": "body",
+                    "label": "Definition",
+                    "type": "textarea",
+                    "wide": True,
+                    "code": True,
+                }
+            ],
+        )
+        label, _row = dlg._row_widgets["body"]
+        self.assertTrue(label.isHidden())
+        self.assertEqual(
+            dlg.get_widget("body").lineWrapMode(), QPlainTextEdit.LineWrapMode.NoWrap
+        )
+
+
 # ############################################################################
 # ####### Stand-alone run ########
 # ################################

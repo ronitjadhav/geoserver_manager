@@ -37,7 +37,7 @@ from geoserver_manager.__about__ import (
     __version__,
 )
 from geoserver_manager.gui.icons import icon
-from geoserver_manager.gui.theme import status_colour
+from geoserver_manager.gui.theme import hint_colour, status_colour
 from geoserver_manager.toolbelt.log_handler import PlgLogger
 from geoserver_manager.toolbelt.preferences import (
     PlgOptionsManager,
@@ -164,7 +164,7 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
                 geoserver_auth_cfg_id=profile["auth_cfg_id"],
                 geoserver_verify_tls=profile["verify_tls"],
             )
-            self._store_connection(stored, **self._buffers[name])
+            self._store_connection(stored, profile=name, **self._buffers[name])
             self._keep(profile, stored)
         # The shown profile goes through `settings`, the connection everything
         # reads, so it becomes the active one: with its own auth config, never
@@ -182,6 +182,7 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
             settings.geoserver_auth_cfg_id = ""
         self._store_connection(
             settings,
+            profile=shown["name"] if shown else None,
             url=self.txt_gs_url.text(),
             username=self.txt_gs_username.text(),
             password=self.txt_gs_password.text(),
@@ -210,12 +211,27 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
                 log_level=Qgis.MessageLevel.NoLevel,
             )
 
-    def _store_connection(self, settings, url, username, password, verify_tls):
+    def _store_connection(
+        self, settings, url, username, password, verify_tls, profile=None
+    ):
         """Validate one profile's URL and store its credentials, into `settings`.
 
         `settings` is the active connection for the shown profile, or a
         stand-in built for another edited one; both are updated in place.
+        With more than one profile, every warning says which one it is about.
         """
+        log = self.log
+        if profile and len(self._profiles) > 1:
+            self.log = lambda message="", **kwargs: log(
+                message=self.tr("Profile '{}': {}").format(profile, message), **kwargs
+            )
+        try:
+            self._store_one_connection(settings, url, username, password, verify_tls)
+        finally:
+            self.log = log
+
+    def _store_one_connection(self, settings, url, username, password, verify_tls):
+        """The checks and the credential write of _store_connection."""
         settings.geoserver_verify_tls = verify_tls
 
         # geoserver URL (not sensitive, stored in QgsSettings)
@@ -401,7 +417,16 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         layout.addWidget(self.cmb_profile, 1)
         layout.addWidget(self.btn_profile_add)
         layout.addWidget(self.btn_profile_remove)
+        self.btn_profile_remove.setToolTip(
+            self.tr("Removes the shown profile when you save. Cancel keeps it.")
+        )
         self.formLayout.insertRow(0, QLabel(self.tr("Profile"), self), row)
+        # Which profile the dialog connects to, and what Save changes: the list
+        # alone does not say, and saving another one switches servers.
+        self.lbl_profile_note = QLabel(self)
+        self.lbl_profile_note.setWordWrap(True)
+        self.lbl_profile_note.setStyleSheet(f"color: {hint_colour(self.palette())};")
+        self.formLayout.insertRow(1, self.lbl_profile_note)
         self.cmb_profile.currentTextChanged.connect(self._on_profile_changed)
         self.btn_profile_add.clicked.connect(self._add_profile)
         self.btn_profile_remove.clicked.connect(self._remove_profile)
@@ -472,6 +497,21 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         self.txt_gs_username.setText(values["username"])
         self.txt_gs_password.setText(values["password"])
         self.opt_verify_tls.setChecked(values["verify_tls"])
+        note = self._profile_note(name)
+        self.lbl_profile_note.setText(note)
+        self.lbl_profile_note.setVisible(bool(note))  # no blank row without one
+
+    def _profile_note(self, shown) -> str:
+        active = self.plg_settings.active_profile_name()
+        if shown is None:
+            return ""
+        if shown == active:
+            return self.tr("The active profile: the dialog connects to it.")
+        if active and self._profile(active) is not None:
+            return self.tr("Active: {}. Saving makes '{}' active instead.").format(
+                active, shown
+            )
+        return self.tr("Saving makes '{}' the active profile.").format(shown)
 
     def _on_profile_changed(self, name) -> None:
         self._commit_fields()
@@ -485,8 +525,10 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         if not ok or not name:
             return
         if self._profile(name) is not None:
-            self._show_test_result(
-                self.tr("A profile named '{}' already exists.").format(name), "error"
+            QMessageBox.warning(
+                self,
+                self.tr("Add a Profile"),
+                self.tr("A profile named '{}' already exists.").format(name),
             )
             return
         typed = self._fields() if self._shown is None else None

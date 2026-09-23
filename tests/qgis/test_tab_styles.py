@@ -305,6 +305,16 @@ class TestStylesTab(unittest.TestCase):
         )
 
 
+class TestStyleDialogLayout(unittest.TestCase):
+    def test_the_definition_is_the_first_tab(self):
+        """It is the one thing the dialog edits; it hid on a second tab."""
+        fields = SyncDialog()._style_fields(editable=True)
+        self.assertEqual(fields[0]["key"], "body")
+        self.assertEqual(fields[0]["group"], "Definition")
+        self.assertTrue(fields[0]["wide"] and fields[0]["code"])
+        self.assertTrue(all(f.get("group") == "Details" for f in fields[1:]))
+
+
 class TestFileField(unittest.TestCase):
     """The form dialog's new 'file' type: a path edit plus Browse."""
 

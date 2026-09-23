@@ -97,6 +97,40 @@ class TestTableState(unittest.TestCase):
         self.assertFalse(self.dlg.btn_delete_selected.isVisible())
 
 
+class TestTableLooks(unittest.TestCase):
+    """Review of 2026-09-23: what the table draws, and what it does not."""
+
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.dlg._extra_click_callbacks = {"Workspace": lambda row: None}
+        self.dlg._name_click_callback = lambda row: None
+        self.dlg._setup_table(["Name", "Workspace", "Gridsets"])
+        self.dlg._populate_rows(
+            [
+                ["a", "(global)", "EPSG:4326"],
+                ["b", "topp", "EPSG:4326, EPSG:900913, WebMercatorQuad"],
+            ]
+        )
+
+    def item(self, row, col):
+        return self.dlg.resultsTable.item(row, col)
+
+    def test_global_is_plain_text_a_workspace_a_link(self):
+        self.assertFalse(self.item(0, 1).font().underline())
+        self.assertTrue(self.item(1, 1).font().underline())
+        self.assertTrue(self.item(0, 0).font().underline())
+        self.assertNotIn("Enter", self.item(1, 1).toolTip())  # Enter opens the row
+
+    def test_a_long_cell_shows_all_of_it_on_hover(self):
+        self.assertEqual(
+            self.item(1, 2).toolTip(), "EPSG:4326, EPSG:900913, WebMercatorQuad"
+        )
+        self.assertEqual(self.item(0, 2).toolTip(), "")
+
+    def test_no_row_numbers_that_restart_on_every_page(self):
+        self.assertTrue(self.dlg.resultsTable.verticalHeader().isHidden())
+
+
 class TestDatastoreUpdate(unittest.TestCase):
     """Editing a datastore must not discard configuration it does not show."""
 
@@ -457,8 +491,8 @@ class TestServerSync(unittest.TestCase):
     def test_workspace_list_marks_the_servers_default(self):
         self.dlg._load_workspaces()
         rows = {row[0]: row[1] for row in self.dlg._all_rows}
-        self.assertEqual(rows["topp"], "default")
-        self.assertEqual(rows["cite"], "")
+        self.assertEqual(rows["topp"], "Yes")
+        self.assertEqual(rows["cite"], "No")
         # column 0 is still the name: delete / edit callbacks rely on it
         self.assertEqual([row[0] for row in self.dlg._all_rows], ["cite", "topp"])
 

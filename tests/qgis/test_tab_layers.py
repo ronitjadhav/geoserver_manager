@@ -431,6 +431,9 @@ class TestEveryLayerType(unittest.TestCase):
         form = self.opened(self.dlg._show_layer_info, self.rows["tasmania_roads"])
         self.assertIn("the_geom", form.get_widget("attributes").toPlainText())
         self.assertEqual(form.get_widget("datastore").text(), "taz_shapes")
+        # Yes / No like the other views, and an abstract with room for prose.
+        self.assertEqual(form.get_widget("enabled").text(), "Yes")
+        self.assertTrue(hasattr(form.get_widget("abstract"), "toPlainText"))
 
     def test_add_to_qgis_offers_wfs_only_for_vectors(self):
         for name, expected in (
@@ -819,6 +822,35 @@ class TestPublish(unittest.TestCase):
         ws.setCurrentText("empty")
         self.assertEqual(ds.count(), 0)
         self.assertEqual(table.count(), 0)
+
+    def test_the_required_srs_is_on_the_first_tab(self):
+        fields = {f["key"]: f for f in self.dlg._publish_fields(["topp"])}
+        self.assertNotIn("group", fields["epsg"])
+
+    def test_a_raster_hides_the_style_option_it_ignores(self):
+        from qgis.core import QgsProject, QgsRasterLayer, QgsVectorLayer
+        from qgis.PyQt.QtWidgets import QDialog
+
+        from geoserver_manager.gui import tab_layers
+        from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+
+        vector = QgsVectorLayer("Point?crs=epsg:4326", "points", "memory")
+        raster = QgsRasterLayer("/nonexistent.tif", "dem")
+        QgsProject.instance().addMapLayers([vector, raster], False)
+        self.addCleanup(QgsProject.instance().removeAllMapLayers)
+        opened = []
+
+        class Recording(ResourceFormDialog):
+            def exec(self):
+                opened.append(self)
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_layers, "ResourceFormDialog", Recording):
+            self.dlg._publish_layer(layer=vector)
+        form = opened[0]
+        self.assertNotIn("with_style", form._hidden_keys)
+        form.get_widget("qgis_layer").setCurrentText("dem  (raster)")
+        self.assertIn("with_style", form._hidden_keys)
 
     def test_the_layer_tree_can_preselect_a_project_layer(self):
         """Publish to GeoServer on a layer opens the form on that layer, not on

@@ -231,28 +231,59 @@ class StyleTabMixin:
         return str(value) if value else ""
 
     def _style_fields(self, editable, language_version=""):
-        """Field definitions for the style dialog."""
+        """Field definitions for the style dialog.
+
+        The definition comes first, on its own tab: it is the one thing the
+        dialog edits, and on a second tab it hid behind read-only details.
+        """
         return [
             {
+                "key": "body",
+                "label": translate("StyleTabMixin", "Definition"),
+                "type": "textarea",
+                "read_only": not editable,
+                "required": editable,
+                "group": translate("StyleTabMixin", "Definition"),
+                "min_height": 320,
+                "max_height": 16777215,  # QWIDGETSIZE_MAX: grow with the dialog
+                "code": True,
+                "wide": True,
+                "help": (
+                    translate(
+                        "StyleTabMixin",
+                        "Edit and Save to replace the style on the server.",
+                    )
+                    if editable
+                    else translate(
+                        "StyleTabMixin",
+                        "Read-only: only SLD and MBStyle bodies can be saved here.",
+                    )
+                ),
+            },
+            {
                 "key": "name",
+                "group": translate("StyleTabMixin", "Details"),
                 "label": translate("StyleTabMixin", "Style Name"),
                 "type": "text",
                 "read_only": True,
             },
             {
                 "key": "workspace",
+                "group": translate("StyleTabMixin", "Details"),
                 "label": translate("StyleTabMixin", "Workspace"),
                 "type": "text",
                 "read_only": True,
             },
             {
                 "key": "format",
+                "group": translate("StyleTabMixin", "Details"),
                 "label": translate("StyleTabMixin", "Format"),
                 "type": "text",
                 "read_only": True,
             },
             {
                 "key": "version",
+                "group": translate("StyleTabMixin", "Details"),
                 "label": translate("StyleTabMixin", "SLD version"),
                 "type": "text",
                 "read_only": True,
@@ -271,12 +302,14 @@ class StyleTabMixin:
             },
             {
                 "key": "filename",
+                "group": translate("StyleTabMixin", "Details"),
                 "label": translate("StyleTabMixin", "File"),
                 "type": "text",
                 "read_only": True,
             },
             {
                 "key": "legend",
+                "group": translate("StyleTabMixin", "Details"),
                 "label": translate("StyleTabMixin", "Legend"),
                 "type": "image",
                 "placeholder": translate(
@@ -284,25 +317,6 @@ class StyleTabMixin:
                 ),
                 "help": translate(
                     "StyleTabMixin", "As GeoServer renders it (GetLegendGraphic)."
-                ),
-            },
-            {
-                "key": "body",
-                "label": translate("StyleTabMixin", "Definition"),
-                "type": "textarea",
-                "read_only": not editable,
-                "required": editable,
-                "group": translate("StyleTabMixin", "Style"),
-                "help": (
-                    translate(
-                        "StyleTabMixin",
-                        "Edit and Save to replace the style on the server.",
-                    )
-                    if editable
-                    else translate(
-                        "StyleTabMixin",
-                        "Read-only: only SLD and MBStyle bodies can be saved here.",
-                    )
                 ),
             },
         ]
@@ -335,7 +349,7 @@ class StyleTabMixin:
             description=(
                 translate(
                     "StyleTabMixin",
-                    "Edit the definition below and Save to replace it on the server; "
+                    "Edit the definition and Save to replace it on the server; "
                     "every layer using the style changes with it.",
                 )
                 if editable
@@ -497,7 +511,6 @@ class StyleTabMixin:
                 "label": translate("StyleTabMixin", "SLD"),
                 "type": "textarea",
                 "required": True,
-                "group": translate("StyleTabMixin", "Style"),
                 "placeholder": translate(
                     "StyleTabMixin", "Paste the SLD document here"
                 ),
@@ -508,7 +521,6 @@ class StyleTabMixin:
                 "type": "file",
                 "required": True,
                 "visible": False,
-                "group": translate("StyleTabMixin", "Style"),
                 "filter": "Styles (*.sld *.zip *.mbstyle);;All files (*)",
                 "help": translate(
                     "StyleTabMixin",
@@ -522,7 +534,6 @@ class StyleTabMixin:
                 "options": [label for label, _layer in styleable_project_layers()],
                 "required": True,
                 "visible": False,
-                "group": translate("StyleTabMixin", "Style"),
                 "help": translate(
                     "StyleTabMixin",
                     "The layer's symbology is exported as SLD and uploaded. QGIS "
