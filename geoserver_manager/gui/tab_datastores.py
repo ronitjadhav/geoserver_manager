@@ -37,6 +37,10 @@ _TYPE_FIELDS = {
         "wfs_lenient",
     ),
 }
+# Any other GeoServer datastore type (Properties, Oracle, SQL Server, CSV...):
+# its name typed as GeoServer knows it, and its parameters as key = value.
+_OTHER = "Other..."
+_TYPE_FIELDS[_OTHER] = ("custom_type", "raw_params")
 _SUPPORTED_TYPES = list(_TYPE_FIELDS)
 
 # GeoServer prefixes every parameter of a cascaded WFS store with its factory.
@@ -46,6 +50,27 @@ _WFS_URL, _WFS_USER, _WFS_PASSWORD = (
     _WFS_KEY + "USERNAME",
     _WFS_KEY + "PASSWORD",
 )
+
+# The connection parameters each typed form owns. The edit form lists every
+# other one under "Other parameters", so none of them needs the web UI; the
+# namespace stays hidden, since GeoServer sets it from the workspace.
+_OWNED_PARAMS = {
+    "PostGIS": ("host", "port", "database", "user", "passwd", "schema", "dbtype"),
+    "PostGIS (JNDI)": ("jndiReferenceName", "schema", "dbtype"),
+    "PMTiles": ("pmtiles",),
+    "Shapefile": ("url", "charset", "create spatial index"),
+    "Directory of spatial files (shapefiles)": ("url", "charset"),
+    "GeoPackage": ("database", "dbtype", "read_only", "Expose primary keys"),
+    "Web Feature Server (NG)": (
+        _WFS_URL,
+        _WFS_USER,
+        _WFS_PASSWORD,
+        _WFS_KEY + "TIMEOUT",
+        _WFS_KEY + "MAXFEATURES",
+        _WFS_KEY + "LENIENT",
+    ),
+}
+_HIDDEN_PARAMS = ("namespace",)
 
 # GeoServer picks the GeoPackage factory by this connection parameter, so it
 # travels with every GeoPackage store the form saves.
@@ -57,28 +82,6 @@ _MASKED = "••••"
 # Every field that belongs to one of those types, in form order.
 _TYPE_SPECIFIC_FIELDS = tuple(
     dict.fromkeys(key for keys in _TYPE_FIELDS.values() for key in keys)
-)
-_TYPE_SPECIFIC_FIELDS = (
-    "pg_host",
-    "pg_port",
-    "pg_db",
-    "pg_user",
-    "pg_password",
-    "pg_schema",
-    "jndi_reference",
-    "pmtiles_url",
-    "file_url",
-    "charset",
-    "spatial_index",
-    "gpkg_database",
-    "gpkg_read_only",
-    "gpkg_expose_pk",
-    "wfs_url",
-    "wfs_user",
-    "wfs_password",
-    "wfs_timeout",
-    "wfs_max_features",
-    "wfs_lenient",
 )
 
 
@@ -207,12 +210,13 @@ class DatastoreTabMixin:
                 "label": translate("DatastoreTabMixin", "Name"),
                 "type": "text",
                 "required": True,
-                # Renaming would upsert: a free name creates a second store and
-                # a taken one overwrites it. Locked until the library grows a
-                # real rename (#50; workspaces do it with a raw PUT).
-                "read_only": edit_mode,
+                # A rename is one PUT on the old path (invariant 6): measured to
+                # keep the store's layers, groups and tile cache.
                 "help": (
-                    translate("DatastoreTabMixin", "A datastore cannot be renamed")
+                    translate(
+                        "DatastoreTabMixin",
+                        "Renaming keeps its layers; only the store's own name changes.",
+                    )
                     if edit_mode
                     else None
                 ),
@@ -307,6 +311,20 @@ class DatastoreTabMixin:
                 "group": connection,
                 "help": translate(
                     "DatastoreTabMixin", "JNDI name of the database connection pool"
+                ),
+            },
+            # --- "Other...": any GeoServer type, by its own name ---
+            {
+                "key": "custom_type",
+                "label": translate("DatastoreTabMixin", "GeoServer type"),
+                "type": "text",
+                "visible": False,
+                "group": connection,
+                "placeholder": translate("DatastoreTabMixin", "e.g. Properties"),
+                "help": translate(
+                    "DatastoreTabMixin",
+                    "The type exactly as GeoServer names it (its web UI lists "
+                    "them under New data source). Some need an extension.",
                 ),
             },
             # --- any other type: shown read-only, since the form cannot edit it ---
@@ -512,6 +530,23 @@ class DatastoreTabMixin:
                     ),
                 },
             )
+            # Every parameter the typed fields do not own. Not in Add: it
+            # would show an empty Advanced tab there.
+            fields.append(
+                {
+                    "key": "other_params",
+                    "label": translate("DatastoreTabMixin", "Other parameters"),
+                    "type": "textarea",
+                    "group": translate("DatastoreTabMixin", "Advanced"),
+                    "help": translate(
+                        "DatastoreTabMixin",
+                        "What the Connection tab does not show (pool sizes, timeouts, "
+                        "Loose bbox, ...), one 'key = value' per line. Lines you "
+                        "remove are removed on the server; a masked password (••••) "
+                        "is kept unless you replace it.",
+                    ),
+                },
+            )
         return fields
 
     @staticmethod
@@ -643,6 +678,8 @@ class DatastoreTabMixin:
         for key in _TYPE_SPECIFIC_FIELDS:
             dlg.set_field_visible(key, False)
         dlg.set_field_visible("raw_params", True)
+        # raw_params already holds every parameter.
+        dlg.set_field_visible("other_params", False)
 
     @staticmethod
     def _parse_params(text):
@@ -739,10 +776,27 @@ class DatastoreTabMixin:
                     description=description,
                 )
             )
+        elif ds_type == _OTHER:
+            custom = (values.get("custom_type") or "").strip()
+            if not custom:
+                raise ValueError(
+                    translate("DatastoreTabMixin", "Give the GeoServer type name.")
+                )
+            self._check(
+                self.gs.create_datastore(
+                    workspace_name=ws,
+                    datastore_name=name,
+                    datastore_type=custom,
+                    connection_parameters=self._parse_params(
+                        values.get("raw_params", "")
+                    ),
+                    description=description,
+                )
+            )
         else:
             raise ValueError(f"Unsupported datastore type: {ds_type}")
 
-    def _update_datastore_from_values(self, values, detail, conn_params):
+    def _update_datastore_from_values(self, values, detail, conn_params, old_name=None):
         """Save an edit without discarding server-side configuration.
 
         The typed create_* helpers post a fixed connection-parameter template
@@ -752,7 +806,13 @@ class DatastoreTabMixin:
         disabled store. Merge the fields the form owns onto what the server
         actually has, and keep its own type and enabled flag.
 
-        TODO(#50): upstream as update_datastore(...) that merges server-side.
+        A changed name is first applied by one PUT on the old path, which
+        GeoServer treats as a rename (measured on 2.28.5: the feature types,
+        layers, groups and tile cache follow); create_datastore() would upsert
+        a second store instead (invariant 6).
+
+        TODO(#50): upstream as update_datastore(...) that merges server-side,
+        and rename_datastore() (row 56).
         """
         ds_type = detail.get("type") if isinstance(detail, dict) else None
         if not ds_type:
@@ -801,6 +861,13 @@ class DatastoreTabMixin:
                 for key, value in edited.items()
             }
 
+        if ds_type in _OWNED_PARAMS and "other_params" in values:
+            merged = self._merge_other_params(
+                merged, conn_params, ds_type, values["other_params"]
+            )
+        if old_name and values["name"] != old_name:
+            self._rename_datastore(values["workspace"], old_name, values["name"])
+
         # The form's own checkbox wins; without one (older callers, tests) the
         # server's flag is kept.
         enabled = (
@@ -820,6 +887,59 @@ class DatastoreTabMixin:
                 description=values.get("description") or "",
                 enabled=bool(enabled),
             )
+        )
+
+    @staticmethod
+    def _other_params_text(ds_type, conn_params):
+        """The parameters a typed form does not own, as 'key = value' lines."""
+        skip = set(_OWNED_PARAMS.get(ds_type, ())) | set(_HIDDEN_PARAMS)
+        return "\n".join(
+            f"{key} = {_MASKED if _is_secret(key) else value}"
+            for key, value in sorted(conn_params.items())
+            if key not in skip
+        )
+
+    def _merge_other_params(self, merged, conn_params, ds_type, text):
+        """Apply the Other parameters textarea onto the merged map.
+
+        A removed line removes the key, a masked value keeps the stored one,
+        and a key the typed fields own is theirs: those are written last.
+        """
+        owned = set(_OWNED_PARAMS[ds_type]) | set(_HIDDEN_PARAMS)
+        shown = {key for key in conn_params if key not in owned}
+        edited = self._parse_params(text)
+        result = {
+            key: value
+            for key, value in merged.items()
+            if key not in shown or key in edited
+        }
+        for key, value in edited.items():
+            if key in owned:
+                continue
+            result[key] = conn_params.get(key, "") if value == _MASKED else value
+        return result
+
+    def _rename_datastore(self, workspace_name, old_name, new_name):
+        """Rename a datastore: one PUT with the new name on the old path.
+
+        TODO(#50): no rename in the library (row 56). Refused before any
+        request when the name is unsafe or taken, since a taken name would
+        leave two stores fighting over one path.
+        """
+        self._require_safe_name(new_name)
+        if self._resource_exists(self.gs.get_datastore, workspace_name, new_name):
+            raise ValueError(
+                translate(
+                    "DatastoreTabMixin",
+                    "Datastore '{}' already exists in workspace '{}'.",
+                ).format(new_name, workspace_name)
+            )
+        self._raw_rest(
+            "put",
+            self.gs.rest_service.rest_endpoints.datastore(
+                quote(workspace_name, safe=""), quote(old_name, safe="")
+            ),
+            json={"dataStore": {"name": new_name}},
         )
 
     @staticmethod
@@ -886,6 +1006,8 @@ class DatastoreTabMixin:
             "wfs_max_features": _as_int(conn_params.get(_WFS_KEY + "MAXFEATURES"), 0),
             "wfs_lenient": str(conn_params.get(_WFS_KEY + "LENIENT", "true")).lower()
             == "true",
+            # Typed stores: what their form does not own; secrets masked
+            "other_params": DatastoreTabMixin._other_params_text(ds_type, conn_params),
             # Generic editor for types without dedicated fields; secrets masked
             "raw_params": "\n".join(
                 f"{key} = {_MASKED if _is_secret(key) else value}"
@@ -911,7 +1033,7 @@ class DatastoreTabMixin:
         values = self._datastore_form_values(
             ws_name, ds_name, ds_type, detail, conn_params
         )
-        editable = ds_type in _SUPPORTED_TYPES
+        editable = ds_type in _OWNED_PARAMS
 
         dlg = ResourceFormDialog(
             title=translate("DatastoreTabMixin", "Edit Datastore '{}'").format(ds_name),
@@ -942,7 +1064,9 @@ class DatastoreTabMixin:
 
         values = dlg.get_values()
         if self._run_action(
-            lambda: self._update_datastore_from_values(values, detail, conn_params),
+            lambda: self._update_datastore_from_values(
+                values, detail, conn_params, old_name=ds_name
+            ),
             translate("DatastoreTabMixin", "Failed to update datastore '{}'").format(
                 values["name"]
             ),

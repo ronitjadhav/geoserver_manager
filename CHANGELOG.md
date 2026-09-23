@@ -15,6 +15,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   plugin asks GeoServer to open it, and a warning gives GeoServer's reason
   when it cannot (a wrong host, password, path or URL).
 - **Reset** on datastores and coverage stores makes GeoServer re-read them.
+- **Rename a datastore**: its feature types, layers, layer groups and tile
+  cache follow. Its other connection parameters (pool, timeouts, Loose
+  bbox...) are editable on the new *Advanced* tab.
+- **Any datastore type** through *Other...*: type GeoServer's name for it and
+  its parameters. ArcGrid and WorldImage coverage stores can be added too.
 - **Edit a layer** instead of going to GeoServer's web interface: rename it,
   change its title, abstract, keywords, SRS and projection policy, turn it
   on or off, hide it from the capabilities, and filter it with CQL (vector

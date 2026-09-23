@@ -27,10 +27,12 @@ from geoserver_manager.gui import tab_coveragestores
 from geoserver_manager.gui.dlg_main import GeoServerMainDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.tab_coveragestores import (
+    ARCGRID,
     COG,
     GEOTIFF,
     MOSAIC_DIRECTORY,
     MOSAIC_ZIP,
+    WORLDIMAGE,
     CoverageStoreTabMixin,
 )
 from geoserver_manager.toolbelt.qgis_export import (
@@ -473,6 +475,15 @@ class TestCreateCoverageStore(unittest.TestCase):
                 None,
             ),
         )
+
+    def test_arcgrid_and_worldimage_keep_their_own_type(self):
+        # GeoServer reads the file with the reader the type names: an ArcGrid
+        # store created as a GeoTIFF one fails to open.
+        for store_type in (ARCGRID, WORLDIMAGE):
+            self.dlg._create_coverage_store_from_values(
+                {"name": "s", "workspace": "sf", "type": store_type, "url": "file:x"}
+            )
+            self.assertEqual(self.dlg.gs.calls[-1][4], store_type)
 
     def test_cog_is_a_geotiff_store_plus_the_cog_settings(self):
         self.dlg._create_coverage_store_from_values(

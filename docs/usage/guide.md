@@ -85,6 +85,7 @@ on the server.
 | GeoPackage | a GeoPackage file on the server |
 | PMTiles | a PMTiles archive |
 | Web Feature Server (NG) | a remote WFS, whose feature types then publish like tables |
+| Other... | any other type GeoServer has (Properties, CSV, Oracle...), typed by its name |
 
 ```{figure} ../static/screenshots/datastore-add.png
 :alt: The Add a Datastore form, with name, workspace, type and description, and a Connection tab
@@ -93,16 +94,18 @@ on the server.
 The connection details go on the *Connection* tab.
 ```
 
-Any other type gets a plain editor, one `key = value` per line, exactly as
-GeoServer stores it.
+*Other...* and any type the plugin has no form for get a plain editor, one
+`key = value` per line, exactly as GeoServer stores it.
 
 **Click a name** to edit a store, or to enable or disable it. A few things to
 know:
 
-- A datastore cannot be renamed.
+- A rename keeps its feature types, layers, layer groups and tile cache.
 - The password field is always blank. GeoServer only returns it encrypted.
   Leave it empty to keep the stored password, or type a new one.
-- Whatever the form does not show is kept as the server has it.
+- The *Advanced* tab lists every other connection parameter (pool size,
+  timeouts, Loose bbox...) as `key = value` lines. Change, add or remove a
+  line there; a removed line removes the parameter.
 - After a save, the plugin asks GeoServer to open the store. If it cannot (a
   wrong host, password or path), a warning says so at once, with GeoServer's
   reason.
@@ -123,6 +126,7 @@ A coverage store holds raster data, such as a GeoTIFF.
 
 - a **GeoTIFF** path on the GeoServer machine;
 - a **COG** (Cloud Optimized GeoTIFF) URL;
+- an **ArcGrid** or a **WorldImage** (a PNG, JPEG or GIF with its world file) URL;
 - an **ImageMosaic**: a folder on the server, or a properties ZIP to upload;
 - **a raster layer from this QGIS project**.
 

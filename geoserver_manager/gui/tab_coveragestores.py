@@ -36,15 +36,25 @@ from geoserver_manager.toolbelt.qgis_export import (
 )
 from geoserver_manager.toolbelt.rest import raw_rest
 
-# Store types offered by the Add form. GeoServer knows more (ArcGrid, WorldImage,
-# NetCDF, …); these are the ones the library has a call for, plus the upload
-# of a raster from this project, which is a GeoTIFF store GeoServer fills itself.
+# Store types offered by the Add form: the ones GeoServer ships without an
+# extension (NetCDF, GRIB and the like need one), plus the upload of a raster
+# from this project, which is a GeoTIFF store GeoServer fills itself.
 GEOTIFF = "GeoTIFF"
+ARCGRID = "ArcGrid"
+WORLDIMAGE = "WorldImage"
 COG = "GeoTIFF (COG)"
 MOSAIC_DIRECTORY = "ImageMosaic (server directory)"
 MOSAIC_ZIP = "ImageMosaic (properties ZIP)"
 QGIS_RASTER = "A raster layer from this QGIS project"
-STORE_TYPES = (GEOTIFF, COG, MOSAIC_DIRECTORY, MOSAIC_ZIP, QGIS_RASTER)
+STORE_TYPES = (
+    GEOTIFF,
+    COG,
+    ARCGRID,
+    WORLDIMAGE,
+    MOSAIC_DIRECTORY,
+    MOSAIC_ZIP,
+    QGIS_RASTER,
+)
 
 # A cloud-optimised GeoTIFF is a GeoTIFF store plus this metadata entry; the
 # library turns {"cogSettings": …} into GeoServer's {"@key": "CogSettings.Key"}
@@ -62,6 +72,8 @@ _STORE_EDITS = (
 # Fields of the Add form that belong to one store type only.
 _TYPE_FIELDS = {
     GEOTIFF: ("url",),
+    ARCGRID: ("url",),
+    WORLDIMAGE: ("url",),
     COG: ("url",),
     MOSAIC_DIRECTORY: ("directory",),
     MOSAIC_ZIP: ("zip",),
@@ -894,7 +906,8 @@ class CoverageStoreTabMixin:
                     ws_name,
                     name,
                     values["url"],
-                    type=GEOTIFF,
+                    # A COG is a GeoTIFF store with a metadata entry.
+                    type=GEOTIFF if store_type == COG else store_type,
                     metadata=_COG_METADATA if store_type == COG else None,
                 )
             )
