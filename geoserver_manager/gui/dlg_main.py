@@ -1530,6 +1530,23 @@ class GeoServerMainDialog(
                         break
         return results
 
+    @staticmethod
+    def _wire_picker(dlg, picker, first, load):
+        """A viewer's picker: choosing an entry fills the form with its details.
+
+        `picker` is the key of the combo; `load(name)` returns the entry's
+        values, or None once a failed read is reported, which leaves the
+        fields as they are rather than blank ones claiming "Enabled: Yes".
+        """
+
+        def show(name):
+            values = load(name) if name else None
+            if values is not None:
+                dlg.set_values(values)
+
+        dlg.get_widget(picker).currentTextChanged.connect(show)
+        show(first)
+
     def _report_partial_failures(self, failures):
         """One warning banner for the items a listing could not fetch.
 

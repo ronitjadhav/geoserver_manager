@@ -269,16 +269,8 @@ class TestCoverageStoresTab(unittest.TestCase):
 
     def test_a_coverage_that_cannot_be_read_leaves_the_viewer_alone(self):
         """After the error banner, blank fields must not claim Enabled: Yes."""
-        self.dlg.show_error_message = lambda text: None
-        filled = []
-
-        class Form:
-            def get_widget(inner, key):
-                filled.append(key)
-
         self.dlg._fetch = lambda action, failure, **kwargs: None
-        self.dlg._refill_coverage_detail(Form(), "sf", "sfdem", "sfdem")
-        self.assertEqual(filled, [])
+        self.assertIsNone(self.dlg._coverage_values("sf", "sfdem", "sfdem"))
 
     def test_a_store_that_cannot_be_read_keeps_its_row(self):
         """It is the one to delete; it used to vanish from the table."""

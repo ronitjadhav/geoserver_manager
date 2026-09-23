@@ -431,6 +431,15 @@ class ResourceFormDialog(QDialog):
         label.setMinimumHeight(pixmap.height())
         label.setToolTip(text)
 
+    def set_values(self, values):
+        """Fill text fields after the form opened: a viewer's picked entry."""
+        for key, value in values.items():
+            widget = self._widgets[key]
+            if isinstance(widget, QPlainTextEdit):
+                widget.setPlainText(value)
+            else:
+                widget.setText(value)
+
     def get_widget(self, key):
         """Return the widget for a field by key.
 

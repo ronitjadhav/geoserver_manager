@@ -206,6 +206,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- Refusing a CSS or MBStyle style for QGIS (*Apply to a QGIS layer*) is an
+  error banner now, with the same explanation, where it was a warning: the
+  Styles tab and the layer tree share one SLD fetch.
 - Read-only details (layers, styles, the tile cache) read as text: no input
   boxes that invite typing. A layer's abstract gets several lines, Enabled
   and Advertised say Yes or No, and the labels are in sentence case.

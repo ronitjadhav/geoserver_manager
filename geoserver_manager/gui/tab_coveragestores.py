@@ -407,10 +407,8 @@ class CoverageStoreTabMixin:
         ]
         return fields
 
-    def _refill_coverage_detail(self, dlg, workspace_name, store_name, name):
-        """Show one coverage's details in the viewer."""
-        if not name:
-            return
+    def _coverage_values(self, workspace_name, store_name, name):
+        """The viewer's values for one coverage; None once reported."""
         detail = self._fetch(
             lambda: self._coverage_detail(workspace_name, store_name, name),
             translate("CoverageStoreTabMixin", "Failed to load coverage '{}'").format(
@@ -418,15 +416,11 @@ class CoverageStoreTabMixin:
             ),
         )
         if detail is None:
-            return  # reported; blank fields would read "Enabled: Yes"
-        values = self._coverage_form_values(detail)
-        values["enabled"] = self._yes_no(detail.get("enabled", True))
-        for key, value in values.items():
-            widget = dlg.get_widget(key)
-            if hasattr(widget, "setPlainText"):
-                widget.setPlainText(value)
-            else:
-                widget.setText(value)
+            return None
+        return dict(
+            self._coverage_form_values(detail),
+            enabled=self._yes_no(detail.get("enabled", True)),
+        )
 
     def _show_coverages(self, row_data):
         """List the store's published coverages and view one at a time."""
@@ -458,11 +452,13 @@ class CoverageStoreTabMixin:
             fields=self._coverage_fields(published),
             parent=self,
         )
-        dlg.get_widget("coverage").currentTextChanged.connect(
-            lambda name: self._refill_coverage_detail(dlg, ws_name, store_name, name)
-        )
-        self._refill_coverage_detail(dlg, ws_name, store_name, published[0])
         dlg.hide_save_button()
+        self._wire_picker(
+            dlg,
+            "coverage",
+            published[0],
+            lambda name: self._coverage_values(ws_name, store_name, name),
+        )
         dlg.exec()
 
     # -- Publish ---------------------------------------------------------------

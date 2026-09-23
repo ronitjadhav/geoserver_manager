@@ -313,24 +313,15 @@ class CascadedStoreTabMixin:
         )
         return fields
 
-    def _refill_cascaded_layer_detail(
-        self, dlg, workspace_name, store_name, kind, name
-    ):
-        """Show one cascaded layer's details in the viewer."""
-        if not name:
-            return
+    def _cascaded_layer_values(self, workspace_name, store_name, kind, name):
+        """The viewer's values for one cascaded layer; None once reported."""
         detail = self._fetch(
             lambda: self._cascaded_layer_detail(workspace_name, store_name, kind, name),
             translate("CascadedStoreTabMixin", "Failed to load layer '{}'").format(
                 name
             ),
         )
-        for key, value in self._cascaded_layer_form_values(detail or {}).items():
-            widget = dlg.get_widget(key)
-            if hasattr(widget, "setPlainText"):
-                widget.setPlainText(value)
-            else:
-                widget.setText(value)
+        return None if detail is None else self._cascaded_layer_form_values(detail)
 
     def _show_cascaded_layers(self, row_data):
         """List the store's cascaded layers and view one at a time."""
@@ -365,12 +356,12 @@ class CascadedStoreTabMixin:
             parent=self,
         )
         dlg.hide_save_button()
-        dlg.get_widget("layer").currentTextChanged.connect(
-            lambda name: self._refill_cascaded_layer_detail(
-                dlg, ws_name, store_name, kind, name
-            )
+        self._wire_picker(
+            dlg,
+            "layer",
+            names[0],
+            lambda name: self._cascaded_layer_values(ws_name, store_name, kind, name),
         )
-        self._refill_cascaded_layer_detail(dlg, ws_name, store_name, kind, names[0])
         dlg.exec()
 
     def _publish_cascaded_layer(self, row_data):

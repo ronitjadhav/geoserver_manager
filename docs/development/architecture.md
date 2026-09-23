@@ -16,7 +16,7 @@ what the code cannot tell you. Python 3.12 (QGIS 3.40 and newer), PyQt5
 | `geoserver_manager/gui/dlg_preview.py` | `LayerPreviewDialog`, a `QgsMapCanvas` showing one WMS layer of the server, with GetFeatureInfo on click; non-modal, nothing reaches the project |
 | `geoserver_manager/gui/dlg_settings.py` | Options page: URL + credentials (credentials go to `QgsAuthManager`, encrypted) and *Test connection*, which probes the fields as typed |
 | `geoserver_manager/gui/layer_tree.py` | `LayerTreeMenu`, the *GeoServer Manager* submenu of the layer tree's context menu: push / apply the clicked layer's style through the main dialog's connection and its `_push_qgis_style` / `_style_body`; outcomes go to `iface.messageBar()` |
-| `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store, and the saved server profiles: the active one is copied into the single-connection fields everything else reads), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser`, `probe` (the bounded connection check the dialog and Settings share), `rest` (the raw REST call, `summarise_body` for banners, the streaming upload body; no QGIS import), `payload` (GeoServer's collection shapes, pure), `sld` and `qgis_export` (QGIS ↔ GeoServer conversions, pure) |
+| `geoserver_manager/toolbelt/` | `preferences` (QgsSettings + auth store, and the saved server profiles: the active one is copied into the single-connection fields everything else reads), `log_handler`, `dependencies` (loads the bundled wheels), `env_var_parser`, `probe` (the bounded connection check the dialog and Settings share), `rest` (the raw REST call, `summarise_body` for banners, the streaming upload body; no QGIS import), `payload` (GeoServer's collection shapes, keywords and translatable titles, pure), `sld` and `qgis_export` (QGIS ↔ GeoServer conversions, pure) |
 | `geoserver_manager/extras/*.whl` | Bundled `geoservercloud` (stripped, see the [GeoServer notes](geoserver-notes.md)) and `xmltodict`, added to `sys.path` at startup |
 | `tests/unit/` | Runs without QGIS. `tests/qgis/` needs the QGIS Python (headless via `qgis.testing.start_app()`) |
 | `docs/` | The site: Sphinx + MyST + Furo, deployed to GitHub Pages on every push to main. `usage/` is written for the user, `development/` for a contributor, `github_issue_roadmap.md` is the feature backlog that GitHub milestones mirror. **`development/geoserver-notes.md` holds the measured GeoServer and library facts this plugin depends on** |
@@ -80,6 +80,7 @@ The `Inspiration/` folder is untracked reference code. Never import from it.
   | `_yes_no(value)` | a boolean cell, translated, never Python's `True` / `False` |
   | `_unwrap` / `_as_list` / `_name_of` | GeoServer's collection shapes, from `toolbelt/payload.py`; no tab keeps its own copy |
   | `_reload_current_tab()` | after an action reachable from another tab |
+  | `_wire_picker(dlg, picker, first, load)` | a read-only viewer with a picker (a store's coverages, its cascaded layers): choosing an entry fills the form through `ResourceFormDialog.set_values`; `load` returns None after a failed read, which leaves the fields alone |
 
 - **Adding a layer to QGIS** (`LayerTabMixin._add_layer_to_qgis`): build the URI with `_layer_uri`
   (pure, tested), construct `QgsRasterLayer`/`QgsVectorLayer`, check `isValid()`, then
