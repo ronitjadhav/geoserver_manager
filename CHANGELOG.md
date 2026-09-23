@@ -378,3 +378,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   of leaving the plugin silently unconfigured.
 - Editing a PostGIS datastore no longer sends GeoServer's encrypted password
   back as the new password; it has to be re-entered.
+
+## 0.1.0 - 2026-03-27
+
+- First release
+- Generated with the [QGIS Plugins templater](https://oslandia.gitlab.io/qgis/template-qgis-plugin/)
+- Placeholder, never released: packaging needs one version here. The first
+  real release will replace this entry.

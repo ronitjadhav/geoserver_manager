@@ -24,10 +24,20 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 # -- Project information --
 changes: dict[str, dict] = keepachangelog.to_dict("../CHANGELOG.md")
-# None until the first release: the site must not name a version nobody
-# can install. The template's placeholder "0.1.0 First release" did.
+# None until the first release: the site must not name a version nobody can
+# install. ponytail: the template's placeholder 0.1.0 entry has to stay,
+# because qgis-plugin-ci cannot package without a released version in the
+# changelog, so it is recognised by its templater line and skipped. Drop the
+# check once the first real release replaces that entry.
+_PLACEHOLDER = "Generated with the [QGIS Plugins templater]"
 latest_version: Optional[str] = next(
-    (v for v in changes.keys() if v not in ("Unreleased", "version_tag")), None
+    (
+        v
+        for v, entry in changes.items()
+        if v not in ("Unreleased", "version_tag")
+        and not any(_PLACEHOLDER in line for line in entry.get("uncategorized", []))
+    ),
+    None,
 )
 
 author: str = __about__.__author__
