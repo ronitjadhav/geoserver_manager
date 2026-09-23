@@ -1039,36 +1039,49 @@ class GwcTabMixin:
             translate("GwcTabMixin", "Stop all"),
             QDialogButtonBox.ButtonRole.ActionRole,
         )
-        stop.clicked.connect(
-            lambda: self._run_action(
+        failure = translate("GwcTabMixin", "Failed to read the tasks")
+        closed = []
+
+        def read(_task):
+            return self._read_seed_tasks(client, path)
+
+        def landed(text):
+            if closed or sip.isdeleted(dlg) or not dlg.isVisible():
+                return
+            dlg.get_widget("tasks").setPlainText(text)
+            timer.start()  # the next read only once this one has landed
+
+        def poll():
+            self._run_quietly(failure, read, landed)
+
+        # Single shot, re-armed by landed: a read slower than the interval
+        # used to be superseded by the next tick, so nothing ever landed and
+        # a dead server collected a new pending request every 2 s.
+        timer = QTimer(dlg)
+        timer.setSingleShot(True)
+        timer.setInterval(2000)
+        timer.timeout.connect(poll)
+
+        def stop_all():
+            if self._run_action(
                 lambda: self._raw_rest(
                     "post", self._seed_path(name, ""), data={"kill_all": "all"}
                 ),
                 translate("GwcTabMixin", "Failed to stop the tasks on '{}'").format(
                     name
                 ),
-            )
-        )
+            ):
+                # In the dialog: a banner would sit behind this modal one.
+                dlg.get_widget("tasks").setPlainText(
+                    translate("GwcTabMixin", "Stopping the tasks…")
+                )
+                timer.stop()
+                poll()
 
-        def read(_task):
-            return self._read_seed_tasks(client, path)
-
-        def landed(text):
-            if not sip.isdeleted(dlg) and dlg.isVisible():
-                dlg.get_widget("tasks").setPlainText(text)
-
-        timer = QTimer(dlg)
-        timer.setInterval(2000)
-        timer.timeout.connect(
-            lambda: self._run_quietly(
-                translate("GwcTabMixin", "Failed to read the tasks"), read, landed
-            )
-        )
-        timer.start()
-        self._run_quietly(
-            translate("GwcTabMixin", "Failed to read the tasks"), read, landed
-        )
+        stop.clicked.connect(stop_all)
+        poll()
         dlg.exec()
+        closed.append(True)
         timer.stop()
 
     # -- Truncate / remove ----------------------------------------------------

@@ -595,7 +595,9 @@ class CascadedStoreTabMixin:
 
         values = dlg.get_values()
         if self._run_action(
-            lambda: self._create_cascaded_store_from_values(values),
+            lambda: self._wait_for(
+                lambda: self._create_cascaded_store_from_values(values)
+            ),
             translate(
                 "CascadedStoreTabMixin", "Failed to create cascaded store '{}'"
             ).format(values["name"]),

@@ -44,8 +44,12 @@ what the code cannot tell you. Python 3.12 (QGIS 3.40 and newer), PyQt5
   progress, *Refresh* turns into *Cancel*, and `finished()` comes back on the GUI thread to
   render. A fetch is `_fetch_<x>_rows(task=None) -> (rows, failures)`; it runs in a worker,
   so it must not touch a widget, and it only gets at the task by passing it to `_fan_out`.
-  Mutations (add / edit / delete) still run inline under `_run_action`: they are one request
-  and the user is waiting for the dialog they just confirmed. The exception is an upload
+  Mutations (add / edit) run under `_run_action`, with their requests in `_wait_for`: the
+  user is waiting for the dialog they just confirmed, but a hung server must not freeze QGIS
+  for the library's 120 s timeout. So the action passed to `_wait_for` makes requests only; a
+  question (`_push_qgis_style`'s "Replace the style?") or a warning stays outside it, and a
+  helper that runs in it returns its warning instead of showing it (`_save_workspace`).
+  Deletes run in the `_delete` task slot. The exception is an upload
   (`_run_upload`): its body is a `toolbelt.rest.ProgressReader`, which moves the task bar from each
   `read()` and raises on Cancel so `requests` drops the connection mid-body. The work gets the REST
   client as an argument, because a Refresh clears `self.gs` while it runs (`toolbelt.rest.raw_rest`
@@ -58,7 +62,7 @@ what the code cannot tell you. Python 3.12 (QGIS 3.40 and newer), PyQt5
   |---|---|
   | `_run_action(fn, failure_message) -> bool` | any mutation: wait cursor, banner + QGIS log on failure |
   | `_fetch(fn, failure_message) -> value \| None` | any read the UI needs before continuing: runs `fn` in a worker thread and waits behind an application-modal *Waiting for GeoServer* box (after 0.3 s) with Cancel, so a dead server cannot freeze QGIS. `in_worker=False` for work on a live QGIS layer. A map layer `fn` builds comes back moved to the GUI thread |
-  | `_wait_for(fn) -> value` | the same wait without the reporting, for a read inside a handler that does its own (the Publish form's combo refills) |
+  | `_wait_for(fn) -> value` | the same wait without the reporting: a save's requests under `_run_action`, or a read inside a handler that does its own (the Publish form's combo refills). `fn` must not touch a widget, nor call `_wait_for` or `_fetch` itself |
   | `_check((content, status))` | unwrap a geoservercloud tuple; raises on ≥ 400 |
   | `_fetch_list(api_method, *args)` | a list endpoint; `[]` when the payload is not a list |
   | `_resource_exists(getter, *args)` | pre-check before *Add* (the library upserts) |

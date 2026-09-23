@@ -649,7 +649,7 @@ class DatastoreTabMixin:
 
         values = dlg.get_values()
         if self._run_action(
-            lambda: self._create_datastore_from_values(values),
+            lambda: self._wait_for(lambda: self._create_datastore_from_values(values)),
             translate("DatastoreTabMixin", "Failed to create datastore '{}'").format(
                 values["name"]
             ),
@@ -1076,8 +1076,10 @@ class DatastoreTabMixin:
 
         values = dlg.get_values()
         if self._run_action(
-            lambda: self._update_datastore_from_values(
-                values, detail, conn_params, old_name=ds_name
+            lambda: self._wait_for(
+                lambda: self._update_datastore_from_values(
+                    values, detail, conn_params, old_name=ds_name
+                )
             ),
             translate("DatastoreTabMixin", "Failed to update datastore '{}'").format(
                 values["name"]

@@ -140,9 +140,16 @@ class LayerPreviewDialog(QDialog):
                 self.tr("This layer does not answer feature info requests.")
             )
             return
+        if getattr(self, "_identifying", False):
+            # The WMS provider's request runs a nested event loop, so a second
+            # click could start another identify inside the first one.
+            return
+        self._identifying = True
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             # The WMS provider needs the view to turn the point into a pixel.
+            # ponytail: a blocking QGIS call on the GUI thread, bounded by
+            # QGIS's own network timeout; the provider is not thread-safe.
             result = provider.identify(
                 point,
                 fmt,
@@ -152,6 +159,7 @@ class LayerPreviewDialog(QDialog):
             )
         finally:
             QApplication.restoreOverrideCursor()
+            self._identifying = False
         self.info.setPlainText(self.result_text(point, result))
 
     @staticmethod

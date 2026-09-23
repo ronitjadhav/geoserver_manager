@@ -460,17 +460,22 @@ class TestDefaultWorkspaceHandling(unittest.TestCase):
             raise RuntimeError("HTTP 403: forbidden")
 
         self.dlg._set_default_workspace = boom
+        warning = []
         ok = self.dlg._run_action(
-            lambda: self.dlg._save_workspace(
-                {"name": "ws", "isolated": False, "set_default": True}
+            lambda: warning.append(
+                self.dlg._save_workspace(
+                    {"name": "ws", "isolated": False, "set_default": True}
+                )
             ),
             "Failed to create workspace 'ws'",
         )
 
         self.assertTrue(ok)  # the create itself succeeded and is reported so
         self.assertEqual(self.calls, [("create", "ws")])
-        self.assertEqual(len(self.warnings), 1)
-        self.assertIn("could not be made the default", self.warnings[0])
+        # Returned, not shown: the save runs in a worker, which must not
+        # touch a widget; the caller shows it once it is back.
+        self.assertEqual(self.warnings, [])
+        self.assertIn("could not be made the default", warning[0])
 
     def test_default_workspace_name_is_none_when_unreadable(self):
         self.assertIsNone(
@@ -1611,7 +1616,7 @@ class TestConnectionGuard(unittest.TestCase):
         self.dlg._probe = lambda gs, url: None
         self.dlg._fetch_version_label = lambda gs: ""
         self.dlg._run_in_task = (
-            lambda message, work, on_success: None
+            lambda message, work, on_success, **kwargs: None
         )  # still in flight
 
         self.dlg.refresh_ui()
