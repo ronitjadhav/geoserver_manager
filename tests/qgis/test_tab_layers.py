@@ -737,7 +737,7 @@ class TestPublish(unittest.TestCase):
         self.assertNotIn("default", field)
         for bad in ("", "abc", "EPSG:"):
             with self.assertRaises(ValueError, msg=bad):
-                self.dlg._publish_layer_from_values(
+                self.dlg._publish_table(
                     {
                         "workspace": "topp",
                         "datastore": "pg",
@@ -748,7 +748,7 @@ class TestPublish(unittest.TestCase):
                         "keywords": "",
                     }
                 )
-        self.dlg._publish_layer_from_values(
+        self.dlg._publish_table(
             {
                 "workspace": "topp",
                 "datastore": "pg",
@@ -762,7 +762,7 @@ class TestPublish(unittest.TestCase):
         self.assertEqual(self.dlg.gs.created[-1]["epsg"], 3857)
 
     def test_publish_sends_what_the_form_collected(self):
-        self.dlg._publish_layer_from_values(
+        self.dlg._publish_table(
             {
                 "workspace": "topp",
                 "datastore": "pg",
@@ -784,7 +784,7 @@ class TestPublish(unittest.TestCase):
 
     def test_publish_refuses_an_existing_layer(self):
         with self.assertRaises(ValueError) as ctx:
-            self.dlg._publish_layer_from_values(
+            self.dlg._publish_table(
                 {"workspace": "topp", "datastore": "pg", "table": "tasmania_roads"}
             )
         self.assertIn("already exists", str(ctx.exception))
@@ -1449,7 +1449,7 @@ class TestPublishQgisLayer(unittest.TestCase):
 
     def test_the_geopackage_is_put_under_the_normalised_name(self):
         self.add_layer()
-        self.dlg._publish_layer_from_values(self.values())
+        self.dlg._publish_qgis_layer(self.values())
 
         verb, path, kwargs = self.sent("PUT")[0]
         # "Roads (2024)" is not a WFS type name; "Roads_2024" is
@@ -1460,7 +1460,7 @@ class TestPublishQgisLayer(unittest.TestCase):
 
     def test_the_uploaded_store_is_made_read_only_by_merging(self):
         self.add_layer()
-        self.dlg._publish_layer_from_values(self.values())
+        self.dlg._publish_qgis_layer(self.values())
 
         # the store exists because the upload created it
         kwargs = self.sent("create_datastore")[0][1]
@@ -1473,7 +1473,7 @@ class TestPublishQgisLayer(unittest.TestCase):
 
     def test_metadata_is_merged_onto_what_geoserver_computed(self):
         self.add_layer()
-        self.dlg._publish_layer_from_values(
+        self.dlg._publish_qgis_layer(
             self.values(title="Roads", abstract="Main roads", keywords="roads, 2024")
         )
         feature_type_puts = [
@@ -1490,14 +1490,14 @@ class TestPublishQgisLayer(unittest.TestCase):
 
     def test_no_metadata_means_no_extra_request(self):
         self.add_layer()
-        self.dlg._publish_layer_from_values(self.values())
+        self.dlg._publish_qgis_layer(self.values())
         self.assertEqual(
             [call for call in self.sent("PUT") if "featuretypes" in call[1]], []
         )
 
     def test_the_symbology_can_travel_with_the_data(self):
         self.add_layer(colour="#00aa44")
-        self.dlg._publish_layer_from_values(self.values(with_style=True))
+        self.dlg._publish_qgis_layer(self.values(with_style=True))
         style_puts = [call for call in self.sent("PUT") if "/styles/" in call[1]]
         self.assertEqual(
             style_puts[0][1], "/rest/workspaces/topp/styles/Roads_2024.sld"
@@ -1512,26 +1512,26 @@ class TestPublishQgisLayer(unittest.TestCase):
         self.add_layer()
         self.dlg.gs = GpkgPublishFakeGS(datastore_exists=True)
         with self.assertRaises(ValueError) as caught:
-            self.dlg._publish_layer_from_values(self.values())
+            self.dlg._publish_qgis_layer(self.values())
         self.assertIn("Roads_2024", str(caught.exception))
         self.assertIn("Replace", str(caught.exception))
         self.assertEqual(self.sent("PUT"), [])
 
-        self.dlg._publish_layer_from_values(self.values(replace=True))
+        self.dlg._publish_qgis_layer(self.values(replace=True))
         self.assertTrue(self.sent("PUT"))
 
     def test_an_existing_layer_is_refused_too(self):
         self.add_layer()
         self.dlg.gs = GpkgPublishFakeGS(layer_exists=True)
         with self.assertRaises(ValueError):
-            self.dlg._publish_layer_from_values(self.values())
+            self.dlg._publish_qgis_layer(self.values())
 
     def test_nothing_is_left_in_the_temporary_folder(self):
         import glob
         import tempfile
 
         self.add_layer()
-        self.dlg._publish_layer_from_values(self.values())
+        self.dlg._publish_qgis_layer(self.values())
         self.assertEqual(glob.glob(f"{tempfile.gettempdir()}/gsm_publish_*"), [])
 
     def test_a_raster_picked_here_goes_down_the_coverage_store_path(self):
@@ -1547,7 +1547,7 @@ class TestPublishQgisLayer(unittest.TestCase):
             layer = QgsRasterLayer(str(write_raster(folder / "dem.tif")), "dem", "gdal")
             self.assertTrue(layer.isValid())
             self.project.addMapLayer(layer)
-            self.dlg._publish_layer_from_values(
+            self.dlg._publish_qgis_layer(
                 self.values(qgis_layer="dem  (raster)", name="dem")
             )
             puts = self.sent("PUT")
@@ -1566,28 +1566,11 @@ class TestPublishQgisLayer(unittest.TestCase):
         warnings = []
         self.dlg.show_warning_message = warnings.append
         self.dlg._upload = object()  # one is running
-        self.dlg._publish_layer_from_values(self.values())
+        self.dlg._publish_qgis_layer(self.values())
         self.assertEqual(self.sent("PUT"), [])
         self.assertTrue(any("already running" in w for w in warnings), warnings)
         self.assertEqual(glob.glob(f"{tempfile.gettempdir()}/gsm_publish_*"), [])
         self.dlg._upload = None
-
-    def test_a_table_source_still_goes_the_old_way(self):
-        # the dispatch must not disturb the datastore-table path
-        self.dlg.gs = PublishFakeGS()
-        self.dlg._publish_layer_from_values(
-            {
-                "source": "A table in a datastore",
-                "workspace": "topp",
-                "datastore": "taz_shapes",
-                "table": "plugin_demo",  # the fake's unpublished table
-                "epsg": 4326,
-                "title": "",
-                "abstract": "",
-                "keywords": "",
-            }
-        )
-        self.assertEqual(self.dlg.gs.created[-1]["layer_name"], "plugin_demo")
 
 
 class TestVectorUploadRunsInATask(unittest.TestCase):
@@ -1619,7 +1602,7 @@ class TestVectorUploadRunsInATask(unittest.TestCase):
         from tests.qgis.test_sld import point_layer
 
         self.project.addMapLayer(point_layer("Roads (2024)", colour="#ff0000"))
-        self.dlg._publish_layer_from_values(
+        self.dlg._publish_qgis_layer(
             {
                 "source": "A layer from this QGIS project",
                 "workspace": "topp",

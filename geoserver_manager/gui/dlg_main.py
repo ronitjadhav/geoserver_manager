@@ -75,10 +75,6 @@ _ELIDED_AFTER = 24
 # a healthy server looks exactly as it did when reads ran inline.
 _WAIT_BEFORE_BOX = 0.3
 
-# The connection probe is the request the user waits for before anything is on
-# screen, so it gets its own short ceiling. The library cannot do this: its
-# RestClient hardcodes timeout=TIMEOUT (120 s); see _probe and issue #50.
-
 
 class _Abandoned(Exception):
     """The user stopped waiting for a read (the waiting box's Cancel)."""
@@ -185,7 +181,7 @@ class GeoServerMainDialog(
         self._filtered_rows = []  # rows after search filter
         self._columns = []  # headers of the table as set up
         self._sort = None  # (column, descending) applied to _filtered_rows
-        self._row_actions = []  # list of (icon, tooltip, callback) for action buttons
+        self._row_actions = []  # (icon, label, callback[, tooltip]) per row action
         self._name_click_callback = None  # callback(row_data) when name is clicked
         self._extra_click_callbacks = {}  # col_header -> callback(row_data)
         self._delete_selected_callback = (
@@ -572,10 +568,7 @@ class GeoServerMainDialog(
         one, which is also why closing the dialog lets an upload finish.
         One upload at a time: a second is refused with a warning.
         """
-        if self._upload is not None:
-            self.show_warning_message(
-                self.tr("An upload is already running. Wait for it or cancel it.")
-            )
+        if not self._upload_slot_free():
             return False
         self._launch_task(
             "_upload",
@@ -923,7 +916,7 @@ class GeoServerMainDialog(
         its text to size it to its buttons. The mixins take the label from
         here rather than translating "Actions" in their own context, so the
         two sides of that comparison cannot drift apart once a translation is
-        installed (see invariant 10 in docs/development/invariants.md).
+        installed (see invariant 11 in docs/development/invariants.md).
         """
         return self.tr("Actions")
 
@@ -1338,10 +1331,11 @@ class GeoServerMainDialog(
         body would make this unnecessary.
         """
         response = getattr(error, "response", None)
-        body = (getattr(response, "text", "") or "").strip()
-        # Skip HTML error pages: a Tomcat stack trace is not an explanation
-        if body and not body.startswith("<") and body not in str(error):
-            return f"{error}: {body.splitlines()[0][:300]}"
+        # One line, markup reduced to its title: a Tomcat stack trace is not an
+        # explanation, and an XML error document still says something.
+        summary = summarise_body(getattr(response, "text", ""))
+        if summary and summary not in str(error):
+            return f"{error}: {summary}"
         return str(error)
 
     def _require_connection(self):
@@ -1352,8 +1346,9 @@ class GeoServerMainDialog(
         runs in a QgsTask, so for that window (up to the probe's 10 s timeout against a
         server that has gone away) the rows and their buttons are still on
         screen and clickable. Every user-triggered action passes through here,
-        which is why the check lives at the four places actions are dispatched
-        rather than in each of the twenty methods behind them.
+        which is why the check lives where actions are dispatched (the header
+        buttons, the row actions, the link cells, Enter and Del; invariant 10)
+        rather than in each of the methods behind them.
         """
         if self.gs is not None:
             return True
@@ -1365,9 +1360,10 @@ class GeoServerMainDialog(
     def _run_action(self, action, failure_message):
         """Run a server action under a wait cursor and report if it fails.
 
-        Every add / edit / delete / load used to spell this out by hand. On an
-        exception the message bar gets "<failure_message>: <error>", the QGIS
-        log gets the same, and False comes back so the caller can stop.
+        For the inline work that is left: a form's checks and export before an
+        upload, a small edit. On an exception the message bar gets
+        "<failure_message>: <error>", the QGIS log gets the same, and False
+        comes back so the caller can stop.
         """
         self.setCursor(Qt.CursorShape.WaitCursor)
         try:

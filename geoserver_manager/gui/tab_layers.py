@@ -839,12 +839,6 @@ class LayerTabMixin:
 
         next_layer()
 
-    def _publish_layer_from_values(self, values):
-        """Publish from whichever source the form was filled for."""
-        if values.get("source") == _SOURCE_QGIS:
-            return self._publish_qgis_layer(values)
-        return self._publish_table(values)
-
     def _publish_qgis_layer(self, values, layer=None, on_done=None):
         """Upload a QGIS layer and publish it: a GeoPackage datastore for a
         vector, a GeoTIFF coverage store for a raster.
