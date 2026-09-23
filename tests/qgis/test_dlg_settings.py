@@ -274,9 +274,14 @@ class TestProfiles(unittest.TestCase):
         self.assertEqual(self.store["idA"], ("ua", "pa"))  # A was not overwritten
 
     def test_a_duplicate_name_is_refused(self):
-        self.add("A")
+        said = []
+        with patch(
+            "geoserver_manager.gui.dlg_settings.QMessageBox.warning",
+            lambda parent, title, text: said.append(text),
+        ):
+            self.add("A")
         self.assertEqual(len(self.page._profiles), 1)
-        self.assertIn("already exists", self.page.lbl_test_result.text())
+        self.assertIn("already exists", said[0])
 
     def test_removing_the_last_profile_leaves_not_configured(self):
         self.page._remove_profile()
@@ -333,6 +338,13 @@ class TestProfiles(unittest.TestCase):
         asked.assert_called_once()
         self.assertIn("idA", self.store)
         self.assertEqual(len(self.manager.profiles), 1)
+
+    def test_the_page_says_which_profile_is_active_and_what_save_does(self):
+        self.assertIn("active profile", self.page.lbl_profile_note.text())
+        self.add("B")
+        note = self.page.lbl_profile_note.text()
+        self.assertIn("Active: A", note)
+        self.assertIn("'B'", note)
 
     def test_cancel_keeps_a_removed_profile(self):
         self.page._remove_profile()

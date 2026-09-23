@@ -103,8 +103,9 @@ class CoverageStoreTabMixin:
                 self._show_coverages,
                 translate(
                     "CoverageStoreTabMixin",
-                    "Coverages: the rasters this store holds, published or not, "
-                    "with their details.",
+                    "Coverages: the rasters this store publishes, with their "
+                    "details. Publish a coverage offers the ones not published "
+                    "yet.",
                 ),
             ),
             (
@@ -225,7 +226,7 @@ class CoverageStoreTabMixin:
         fields = [
             {"key": key, "label": label, "type": "text", "read_only": True}
             for key, label in (
-                ("name", translate("CoverageStoreTabMixin", "Coverage Store")),
+                ("name", translate("CoverageStoreTabMixin", "Name")),
                 ("workspace", translate("CoverageStoreTabMixin", "Workspace")),
                 ("type", translate("CoverageStoreTabMixin", "Type")),
                 ("url", translate("CoverageStoreTabMixin", "URL")),
@@ -575,7 +576,7 @@ class CoverageStoreTabMixin:
         return [
             {
                 "key": "name",
-                "label": translate("CoverageStoreTabMixin", "Coverage Store"),
+                "label": translate("CoverageStoreTabMixin", "Name"),
                 "type": "text",
                 "required": True,
             },
@@ -598,7 +599,6 @@ class CoverageStoreTabMixin:
                 "label": translate("CoverageStoreTabMixin", "URL"),
                 "type": "text",
                 "required": True,
-                "group": translate("CoverageStoreTabMixin", "Source"),
                 "placeholder": "file:data/sf/sfdem.tif",
                 "help": translate(
                     "CoverageStoreTabMixin",
@@ -613,7 +613,6 @@ class CoverageStoreTabMixin:
                 "type": "text",
                 "required": True,
                 "visible": False,
-                "group": translate("CoverageStoreTabMixin", "Source"),
                 "placeholder": "/opt/geoserver_data/coverages/my_mosaic",
                 "help": translate(
                     "CoverageStoreTabMixin",
@@ -627,7 +626,6 @@ class CoverageStoreTabMixin:
                 "type": "file",
                 "required": True,
                 "visible": False,
-                "group": translate("CoverageStoreTabMixin", "Source"),
                 "filter": "ZIP (*.zip);;All files (*)",
                 "help": translate(
                     "CoverageStoreTabMixin",
@@ -645,7 +643,6 @@ class CoverageStoreTabMixin:
                 "options": [label for label, _layer in raster_project_layers()],
                 "required": True,
                 "visible": False,
-                "group": translate("CoverageStoreTabMixin", "Source"),
                 "help": translate(
                     "CoverageStoreTabMixin",
                     "File-based rasters of this project. The layer is written to a "
@@ -663,7 +660,6 @@ class CoverageStoreTabMixin:
                 "type": "checkbox",
                 "default": False,
                 "visible": False,
-                "group": translate("CoverageStoreTabMixin", "Source"),
             },
             {
                 "key": "title",
@@ -703,6 +699,15 @@ class CoverageStoreTabMixin:
             translate("CoverageStoreTabMixin", "Failed to load the workspaces"),
         )
         if workspace_names is None:
+            return
+        if not workspace_names:
+            # The other Add forms say this up front, rather than after Create.
+            self.show_warning_message(
+                translate(
+                    "CoverageStoreTabMixin",
+                    "No workspaces available. Create a workspace first.",
+                )
+            )
             return
 
         dlg = ResourceFormDialog(

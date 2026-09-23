@@ -67,6 +67,9 @@ from geoserver_manager.toolbelt.rest import raw_rest, summarise_body
 # never block the GUI thread.
 _MAX_PARALLEL_REQUESTS = 8
 _UNSAFE_IN_NAMES = "/?#%\\"
+# A cell longer than this gets its whole text as a tooltip: columns share the
+# width, so a list of gridsets or a long title is cut short on screen.
+_ELIDED_AFTER = 24
 
 # A read that answers within this many seconds never shows the waiting box, so
 # a healthy server looks exactly as it did when reads ran inline.
@@ -171,6 +174,9 @@ class GeoServerMainDialog(
         self._icon_refresh_timer.setSingleShot(True)
         self._icon_refresh_timer.timeout.connect(self._refresh_icons)
         self._setup_nav()
+        # Qt numbers the rows of the page (1 to 20 on every page), which read
+        # as the position in the list while "Results 21 to 40" said otherwise.
+        self.resultsTable.verticalHeader().setVisible(False)
 
         # Pagination state
         self._page_size = 20
@@ -1015,8 +1021,14 @@ class GeoServerMainDialog(
         self.resultsTable.setRowCount(len(page_rows))
         for row_idx, values in enumerate(page_rows):
             for col, val in enumerate(values):
-                item = QTableWidgetItem("-" if val is None else str(val))
-                if self._cell_click_callback(col) is not None:
+                text = "-" if val is None else str(val)
+                item = QTableWidgetItem(text)
+                # "(global)" in a Workspace column has nowhere to go, so it is
+                # not drawn as a link (the click skips it too).
+                is_link = self._cell_click_callback(col) is not None and (
+                    col == 0 or scope(text) is not None
+                )
+                if is_link:
                     # Styled as a link; the click itself is handled by
                     # _on_cell_clicked. A real item (not a QPushButton) keeps
                     # the row selectable, so "Delete Selected" works here too.
@@ -1025,8 +1037,15 @@ class GeoServerMainDialog(
                     font.setUnderline(True)
                     item.setFont(font)
                     item.setToolTip(
+                        # Enter opens the row's own resource, not a workspace.
                         self.tr("Click to open (or select and press Enter)")
+                        if col == 0
+                        else self.tr("Click to open")
                     )
+                elif len(text) > _ELIDED_AFTER:
+                    # A narrow column cuts it ("EPSG:4326, EPSG:…"): the whole
+                    # value on hover.
+                    item.setToolTip(text)
                 self.resultsTable.setItem(row_idx, col, item)
             if self._row_actions:
                 self.resultsTable.setCellWidget(

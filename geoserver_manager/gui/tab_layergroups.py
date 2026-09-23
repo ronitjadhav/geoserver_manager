@@ -295,7 +295,7 @@ class LayerGroupTabMixin:
             title=translate("LayerGroupTabMixin", "Layer Group '{}'").format(name),
             description=translate(
                 "LayerGroupTabMixin",
-                "Read-only: to change a group, create it again or delete it.",
+                "Read-only. To change it, delete it and create it again.",
             ),
             fields=self._group_info_fields(),
             values=self._group_form_values(detail, name, workspace_label),

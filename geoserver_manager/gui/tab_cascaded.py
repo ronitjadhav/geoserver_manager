@@ -88,7 +88,7 @@ class CascadedStoreTabMixin:
                 translate("CascadedStoreTabMixin", "Workspace"),
                 translate("CascadedStoreTabMixin", "Type"),
                 translate("CascadedStoreTabMixin", "Enabled"),
-                translate("CascadedStoreTabMixin", "Capabilities URL"),
+                translate("CascadedStoreTabMixin", "GetCapabilities URL"),
                 self.actions_column_label(),
             ]
         )
@@ -575,7 +575,7 @@ class CascadedStoreTabMixin:
                 ("type", translate("CascadedStoreTabMixin", "Type")),
                 (
                     "capabilities_url",
-                    translate("CascadedStoreTabMixin", "Capabilities URL"),
+                    translate("CascadedStoreTabMixin", "GetCapabilities URL"),
                 ),
                 ("enabled", translate("CascadedStoreTabMixin", "Enabled")),
             )
@@ -628,7 +628,8 @@ class CascadedStoreTabMixin:
             ),
             description=translate(
                 "CascadedStoreTabMixin",
-                "Read-only: to point the store at another server, create it again.",
+                "Read-only. To point it at another server, delete it and create "
+                "it again; its published layers go with it.",
             ),
             fields=self._cascaded_store_info_fields(),
             values=self._cascaded_store_form_values(detail, ws_name, kind, published),

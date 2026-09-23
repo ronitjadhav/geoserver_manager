@@ -206,6 +206,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- Read-only details (layers, styles, the tile cache) read as text: no input
+  boxes that invite typing. A layer's abstract gets several lines, Enabled
+  and Advertised say Yes or No, and the labels are in sentence case.
+- The style dialog opens on its definition, in a fixed font over the whole
+  width, with its format, version and legend on a *Details* tab. *Upload a
+  Style* fits on one page.
+- *Publish a Layer* asks for the SRS on its first tab instead of bouncing to
+  *Metadata*, and hides "upload its symbology" for a raster, which ignores it.
+- *Add a Coverage Store* is one page, names its first field "Name", and says
+  up front when there is no workspace to put it in.
+- Tables: no row numbers restarting on every page, "(global)" is no longer
+  drawn as a link that goes nowhere, and a cell cut short shows its whole
+  text on hover. The Workspaces *Default* column reads Yes or No.
+- The settings page says which profile is active and what Save will change;
+  *Remove* says it waits for Save, and warnings name their profile.
+- Wording: cascaded stores say "GetCapabilities URL" everywhere, and two
+  read-only dialogs no longer advise "create it again", which Add refuses.
 - The documentation has a quick start, and the user guide is rewritten in
   plainer words with a screenshot of every tab and main form. The capture
   script grabs them all from the sandbox, so they stay current.

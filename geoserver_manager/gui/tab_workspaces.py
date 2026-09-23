@@ -68,7 +68,8 @@ class WorkspaceTabMixin:
         # GeoServer always has exactly one default and it cannot be unset.
         default = self._default_workspace_name()
         rows = [
-            [name, translate("WorkspaceTabMixin", "default") if name == default else ""]
+            # A boolean cell, like every other: Yes / No, translated.
+            [name, self._yes_no(name == default)]
             for name in (self._name_of(ws) for ws in workspaces)
         ]
         return rows, []

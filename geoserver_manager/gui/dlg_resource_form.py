@@ -55,10 +55,14 @@ Field options:
     - on_change (callable): for "combo" fields, called with (new_value)
       when the selection changes
     - visible (bool): initial visibility (default True)
+    - max_height / min_height (int): a "textarea"'s height bounds (default at
+      most 120 px); a document to edit, like a style, wants more
+    - code (bool): a "textarea" of markup: fixed font, no line wrapping
+    - wide (bool): span the whole form, without a label beside the widget
 """
 
-from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtGui import QPixmap
+from qgis.PyQt.QtCore import QCoreApplication, Qt
+from qgis.PyQt.QtGui import QFontDatabase, QPixmap
 from qgis.PyQt.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -178,7 +182,8 @@ class ResourceFormDialog(QDialog):
     def _collect_groups(fields):
         """Organise fields into ordered groups (preserves insertion order)."""
         groups = {}
-        default_group = "General"
+        # A tab name the user reads, so it is translated like the rest.
+        default_group = QCoreApplication.translate("ResourceFormDialog", "General")
         for field in fields:
             group = field.get("group", default_group)
             groups.setdefault(group, []).append(field)
@@ -222,7 +227,15 @@ class ResourceFormDialog(QDialog):
                 )
                 wrapper.addWidget(help_label)
 
-            form.addRow(label, wrapper_widget)
+            if field.get("wide"):
+                # The whole width, no label beside it: a document to edit
+                # whose tab already names it. The label still names it in a
+                # validation message.
+                label.setParent(container)
+                label.hide()
+                form.addRow(wrapper_widget)
+            else:
+                form.addRow(label, wrapper_widget)
             self._row_widgets[field["key"]] = (label, wrapper_widget)
 
             # Initial visibility
@@ -257,6 +270,7 @@ class ResourceFormDialog(QDialog):
                 # Not setEnabled(False): a greyed field cannot be selected or
                 # copied, and detail views are made of these (bounds, URLs).
                 w.setReadOnly(True)
+                self._looks_read_only(w)
             return w
 
         if ftype == "checkbox":
@@ -288,7 +302,14 @@ class ResourceFormDialog(QDialog):
 
         if ftype == "textarea":
             w = QPlainTextEdit()
-            w.setMaximumHeight(120)
+            if field.get("code"):
+                # Markup reads as written: a fixed font, and no wrapping in
+                # the middle of an attribute.
+                w.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
+                w.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+            w.setMaximumHeight(field.get("max_height", 120))
+            if field.get("min_height"):
+                w.setMinimumHeight(field["min_height"])
             if value:
                 w.setPlainText(str(value))
             placeholder = field.get("placeholder")
@@ -296,6 +317,7 @@ class ResourceFormDialog(QDialog):
                 w.setPlaceholderText(placeholder)
             if read_only:
                 w.setReadOnly(True)
+                self._looks_read_only(w)
             return w
 
         if ftype == "file":
@@ -339,6 +361,20 @@ class ResourceFormDialog(QDialog):
         if value:
             w.setText(str(value))
         return w
+
+    @staticmethod
+    def _looks_read_only(widget):
+        """Draw a read-only box as text: no frame, the window's background.
+
+        An input box invites typing; in a detail view nothing can be typed,
+        and every field looked editable anyway. Selecting and copying still
+        work, which is why these are read-only rather than disabled.
+        """
+        if isinstance(widget, QLineEdit):
+            widget.setFrame(False)
+        else:
+            widget.setFrameShape(QPlainTextEdit.Shape.NoFrame)
+        widget.setStyleSheet("background: transparent;")
 
     def get_values(self):
         """Return a dict of field key -> current value."""
@@ -434,7 +470,9 @@ class ResourceFormDialog(QDialog):
         # Reset styles
         for field in self._fields:
             widget = self._widgets[field["key"]]
-            if not field.get("read_only"):
+            # Read-only boxes keep their text look, and the image keeps the
+            # hint colour of its placeholder.
+            if not field.get("read_only") and field.get("type") != "image":
                 widget.setStyleSheet("")
 
         values = self.get_values()
