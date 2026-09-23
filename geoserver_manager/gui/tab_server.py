@@ -155,6 +155,7 @@ class ServerTabMixin:
                 self.actions_column_label(),
             ]
         )
+        self._path_columns = ()  # fixed rows, no names in the paths
         self._start_load(
             translate("ServerTabMixin", "Failed to load the server settings"),
             self._fetch_server_rows,
@@ -262,7 +263,7 @@ class ServerTabMixin:
         dlg = ResourceFormDialog(
             title=row_data[0],
             description=self._server_description(kind),
-            fields=self._server_fields(kind),
+            fields=self._server_fields(kind, before),
             values=before,
             parent=self,
         )
@@ -317,8 +318,13 @@ class ServerTabMixin:
             values["max_features"] = int(settings.get("maxFeatures") or 0)
         return values
 
-    def _server_fields(self, kind):
-        """Field definitions for one row's form."""
+    def _server_fields(self, kind, current=None):
+        """Field definitions for one row's form.
+
+        :param current: the form's prefill. A logging profile GeoServer has
+            beyond the built-in ones is offered too: the combo would otherwise
+            select DEFAULT_LOGGING, and an untouched Save sent it.
+        """
 
         def text(key, label, **extra):
             return {"key": key, "label": label, "type": "text", **extra}
@@ -393,7 +399,12 @@ class ServerTabMixin:
                     "key": "level",
                     "label": t("ServerTabMixin", "Profile"),
                     "type": "combo",
-                    "options": list(LOG_LEVELS),
+                    "options": list(LOG_LEVELS)
+                    + [
+                        level
+                        for level in [(current or {}).get("level")]
+                        if level and level not in LOG_LEVELS
+                    ],
                 },
                 text(
                     "location",

@@ -182,6 +182,7 @@ class GeoServerMainDialog(
         self._all_rows = []  # all fetched rows (list of list-of-str)
         self._filtered_rows = []  # rows after search filter
         self._columns = []  # headers of the table as set up
+        self._path_columns = (0, 1)  # cells that go into REST paths: _addressable
         self._sort = None  # (column, descending) applied to _filtered_rows
         self._row_actions = []  # (icon, label, callback[, tooltip]) per row action
         self._name_click_callback = None  # callback(row_data) when name is clicked
@@ -276,7 +277,11 @@ class GeoServerMainDialog(
             and self._name_click_callback is not None
         ):
             selected = self._get_selected_rows()
-            if len(selected) == 1 and self._require_connection():
+            if (
+                len(selected) == 1
+                and self._require_connection()
+                and self._addressable(selected)
+            ):
                 self._name_click_callback(selected[0])
             return
         if (
@@ -287,8 +292,9 @@ class GeoServerMainDialog(
         ):
             # The fifth dispatch point (invariant 10): the button is re-enabled
             # by a selection change even while a Refresh has no client yet.
-            if self._require_connection():
-                self._delete_selected_callback(self._get_selected_rows())
+            rows = self._get_selected_rows()
+            if self._require_connection() and self._addressable(rows):
+                self._delete_selected_callback(rows)
             return
         super().keyPressEvent(event)
 
@@ -438,6 +444,8 @@ class GeoServerMainDialog(
         Returns as soon as the probe is on its way: nothing here waits for the
         server, so QGIS stays usable even when the host swallows the SYN.
         """
+        if self._refuse_while_writing():
+            return
         self._set_status(self.tr("Connecting…"), "busy")
         self.setWindowTitle(__title__)
         self._fill_profile_switcher()
@@ -512,8 +520,28 @@ class GeoServerMainDialog(
         )
         if profile is None:
             return
+        if self._refuse_while_writing():
+            self._fill_profile_switcher()  # back to the profile still in use
+            return
         self.plg_settings.activate_profile(profile)
         self.refresh_ui(show_message=True)
+
+    def _refuse_while_writing(self):
+        """True, with a warning, while a delete batch or an upload runs.
+
+        Their remaining steps read self.gs: swapping the connection under them
+        sent the rest of a delete batch (recurse=true) to the other server, and
+        a publish's style and metadata too. So the connection waits instead.
+        """
+        if self._delete is None and self._upload is None:
+            return False
+        self.show_warning_message(
+            self.tr(
+                "A delete or an upload is still running on this server. Let it "
+                "finish, or cancel it, before connecting again."
+            )
+        )
+        return True
 
     # -- Background loading ------------------------------------------------
 
@@ -882,7 +910,11 @@ class GeoServerMainDialog(
         except TypeError:
             pass
         self.btn_delete_selected.clicked.connect(
-            lambda: self._require_connection() and callback(self._get_selected_rows())
+            lambda: (
+                self._require_connection()
+                and self._addressable(self._get_selected_rows())
+                and callback(self._get_selected_rows())
+            )
         )
 
     def _setup_table(self, columns):
@@ -896,6 +928,9 @@ class GeoServerMainDialog(
             # Another resource type: its columns mean something else.
             self._sort = None
         self._columns = list(columns)
+        # The cells that end up in REST paths: the name and the workspace.
+        # A tab with others (the Layers tab's store) or none sets it after.
+        self._path_columns = (0, 1)
         # Loaders call this before fetching, so drop the previous rows here too:
         # a fetch that raises must not leave them to be repainted under the new
         # headers (see _reset_table_state).
@@ -1126,7 +1161,9 @@ class GeoServerMainDialog(
         if callback is None or not self._require_connection():
             return
         index = self._current_page * self._page_size + row
-        if index < len(self._filtered_rows):
+        if index < len(self._filtered_rows) and self._addressable(
+            [self._filtered_rows[index]]
+        ):
             callback(self._filtered_rows[index])
 
     def _make_action_widget(self, row_data):
@@ -1156,7 +1193,7 @@ class GeoServerMainDialog(
             btn.setFixedSize(size, size)
             btn.clicked.connect(
                 lambda _checked=False, cb=callback, row=row_data: (
-                    self._require_connection() and cb(row)
+                    self._require_connection() and self._addressable([row]) and cb(row)
                 )
             )
             layout.addWidget(btn)
@@ -1177,7 +1214,9 @@ class GeoServerMainDialog(
                 entry.setToolTip(action[3] if len(action) > 3 else label)
                 entry.triggered.connect(
                     lambda _checked=False, cb=callback, row=row_data: (
-                        self._require_connection() and cb(row)
+                        self._require_connection()
+                        and self._addressable([row])
+                        and cb(row)
                     )
                 )
             menu.aboutToShow.connect(lambda: self._refresh_action_menu(menu))
@@ -1327,6 +1366,31 @@ class GeoServerMainDialog(
         if isinstance(value, str):
             value = value.strip().lower() == "true"
         return self.tr("Yes") if value else self.tr("No")
+
+    def _addressable(self, rows):
+        """True unless a row's name cannot go into a REST path; then say so.
+
+        A resource made elsewhere (the web UI, REST) can be called "a#b", and
+        `requests` sends its path as ".../a": deleting "a#b" deleted "a" and
+        reported success, and its edit form showed "a". So the rows are
+        refused, as the Add forms refuse such names.
+        ponytail: refused, not quoted; the library builds paths from raw names
+        (issue #50 row 50), and quoting only the plugin's side would double-
+        quote wherever it already does. Quote everywhere once the library does.
+        """
+        for row in rows:
+            for column in self._path_columns:
+                value = row[column] if column < len(row) else None
+                if isinstance(value, str) and any(c in value for c in _UNSAFE_IN_NAMES):
+                    self.show_warning_message(
+                        self.tr(
+                            "'{}' has a '/', '?', '#' or '%' in its name, which "
+                            "changes the address the plugin would use. Rename it "
+                            "in GeoServer's web interface to manage it here."
+                        ).format(value)
+                    )
+                    return False
+        return True
 
     def _require_safe_name(self, name):
         """Refuse a name the REST paths cannot carry, before it reaches them.

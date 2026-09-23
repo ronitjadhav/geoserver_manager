@@ -49,6 +49,11 @@ These rules prevent regressions found in testing or observed against GeoServer. 
    The tab fetchers read `self.gs` from their worker, which is safe for one reason only: the client
    changes solely after the running load is cancelled (`refresh_ui()` cancels, then clears), and a
    cancelled load renders nothing. Anything new that assigns `self.gs` must cancel the load first;
-   `test_a_refresh_cancels_the_load_before_it_drops_the_client` guards it.
+   `test_a_refresh_cancels_the_load_before_it_drops_the_client` guards it. A delete batch and an upload
+   are not cancelled by a refresh, and their later steps read `self.gs`: a profile switch mid-batch sent the
+   rest of a recursive delete to the other server. So `refresh_ui()` and the profile switch refuse, with a
+   warning, while either runs (`_refuse_while_writing`). The same dispatch points also pass
+   `_addressable(rows)`: a row whose name holds `/ ? # %` is refused, because `requests` sends
+   `datastores/a#b` as `datastores/a` and the delete of "a#b" deleted "a".
 11. **Nav labels in `TABS` are logic keys as well as text.** The `tr("Actions")` column and the
    `tr("Workspace")` key in `_extra_click_callbacks` must match the header strings exactly.

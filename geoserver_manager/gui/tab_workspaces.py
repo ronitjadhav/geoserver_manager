@@ -264,10 +264,14 @@ class WorkspaceTabMixin:
         return ", ".join(str(item) for item in (items or []))
 
     @classmethod
-    def _wms_form_values(cls, settings):
-        """Prefill for the WMS group; settings is None for "no own settings"."""
+    def _wms_form_values(cls, settings, overall=None):
+        """Prefill for the WMS group; settings is None for "no own settings".
+
+        Then the fields show the global WMS settings, like the other services:
+        a new override began at no rendering limits and an empty title.
+        """
         present = settings is not None
-        settings = settings or {}
+        settings = settings if present else (overall or {})
         return {
             "wms_own": present,
             "wms_enabled": bool(settings.get("enabled", True)),
@@ -580,12 +584,19 @@ class WorkspaceTabMixin:
                     service: self._service_settings(service, old_name)
                     for service in OTHER_SERVICES
                 },
+                self._raw_rest(
+                    "get",
+                    f"{self.gs.rest_service.rest_endpoints.base_url}"
+                    "/services/wms/settings.json",
+                )
+                .json()
+                .get("wms"),
             ),
             translate("WorkspaceTabMixin", "Failed to load workspace details"),
         )
         if fetched is None:
             return
-        detail, wms_settings, default_name, uri, services = fetched
+        detail, wms_settings, default_name, uri, services, overall_wms = fetched
 
         is_default = default_name == old_name
         values = {
@@ -598,7 +609,7 @@ class WorkspaceTabMixin:
             "set_default": is_default,
             "uri": uri,
         }
-        values.update(self._wms_form_values(wms_settings))
+        values.update(self._wms_form_values(wms_settings, overall_wms))
         for service, (own, overall) in services.items():
             values.update(self._service_form_values(service, own, overall))
         dlg = ResourceFormDialog(

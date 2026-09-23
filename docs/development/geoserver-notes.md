@@ -176,6 +176,14 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   it (`""` stores an empty one). The log is `GET /rest/resource/{location}`: served whole, gzip, no length, no
   Range, so it is streamed and only its end kept. `POST /rest/reload` and `/rest/reset` answer 200 at once on
   the sandbox. The web admin pages are `/web/wicket/bookmarkable/{class}` (a wrong class is a 404).
+- **Library models that lose data** (row 62, measured on 2.28.5): `rest_service.get_layer()` keeps a single
+  other style as the bare `{"name", "href"}` object GeoServer writes, and `Layer.asdict()` reads its keys as two
+  styles named "name" and "href" (11 demo layers); `get_wms_store()`'s model drops `user`, `password`,
+  `maxConnections`, `readTimeout` and `connectTimeout`. Both are read raw. A style is created in **one** `POST`
+  to the collection with `?name=` and the body's content type: creating the definition first left an empty style
+  behind when the body was refused (a retry then "already exists"). A GeoPackage upload whose name matches a
+  layer in another store is published as `name1`, and a Replace upload onto a store of another type makes
+  GeoServer import into that store (a PostGIS database), so `_refuse_layer_clash` checks both first.
 - **Seeding** (row 59, measured on 2.28.5): `POST /gwc/rest/seed/{layer}.json` with a `seedRequest` (name,
   gridSetId, format, type seed/reseed/truncate, zoomStart/Stop, threadCount, optional `bounds.coords.double`
   and `parameters.entry[].string[key, value]`) answers 200 and starts `threadCount` tasks; an unknown gridset is

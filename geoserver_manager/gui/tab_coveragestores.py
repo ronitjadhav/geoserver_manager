@@ -1100,6 +1100,9 @@ class CoverageStoreTabMixin:
                 name,
                 translate("CoverageStoreTabMixin", "Tick Replace to overwrite it."),
             )
+        self._refuse_layer_clash(
+            ws_name, name, values.get("replace"), "coverage", "GeoTIFF"
+        )
         source = local_geotiff_path(layer)
         if source is not None:
             return source, None

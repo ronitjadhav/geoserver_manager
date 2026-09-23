@@ -21,7 +21,7 @@ from geoserver_manager.gui import tab_styles
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.scope import GLOBAL
 from geoserver_manager.gui.tab_styles import StyleTabMixin
-from geoserver_manager.toolbelt.sld import SLD_1_1, layer_to_sld
+from geoserver_manager.toolbelt.sld import SLD_1_0, SLD_1_1, layer_to_sld
 from tests.qgis.sync_dialog import SyncDialog
 from tests.qgis.test_sld import point_layer
 
@@ -231,15 +231,14 @@ class TestStylesTab(unittest.TestCase):
                 "sld": SLD,
             }
         )
-        # the definition first, then the body, not create_style_from_string,
-        # which would force the SLD 1.0 content type on any document
-        self.assertEqual(
-            self.dlg.gs.calls[0], ("definition", "brand_new", "brand_new.sld", None)
-        )
-        self.assertEqual(
-            self.dlg.gs.calls[1],
-            ("PUT-body", "brand_new", None, "sld", SLD.encode()),
-        )
+        # One POST with the body's own content type: a definition created first
+        # stayed behind, empty, when GeoServer refused the body.
+        creates = [c for c in self.dlg.gs.calls if c[0] in ("POST", "definition")]
+        ((verb, path, kwargs),) = creates
+        self.assertEqual((verb, path), ("POST", "/rest/styles.json"))
+        self.assertEqual(kwargs["params"], {"name": "brand_new"})
+        self.assertEqual(kwargs["headers"]["Content-Type"], SLD_1_0)
+        self.assertEqual(kwargs["data"], SLD.encode())
         self.assertFalse(any(c[0] == "from_string" for c in self.dlg.gs.calls))
 
     def test_upload_from_an_sld_file_reads_it_and_takes_the_same_path(self):
@@ -258,10 +257,9 @@ class TestStylesTab(unittest.TestCase):
                 "file": path,
             }
         )
-        self.assertEqual(
-            self.dlg.gs.calls[-1],
-            ("PUT-body", "brand_new", "topp", "sld", SLD.encode()),
-        )
+        verb, path, kwargs = self.dlg.gs.calls[-1]
+        self.assertEqual((verb, path), ("POST", "/rest/workspaces/topp/styles.json"))
+        self.assertEqual(kwargs["data"], SLD.encode())
         self.assertFalse(any(c[0] == "from_file" for c in self.dlg.gs.calls))
 
     def test_a_zip_or_mbstyle_file_still_goes_through_the_library(self):
@@ -457,12 +455,10 @@ class TestStyleFromQgisLayer(unittest.TestCase):
                 "qgis_layer": "towns  (vector)",
             }
         )
-        self.assertEqual(
-            self.dlg.gs.calls[0],
-            ("definition", "new_towns", "new_towns.sld", "topp"),
-        )
+        self.assertFalse(any(c[0] == "definition" for c in self.dlg.gs.calls))
         verb, _path, kwargs = self.dlg.gs.calls[-1]
-        self.assertEqual(verb, "PUT")
+        self.assertEqual(verb, "POST")
+        self.assertEqual(kwargs["params"], {"name": "new_towns"})
         self.assertEqual(kwargs["headers"]["Content-Type"], SLD_1_1)
         self.assertIn(b"ff0000", kwargs["data"].lower())  # the symbology travelled
 

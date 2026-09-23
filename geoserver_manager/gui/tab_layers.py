@@ -170,6 +170,7 @@ class LayerTabMixin:
                 self.actions_column_label(),
             ]
         )
+        self._path_columns = (0, 1, 3)  # the store is in the resource's path
         self._start_load(
             translate("LayerTabMixin", "Failed to load layers"), self._fetch_layer_rows
         )
@@ -214,6 +215,58 @@ class LayerTabMixin:
         return sorted(
             self._name_of(layer) for layer in self._unwrap(payload, "layers", "layer")
         )
+
+    def _refuse_layer_clash(self, ws_name, name, replace, kind, store_type):
+        """Refuse an upload that would land on another store's layer.
+
+        Measured on 2.28.5: a layer ws:name in another store makes GeoServer
+        call the new one name1, and the style and metadata that follow went to
+        the old ws:name, reported as "name published". With Replace, a store
+        of the name that is not the plugin's own file store (a PostGIS one)
+        had GeoServer import the file's tables into that database.
+
+        :param kind: "data" or "coverage", the store collection.
+        :param store_type: the only store type Replace may overwrite.
+        """
+        qualified = f"{ws_name}:{name}"
+        if self.gs.rest_service.resource_exists(self._layers_url(qualified)):
+            if not replace:
+                raise ValueError(
+                    translate(
+                        "LayerTabMixin",
+                        "Layer '{}' already exists. Tick Replace to overwrite it, "
+                        "or pick another name.",
+                    ).format(qualified)
+                )
+            _kind, store, _style = self._layer_summary(qualified)
+            if store != name:
+                raise ValueError(
+                    translate(
+                        "LayerTabMixin",
+                        "Layer '{}' is published from store '{}', which this "
+                        "upload would not replace. Pick another name.",
+                    ).format(qualified, store)
+                )
+        if not replace:
+            return
+        path = "{}/workspaces/{}/{}stores/{}.json".format(
+            self.gs.rest_service.rest_endpoints.base_url,
+            quote(ws_name, safe=""),
+            kind,
+            quote(name, safe=""),
+        )
+        if not self.gs.rest_service.resource_exists(path):
+            return
+        payload = self._raw_rest("get", path).json()
+        found = (next(iter(payload.values()), {}) or {}).get("type") or "-"
+        if found != store_type:
+            raise ValueError(
+                translate(
+                    "LayerTabMixin",
+                    "Store '{}' is a {} store. Replace only overwrites a {} store "
+                    "this plugin published; pick another name.",
+                ).format(name, found, store_type)
+            )
 
     def _layer_summary(self, qualified_name):
         """(type, store, default style) of one layer. Raises on HTTP errors.
@@ -1138,6 +1191,9 @@ class LayerTabMixin:
                         + " "
                         + translate("LayerTabMixin", "Tick Replace to overwrite it.")
                     )
+        self._refuse_layer_clash(
+            ws_name, name, values.get("replace"), "data", "GeoPackage"
+        )
 
         # A CRS without an EPSG code would be published as UNKNOWN: the export
         # reprojects it to one GeoServer can declare (reprojection_target).
@@ -1309,24 +1365,25 @@ class LayerTabMixin:
     # -- Default style --------------------------------------------------------
 
     def _layer_styles(self, workspace_name, name):
-        """(default style, [other styles]) of a layer; (None, []) if unreadable.
+        """(default style, [other styles]) of a layer. Raises on HTTP errors.
 
-        TODO(#50): upstream: the facade has set_default_layer_style() but no
-        get_layer(); rest_service.get_layer() exists and is used here directly.
+        TODO(#50): rest_service.get_layer() keeps a single other style as the
+        bare {"name", "href"} dict GeoServer sends, and Layer.asdict() then
+        reads its keys as two styles, "name" and "href" (row 62): Set style
+        refused to save, and deleting those lines wiped the real style. So
+        the layer document is read here and unwrapped like every list.
         """
-        try:
-            layer = self._check(self.gs.rest_service.get_layer(workspace_name, name))
-        except Exception:
-            return None, []
-        info = layer.asdict() if hasattr(layer, "asdict") else layer
-        if not isinstance(info, dict):
-            return None, []
-        others = (
-            unwrap(info, "styles", "style")
-            if isinstance(info.get("styles"), dict)
-            else (info.get("styles") or [])
-        )
-        return info.get("defaultStyle"), [self._name_of(s) for s in others]
+        payload = self._raw_rest(
+            "get", self._layers_url(f"{workspace_name}:{name}")
+        ).json()
+        layer = payload.get("layer") or {}
+        default = (layer.get("defaultStyle") or {}).get("name")
+        others = [
+            self._name_of(style)
+            for style in unwrap(layer, "styles", "style")
+            if isinstance(style, dict)
+        ]
+        return default, others
 
     def _style_choices(self, workspace_name):
         """Styles a layer in this workspace may use: global ones and its workspace's.
@@ -1586,7 +1643,7 @@ class LayerTabMixin:
         """Create or replace the style in the layer's workspace, then assign it.
 
         Returns False when the style exists and the user chose to keep it:
-        create_style_definition upserts, and every layer sharing that style
+        a style is shared, and every layer using it
         would render differently, so replacing is confirmed, never silent
         (the Styles tab refuses an existing name outright; here replacing is
         the stated workflow: push the change you just made in QGIS).
@@ -1595,16 +1652,17 @@ class LayerTabMixin:
         defaultStyle gets "workspace:style"; a bare name there would resolve
         to a global style of the same name instead.
         """
-        if self._resource_exists(
+        exists = self._resource_exists(
             self.gs.get_style_definition, style_name, workspace_name
-        ) and not self._confirm_replace_style(style_name, workspace_name):
-            return False
-        self._check(
-            self.gs.create_style_definition(
-                style_name, f"{style_name}.sld", workspace_name
-            )
         )
-        self._put_sld_body(style_name, workspace_name, sld)
+        if exists and not self._confirm_replace_style(style_name, workspace_name):
+            return False
+        if exists:
+            self._put_sld_body(style_name, workspace_name, sld)
+        else:
+            # One request: a definition created first stayed behind, empty,
+            # when GeoServer refused the body (StyleTabMixin._create_style).
+            self._create_style(style_name, workspace_name, "sld", sld)
         if set_default:
             self._check(
                 self.gs.set_default_layer_style(

@@ -826,7 +826,7 @@ class DatastoreTabMixin:
             merged.update(
                 {
                     "host": values.get("pg_host", ""),
-                    "port": int(values.get("pg_port", 5432)),
+                    "port": self._kept_port(conn_params.get("port"), values),
                     "database": values.get("pg_db", ""),
                     "user": values.get("pg_user", ""),
                     # Blank keeps the stored (encrypted) value; see _wfs_params.
@@ -888,6 +888,18 @@ class DatastoreTabMixin:
                 enabled=bool(enabled),
             )
         )
+
+    @staticmethod
+    def _kept_port(stored, values):
+        """The port to save: the stored text unless the form changed it.
+
+        The spinbox can only show a number, so "${PG_PORT}" (a parametrised
+        port) was prefilled as 5432 and saved as 5432 by an unrelated edit.
+        """
+        port = int(values.get("pg_port", 5432))
+        if stored is not None and _as_int(stored, 5432) == port:
+            return stored
+        return port
 
     @staticmethod
     def _other_params_text(ds_type, conn_params):
