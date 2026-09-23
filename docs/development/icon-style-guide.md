@@ -82,12 +82,3 @@ deleted freely. Inspect the actual QGIS control at normal and 2× scaling too.
 Unit tests check registration, fallbacks, missing SVGs and stroke consistency;
 no generated files need to be committed. Update the usage guide, changelog and
 real-dialog screenshot when a visible icon changes.
-
-## Generation brief
-
-> Create an original SVG for [action], distinct from [similar actions]. Read
-> this guide and use [existing SVG paths] as references. Preserve the 24 px
-> grid, 1.2-unit strokes and exact colour tokens. Use simple vector geometry
-> and clear space around action markers. Check recognition at 16–24 px in
-> monochrome and both themes. Deliver the SVG and registry entry; generate
-> a local preview only for review.

@@ -59,9 +59,9 @@ Set up an environment, run the tests, and find the work that is waiting.
 
 Every list loads in the background, and is searchable, sortable and paginated.
 Credentials live in the QGIS authentication database, never in a project file.
-Every request goes through
-[python-geoservercloud](https://github.com/camptocamp/python-geoservercloud):
-the plugin exists partly to drive that library's maturity.
+The plugin uses
+[python-geoservercloud](https://github.com/camptocamp/python-geoservercloud)
+with documented workarounds for missing library operations.
 
 :::{note}
 The plugin is experimental and not on the QGIS plugin repository yet.

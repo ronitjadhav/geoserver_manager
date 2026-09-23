@@ -246,6 +246,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- Contributor documentation now uses public instructions throughout. Removed
+  private workflow references and corrected stale installation and setup guidance.
+
 - Error banners read "HTTP 500: GeoServer's reason" instead of the
   library's "500 Server Error: for url: <the whole request URL>".
 - Refusing a CSS or MBStyle style for QGIS (*Apply to a QGIS layer*) is an
@@ -314,10 +317,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - *Publish a table*: the declared SRS has no default any more (4326 was
   usually wrong for a projected table), and must be an EPSG number; the help
   says where to look it up.
-- A coverage store's *Enabled* reads Yes / No instead of True / False; its
-  read-only note no longer blames GeoServer's REST API (which does update
-  stores) for what is a library gap: "Read-only in this version. Edit it in
-  GeoServer's web UI."
+- A coverage store's *Enabled* reads Yes / No instead of True / False.
 - Editing a PostGIS store no longer demands the password again: leave the
   field empty to keep the stored one, type to replace it. GeoServer accepts
   its own encrypted value back (measured, a store still connected after the
@@ -325,8 +325,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 - The bundled `geoservercloud` wheel is stripped of its acceptance-test
   fixtures: 16 MB -> 49 KB.
-- The datastore list fetches store details in parallel (~5x faster) and caches
-  workspace names between dialogs.
+- The datastore list fetches store details in parallel. Workspace names are
+  fetched when a form opens to reflect changes made on the server.
 
 ### Fixed
 
@@ -458,15 +458,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   disabled stores. Edits now merge onto what the server holds.
 - "Add a New Workspace/Datastore" silently overwrote an existing resource of the
   same name and reported it as created; both now refuse a taken name.
-- A datastore cannot be renamed from the edit form any more: it would either
-  duplicate the store or overwrite whatever already held the new name.
 - Delete confirmations now state what the cascade takes with it (both delete
   paths send `recurse=true`).
 - The first, blocking connection attempt no longer runs before the window is on
   screen, which made an unreachable host look like a hung QGIS.
 
-- Bulk delete acted on the wrong rows once a column was sorted; table sorting is
-  now disabled, since rows are paginated client-side.
+- Bulk delete now uses the sorted row cache, so it acts on the selected resources
+  after sorting or pagination.
 - A wrong password or an HTTP error was reported as "server unreachable", and a
   404 from the configured URL was reported as a successful connection.
 - Required form fields on an inactive tab were never validated, so datastores
@@ -477,8 +475,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   credentials entered alongside it.
 - Failures to write to the QGIS authentication database are now reported instead
   of leaving the plugin silently unconfigured.
-- Editing a PostGIS datastore no longer sends GeoServer's encrypted password
-  back as the new password; it has to be re-entered.
 
 ## 0.1.0 - 2026-03-27
 

@@ -1,8 +1,6 @@
 # Invariants
 
-Eleven rules that the code enforces and a change must not break. Each one was
-a real bug or a measured GeoServer behaviour, so a change that seems to make
-one of them unnecessary usually has not understood it yet. The
+These rules prevent regressions found in testing or observed against GeoServer. The
 [architecture](architecture.md) page explains the pieces they name; the
 [conventions](conventions.md) page refers to them by number.
 

@@ -49,8 +49,7 @@ what the pieces are; this page says how to work on them.
   workspace-name cache once survived a Refresh and left the datastore form's combo stale; it was removed
   rather than given a TTL. One extra GET is always cheaper than a stale view.
 - **Smallest change that removes demonstrated friction.** No abstraction with one implementation, no
-  config for a value that never changes. A service layer between GUI and library was proposed twice and
-  rejected as premature; don't build it until a non-GUI caller needs the API.
+  config for a value that never changes. Add a service layer only when a non-GUI caller needs the API.
 - Deliberate shortcuts carry a `ponytail:` comment naming the ceiling and the upgrade path; library gaps
   carry `TODO(#50)` (see the first convention). Leave both in place until the condition they name is met.
 - **Strings in a tab mixin use `translate("<MixinClass>", "…")`**, never `self.tr()`: `self.tr` in a mixin
@@ -125,8 +124,8 @@ what the pieces are; this page says how to work on them.
 
   The site build must stay silent: `sphinx-build -b html -q docs docs/_build/html`
   prints nothing when it is healthy, so a warning is a broken link or an orphan page.
-  There is no API reference and there cannot be one: the plugin does not import
-  without QGIS, which the documentation job does not install.
+  The site has no generated API reference because importing the plugin requires QGIS,
+  which the documentation job does not install.
 - **No em dashes, and prefer short sentences.** In code, comments, docstrings, docs, commit messages and
   every user-facing string, use commas, periods, colons, semicolons or parentheses instead of an em dash.
   Split a long sentence into two rather than joining two clauses with a dash.
@@ -144,7 +143,7 @@ python -m pytest tests/unit
 QT_QPA_PLATFORM=offscreen python -m pytest tests/qgis
 # after changing any user-visible string (needs pip install PyQt6); test_i18n fails otherwise
 python scripts/update_translations.py
-# build the zip qgis-plugin-ci would release (~250 KB, 65 files)
+# build the zip qgis-plugin-ci would release
 qgis-plugin-ci package 0.1.0 --allow-uncommitted-changes && rm geoserver_manager.0.1.0.zip
 ```
 
