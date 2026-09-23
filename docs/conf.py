@@ -24,17 +24,21 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 # -- Project information --
 changes: dict[str, dict] = keepachangelog.to_dict("../CHANGELOG.md")
-latest_version: str = [
-    v for v in changes.keys() if v not in ("Unreleased", "version_tag")
-][0]
+# None until the first release: the site must not name a version nobody
+# can install. The template's placeholder "0.1.0 First release" did.
+latest_version: Optional[str] = next(
+    (v for v in changes.keys() if v not in ("Unreleased", "version_tag")), None
+)
 
 author: str = __about__.__author__
 copyright: str = __about__.__copyright__
 description: str = __about__.__summary__
 official_repository_id: Optional[int] = None
 project: str = __about__.__title__
-release: str = latest_version  # latest version from CHANGELOG.md
 version: str = __about__.__version__  # defined in metadata.txt
+# Sphinx puts `release` in every page title; the version in development until
+# there is a release, so no title reads "none yet".
+release: str = latest_version or version
 
 # -- General configuration ---------------------------------------------------
 
@@ -143,7 +147,7 @@ myst_substitutions: dict[str, str] = {
     "repo_url": __about__.__uri__,
     "title": project,
     "version": version,
-    "release_version": release,
+    "release_version": latest_version or "none yet",
 }
 
 # Anchors for "page.md#a-heading" links, down to ### headings.
@@ -165,7 +169,7 @@ def generate_qdt_snippet(_) -> None:
         "folder_name": "geoserver_manager",
         "official_repository": True,
         "plugin_id": official_repository_id,
-        "version": f"{latest_version}",
+        "version": f"{latest_version or version}",
     }
 
     with output_path.open("w", encoding="UTF8") as wf:
