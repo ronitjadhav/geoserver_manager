@@ -344,6 +344,7 @@ class TestPrimaryButtons(unittest.TestCase):
         dlg.gs = FakeGS()
         dlg.show_warning_message = dlg.show_error_message = lambda text: None
         dlg._all_layer_names = lambda: []
+        dlg._all_group_names = lambda: []
         ok = QDialogButtonBox.StandardButton.Ok
         seen = {}
         for _label, _icon, loader in type(dlg).TABS:

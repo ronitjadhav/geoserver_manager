@@ -2000,228 +2000,288 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
 </context><context>
     <name>LayerGroupTabMixin</name>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="43" />
+        <location filename="../../gui/tab_layergroups.py" line="57" />
         <source>Single</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="44" />
+        <location filename="../../gui/tab_layergroups.py" line="58" />
         <source>Opaque Container</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="45" />
+        <location filename="../../gui/tab_layergroups.py" line="59" />
         <source>Named Tree</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="46" />
+        <location filename="../../gui/tab_layergroups.py" line="60" />
         <source>Container Tree</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="47" />
+        <location filename="../../gui/tab_layergroups.py" line="61" />
         <source>Earth Observation Tree</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="389" />
-        <location filename="../../gui/tab_layergroups.py" line="68" />
+        <location filename="../../gui/tab_layergroups.py" line="692" />
+        <location filename="../../gui/tab_layergroups.py" line="82" />
         <source>Create a Layer Group</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="69" />
+        <location filename="../../gui/tab_layergroups.py" line="83" />
         <source>Publish several layers as one</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="312" />
-        <location filename="../../gui/tab_layergroups.py" line="241" />
-        <location filename="../../gui/tab_layergroups.py" line="102" />
-        <location filename="../../gui/tab_layergroups.py" line="75" />
+        <location filename="../../gui/tab_layergroups.py" line="533" />
+        <location filename="../../gui/tab_layergroups.py" line="116" />
+        <location filename="../../gui/tab_layergroups.py" line="89" />
         <source>Workspace</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="80" />
+        <location filename="../../gui/tab_layergroups.py" line="94" />
         <source>Add to QGIS</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="85" />
+        <location filename="../../gui/tab_layergroups.py" line="99" />
         <source>Preview in a browser</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="87" />
+        <location filename="../../gui/tab_layergroups.py" line="101" />
         <source>Preview in a browser: GeoServer's own OpenLayers page. A secured server will ask the browser to log in.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="95" />
+        <location filename="../../gui/tab_layergroups.py" line="109" />
         <source>Delete</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="306" />
-        <location filename="../../gui/tab_layergroups.py" line="240" />
-        <location filename="../../gui/tab_layergroups.py" line="101" />
+        <location filename="../../gui/tab_layergroups.py" line="526" />
+        <location filename="../../gui/tab_layergroups.py" line="115" />
         <source>Name</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="322" />
-        <location filename="../../gui/tab_layergroups.py" line="242" />
-        <location filename="../../gui/tab_layergroups.py" line="103" />
+        <location filename="../../gui/tab_layergroups.py" line="544" />
+        <location filename="../../gui/tab_layergroups.py" line="117" />
         <source>Mode</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="357" />
-        <location filename="../../gui/tab_layergroups.py" line="354" />
-        <location filename="../../gui/tab_layergroups.py" line="349" />
-        <location filename="../../gui/tab_layergroups.py" line="264" />
-        <location filename="../../gui/tab_layergroups.py" line="261" />
-        <location filename="../../gui/tab_layergroups.py" line="104" />
+        <location filename="../../gui/tab_layergroups.py" line="613" />
+        <location filename="../../gui/tab_layergroups.py" line="601" />
+        <location filename="../../gui/tab_layergroups.py" line="582" />
+        <location filename="../../gui/tab_layergroups.py" line="579" />
+        <location filename="../../gui/tab_layergroups.py" line="571" />
+        <location filename="../../gui/tab_layergroups.py" line="118" />
         <source>Layers</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="109" />
+        <location filename="../../gui/tab_layergroups.py" line="123" />
         <source>Failed to load layer groups</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="336" />
-        <location filename="../../gui/tab_layergroups.py" line="243" />
-        <source>Title</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_layergroups.py" line="244" />
-        <source>Bounds</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_layergroups.py" line="341" />
-        <location filename="../../gui/tab_layergroups.py" line="253" />
-        <source>Abstract</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_layergroups.py" line="265" />
-        <source>In drawing order: the first line is at the bottom.</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_layergroups.py" line="571" />
-        <location filename="../../gui/tab_layergroups.py" line="278" />
+        <location filename="../../gui/tab_layergroups.py" line="864" />
+        <location filename="../../gui/tab_layergroups.py" line="262" />
         <source>Failed to load layer group '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="286" />
+        <location filename="../../gui/tab_layergroups.py" line="273" />
         <source>Layer Group '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
+        <location filename="../../gui/tab_layergroups.py" line="274" />
+        <source>GeoServer cannot rename a layer group. When the layers change, the plugin recomputes the group's bounds.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
         <location filename="../../gui/tab_layergroups.py" line="287" />
-        <source>Read-only. To change it, delete it and create it again.</source>
+        <source>Save</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="315" />
-        <source>A global group can mix layers from several workspaces</source>
+        <location filename="../../gui/tab_layergroups.py" line="302" />
+        <source>Failed to update layer group '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="326" />
-        <source>Single publishes the group as one layer; Opaque Container is the same but hides its layers from the capabilities; Named Tree also keeps the layers addressable on their own; Container Tree and Earth Observation Tree only group them</source>
+        <location filename="../../gui/tab_layergroups.py" line="308" />
+        <source>Layer group '{}' updated.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="346" />
-        <source>Add a layer</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_layergroups.py" line="350" />
-        <source>Appends to the list below</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_layergroups.py" line="361" />
-        <source>One layer per line, in drawing order: the first line is drawn first, at the bottom. Reorder by editing the text. Add "= style" to a line to publish that layer with a style other than its own default.</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_layergroups.py" line="382" />
-        <source>Failed to load the workspaces and layers</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_layergroups.py" line="390" />
-        <source>Publish several layers as one. GeoServer computes the group's bounds from the layers it contains.</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_layergroups.py" line="397" />
-        <source>Create</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_layergroups.py" line="408" />
-        <source>Failed to create layer group '{}'</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_layergroups.py" line="413" />
-        <source>Layer group '{}' created.</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_layergroups.py" line="453" />
-        <source>No style '{}' on the server.</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_layergroups.py" line="478" />
+        <location filename="../../gui/tab_layergroups.py" line="380" />
         <source>List at least one layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="484" />
-        <source>No layer named '{}' on the server. Pick it from the list, or qualify it as workspace:layer.</source>
+        <location filename="../../gui/tab_layergroups.py" line="393" />
+        <source>No layer or group named '{}' on the server. Pick it from the list, or qualify it as workspace:layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="493" />
+        <location filename="../../gui/tab_layergroups.py" line="410" />
+        <source>An Earth Observation group needs a root layer.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="417" />
+        <source>No layer named '{}' on the server.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="424" />
+        <source>Root layer '{}' has no default style: type one.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="459" />
+        <source>None of the layers has bounds, so the group would have none.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="537" />
+        <source>A global group can mix layers from several workspaces</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="548" />
+        <source>Single publishes the group as one layer; Opaque Container is the same but hides its layers from the capabilities; Named Tree also keeps the layers addressable on their own; Container Tree and Earth Observation Tree only group them</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="558" />
+        <source>Title</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="563" />
+        <source>Abstract</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="568" />
+        <source>Add a layer</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="572" />
+        <source>Appends to the list below; the groups come after the layers</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="586" />
+        <source>One layer or group per line, in drawing order: the first line is drawn first, at the bottom. Reorder by editing the text. Add "= style" to a line to publish that layer with a style other than its own default.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="596" />
+        <source>Root layer</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="602" />
+        <source>What an Earth Observation group draws when it is requested as a whole</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="610" />
+        <source>Root layer style</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="614" />
+        <source>Its default style</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="621" />
+        <source>Enabled</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="627" />
+        <source>Advertised</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="630" />
+        <source>Listed in the capabilities. Off, the group is still served to whoever names it.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="640" />
+        <source>Bounds</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="685" />
+        <source>Failed to load the workspaces and layers</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="693" />
+        <source>Publish several layers as one. GeoServer computes the group's bounds from the layers it contains.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="702" />
+        <source>Create</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="713" />
+        <source>Failed to create layer group '{}'</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="718" />
+        <source>Layer group '{}' created.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="758" />
+        <source>No style '{}' on the server.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_layergroups.py" line="790" />
         <source>Layer group '{}' already exists in {}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="545" />
+        <location filename="../../gui/tab_layergroups.py" line="838" />
         <source>layer is not valid</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="551" />
+        <location filename="../../gui/tab_layergroups.py" line="844" />
         <source>Could not add '{}' to QGIS</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="556" />
+        <location filename="../../gui/tab_layergroups.py" line="849" />
         <source>'{}' added to the project as WMS.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="598" />
+        <location filename="../../gui/tab_layergroups.py" line="891" />
         <source>layer group</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_layergroups.py" line="609" />
+        <location filename="../../gui/tab_layergroups.py" line="902" />
         <source>%n layer group(s)</source>
         <translation>
             <numerusform>%n layer group</numerusform>
@@ -2229,7 +2289,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="610" />
+        <location filename="../../gui/tab_layergroups.py" line="903" />
         <source>Only the group goes away. The layers it published stay. GeoServer refuses if another layer group contains this one.</source>
         <translation type="unfinished" />
     </message>
