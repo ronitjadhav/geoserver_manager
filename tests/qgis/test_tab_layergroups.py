@@ -411,6 +411,12 @@ class TestDeleteAndAddToQgis(unittest.TestCase):
         self.dlg.show_error_message = lambda text: self.fail(f"unexpected: {text}")
         self.dlg._load_layer_groups = lambda: None
 
+    def test_a_name_with_a_hash_is_quoted_in_both_scopes(self):
+        """ "a#b" went out as ".../layergroups/a", another group's path."""
+        self.dlg._delete_selected_layer_groups([["a#b", "topp", "SINGLE", "1"]])
+        self.assertIn(("delete_layer_group", "topp", "a%23b"), self.dlg.gs.calls)
+        self.assertIn("/layergroups/a%23b.json", self.dlg._group_path("a#b", "topp"))
+
     def test_workspace_group_deletes_through_the_library_global_through_rest(self):
         self.dlg._delete_selected_layer_groups(
             [["roads_group", "topp", "CONTAINER", "1"], ["tasmania", GLOBAL, "", "2"]]

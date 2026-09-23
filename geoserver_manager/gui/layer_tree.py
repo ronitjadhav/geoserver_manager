@@ -25,6 +25,7 @@ from qgis.PyQt.QtCore import QCoreApplication, Qt
 from qgis.PyQt.QtWidgets import QApplication, QDialog
 
 from geoserver_manager.__about__ import __title__
+from geoserver_manager.gui.dlg_main import _Abandoned
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.icons import icon
 from geoserver_manager.toolbelt.log_handler import PlgLogger
@@ -180,7 +181,7 @@ class LayerTreeMenu:
         known = self.server_layer_from_source(layer, dlg.gs.url)
         if known:
             return [known]
-        ok, names = self._run(
+        ok, names = self._read(
             dlg,
             lambda: self._server_layers(dlg),
             translate("LayerTreeMenu", "Could not list the layers of the server"),
@@ -368,7 +369,7 @@ class LayerTreeMenu:
         if target is None:
             return None
         workspace, name = target.split(":", 1)
-        ok, styles = self._run(
+        ok, styles = self._read(
             dlg,
             lambda: self._layer_styles(dlg, workspace, name),
             translate("LayerTreeMenu", "Failed to load the styles of '{}'").format(
@@ -411,7 +412,7 @@ class LayerTreeMenu:
                 return None
             style = form.get_values()["style"]
 
-        ok, sld = self._run(
+        ok, sld = self._read(
             dlg,
             lambda: self._sld_body(dlg, style),
             translate("LayerTreeMenu", "Failed to load style '{}'").format(style),
@@ -474,6 +475,11 @@ class LayerTreeMenu:
 
     # -- Plumbing ----------------------------------------------------------------
 
+    def _read(self, dlg, fn, failure_message):
+        """_run for a server read: in the dialog's worker, behind its waiting
+        box with Cancel, so a dead server cannot freeze QGIS (issue #59)."""
+        return self._run(dlg, lambda: dlg._wait_for(fn), failure_message)
+
     def _run(self, dlg, fn, failure_message):
         """fn() under a wait cursor. (True, result), or (False, None) once the
         failure is in the message bar and the QGIS log.
@@ -484,6 +490,8 @@ class LayerTreeMenu:
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             return True, fn()
+        except _Abandoned:
+            return False, None  # the user pressed Cancel: nothing to report
         except Exception as error:  # noqa: BLE001 (anything, reported as text)
             detail = dlg._error_text(error)
             self._say(f"{failure_message}: {detail}", Qgis.MessageLevel.Critical)
@@ -495,7 +503,10 @@ class LayerTreeMenu:
             QApplication.restoreOverrideCursor()
 
     def _say(self, text, level):
-        self.iface.messageBar().pushMessage(__title__, text, level, 8)
+        # A warning or an error says what to do next: it stays until closed,
+        # like the dialog's own banners. Only good news fades.
+        fades = level in (Qgis.MessageLevel.Success, Qgis.MessageLevel.Info)
+        self.iface.messageBar().pushMessage(__title__, text, level, 8 if fades else 0)
 
     def _say_not_connected(self):
         self._say(

@@ -416,6 +416,8 @@ class TestEveryLayerType(unittest.TestCase):
         self.assertEqual(form.get_widget("srs").text(), "EPSG:26713")
         self.assertIn("GRAY_INDEX", form.get_widget("bands").toPlainText())
         self.assertIsNone(form.get_widget("coverage"))  # the picker stays home
+        # A boolean reads Yes / No, never Python's True / False.
+        self.assertIn(form.get_widget("enabled").text(), ("Yes", "No"))
 
     def test_a_cascaded_layer_shows_its_remote_details(self):
         form = self.opened(self.dlg._show_layer_info, self.rows["roads_cascade"])

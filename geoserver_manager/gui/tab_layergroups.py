@@ -182,9 +182,11 @@ class LayerGroupTabMixin:
     def _group_path(self, name, workspace_name):
         """REST path of one layer group, global or in a workspace."""
         endpoints = self.gs.rest_service.rest_endpoints
+        # quote(): a "/", "?" or "#" in a name would otherwise change the path
         if workspace_name:
-            return endpoints.layergroup(workspace_name, name)
-        # quote(): a "/" or "?" in a name would otherwise change the path
+            return endpoints.layergroup(
+                quote(workspace_name, safe=""), quote(name, safe="")
+            )
         return f"{endpoints.base_url}/layergroups/{quote(name, safe='')}.json"
 
     @classmethod
@@ -628,6 +630,12 @@ class LayerGroupTabMixin:
         workspace_name, so a global group needs the raw path.
         """
         if workspace_name:
-            self._check(self.gs.delete_layer_group(workspace_name, name))
+            # The library interpolates the names into the path as they are, so
+            # "a#b" would delete "a": hand it the quoted segments.
+            self._check(
+                self.gs.delete_layer_group(
+                    quote(workspace_name, safe=""), quote(name, safe="")
+                )
+            )
         else:
             self._raw_rest("delete", self._group_path(name, None))

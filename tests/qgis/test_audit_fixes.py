@@ -271,8 +271,56 @@ class TestDeletesRunInATask(unittest.TestCase):
             lambda: reloaded.append(1),
             lambda n: f"{n} styles",
         )
-        self.assertIsNotNone(dlg._task)  # still running when the call returned
+        self.assertIsNotNone(dlg._delete)  # still running when the call returned
         self.assertTrue(spin_until(lambda: reloaded == [1]))
+
+    def start(self, count=5, pause=0.1):
+        dlg = connected_dialog()
+        dlg.gs = object()
+        dlg._confirm_delete = lambda *args, **kwargs: True
+        self.done, self.reloaded, self.said = [], [], []
+        dlg.show_success_message = dlg.show_warning_message = self.said.append
+        dlg._delete_many(
+            "style",
+            [
+                (f"s{i}", lambda i=i: time.sleep(pause) or self.done.append(i))
+                for i in range(count)
+            ],
+            lambda: self.reloaded.append(1),
+            lambda n: f"{n} styles",
+        )
+        return dlg
+
+    def test_a_tab_switch_or_refresh_does_not_stop_it(self):
+        """A load supersedes the load slot; a delete used to sit in it and
+        stopped half way with no banner and no log line."""
+        dlg = self.start()
+        dlg._start_load("load failed", lambda task: ([], []))  # what a tab switch does
+        self.assertTrue(spin_until(lambda: dlg._delete is None))
+        self.assertEqual(self.done, [0, 1, 2, 3, 4])
+        self.assertIn("5 styles deleted.", self.said)
+
+    def test_it_reloads_only_the_tab_it_started_from(self):
+        dlg = self.start(count=2)
+        dlg.navList.blockSignals(True)
+        dlg.navList.setCurrentRow(dlg.navList.currentRow() + 1)
+        dlg.navList.blockSignals(False)
+        self.assertTrue(spin_until(lambda: dlg._delete is None))
+        self.assertEqual(self.reloaded, [])  # that tab's rows are its own
+
+    def test_the_cancel_button_still_stops_it(self):
+        dlg = self.start(count=20)
+        spin_until(lambda: self.done)
+        dlg._on_refresh_clicked()  # the Refresh button reads Cancel meanwhile
+        self.assertTrue(spin_until(lambda: dlg._delete is None))
+        self.assertLess(len(self.done), 20)
+        self.assertTrue(any("Cancelled" in text for text in self.said))
+
+    def test_a_second_batch_waits_for_the_first(self):
+        dlg = self.start(count=3)
+        dlg._delete_many("style", [("x", lambda: None)], lambda: None, lambda n: "")
+        self.assertTrue(any("already running" in text for text in self.said))
+        spin_until(lambda: dlg._delete is None)
 
 
 class TestFormFeedback(unittest.TestCase):

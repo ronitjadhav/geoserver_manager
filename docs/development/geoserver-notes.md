@@ -81,6 +81,9 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   carry **`dbtype: geopkg`** (that is how GeoServer picks the factory), and an empty `charset` is omitted
   rather than sent blank, because blank is not "use your default". GeoServer fills in `namespace` itself, and
   the edit merge keeps it along with everything else the form does not show.
+- **An emptied datastore description has to be sent as `""`.** The library leaves a `None` field out of the
+  payload, and a PUT without `description` keeps the old one (measured on 2.28.5: "old text" survived a PUT
+  with `description=None`, and `""` cleared it). The edit sends the form's value as it is, empty included.
 - **Cascaded WFS datastores** (row 41 of #50): type `Web Feature Server (NG)`, every parameter prefixed
   `WFSDataStoreFactory:` (`GET_CAPABILITIES_URL`, `USERNAME`, `PASSWORD`, `TIMEOUT`, `MAXFEATURES`, `LENIENT`);
   GeoServer adds `namespace` itself. A PUT without a key drops it (the map is replaced, invariant 3), and

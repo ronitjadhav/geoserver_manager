@@ -104,8 +104,9 @@ class Response:
 
 class FakeGS:
     """GeoWebCache caches topp:states and the global group tasmania; the
-    cached broken:layer cannot be read. topp:roads, sf:archsites and the
-    group spearfish are published but not cached."""
+    cached broken:layer cannot be read. topp:roads, sf:archsites, the global
+    group spearfish and topp's own group topp:overview are published but not
+    cached."""
 
     def __init__(self, cached=("broken:layer", "tasmania", "topp:states")):
         self.cached = list(cached)
@@ -154,6 +155,13 @@ class FakeGS:
                 return outer.answer(path).status_code == 200
 
         self.rest_service = Service()
+
+    def get_workspaces(self):
+        return ([{"name": "topp"}, {"name": "sf"}], 200)
+
+    def get_layer_groups(self, workspace_name=None):
+        groups = {"topp": [{"name": "overview"}], "sf": []}
+        return (groups.get(workspace_name, []), 200)
 
     def answer(self, path):
         if path == "/gwc/rest/layers.json":
@@ -273,7 +281,7 @@ class TestListing(unittest.TestCase):
         self.assertEqual(self.dlg._gridset_names(), sorted(GRIDSETS))
         self.assertEqual(
             self.dlg._uncached_layer_names(),
-            ["sf:archsites", "spearfish", "topp:roads"],
+            ["sf:archsites", "spearfish", "topp:overview", "topp:roads"],
         )
 
 
@@ -447,7 +455,7 @@ class TestActions(unittest.TestCase):
         combo = form.get_widget("layer")
         self.assertEqual(
             [combo.itemText(i) for i in range(combo.count())],
-            ["sf:archsites", "spearfish", "topp:roads"],
+            ["sf:archsites", "spearfish", "topp:overview", "topp:roads"],
         )
         values = form.get_values()
         self.assertEqual(values["gridsets"], "EPSG:4326\nEPSG:900913")
@@ -467,6 +475,7 @@ class TestActions(unittest.TestCase):
             "sf:archsites",
             "tasmania",
             "spearfish",
+            "topp:overview",
         ]
         with patch.object(tab_gwc, "ResourceFormDialog", Recording):
             self.dlg._add_gwc_layer()

@@ -190,6 +190,9 @@ class GeoServerMainDialog(
         self._task = None  # the running _FetchTask, if any
         self._upload = None  # the running upload task, its own slot: _run_upload
         self._side = None  # a quiet side task (a dialog's legend): _run_quietly
+        # A running batch of deletes: its own slot, so a tab switch or F5 (which
+        # supersede `_task`) cannot stop it half way without a word.
+        self._delete = None
         self._closing = False  # set in closeEvent: a late finish must stay away
         self._announce_after_load = None  # banner to show once rows have landed
 
@@ -590,7 +593,9 @@ class GeoServerMainDialog(
         quiet=False,
         on_done=None,
     ):
-        """Park a _FetchTask in `slot` ("_task" or "_upload") and start it.
+        """Park a _FetchTask in `slot` and start it.
+
+        The slots are "_task" (loads), "_upload", "_delete" and "_side".
 
         The two slots never cancel each other. `finished` comes back on the
         GUI thread: a cancel (the user's, a superseding load's, or our own
@@ -668,20 +673,24 @@ class GeoServerMainDialog(
         """Cancel the running load, if any. `user` marks the Cancel button.
 
         The button stops a running upload first (that is the transfer the
-        user sees a bar for), and only a user does: a superseding load
-        (`user=False`) never touches an upload.
+        user sees a bar for), then a running delete batch, and only a user
+        does: a superseding load (`user=False`) never touches either.
         """
-        if user and self._upload is not None:
-            self._upload.user_cancelled = True
-            self._upload.cancel()
-            return
+        for slot in ("_upload", "_delete"):
+            running = getattr(self, slot)
+            if user and running is not None:
+                running.user_cancelled = True
+                running.cancel()
+                return
         if self._task is not None:
             self._task.user_cancelled = user
             self._task.cancel()
 
     def _loading(self):
-        """True while a background load or an upload is running."""
-        return self._task is not None or self._upload is not None
+        """True while a background load, an upload or a delete batch runs."""
+        return any(
+            slot is not None for slot in (self._task, self._upload, self._delete)
+        )
 
     def _set_loading(self, loading, busy_text=None):
         """Say that a task is running, and offer Cancel in place of Refresh."""
@@ -690,11 +699,22 @@ class GeoServerMainDialog(
             tooltip = self.tr("Refresh resources from the GeoServer (F5)")
         elif self._upload is not None:
             tooltip = self.tr("Cancel the upload")
+        elif self._delete is not None:
+            tooltip = self.tr("Stop before the next item")
         else:
             tooltip = self.tr("Stop loading")
         self.btn_refresh.setToolTip(tooltip)
         if loading:
-            self.lbl_page_info.setText(busy_text or self.tr("Loading…"))
+            if busy_text is None:
+                # Say what is still running: a load that just ended must not
+                # leave "Loading…" behind while an upload goes on.
+                if self._task is not None:
+                    busy_text = self.tr("Loading…")
+                elif self._upload is not None:
+                    busy_text = self.tr("Uploading…")
+                else:
+                    busy_text = self.tr("Working…")
+            self.lbl_page_info.setText(busy_text)
         elif not self._all_rows:
             self.lbl_page_info.setText(self._empty_state_text())
         else:
@@ -1582,6 +1602,11 @@ class GeoServerMainDialog(
         """
         if not labeled_deletes:
             return
+        if self._delete is not None:
+            self.show_warning_message(
+                self.tr("A delete is already running. Wait for it or cancel it.")
+            )
+            return
         labels = [label for label, _ in labeled_deletes]
         if not self._confirm_delete(kind, labels, cascade, verb=verb, counted=counted):
             return
@@ -1626,19 +1651,28 @@ class GeoServerMainDialog(
                         things=counted(len(labels)), done=done
                     )
                 )
-            reload_fn()
+            reload_same_tab()
 
         def cancelled(_task):
             self.show_warning_message(
                 self.tr("Cancelled. What was already done stays done.")
             )
-            reload_fn()
+            reload_same_tab()
 
-        self._run_in_task(
+        # The user may switch tabs while it runs; that tab loaded itself, and
+        # this tab's loader would paint its rows under the other one's header.
+        started_on = self.navList.currentRow()
+
+        def reload_same_tab():
+            if self.navList.currentRow() == started_on:
+                reload_fn()
+
+        self._launch_task(
+            "_delete",
             self.tr("{verb} failed").format(verb=verb.capitalize()),
             delete_all,
             report,
-            on_cancel=cancelled,
+            cancelled,
             busy_text=self.tr("Working…"),
         )
 

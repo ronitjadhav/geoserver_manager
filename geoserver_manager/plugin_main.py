@@ -214,7 +214,13 @@ class GeoServerManagerPlugin:
     def run(self):
         """Open the main plugin dialog."""
         if not self.dependencies_available:
-            return
+            # Try again, and say why once more: the explanation was shown once
+            # at QGIS startup, and a toolbar click that does nothing says less.
+            from geoserver_manager.toolbelt.dependencies import ensure_dependencies
+
+            self.dependencies_available = ensure_dependencies()
+            if not self.dependencies_available:
+                return
 
         settings = self.plg_settings.get_plg_settings()
 
