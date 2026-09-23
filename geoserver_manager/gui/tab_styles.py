@@ -732,15 +732,20 @@ class StyleTabMixin:
             self._create_style(name, workspace_name, style_format, values["sld"])
 
     def _create_style(self, name, workspace_name, style_format, body):
-        """Create a style of any format from its body.
+        """Create a style of any format from its body, in one request.
 
-        TODO(#50): create_style_from_string() is SLD 1.0 only (row 58). Other
-        formats POST to the collection with their content type, which creates
-        the definition and the body at once; a PUT would be refused (400).
+        TODO(#50): create_style_from_string() is SLD 1.0 only (row 58). So a
+        POST to the collection with the body's own content type creates the
+        definition and the body together (a PUT there is refused, 400). One
+        request, measured on 2.28.5: an SLD 1.1 body is recorded as 1.1, and
+        a body GeoServer refuses leaves nothing. Creating the definition
+        first left an empty style behind, and the retry "already exists".
         """
-        if style_format == "sld":
-            self._create_sld_style(name, workspace_name, body)
-            return
+        content_type = (
+            sld_content_type(body)
+            if style_format == "sld"
+            else _CONTENT_TYPES[style_format]
+        )
         collection = self._style_path(name, workspace_name, "json")
         collection = collection.rsplit("/", 1)[0] + ".json"
         self._raw_rest(
@@ -748,17 +753,12 @@ class StyleTabMixin:
             collection,
             params={"name": name},
             data=body.encode("utf-8"),
-            headers={"Content-Type": _CONTENT_TYPES[style_format]},
+            headers={"Content-Type": content_type},
         )
 
     def _create_sld_style(self, name, workspace_name, sld):
-        """Create the style definition, then upload the body as its version."""
-        # create_style_from_string would do both, but always with the SLD 1.0
-        # content type; see _put_sld_body.
-        self._check(
-            self.gs.create_style_definition(name, f"{name}.sld", workspace_name)
-        )
-        self._put_sld_body(name, workspace_name, sld)
+        """Create an SLD style from its body; see _create_style."""
+        self._create_style(name, workspace_name, "sld", sld)
 
     @staticmethod
     def _picked_layer(values):

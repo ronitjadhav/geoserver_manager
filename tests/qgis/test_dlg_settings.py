@@ -189,7 +189,11 @@ class TestProfiles(unittest.TestCase):
         # QgsAuthManager, in memory: auth config id -> (user, password).
         self.store = {"idA": ("ua", "pa")}
 
+        self.declined = False  # the master password prompt was dismissed
+
         def get_credentials(inner):
+            if self.declined:
+                return ("", "")
             return self.store.get(inner.geoserver_auth_cfg_id, ("", ""))
 
         def save_credentials(inner, username, password):
@@ -234,6 +238,26 @@ class TestProfiles(unittest.TestCase):
             return_value=(name, True),
         ):
             self.page._add_profile()
+
+    def test_an_untouched_profile_keeps_credentials_it_could_not_decrypt(self):
+        # QGIS calls apply() on every options page for any OK. With the master
+        # password prompt dismissed the fields read blank, and "both blank"
+        # removed the stored credentials.
+        self.declined = True
+        page = ConfigOptionsPage(None)
+        page.plg_settings = self.manager
+        page.log = lambda *args, **kwargs: None
+        page.load_settings()
+        self.assertEqual(page.txt_gs_username.text(), "")
+        page.apply()
+        self.assertEqual(self.store["idA"], ("ua", "pa"))
+        self.assertEqual(self.manager.profiles[0]["auth_cfg_id"], "idA")
+
+    def test_blanking_both_fields_on_purpose_still_forgets_them(self):
+        self.page.txt_gs_username.setText("")
+        self.page.txt_gs_password.setText("")
+        self.page.apply()
+        self.assertNotIn("idA", self.store)
 
     def test_the_active_profile_is_shown_with_its_credentials(self):
         self.assertEqual(self.page.cmb_profile.currentText(), "A")

@@ -339,6 +339,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- A profile switch or a Refresh while a delete batch or an upload ran sent
+  the rest of it to the other server. The connection now waits, and says so.
+- A resource whose name holds `/`, `?`, `#` or `%` (made outside the plugin)
+  could not be addressed: deleting "a#b" deleted "a", and its edit form showed
+  "a". Such rows are now refused with a reason.
+- Pressing OK in QGIS Options after dismissing the master password prompt no
+  longer deletes the stored GeoServer credentials.
+- Publishing a layer whose name another store's layer already had styled
+  that other layer and reported success; with Replace over a PostGIS store,
+  GeoServer tried to import the file into the database. Both are refused.
+- A layer with exactly one other style showed it as "name" and "href", so
+  Set style could not save, and the layer tree never offered that style.
+- An untouched save no longer rewrites what the form could not show: a
+  parametrised PostGIS port, a custom logging profile, meta-tiles or a gutter
+  beyond the spinbox range. A workspace's new own WMS settings start from the
+  global ones.
+- The cascaded WMS store form shows the stored user and limits, so
+  authentication can be removed.
+- A style GeoServer refuses is no longer left behind empty, blocking a retry.
 - A long value in a form (a title, a URL) opens at its beginning, not
   scrolled to its end.
 - An error GeoServer reports on its HTML error page now shows GeoServer's

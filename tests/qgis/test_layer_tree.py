@@ -126,6 +126,19 @@ def connected_dialog(layers, styles_by_layer=None, formats=None):
 
     def raw_rest(method, path, **kwargs):
         dlg.requests.append((method, path))
+        if "/rest/layers/" in path:
+            # One layer's document, as GeoServer writes it: a single other
+            # style comes as a bare object, several as a list.
+            qualified = path.rsplit("/", 1)[1][: -len(".json")]
+            entry = (styles_by_layer or {}).get(qualified)
+            if entry is None:
+                raise RuntimeError("HTTP 404: no such layer")
+            default, others = entry
+            styles = [{"name": name} for name in others]
+            layer = {"defaultStyle": {"name": default} if default else None}
+            if styles:
+                layer["styles"] = {"style": styles[0] if len(styles) == 1 else styles}
+            return FakeResponse({"layer": layer})
         if path.endswith("/layers.json"):
             names = [{"name": name} for name in dlg.gs.layers]
             return FakeResponse({"layers": {"layer": names}})

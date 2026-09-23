@@ -180,14 +180,19 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
             # left to connect with.
             settings.geoserver_url = ""
             settings.geoserver_auth_cfg_id = ""
-        self._store_connection(
-            settings,
-            profile=shown["name"] if shown else None,
-            url=self.txt_gs_url.text(),
-            username=self.txt_gs_username.text(),
-            password=self.txt_gs_password.text(),
-            verify_tls=self.opt_verify_tls.isChecked(),
-        )
+        # QGIS calls apply() on every options page for any OK. An untouched
+        # profile is left alone: its fields hold ("", "") when the master
+        # password prompt was dismissed, and "both blank" means "forget the
+        # credentials", which deleted them for an unrelated OK.
+        if shown is None or self._is_dirty(shown["name"]):
+            self._store_connection(
+                settings,
+                profile=shown["name"] if shown else None,
+                url=self.txt_gs_url.text(),
+                username=self.txt_gs_username.text(),
+                password=self.txt_gs_password.text(),
+                verify_tls=self.opt_verify_tls.isChecked(),
+            )
 
         # dump settings into QgsSettings
         self.plg_settings.save_from_object(settings)

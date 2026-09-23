@@ -172,15 +172,17 @@ class CascadedStoreTabMixin:
         return sorted(stores)
 
     def _cascaded_store_detail(self, workspace_name, name, kind):
-        """One store as GeoServer stores it: type, enabled, capabilitiesURL, …"""
-        if kind == WMS:
-            return self._check(self.gs.get_wms_store(workspace_name, name))
-        # TODO(#50): the library has get_wms_store() but no get_wmts_store().
-        # Workaround: GET the store path.
-        path = self.gs.rest_service.rest_endpoints.wmtsstore(
-            _q(workspace_name), _q(name)
-        )
-        return self._raw_rest("get", path).json().get("wmtsStore") or {}
+        """One store as GeoServer stores it: type, enabled, capabilitiesURL, …
+
+        TODO(#50): no get_wmts_store() in the library, and get_wms_store()'s
+        model drops user, password, maxConnections and both timeouts (row 62):
+        the edit form showed a blank user and the defaults, so authentication
+        could not be removed. Both are read raw.
+        """
+        endpoints = self.gs.rest_service.rest_endpoints
+        builder = endpoints.wmsstore if kind == WMS else endpoints.wmtsstore
+        payload = self._raw_rest("get", builder(_q(workspace_name), _q(name))).json()
+        return payload.get("wmsStore" if kind == WMS else "wmtsStore") or {}
 
     def _cascaded_store_exists(self, workspace_name, name, kind):
         """True when the store is already there (create_* would upsert it)."""

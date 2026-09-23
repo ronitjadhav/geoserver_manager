@@ -145,6 +145,9 @@ class FakeGS:
             rest_client = Client()
             rest_endpoints = Endpoints()
 
+            def resource_exists(inner, path):
+                return False  # no layer of the name in another store
+
         self.rest_service = Rest()
 
     # -- payloads -----------------------------------------------------------

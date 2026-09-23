@@ -672,6 +672,19 @@ class GwcTabMixin:
             },
         ]
 
+    @staticmethod
+    def _fields_that_hold(fields, values):
+        """Widen a spinbox's maximum to the stored value. Pure.
+
+        A 32x32 meta-tile or a 250 px gutter (possible over REST) was clamped
+        by the spinbox to 20 and 100, and an untouched Save wrote those back.
+        """
+        for field in fields:
+            value = values.get(field["key"])
+            if field.get("type") == "spinbox" and isinstance(value, int):
+                field["max"] = max(field.get("max", value), value)
+        return fields
+
     def _wire_gridset_picker(self, dlg):
         """The Add-a-gridset combo appends its pick to the gridsets textarea."""
         combo = dlg.get_widget("add_gridset")
@@ -708,7 +721,9 @@ class GwcTabMixin:
                 "How GeoWebCache caches this layer. Changes apply to the tiles "
                 "rendered from now on; Truncate clears what is cached already.",
             ),
-            fields=self._gwc_fields(gridset_names),
+            fields=self._fields_that_hold(
+                self._gwc_fields(gridset_names), self._gwc_form_values(xml_text)
+            ),
             values=self._gwc_form_values(xml_text),
             parent=self,
         )

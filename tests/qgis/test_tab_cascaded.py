@@ -81,6 +81,22 @@ class FakeGS:
             "wmsStores": {"wmsStore": [{"name": "remote", "href": "…"}]}
         },
         "/rest/workspaces/topp/wmtsstores.json": {"wmtsStores": ""},
+        # The raw document: user, maxConnections and the timeouts are in it,
+        # where the library's WmsStore model drops them.
+        "/rest/workspaces/topp/wmsstores/remote.json": {
+            "wmsStore": {
+                "name": "remote",
+                "type": "WMS",
+                "enabled": True,
+                "workspace": {"name": "topp"},
+                "capabilitiesURL": CAPS,
+                "user": "bob",
+                "password": "crypt1:SECRET",
+                "maxConnections": 10,
+                "readTimeout": 90,
+                "connectTimeout": 20,
+            }
+        },
         "/rest/workspaces/sf/wmsstores.json": {"wmsStores": ""},
         # a one-entry collection: GeoServer writes the entry bare, not in a list
         "/rest/workspaces/sf/wmtsstores.json": {
@@ -267,6 +283,21 @@ class TestViewerRead(unittest.TestCase):
         dlg = SyncDialog()
         dlg._fetch = lambda action, failure, **kwargs: None
         self.assertIsNone(dlg._cascaded_layer_values("topp", "store", "WMS", "x"))
+
+
+class TestWmsStoreDetail(unittest.TestCase):
+    def test_the_edit_form_shows_the_stored_credentials_and_limits(self):
+        # Read through the library, the user was blank and the limits were
+        # the defaults, so clearing the credentials could never be sent.
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        detail = dlg._cascaded_store_detail("topp", "remote", "WMS")
+        values = dlg._cascaded_store_form_values(detail, "topp", "WMS", [])
+        self.assertEqual(values["user"], "bob")
+        self.assertEqual(values["max_connections"], 10)
+        self.assertEqual(values["read_timeout"], 90)
+        self.assertEqual(values["connect_timeout"], 20)
+        self.assertEqual(values["password"], "")  # never shown
 
 
 class TestListing(unittest.TestCase):

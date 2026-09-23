@@ -1219,6 +1219,24 @@ class TestSetLayerStyle(unittest.TestCase):
                     return ([{"name": "population"}, {"name": "simple_roads"}], 200)
                 return ([{"name": "roads_ws"}], 200)
 
+            def answer(inner, path):
+                if path.endswith("/layers/topp:tasmania_roads.json"):
+                    # As GeoServer writes a single other style: a bare object,
+                    # which the library's model read as "name" and "href".
+                    return (
+                        {
+                            "layer": {
+                                "defaultStyle": {"name": "simple_roads"},
+                                "styles": {
+                                    "@class": "linked-hash-set",
+                                    "style": {"name": "population", "href": "…"},
+                                },
+                            }
+                        },
+                        200,
+                    )
+                return super().answer(path)
+
             def set_default_layer_style(inner, layer_name, workspace_name, style):
                 outer.set_calls.append((layer_name, workspace_name, style))
                 return ("", 200)
@@ -1393,6 +1411,10 @@ class StyleFakeGS(FakeGS):
                 outer.style_calls.append(("PUT", path, kwargs))
                 return Response()
 
+            def post(inner, path, **kwargs):
+                outer.style_calls.append(("POST", path, kwargs))
+                return Response()
+
         class Endpoints:
             base_url = "/rest"
 
@@ -1490,14 +1512,11 @@ class TestStyleFromQgis(unittest.TestCase):
         self.add_layer("tasmania_roads")
         self.push(["tasmania_roads", "topp", "VECTOR", "taz_shapes", "simple_roads"])
 
-        self.assertEqual(
-            self.dlg.gs.style_calls[0],
-            ("definition", "tasmania_roads", "tasmania_roads.sld", "topp"),
-        )
-        verb, path, kwargs = self.dlg.gs.style_calls[1]
-        self.assertEqual(
-            (verb, path), ("PUT", "/rest/workspaces/topp/styles/tasmania_roads.sld")
-        )
+        # One request: a definition created first stayed behind, empty, when
+        # GeoServer refused the body.
+        verb, path, kwargs = self.dlg.gs.style_calls[0]
+        self.assertEqual((verb, path), ("POST", "/rest/workspaces/topp/styles.json"))
+        self.assertEqual(kwargs["params"], {"name": "tasmania_roads"})
         self.assertEqual(
             kwargs["headers"]["Content-Type"], "application/vnd.ogc.se+xml"
         )
@@ -1505,7 +1524,7 @@ class TestStyleFromQgis(unittest.TestCase):
         # a workspace style is referenced as "workspace:style"; a bare name
         # would resolve to a global style of the same name
         self.assertEqual(
-            self.dlg.gs.style_calls[2],
+            self.dlg.gs.style_calls[1],
             ("set_default", "tasmania_roads", "topp", "topp:tasmania_roads"),
         )
 
@@ -1540,7 +1559,11 @@ class TestStyleFromQgis(unittest.TestCase):
             self.push(
                 ["tasmania_roads", "topp", "VECTOR", "taz_shapes", "simple_roads"]
             )
-        self.assertEqual(self.dlg.gs.style_calls[0][0], "definition")
+        # Replacing puts the new body only; the definition stays as it is.
+        verb, path, _kwargs = self.dlg.gs.style_calls[0]
+        self.assertEqual(
+            (verb, path), ("PUT", "/rest/workspaces/topp/styles/tasmania_roads.sld")
+        )
 
     def test_the_style_name_is_the_layers_and_can_be_changed(self):
         self.add_layer("tasmania_roads")
@@ -1549,8 +1572,7 @@ class TestStyleFromQgis(unittest.TestCase):
             style="roads_from_qgis",
         )
         self.assertEqual(
-            self.dlg.gs.style_calls[0],
-            ("definition", "roads_from_qgis", "roads_from_qgis.sld", "topp"),
+            self.dlg.gs.style_calls[0][2]["params"], {"name": "roads_from_qgis"}
         )
         self.assertEqual(self.dlg.gs.style_calls[-1][3], "topp:roads_from_qgis")
 
@@ -1603,6 +1625,16 @@ class GpkgPublishFakeGS(StyleFakeGS):
                 return {}
 
         class Client:
+            def post(inner, path, **kwargs):
+                outer.style_calls.append(("POST", path, kwargs))
+                return Response()
+
+            def get(inner, path, **kwargs):
+                # The store Replace would overwrite: the plugin's own kind.
+                response = Response()
+                response.json = lambda: {"dataStore": {"type": "GeoPackage"}}
+                return response
+
             def put(inner, path, **kwargs):
                 body = kwargs.get("data")
                 if hasattr(body, "read"):  # a streaming upload: record its bytes
@@ -1639,6 +1671,12 @@ class GpkgPublishFakeGS(StyleFakeGS):
         class Rest:
             rest_client = Client()
             rest_endpoints = Endpoints()
+
+            def resource_exists(inner, path):
+                # No other store's layer of the name; the store as the fake has it.
+                if "/datastores/" in path:
+                    return outer.datastore_exists
+                return False
 
         self.rest_service = Rest()
 
@@ -1761,11 +1799,10 @@ class TestPublishQgisLayer(unittest.TestCase):
     def test_the_symbology_can_travel_with_the_data(self):
         self.add_layer(colour="#00aa44")
         self.dlg._publish_qgis_layer(self.values(with_style=True))
-        style_puts = [call for call in self.sent("PUT") if "/styles/" in call[1]]
-        self.assertEqual(
-            style_puts[0][1], "/rest/workspaces/topp/styles/Roads_2024.sld"
-        )
-        self.assertIn(b"00aa44", style_puts[0][2]["data"].lower())
+        style_posts = [call for call in self.dlg.gs.style_calls if call[0] == "POST"]
+        self.assertEqual(style_posts[0][1], "/rest/workspaces/topp/styles.json")
+        self.assertEqual(style_posts[0][2]["params"], {"name": "Roads_2024"})
+        self.assertIn(b"00aa44", style_posts[0][2]["data"].lower())
         self.assertIn(
             ("set_default", "Roads_2024", "topp", "topp:Roads_2024"),
             self.dlg.gs.style_calls,

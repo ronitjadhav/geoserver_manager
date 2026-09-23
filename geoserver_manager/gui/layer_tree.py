@@ -323,23 +323,9 @@ class LayerTreeMenu:
 
     @staticmethod
     def _layer_styles(dlg, workspace, name):
-        """The server layer's styles, default first, as qualified-or-bare names.
-
-        TODO(#50): the facade has set_default_layer_style() but no get_layer();
-        rest_service.get_layer() answers a Layer model (a dict is tolerated
-        too, in case that changes).
-        """
-        layer = dlg._check(dlg.gs.rest_service.get_layer(workspace, name))
-        default = getattr(layer, "default_style_name", None)
-        others = getattr(layer, "styles", None)
-        if isinstance(layer, dict):
-            default, others = layer.get("defaultStyle"), layer.get("styles")
-        if isinstance(default, dict):
-            default = default.get("name")
-        if isinstance(others, dict):
-            others = others.get("style") or []
-        names = [dlg._name_of(item) for item in (others or [])]
-        return ([default] if default else []) + [n for n in names if n != default]
+        """The server layer's styles, default first, as qualified-or-bare names."""
+        default, others = dlg._layer_styles(workspace, name)
+        return ([default] if default else []) + [n for n in others if n != default]
 
     @staticmethod
     def _sld_body(dlg, style):
