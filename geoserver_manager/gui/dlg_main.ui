@@ -344,6 +344,13 @@
             </spacer>
           </item>
           <item>
+            <widget class="QComboBox" name="cmb_profile">
+              <property name="visible">
+                <bool>false</bool>
+              </property>
+            </widget>
+          </item>
+          <item>
             <widget class="QLabel" name="lbl_status">
               <property name="text">
                 <string>Disconnected</string>

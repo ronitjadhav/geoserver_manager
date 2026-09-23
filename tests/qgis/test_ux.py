@@ -428,6 +428,12 @@ class TestWindowTitleAndEnter(unittest.TestCase):
             def get_plg_settings(inner):
                 return Settings()
 
+            def get_profiles(inner):
+                return []
+
+            def active_profile_name(inner):
+                return ""
+
             def get_value_from_key(inner, *args, **kwargs):
                 return None
 

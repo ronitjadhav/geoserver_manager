@@ -18,7 +18,15 @@ from qgis.gui import QgsOptionsPageWidget, QgsOptionsWidgetFactory
 from qgis.PyQt import uic
 from qgis.PyQt.QtCore import QEvent, QSize, Qt, QTimer, QUrl
 from qgis.PyQt.QtGui import QDesktopServices, QIcon
-from qgis.PyQt.QtWidgets import QApplication, QWidget
+from qgis.PyQt.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QPushButton,
+    QWidget,
+)
 
 # project
 from geoserver_manager.__about__ import (
@@ -90,6 +98,7 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         self.btn_reset.pressed.connect(self.on_reset_settings)
 
         self.btn_test_connection.clicked.connect(self.test_connection)
+        self._build_profile_row()
         # A result describes the fields as they were; editing any of them ends it.
         for field in (self.txt_gs_url, self.txt_gs_username, self.txt_gs_password):
             field.textChanged.connect(self.lbl_test_result.clear)
@@ -141,10 +150,75 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         # misc
         settings.debug_mode = self.opt_debug.isChecked()
         settings.version = __version__
-        settings.geoserver_verify_tls = self.opt_verify_tls.isChecked()
+
+        self._commit_fields()
+        # Profiles edited but not shown: their connection and credentials,
+        # through the same checks as the shown one.
+        for profile in self._profiles:
+            name = profile["name"]
+            if name == self._shown or not self._is_dirty(name):
+                continue
+            stored = PlgSettingsStructure(
+                geoserver_url=profile["url"],
+                geoserver_auth_cfg_id=profile["auth_cfg_id"],
+                geoserver_verify_tls=profile["verify_tls"],
+            )
+            self._store_connection(stored, **self._buffers[name])
+            self._keep(profile, stored)
+        # The shown profile goes through `settings`, the connection everything
+        # reads, so it becomes the active one: with its own auth config, never
+        # the one of the profile that was active before.
+        shown = self._profile(self._shown)
+        if shown is not None:
+            settings.geoserver_url = shown["url"]
+            settings.geoserver_auth_cfg_id = shown["auth_cfg_id"]
+        elif self._profile(self.plg_settings.active_profile_name()) is None and (
+            self.plg_settings.active_profile_name()
+        ):
+            # The active profile was removed, and no other is shown: nothing is
+            # left to connect with.
+            settings.geoserver_url = ""
+            settings.geoserver_auth_cfg_id = ""
+        self._store_connection(
+            settings,
+            url=self.txt_gs_url.text(),
+            username=self.txt_gs_username.text(),
+            password=self.txt_gs_password.text(),
+            verify_tls=self.opt_verify_tls.isChecked(),
+        )
+
+        # dump settings into QgsSettings
+        self.plg_settings.save_from_object(settings)
+        if shown is None and settings.geoserver_url:
+            # No profile yet: the first save makes one, named after the host.
+            shown = {"name": urlparse(settings.geoserver_url).netloc or "GeoServer"}
+            self._profiles.append(shown)
+        if shown is not None:
+            self._keep(shown, settings)
+        for auth_cfg_id in self._removed_auth:
+            PlgSettingsStructure(geoserver_auth_cfg_id=auth_cfg_id).remove_credentials()
+        self._removed_auth = []
+        self.plg_settings.save_profiles(self._profiles)
+        self.plg_settings.set_value_from_key(
+            "active_profile", shown["name"] if shown else ""
+        )
+
+        if __debug__:
+            self.log(
+                message="DEBUG - Settings successfully saved.",
+                log_level=Qgis.MessageLevel.NoLevel,
+            )
+
+    def _store_connection(self, settings, url, username, password, verify_tls):
+        """Validate one profile's URL and store its credentials, into `settings`.
+
+        `settings` is the active connection for the shown profile, or a
+        stand-in built for another edited one; both are updated in place.
+        """
+        settings.geoserver_verify_tls = verify_tls
 
         # geoserver URL (not sensitive, stored in QgsSettings)
-        url = self.txt_gs_url.text().strip()
+        url = url.strip()
         parsed = urlparse(url)
         if url and (parsed.username or parsed.password):
             # user:pass@host would surface in the window title, the status
@@ -172,8 +246,6 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
             settings.geoserver_url = url
 
         # credentials (sensitive, stored encrypted in QgsAuthManager)
-        username = self.txt_gs_username.text()
-        password = self.txt_gs_password.text()
         if not (username or password) and settings.geoserver_auth_cfg_id:
             # Both blanked on purpose: forget the stored credentials rather
             # than keep them behind empty fields.
@@ -195,15 +267,6 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
                 )
 
         self._warn_if_password_travels_in_clear(url, username, password)
-
-        # dump settings into QgsSettings
-        self.plg_settings.save_from_object(settings)
-
-        if __debug__:
-            self.log(
-                message="DEBUG - Settings successfully saved.",
-                log_level=Qgis.MessageLevel.NoLevel,
-            )
 
     def _warn_if_password_travels_in_clear(
         self, url: str, username: str, password: str
@@ -274,24 +337,155 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         # global
         self.opt_debug.setChecked(settings.debug_mode)
 
-        # geoserver URL
-        self.txt_gs_url.setText(settings.geoserver_url)
-        self.opt_verify_tls.setChecked(settings.geoserver_verify_tls)
-
-        # credentials from encrypted store
-        username, password = settings.get_credentials()
-        self.txt_gs_username.setText(username)
-        self.txt_gs_password.setText(password)
+        # Profiles: edits are kept per profile until Save (or dropped by
+        # Cancel); a removed profile's credentials go only on Save.
+        self._profiles = [dict(profile) for profile in self.plg_settings.get_profiles()]
+        self._buffers, self._loaded, self._removed_auth = {}, {}, []
+        active = self.plg_settings.active_profile_name()
+        self._shown = None
+        self._fill_profile_combo(
+            active or (self._profiles[0]["name"] if self._profiles else None)
+        )
 
     def on_reset_settings(self) -> None:
-        """Reset settings to default values."""
+        """Reset settings to default values, every profile included."""
+        for profile in self.plg_settings.get_profiles():
+            PlgSettingsStructure(
+                geoserver_auth_cfg_id=profile.get("auth_cfg_id", "")
+            ).remove_credentials()
         # Remove the auth config if it exists
         current = self.plg_settings.get_plg_settings()
         current.remove_credentials()
 
         default_settings: PlgSettingsStructure = PlgSettingsStructure()
         self.plg_settings.save_from_object(default_settings)
+        self.plg_settings.save_profiles([])
+        self.plg_settings.set_value_from_key("active_profile", "")
         self.load_settings()
+
+    # -- Server profiles (#47) -------------------------------------------------
+
+    def _build_profile_row(self) -> None:
+        """A Profile row above the URL: pick, add, remove."""
+        row = QWidget(self)
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.cmb_profile = QComboBox(row)
+        self.cmb_profile.setToolTip(
+            self.tr(
+                "The server connection shown below. Saving makes it the active one."
+            )
+        )
+        self.btn_profile_add = QPushButton(self.tr("Add…"), row)
+        self.btn_profile_remove = QPushButton(self.tr("Remove"), row)
+        layout.addWidget(self.cmb_profile, 1)
+        layout.addWidget(self.btn_profile_add)
+        layout.addWidget(self.btn_profile_remove)
+        self.formLayout.insertRow(0, QLabel(self.tr("Profile"), self), row)
+        self.cmb_profile.currentTextChanged.connect(self._on_profile_changed)
+        self.btn_profile_add.clicked.connect(self._add_profile)
+        self.btn_profile_remove.clicked.connect(self._remove_profile)
+
+    def _profile(self, name):
+        return next((p for p in self._profiles if p["name"] == name), None)
+
+    def _fields(self) -> dict:
+        return {
+            "url": self.txt_gs_url.text(),
+            "username": self.txt_gs_username.text(),
+            "password": self.txt_gs_password.text(),
+            "verify_tls": self.opt_verify_tls.isChecked(),
+        }
+
+    def _commit_fields(self) -> None:
+        """Keep what the fields say for the profile they show."""
+        if self._shown is not None:
+            self._buffers[self._shown] = self._fields()
+
+    def _is_dirty(self, name) -> bool:
+        return name in self._buffers and self._buffers[name] != self._loaded.get(name)
+
+    @staticmethod
+    def _keep(profile, settings) -> None:
+        """Copy a saved connection back into its profile entry."""
+        profile.update(
+            url=settings.geoserver_url,
+            auth_cfg_id=settings.geoserver_auth_cfg_id,
+            verify_tls=bool(settings.geoserver_verify_tls),
+        )
+
+    def _fill_profile_combo(self, select) -> None:
+        self.cmb_profile.blockSignals(True)
+        self.cmb_profile.clear()
+        self.cmb_profile.addItems([p["name"] for p in self._profiles])
+        if not self._profiles:
+            # What an empty list means. Qt 5's combo placeholder does not
+            # render in every style, so it is an item, disabled with the combo;
+            # no profile has this name, so nothing can select or save it.
+            self.cmb_profile.addItem(self.tr("None yet. Saving creates one."))
+        self.cmb_profile.setEnabled(bool(self._profiles))
+        self.cmb_profile.setCurrentText(select or "")
+        self.cmb_profile.blockSignals(False)
+        self.btn_profile_remove.setEnabled(bool(self._profiles))
+        self._show_profile(select if self._profile(select) else None)
+
+    def _show_profile(self, name) -> None:
+        """Fill the fields from a profile's edits, else from what is stored."""
+        self._shown = name
+        profile = self._profile(name)
+        if name in self._buffers:
+            values = self._buffers[name]
+        elif profile is not None:
+            username, password = PlgSettingsStructure(
+                geoserver_auth_cfg_id=profile.get("auth_cfg_id", "")
+            ).get_credentials()
+            values = {
+                "url": profile.get("url", ""),
+                "username": username,
+                "password": password,
+                "verify_tls": bool(profile.get("verify_tls", True)),
+            }
+            self._loaded[name] = dict(values)
+        else:
+            values = {"url": "", "username": "", "password": "", "verify_tls": True}
+        self.txt_gs_url.setText(values["url"])
+        self.txt_gs_username.setText(values["username"])
+        self.txt_gs_password.setText(values["password"])
+        self.opt_verify_tls.setChecked(values["verify_tls"])
+
+    def _on_profile_changed(self, name) -> None:
+        self._commit_fields()
+        self._show_profile(name if self._profile(name) else None)
+
+    def _add_profile(self) -> None:
+        name, ok = QInputDialog.getText(
+            self, self.tr("Add a Profile"), self.tr("Name of the new profile:")
+        )
+        name = name.strip()
+        if not ok or not name:
+            return
+        if self._profile(name) is not None:
+            self._show_test_result(
+                self.tr("A profile named '{}' already exists.").format(name), "error"
+            )
+            return
+        self._commit_fields()
+        self._profiles.append(
+            {"name": name, "url": "", "auth_cfg_id": "", "verify_tls": True}
+        )
+        self._fill_profile_combo(name)
+
+    def _remove_profile(self) -> None:
+        """Drop the shown profile; its credentials go when the page is saved."""
+        profile = self._profile(self._shown)
+        if profile is None:
+            return
+        self._profiles.remove(profile)
+        self._buffers.pop(profile["name"], None)
+        if profile.get("auth_cfg_id"):
+            self._removed_auth.append(profile["auth_cfg_id"])
+        self._shown = None
+        self._fill_profile_combo(self._profiles[0]["name"] if self._profiles else None)
 
 
 class PlgOptionsFactory(QgsOptionsWidgetFactory):

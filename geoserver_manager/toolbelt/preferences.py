@@ -5,7 +5,9 @@ Plugin settings.
 """
 
 # standard
+import json
 from dataclasses import asdict, dataclass, fields
+from urllib.parse import urlparse
 
 # PyQGIS
 from qgis.core import QgsApplication, QgsAuthMethodConfig, QgsSettings
@@ -221,3 +223,68 @@ class PlgOptionsManager:
         """
         for k, v in asdict(plugin_settings_obj).items():
             cls.set_value_from_key(k, v)
+
+    # -- Server profiles (#47) -----------------------------------------------
+    # A profile is {"name", "url", "auth_cfg_id", "verify_tls"}, one auth
+    # config each in QgsAuthManager. The list is JSON under "profiles". The
+    # active one is also copied into geoserver_url / geoserver_auth_cfg_id /
+    # geoserver_verify_tls, which is all the rest of the plugin reads, so only
+    # the settings page and the dialog's switcher know that profiles exist.
+
+    @classmethod
+    def get_profiles(cls) -> list:
+        """The saved profiles, in order. A connection saved before profiles
+        existed comes back as the first one, named after its host."""
+        raw = cls.get_value_from_key("profiles", "", str) or ""
+        try:
+            profiles = json.loads(raw) if raw else []
+        except ValueError:
+            profiles = []
+        profiles = [
+            profile
+            for profile in profiles
+            if isinstance(profile, dict) and profile.get("name")
+        ]
+        if not profiles:
+            current = cls.get_plg_settings()
+            if current.geoserver_url:
+                profiles = [
+                    {
+                        "name": urlparse(current.geoserver_url).netloc
+                        or current.geoserver_url,
+                        "url": current.geoserver_url,
+                        "auth_cfg_id": current.geoserver_auth_cfg_id,
+                        "verify_tls": bool(current.geoserver_verify_tls),
+                    }
+                ]
+        return profiles
+
+    @classmethod
+    def save_profiles(cls, profiles: list) -> bool:
+        """Store the profile list as it is, active one included."""
+        return cls.set_value_from_key("profiles", json.dumps(profiles))
+
+    @classmethod
+    def active_profile_name(cls) -> str:
+        """The name of the profile the dialog connects to, or ""."""
+        name = cls.get_value_from_key("active_profile", "", str) or ""
+        profiles = cls.get_profiles()
+        if not name and profiles:
+            # Migrated from a single connection: that one is what is active.
+            current = cls.get_plg_settings()
+            if profiles[0]["url"] == current.geoserver_url:
+                name = profiles[0]["name"]
+        return name if any(p["name"] == name for p in profiles) else ""
+
+    @classmethod
+    def activate_profile(cls, profile) -> None:
+        """Make `profile` the connection everything reads; None clears it,
+        which the dialog shows as "Not configured"."""
+        settings = cls.get_plg_settings()
+        settings.geoserver_url = profile["url"] if profile else ""
+        settings.geoserver_auth_cfg_id = profile["auth_cfg_id"] if profile else ""
+        settings.geoserver_verify_tls = (
+            bool(profile.get("verify_tls", True)) if profile else True
+        )
+        cls.save_from_object(settings)
+        cls.set_value_from_key("active_profile", profile["name"] if profile else "")

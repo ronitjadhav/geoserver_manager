@@ -220,6 +220,8 @@ class GeoServerMainDialog(
         self.btn_close.clicked.connect(self.close)
         self.btn_refresh.clicked.connect(self._on_refresh_clicked)
         self.btn_edit_credentials.clicked.connect(self._edit_credentials)
+        self.cmb_profile.setToolTip(self.tr("Switch to another saved GeoServer"))
+        self.cmb_profile.textActivated.connect(self._switch_profile)
         self.navList.currentRowChanged.connect(self._on_nav_changed)
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
@@ -431,6 +433,7 @@ class GeoServerMainDialog(
         """
         self._set_status(self.tr("Connecting…"), "busy")
         self.setWindowTitle(__title__)
+        self._fill_profile_switcher()
         # Reopened after Close: closeEvent set _closing so a late finish would
         # stay away from dying widgets. A new connection means we are alive
         # again. Without this the dialog worked exactly once per QGIS session.
@@ -481,6 +484,29 @@ class GeoServerMainDialog(
             self._on_nav_changed(self.navList.currentRow())
 
         self._run_in_task(self.tr("Connection failed"), connect, connected)
+
+    def _fill_profile_switcher(self):
+        """The saved profiles next to the status line, the active one chosen.
+
+        Hidden with fewer than two: one server needs no switch (#47).
+        """
+        profiles = self.plg_settings.get_profiles()
+        self.cmb_profile.blockSignals(True)
+        self.cmb_profile.clear()
+        self.cmb_profile.addItems([profile["name"] for profile in profiles])
+        self.cmb_profile.setCurrentText(self.plg_settings.active_profile_name())
+        self.cmb_profile.blockSignals(False)
+        self.cmb_profile.setVisible(len(profiles) > 1)
+
+    def _switch_profile(self, name):
+        """Connect to another saved profile, then reload the open tab."""
+        profile = next(
+            (p for p in self.plg_settings.get_profiles() if p["name"] == name), None
+        )
+        if profile is None:
+            return
+        self.plg_settings.activate_profile(profile)
+        self.refresh_ui(show_message=True)
 
     # -- Background loading ------------------------------------------------
 
