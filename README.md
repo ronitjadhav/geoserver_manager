@@ -25,9 +25,8 @@ project; bring what the server has back into QGIS as WMS, WFS or WMTS, without
 switching to the GeoServer web admin.
 
 Built on [`python-geoservercloud`](https://github.com/camptocamp/python-geoservercloud):
-every request goes through the library, and what the library cannot do yet is
-recorded in [issue #50](https://github.com/ronitjadhav/geoserver_manager/issues/50)
-so that it gets added there rather than worked around here.
+missing library operations and plugin workarounds are tracked in
+[issue #50](https://github.com/ronitjadhav/geoserver_manager/issues/50).
 
 > **Status:** experimental, not yet released. Developed against GeoServer 2.28;
 > what is still missing is on the [roadmap](docs/github_issue_roadmap.md).
@@ -69,9 +68,17 @@ wheels in `geoserver_manager/extras/` and added to `sys.path` at startup.
 
 Until the plugin is published on <https://plugins.qgis.org>:
 
-1. Download the latest `geoserver_manager.*.zip` from the
-   [releases page](https://github.com/ronitjadhav/geoserver_manager/releases).
-2. In QGIS: *Plugins → Manage and Install Plugins → Install from ZIP*.
+1. Open *Plugins → Manage and Install Plugins → Settings*.
+2. Enable experimental plugins and add this repository URL:
+
+   ```text
+   https://ronitjadhav.github.io/geoserver_manager/plugins.xml
+   ```
+
+3. Find *GeoServer Manager* in the plugin manager and install it.
+
+The feed contains development builds. See the
+[installation guide](docs/usage/installation.md) for details.
 
 For a development install, see [Development](#development) below.
 

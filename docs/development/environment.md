@@ -19,7 +19,7 @@ Then enter into the virtual environment:
 source .venv/bin/activate
 ```
 
-Old school way:
+Alternatively, use the system Python with access to QGIS packages:
 
 ```bash
 # create virtual environment linking to system packages (for pyqgis)
@@ -79,12 +79,8 @@ docker compose ps          # wait until gsm-geoserver is "healthy"
 Configure the plugin with that URL and those credentials in *Settings → Options →
 GeoServer Manager*.
 
-The server comes up with GeoServer's demo data: 8 workspaces, 5 datastores, 24
-layers, 21 styles and 3 layer groups: enough for the list views, search and
-pagination to show something real, and for the upcoming Layers/Styles tabs to
-have resources to list. Note that 4 of the 5 demo datastores are Shapefile or
-GeoPackage, types the plugin cannot edit, so clicking one opens the read-only
-dialog (see issue #28).
+The server includes demo workspaces, stores, layers, styles and layer groups.
+Use them to exercise listings, search, pagination and resource editing.
 
 For the empty first-run state, "no workspaces yet", which the Add flows and the
 "create a workspace first" warning are about:

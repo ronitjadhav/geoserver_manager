@@ -1,6 +1,9 @@
 # Feature Roadmap: GeoServer Manager QGIS Plugin
 
-Track all planned features for the GeoServer Manager plugin. The authoritative, up-to-date plan is the [GitHub milestones](https://github.com/ronitjadhav/geoserver_manager/milestones) (one issue per item below, plus `tech-debt` issues from the code audit); tick items here when they ship. Every feature listed is backed by the [`python-geoservercloud`](https://github.com/camptocamp/python-geoservercloud) library (v0.8.5).
+This checklist records shipped and planned features.
+[GitHub milestones](https://github.com/ronitjadhav/geoserver_manager/milestones)
+group the implementation issues. Library gaps and existing workarounds are tracked in
+[issue #50](https://github.com/ronitjadhav/geoserver_manager/issues/50).
 
 ---
 
@@ -139,9 +142,7 @@ Track all planned features for the GeoServer Manager plugin. The authoritative, 
 
 - [x] Async/threaded API calls (prevent UI freezing): every tab load and the
   connection probe run in a `QgsTask`, with progress and Cancel
-- [x] Resource list caching with TTL: decided against. Every list is fetched
-  on tab switch and Refresh, and the one cache that existed (workspace names)
-  was removed because it left a stale picker behind. Refresh is the TTL
+- [x] Fresh resource lists on every tab switch and Refresh, without a persistent cache
 - [x] Keyboard shortcuts (F5 refresh, Del delete, Ctrl+F search, Esc clear)
 - [x] Dark theme support: status and hint colours come from the palette
 - [x] i18n / translation support: the tab mixins translate in their own

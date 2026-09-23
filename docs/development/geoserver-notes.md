@@ -3,9 +3,7 @@
 Everything here was measured, not assumed: against GeoServer **2.28.5** in the
 [docker sandbox](environment.md), and against the
 [python-geoservercloud](https://github.com/camptocamp/python-geoservercloud)
-version bundled in `geoserver_manager/extras/`. It is the reference for anyone
-touching a tab's server calls, and the reason a piece of code that looks
-needlessly careful usually is not.
+version bundled in `geoserver_manager/extras/`. Use these notes when changing server calls.
 
 Two rules frame all of it. Every GeoServer call goes through the library, and
 each gap in the library is recorded as a row in
@@ -28,8 +26,7 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   and the web UI's "Default Workspace" checkbox only *sets*: `WorkspaceEditPage` has
   `if (defaultWs) setDefaultWorkspace(ws)` with no else, so unchecking it and saving is a no-op. The
   plugin therefore shows the default read-only-and-checked, marks it in the Workspaces list, and reads it
-  live from the server on every load and every edit dialog. If it looks "out of sync" with the web UI,
-  the web UI is the one lying.
+  live from the server on every load and every edit dialog.
 - The client strips trailing `/` from the URL itself. It has no timeout parameter at all
   (`TIMEOUT = 120` is a module constant and `RestClient.get` takes no `timeout`), which is why
   `toolbelt/probe.py` is the one call that uses `requests` directly: a dead host must cost 10 s, not two
@@ -259,7 +256,7 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   A workspace group can only hold that workspace's layers. A group may share a layer's qualified name.
 - The bundled wheel is the upstream 0.8.5 with `geoserver_acceptance_tests/` removed (15 MB of fixtures):
   16 MB → 49 KB. On a version bump, strip the new wheel the same way. The procedure is in
-  `toolbelt/dependencies.py` and the `release-plugin` skill. `GSC_REQUIRED` pins the version;
+  `toolbelt/dependencies.py`; see [packaging and release](packaging.md). `GSC_REQUIRED` pins the version;
   `ensure_dependencies()` logs which copy was imported and from where, and pushes a warning when it is not
   the pin. An install in the QGIS profile still wins over the bundled wheel, the warning is how you notice.
   `tests/qgis/test_library_contract.py` asserts the pin equals the shipped wheel.

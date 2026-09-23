@@ -23,8 +23,6 @@ what the code cannot tell you. Python 3.12 (QGIS 3.40 and newer), PyQt5
 | `scripts/` | `update_translations.py` (pylupdate6), `export_branding.py` (every brand asset from one SVG), `capture_screenshot.py` (every screenshot the README and the guide show, grabbed from the real dialog) |
 | `docker-compose.yml` | Throwaway GeoServer 2.28.5 (`:8080`, admin/geoserver) + PostGIS, for testing against a real server |
 
-The `Inspiration/` folder is untracked reference code. Never import from it.
-
 ## How the dialog works
 
 - **Tabs are one registry.** `GeoServerMainDialog.TABS = ((label, icon, loader_name), …)`.

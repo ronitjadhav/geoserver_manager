@@ -1,23 +1,26 @@
 # Contributing Guidelines
 
-First off, thanks for considering to contribute to this project!
-
-These are mostly guidelines, not rules. Use your best judgment, and feel free to propose changes to this document in a pull request.
+Contributions are welcome through issues and pull requests. Start with the
+[development setup](https://ronitjadhav.github.io/geoserver_manager/development/environment.html).
 
 ## Git hooks
 
-We use git hooks through [pre-commit](https://pre-commit.com/) to enforce and automatically check some "rules". Please install them (`pre-commit install`) before to push any commit.
+Install [pre-commit](https://pre-commit.com/) hooks before making a commit:
+
+```sh
+pre-commit install
+```
 
 See the relevant configuration file: `.pre-commit-config.yaml`.
 
 ## Code Style
 
-Make sure your code *roughly* follows [PEP-8](https://www.python.org/dev/peps/pep-0008/) and keeps things consistent with the rest of the code:
+Follow [PEP-8](https://www.python.org/dev/peps/pep-0008/) and the existing code style:
 
 - docstrings: [sphinx-style](https://sphinx-rtd-tutorial.readthedocs.io/en/latest/docstrings.html#the-sphinx-docstring-format) is used to write technical documentation.
-- formatting: [black](https://black.readthedocs.io/) is used to automatically format the code without debate.
+- formatting: [black](https://black.readthedocs.io/) is used to format the code.
 - sorted imports: [isort](https://pycqa.github.io/isort/) is used to sort imports
-- static analysis: [flake8](https://flake8.pycqa.org/en/latest/) is used to catch some dizziness and keep the source code healthy.
+- static analysis: [flake8](https://flake8.pycqa.org/en/latest/) is used to check for errors and style violations.
 - linting and formatting: [ruff](https://docs.astral.sh/ruff/) runs first, through the same pre-commit hooks.
 
 Two habits the whole repository keeps: no em dashes, and two short sentences
