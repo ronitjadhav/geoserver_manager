@@ -1334,6 +1334,12 @@ class GeoServerMainDialog(
         # One line, markup reduced to its title: a Tomcat stack trace is not an
         # explanation, and an XML error document still says something.
         summary = summarise_body(getattr(response, "text", ""))
+        status = getattr(response, "status_code", None)
+        if status is not None:
+            # "HTTP 500: the reason", not "500 Server Error:  for url: <the
+            # whole request URL>": the URL is noise in a banner, and the log
+            # line carries the same text.
+            return f"HTTP {status}: {summary}" if summary else f"HTTP {status}"
         if summary and summary not in str(error):
             return f"{error}: {summary}"
         return str(error)
@@ -1546,6 +1552,25 @@ class GeoServerMainDialog(
 
         dlg.get_widget(picker).currentTextChanged.connect(show)
         show(first)
+
+    def _warn_if_store_unreachable(self, name, read):
+        """After a store was saved: make GeoServer open it, and say so if it cannot.
+
+        GeoServer stores whatever URL, path or password it is given and only
+        fails when a layer is listed or drawn. `read()` is a cheap GET that
+        forces the connection (a store's unpublished tables, coverages or
+        remote layers); it runs in the worker behind the waiting box.
+        """
+        try:
+            self._wait_for(read)
+        except _Abandoned:
+            return
+        except Exception as error:  # the reason is what the user needs
+            self.show_warning_message(
+                self.tr("'{}' was saved, but GeoServer cannot read it: {}").format(
+                    name, self._error_text(error)
+                )
+            )
 
     def _report_partial_failures(self, failures):
         """One warning banner for the items a listing could not fetch.

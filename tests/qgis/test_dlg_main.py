@@ -97,6 +97,47 @@ class TestTableState(unittest.TestCase):
         self.assertFalse(self.dlg.btn_delete_selected.isVisible())
 
 
+class TestStoreReachAndReset(unittest.TestCase):
+    """Wave 2: a saved store is checked at once, and can be reset."""
+
+    def test_a_store_geoserver_cannot_read_is_said_after_the_save(self):
+        dlg = SyncDialog()
+        warnings = []
+        dlg.show_warning_message = warnings.append
+
+        def unreachable(ws, name):
+            raise RuntimeError("HTTP 500: Connection refused to host postgis2")
+
+        dlg._available_tables = unreachable
+        dlg._warn_if_reaches_nothing({"workspace": "topp", "name": "pg"})
+        self.assertIn("'pg' was saved, but GeoServer cannot read it", warnings[0])
+        self.assertIn("Connection refused", warnings[0])
+
+    def test_a_store_that_answers_says_nothing_more(self):
+        dlg = SyncDialog()
+        warnings = []
+        dlg.show_warning_message = warnings.append
+        dlg._available_tables = lambda ws, name: ["roads"]
+        dlg._warn_if_reaches_nothing({"workspace": "topp", "name": "pg"})
+        self.assertEqual(warnings, [])
+
+    def test_reset_posts_to_the_datastores_reset_path(self):
+        class GS:
+            class rest_service:
+                class rest_endpoints:
+                    @staticmethod
+                    def datastore(ws, ds):
+                        return f"/rest/workspaces/{ws}/datastores/{ds}.json"
+
+        dlg = SyncDialog()
+        dlg.gs = GS()
+        sent = []
+        dlg._raw_rest = lambda method, path, **kw: sent.append((method, path))
+        dlg.show_success_message = lambda text: None
+        dlg._reset_datastore(["pg", "topp", "PostGIS", "Yes"])
+        self.assertEqual(sent, [("post", "/rest/workspaces/topp/datastores/pg/reset")])
+
+
 class TestTableLooks(unittest.TestCase):
     """Review of 2026-09-23: what the table draws, and what it does not."""
 
@@ -730,8 +771,11 @@ class TestErrorText(unittest.TestCase):
             500, "Unable to delete layer referenced by layer group 'tasmania'"
         )
         text = GeoServerMainDialog._error_text(error)
-        self.assertIn("layer group 'tasmania'", text)
-        self.assertIn("500 Server Error", text)
+        self.assertEqual(
+            text,
+            "HTTP 500: Unable to delete layer referenced by layer group 'tasmania'",
+        )
+        self.assertNotIn("for url", text)  # the request URL is noise here
 
     def test_html_error_pages_are_skipped(self):
         error = self._http_error(401, "<!doctype html><html><title>401</title></html>")

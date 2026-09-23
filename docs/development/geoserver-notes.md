@@ -81,6 +81,15 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   carry **`dbtype: geopkg`** (that is how GeoServer picks the factory), and an empty `charset` is omitted
   rather than sent blank, because blank is not "use your default". GeoServer fills in `namespace` itself, and
   the edit merge keeps it along with everything else the form does not show.
+- **Editing a store is one partial PUT too** (rows 54 and 55 of #50). Measured on 2.28.5: a
+  `PUT …/coveragestores/{cs}.json`, `…/wmsstores/{s}.json` or `…/wmtsstores/{s}.json` with only the changed
+  fields merges. A coverage store rename keeps its coverages and layers; a datastore rename (one PUT with
+  the new `name` on the old path) keeps its feature types, layers, groups and GWC layers. A cascaded store
+  **cannot** be renamed (403). Cascaded store passwords come back `crypt1:…`; a PUT without `password` keeps
+  it, the ciphertext is accepted back, and removing authentication needs JSON `null` for `user` and
+  `password`: an empty string is stored as an encrypted empty password, and the store then fails to load.
+  `POST …/{datastores|coveragestores}/{s}/reset` makes GeoServer re-read a store; cascaded stores have no
+  reset (404).
 - **Editing a layer is one partial resource PUT** (row 53 of #50). Measured on 2.28.5: a
   `PUT …/featuretypes/{ft}.json` or `…/coverages/{c}.json` with only some of title, abstract, keywords,
   srs, projectionPolicy, enabled, advertised, cqlFilter and name merges and keeps the rest (bounds,

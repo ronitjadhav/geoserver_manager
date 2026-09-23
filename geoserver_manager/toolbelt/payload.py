@@ -73,3 +73,17 @@ def bbox_text(box):
     )
     crs = crs_text(box.get("crs"))
     return f"{text}  ({crs})" if crs else text
+
+
+def changed(before, after, mapping):
+    """{REST key: new value} for the form fields that differ, else {}.
+
+    `mapping` is (form key, REST key) pairs. An edit sends only these, as a
+    partial PUT that GeoServer merges, so nothing the form does not show is
+    touched.
+    """
+    return {
+        rest_key: after.get(key)
+        for key, rest_key in mapping
+        if after.get(key) != before.get(key)
+    }

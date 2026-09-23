@@ -86,3 +86,24 @@ class TestKeywordsAndText(unittest.TestCase):
             text_of({"fr": "Routes", "en": "Roads"}), "en: Roads; fr: Routes"
         )
         self.assertEqual(text_of(None), "")
+
+
+class TestChanged(unittest.TestCase):
+    def test_only_fields_that_differ_come_back_under_their_rest_names(self):
+        from geoserver_manager.toolbelt.payload import changed
+
+        before = {"url": "a", "enabled": True, "description": "x"}
+        after = {"url": "b", "enabled": True, "description": ""}
+        self.assertEqual(
+            changed(
+                before,
+                after,
+                (
+                    ("url", "url"),
+                    ("enabled", "enabled"),
+                    ("description", "description"),
+                ),
+            ),
+            {"url": "b", "description": ""},
+        )
+        self.assertEqual(changed(before, dict(before), (("url", "url"),)), {})

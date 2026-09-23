@@ -13,7 +13,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.toolbelt.payload import bbox_text, keyword_list
+from geoserver_manager.toolbelt.payload import bbox_text, changed, keyword_list
 
 # GeoServer's own `type` values. The Type column carries them, and every
 # action reads the row's type to pick the WMS or the WMTS endpoint.
@@ -33,6 +33,26 @@ _LAYER_KEYS = {WMS: ("wmsLayers", "wmsLayer"), WMTS: ("wmtsLayers", "wmtsLayer")
 # be extracted at all (pylupdate only understands a literal context), hence
 # the repetition.
 translate = QCoreApplication.translate
+
+
+# What the store edit form may change, as (form key, REST key).
+_STORE_EDITS = (
+    ("capabilities_url", "capabilitiesURL"),
+    ("enabled", "enabled"),
+    ("user", "user"),
+    ("max_connections", "maxConnections"),
+    ("read_timeout", "readTimeout"),
+    ("connect_timeout", "connectTimeout"),
+)
+# The JSON wrapper of each store type.
+_STORE_WRAPPER = {WMS: "wmsStore", WMTS: "wmtsStore"}
+# GeoServer's own defaults: a create sends only what differs from these.
+_CONNECTION_DEFAULTS = {
+    "user": "",
+    "max_connections": 6,
+    "read_timeout": 60,
+    "connect_timeout": 30,
+}
 
 
 def _q(segment):
@@ -438,42 +458,106 @@ class CascadedStoreTabMixin:
 
     # -- Add ------------------------------------------------------------------
 
-    def _cascaded_store_fields(self, workspace_names):
-        """Field definitions for the create dialog."""
+    @staticmethod
+    def _cascaded_connection_fields(edit_mode=False):
+        """Credentials and limits of a cascaded store, as GeoServer names them."""
+        connection = translate("CascadedStoreTabMixin", "Connection")
         return [
             {
-                "key": "name",
-                "label": translate("CascadedStoreTabMixin", "Name"),
+                "key": "user",
+                "label": translate("CascadedStoreTabMixin", "User name"),
                 "type": "text",
-                "required": True,
-            },
-            {
-                "key": "workspace",
-                "label": translate("CascadedStoreTabMixin", "Workspace"),
-                "type": "combo",
-                "options": list(workspace_names),
-                "required": True,
-            },
-            {
-                "key": "type",
-                "label": translate("CascadedStoreTabMixin", "Type"),
-                "type": "combo",
-                "options": [WMS, WMTS],
-                "required": True,
-            },
-            {
-                "key": "capabilities_url",
-                "label": translate("CascadedStoreTabMixin", "GetCapabilities URL"),
-                "type": "text",
-                "required": True,
-                "placeholder": "https://example.org/geoserver/wms?service=WMS"
-                "&version=1.3.0&request=GetCapabilities",
-                "help": translate(
-                    "CascadedStoreTabMixin",
-                    "As GeoServer reaches it, from its own machine, not from yours.",
+                "group": connection,
+                "placeholder": translate(
+                    "CascadedStoreTabMixin", "Only if the remote server asks"
                 ),
             },
+            {
+                "key": "password",
+                "label": translate("CascadedStoreTabMixin", "Password"),
+                "type": "text",
+                "echo_password": True,
+                "group": connection,
+                "help": (
+                    translate(
+                        "CascadedStoreTabMixin",
+                        "Blank keeps the stored password. Clear the user name and "
+                        "the password to stop authenticating.",
+                    )
+                    if edit_mode
+                    else None
+                ),
+            },
+            {
+                "key": "max_connections",
+                "label": translate("CascadedStoreTabMixin", "Max connections"),
+                "type": "spinbox",
+                "min": 1,
+                "max": 128,
+                "default": 6,
+                "group": connection,
+            },
+            {
+                "key": "read_timeout",
+                "label": translate("CascadedStoreTabMixin", "Read timeout (s)"),
+                "type": "spinbox",
+                "min": 1,
+                "max": 3600,
+                "default": 60,
+                "group": connection,
+            },
+            {
+                "key": "connect_timeout",
+                "label": translate("CascadedStoreTabMixin", "Connect timeout (s)"),
+                "type": "spinbox",
+                "min": 1,
+                "max": 3600,
+                "default": 30,
+                "group": connection,
+            },
         ]
+
+    def _cascaded_store_fields(self, workspace_names):
+        """Field definitions for the create dialog."""
+        return self._with_connection(
+            [
+                {
+                    "key": "name",
+                    "label": translate("CascadedStoreTabMixin", "Name"),
+                    "type": "text",
+                    "required": True,
+                },
+                {
+                    "key": "workspace",
+                    "label": translate("CascadedStoreTabMixin", "Workspace"),
+                    "type": "combo",
+                    "options": list(workspace_names),
+                    "required": True,
+                },
+                {
+                    "key": "type",
+                    "label": translate("CascadedStoreTabMixin", "Type"),
+                    "type": "combo",
+                    "options": [WMS, WMTS],
+                    "required": True,
+                },
+                {
+                    "key": "capabilities_url",
+                    "label": translate("CascadedStoreTabMixin", "GetCapabilities URL"),
+                    "type": "text",
+                    "required": True,
+                    "placeholder": "https://example.org/geoserver/wms?service=WMS"
+                    "&version=1.3.0&request=GetCapabilities",
+                    "help": translate(
+                        "CascadedStoreTabMixin",
+                        "As GeoServer reaches it, from its own machine, not from yours.",
+                    ),
+                },
+            ]
+        )
+
+    def _with_connection(self, fields, edit_mode=False):
+        return fields + self._cascaded_connection_fields(edit_mode)
 
     def _add_cascaded_store(self):
         """Open a form dialog to create a cascaded store."""
@@ -549,24 +633,47 @@ class CascadedStoreTabMixin:
             self._check(self.gs.create_wms_store(ws, name, url))
         else:
             self._check(self.gs.create_wmts_store(ws, name, url))
+        # TODO(#50): the library's create_wms_store/create_wmts_store take no
+        # credentials, timeouts or pool size (row 55). A merging PUT adds what
+        # the form set; an authenticated remote needs it before any layer.
+        defaults = dict(
+            _CONNECTION_DEFAULTS, capabilities_url=values["capabilities_url"]
+        )
+        extras = self._cascaded_store_changes(defaults, dict(defaults, **values))
+        if extras:
+            self._put_cascaded_store(ws, name, kind, extras)
 
     # -- Info -----------------------------------------------------------------
 
     def _cascaded_store_info_fields(self):
-        """Field definitions for the read-only store dialog."""
+        """The store edit form. Name, workspace and type stay: GeoServer
+        refuses to rename a cascaded store (403, measured on 2.28.5)."""
         fields = [
             {"key": key, "label": label, "type": "text", "read_only": True}
             for key, label in (
                 ("name", translate("CascadedStoreTabMixin", "Name")),
                 ("workspace", translate("CascadedStoreTabMixin", "Workspace")),
                 ("type", translate("CascadedStoreTabMixin", "Type")),
-                (
-                    "capabilities_url",
-                    translate("CascadedStoreTabMixin", "GetCapabilities URL"),
-                ),
-                ("enabled", translate("CascadedStoreTabMixin", "Enabled")),
             )
         ]
+        fields += [
+            {
+                "key": "capabilities_url",
+                "label": translate("CascadedStoreTabMixin", "GetCapabilities URL"),
+                "type": "text",
+                "required": True,
+                "help": translate(
+                    "CascadedStoreTabMixin",
+                    "As GeoServer reaches it, from its own machine, not from yours.",
+                ),
+            },
+            {
+                "key": "enabled",
+                "label": translate("CascadedStoreTabMixin", "Enabled"),
+                "type": "checkbox",
+            },
+        ]
+        fields = self._with_connection(fields, edit_mode=True)
         fields.append(
             {
                 "key": "layers",
@@ -582,6 +689,34 @@ class CascadedStoreTabMixin:
         )
         return fields
 
+    @staticmethod
+    def _cascaded_store_changes(before, after):
+        """The partial PUT body for what changed, or {}. Pure.
+
+        Measured on 2.28.5: a PUT without `password` keeps the stored one (so
+        a blank field is left out); GeoServer accepts its own ciphertext back;
+        and removing authentication needs JSON null for both, since an empty
+        string is stored as an encrypted empty password that breaks the store.
+        """
+        body = changed(before, after, _STORE_EDITS)
+        if after.get("password"):
+            body["password"] = after["password"]
+        elif not after.get("user") and before.get("user"):
+            body["user"] = None
+            body["password"] = None
+        return body
+
+    def _put_cascaded_store(self, workspace_name, name, kind, body):
+        """One merging PUT on a cascaded store. TODO(#50): no update in the
+        library (row 55)."""
+        endpoints = self.gs.rest_service.rest_endpoints
+        builder = endpoints.wmsstore if kind == WMS else endpoints.wmtsstore
+        self._raw_rest(
+            "put",
+            builder(_q(workspace_name), _q(name)),
+            json={_STORE_WRAPPER[kind]: body},
+        )
+
     def _cascaded_store_form_values(self, detail, workspace_name, kind, published):
         """Prefill for the store dialog."""
         return {
@@ -589,12 +724,17 @@ class CascadedStoreTabMixin:
             "workspace": workspace_name,
             "type": detail.get("type") or kind,
             "capabilities_url": detail.get("capabilitiesURL", ""),
-            "enabled": self._yes_no(detail.get("enabled", True)),
+            "enabled": bool(detail.get("enabled", True)),
+            "user": detail.get("user") or "",
+            "password": "",  # never shown; blank keeps it (invariant 5)
+            "max_connections": int(detail.get("maxConnections") or 6),
+            "read_timeout": int(detail.get("readTimeout") or 60),
+            "connect_timeout": int(detail.get("connectTimeout") or 30),
             "layers": "\n".join(published) or "-",
         }
 
     def _show_cascaded_store_info(self, row_data):
-        """Open a cascaded store, read-only."""
+        """Open a cascaded store to edit its URL, credentials and limits."""
         name, ws_name, kind = row_data[0], row_data[1], row_data[2]
         fetched = self._fetch(
             lambda: (
@@ -608,22 +748,48 @@ class CascadedStoreTabMixin:
         if fetched is None:
             return
         detail, published = fetched
-
+        before = self._cascaded_store_form_values(detail, ws_name, kind, published)
         dlg = ResourceFormDialog(
             title=translate("CascadedStoreTabMixin", "Cascaded Store '{}'").format(
                 name
             ),
-            description=translate(
-                "CascadedStoreTabMixin",
-                "Read-only. To point it at another server, delete it and create "
-                "it again; its published layers go with it.",
-            ),
             fields=self._cascaded_store_info_fields(),
-            values=self._cascaded_store_form_values(detail, ws_name, kind, published),
+            values=before,
             parent=self,
         )
-        dlg.hide_save_button()
-        dlg.exec()
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        after = dlg.get_values()
+        body = self._cascaded_store_changes(before, after)
+        if not body:
+            return
+        url = (body.get("capabilitiesURL") or "").strip()
+        if "capabilitiesURL" in body and not url.startswith(("http://", "https://")):
+            self.show_error_message(
+                translate(
+                    "CascadedStoreTabMixin",
+                    "The GetCapabilities URL must start with http:// or https://.",
+                )
+            )
+            return
+        if self._run_action(
+            lambda: self._wait_for(
+                lambda: self._put_cascaded_store(ws_name, name, kind, body)
+            ),
+            translate(
+                "CascadedStoreTabMixin", "Failed to save cascaded store '{}'"
+            ).format(name),
+        ):
+            self.show_success_message(
+                translate("CascadedStoreTabMixin", "Cascaded store '{}' saved.").format(
+                    name
+                )
+            )
+            self._warn_if_store_unreachable(
+                name,
+                lambda: self._cascaded_layer_names(ws_name, name, kind, available=True),
+            )
+            self._load_cascaded_stores()
 
     # -- Delete ---------------------------------------------------------------
 

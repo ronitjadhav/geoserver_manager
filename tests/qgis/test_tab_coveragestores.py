@@ -353,14 +353,77 @@ class TestStoreAndCoverageDetail(unittest.TestCase):
         self.assertEqual(values["bounds"], "")
         self.assertEqual(values["bands"], "-")
 
-    def test_the_store_dialog_is_read_only(self):
+    def store_dialog(self, **edits):
+        """Open the store form, apply `edits`, and press Save."""
         dlg = SyncDialog()
         dlg.gs = FakeGS()
-        with patch.object(tab_coveragestores, "ResourceFormDialog", Recording):
+        sent = []
+        dlg._raw_rest = lambda method, path, **kw: sent.append((method, path, kw))
+        dlg._coverage_store_detail = lambda ws, name: dict(SFDEM_STORE)
+        dlg._published_coverage_names = lambda ws, name: ["sfdem"]
+        dlg._warn_if_store_unreachable = lambda name, read: None
+        dlg._load_coverage_stores = lambda: None
+        dlg.show_success_message = lambda text: None
+
+        class Editing(ResourceFormDialog):
+            opened = []
+
+            def exec(inner):
+                Editing.opened.append(inner)
+                for key, value in edits.items():
+                    widget = inner.get_widget(key)
+                    if hasattr(widget, "setPlainText"):
+                        widget.setPlainText(value)
+                    elif hasattr(widget, "setChecked") and isinstance(value, bool):
+                        widget.setChecked(value)
+                    else:
+                        widget.setText(value)
+                return QDialog.DialogCode.Accepted
+
+        with patch.object(tab_coveragestores, "ResourceFormDialog", Editing):
             dlg._show_coverage_store_info(["sfdem", "sf"])
-        form = Recording.opened[-1]
-        self.assertTrue(form.get_widget("url").isReadOnly())  # copyable, not greyed
-        self.assertTrue(form.get_widget("description").isReadOnly())
+        return dlg, Editing.opened[-1], sent
+
+    def test_the_store_can_be_edited_here_workspace_and_type_stay(self):
+        _dlg, form, _sent = self.store_dialog()
+        self.assertFalse(form.get_widget("url").isReadOnly())
+        self.assertFalse(form.get_widget("name").isReadOnly())
+        self.assertTrue(form.get_widget("workspace").isReadOnly())
+        self.assertTrue(form.get_widget("type").isReadOnly())
+
+    def test_save_sends_only_what_changed(self):
+        _dlg, _form, sent = self.store_dialog(description="Edited", enabled=False)
+        ((method, path, kwargs),) = sent
+        self.assertEqual(method, "put")
+        self.assertTrue(path.endswith("/workspaces/sf/coveragestores/sfdem.json"), path)
+        self.assertEqual(
+            kwargs["json"],
+            {"coverageStore": {"enabled": False, "description": "Edited"}},
+        )
+
+    def test_an_untouched_form_sends_nothing(self):
+        _dlg, _form, sent = self.store_dialog()
+        self.assertEqual(sent, [])
+
+    def test_a_rename_to_a_taken_name_is_refused_before_the_put(self):
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        sent = []
+        dlg._raw_rest = lambda method, path, **kw: sent.append(method)
+        dlg._resource_exists = lambda getter, *args: True
+        with self.assertRaises(ValueError):
+            dlg._save_coverage_store("sf", "sfdem", {"name": "taken"})
+        self.assertEqual(sent, [])
+
+    def test_reset_posts_to_the_stores_reset_path(self):
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        sent = []
+        dlg._raw_rest = lambda method, path, **kw: sent.append((method, path))
+        dlg.show_success_message = lambda text: None
+        dlg._reset_coverage_store(["sfdem", "sf"])
+        self.assertEqual(sent[0][0], "post")
+        self.assertTrue(sent[0][1].endswith("/coveragestores/sfdem/reset"), sent)
 
     def test_the_coverage_viewer_fills_itself_from_the_picked_coverage(self):
         dlg = SyncDialog()
