@@ -347,6 +347,27 @@ class TestDocument(unittest.TestCase):
             },
         )
 
+    def test_a_bad_edit_stays_in_the_form(self):
+        # A zoom range with one end, refused after the form closed, lost
+        # every other change of the edit with it.
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        seen = {}
+
+        class Editing(ResourceFormDialog):
+            def exec(inner):
+                table = inner.get_widget("gridsets")
+                table.set_rows([["EPSG:4326", 3, None]])
+                inner._on_accept()
+                seen["open"] = not inner.result()
+                seen["said"] = inner._validation_label.text()
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_gwc, "ResourceFormDialog", Editing):
+            dlg._show_gwc_layer_info(STATES_ROW)
+        self.assertTrue(seen["open"])
+        self.assertTrue(seen["said"])
+
     def test_a_gridset_listed_twice_is_refused(self):
         # The second row was dropped without a word, with its zoom range.
         values = {
@@ -720,6 +741,27 @@ class TestSeed(unittest.TestCase):
         self.assertEqual(posts[0][1], "/gwc/rest/seed/topp:states.json")
         self.assertEqual(posts[0][2]["json"]["seedRequest"]["type"], "seed")
         monitor.assert_called_once_with(STATES_ROW)
+
+    def test_a_truncate_from_the_seed_form_asks_first(self):
+        # The row action's Truncate asked; the form's sent it straight away.
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        values = dict(self.VALUES, type="truncate")
+
+        class Accepting(ResourceFormDialog):
+            def exec(inner):
+                return QDialog.DialogCode.Accepted
+
+            def get_values(inner):
+                return values
+
+        with (
+            patch.object(tab_gwc, "ResourceFormDialog", Accepting),
+            patch.object(dlg, "_confirm_delete", return_value=False) as asked,
+        ):
+            dlg._seed_gwc_layer(STATES_ROW)
+        asked.assert_called_once()
+        self.assertEqual([c for c in dlg.gs.calls if c[0] == "POST"], [])
 
     def test_the_area_is_given_in_the_picked_gridsets_crs(self):
         # Picked on the map or from a layer, it is sent in the gridset's CRS:

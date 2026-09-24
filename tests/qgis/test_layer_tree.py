@@ -336,12 +336,12 @@ class TestReadsAndMessages(MenuCase):
         self.assertIsNot(where, threading.main_thread())
 
     def test_cancelling_the_wait_reports_nothing(self):
-        from geoserver_manager.gui.dlg_main import _Abandoned
+        from geoserver_manager.toolbelt.rest import Abandoned
 
         self.dlg = connected_dialog(["topp:states"])
 
         def abandon(_fn):
-            raise _Abandoned()
+            raise Abandoned()
 
         self.dlg._wait_for = abandon
         self.assertEqual(self.menu._read(self.dlg, lambda: 1, "failed"), (False, None))

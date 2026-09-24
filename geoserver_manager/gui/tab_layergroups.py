@@ -304,6 +304,9 @@ class LayerGroupTabMixin:
             values=before,
             parent=self,
             ok_label=translate("LayerGroupTabMixin", "Save"),
+            validate=lambda after: self._check_group_rows(
+                after, scope(workspace_label), layer_names, group_names
+            ),
         )
         self._wire_group_form(dlg)
         for key, international in (
@@ -752,6 +755,11 @@ class LayerGroupTabMixin:
             ),
             parent=self,
             ok_label=translate("LayerGroupTabMixin", "Create"),
+            validate=self._form_check(
+                lambda values: self._check_new_layer_group(
+                    values, layer_names, group_names
+                )
+            ),
         )
         self._wire_group_form(dlg)
         if dlg.exec() != QDialog.DialogCode.Accepted:
@@ -812,6 +820,27 @@ class LayerGroupTabMixin:
                     ).format(reference)
                 )
 
+    def _check_group_rows(self, values, workspace_name, known_layers, known_groups):
+        """Refuse layer rows GeoServer would drop or refuse. Pure: the form
+        runs it before it closes."""
+        self._group_publishables(
+            values["layers"], workspace_name, known_layers, known_groups
+        )
+        if _mode_from_label(values["mode"]) == "EO":
+            self._eo_root(values, known_layers)
+
+    def _check_new_layer_group(self, values, known_layers, known_groups):
+        """The rows, a name a URL would eat, a name taken. Reads only."""
+        name, workspace_name = values["name"], scope(values["workspace"])
+        self._require_safe_name(name)
+        self._check_group_rows(values, workspace_name, known_layers, known_groups)
+        if self.gs.rest_service.resource_exists(self._group_path(name, workspace_name)):
+            raise ValueError(
+                translate(
+                    "LayerGroupTabMixin", "Layer group '{}' already exists in {}."
+                ).format(name, values["workspace"] or GLOBAL)
+            )
+
     def _create_layer_group_from_values(
         self, values, known_layers=None, known_groups=()
     ):
@@ -830,19 +859,13 @@ class LayerGroupTabMixin:
         "abstract", which GeoServer silently drops, and it has no root layer.
         """
         name = values["name"]
-        self._require_safe_name(name)
         workspace_name = scope(values["workspace"])
+        self._check_new_layer_group(values, known_layers, known_groups)
         published, styles = self._group_publishables(
             values["layers"], workspace_name, known_layers, known_groups
         )
         mode = _mode_from_label(values["mode"])
         root = self._eo_root(values, known_layers) if mode == "EO" else {}
-        if self.gs.rest_service.resource_exists(self._group_path(name, workspace_name)):
-            raise ValueError(
-                translate(
-                    "LayerGroupTabMixin", "Layer group '{}' already exists in {}."
-                ).format(name, values["workspace"] or GLOBAL)
-            )
 
         group = {"name": name, "mode": mode, "publishables": {"published": published}}
         group.update(root)

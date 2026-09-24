@@ -604,6 +604,7 @@ class CascadedStoreTabMixin:
             fields=self._cascaded_store_fields(workspace_names),
             parent=self,
             ok_label=translate("CascadedStoreTabMixin", "Create"),
+            validate=self._form_check(self._check_new_cascaded_store),
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -624,12 +625,11 @@ class CascadedStoreTabMixin:
             )
             self._load_cascaded_stores()
 
-    def _create_cascaded_store_from_values(self, values):
-        """Create the store the form describes. Raises on a taken name or a bad URL."""
-        ws = values["workspace"]
-        name = values["name"].strip()
+    def _check_new_cascaded_store(self, values):
+        """Refuse a taken name or a bad URL, before anything is sent. Reads
+        only: the form runs it before it closes, the create again."""
+        ws, name, kind = values["workspace"], values["name"].strip(), values["type"]
         self._require_safe_name(name)
-        kind = values["type"]
         url = values["capabilities_url"].strip()
         if not url.startswith(("http://", "https://")):
             # GeoServer accepts any string here and only fails later, when the
@@ -648,6 +648,12 @@ class CascadedStoreTabMixin:
                     "Cascaded store '{}' already exists in workspace '{}'.",
                 ).format(name, ws)
             )
+
+    def _create_cascaded_store_from_values(self, values):
+        """Create the store the form describes. Raises on a taken name or a bad URL."""
+        ws, name, kind = values["workspace"], values["name"].strip(), values["type"]
+        url = values["capabilities_url"].strip()
+        self._check_new_cascaded_store(values)
         if kind == WMS:
             self._check(self.gs.create_wms_store(ws, name, url))
         else:

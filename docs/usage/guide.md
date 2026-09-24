@@ -27,6 +27,7 @@ The Layers tab of a connected dialog.
 Working with a list:
 
 - **Search** filters every column. Press Ctrl+F to jump there and Esc to clear.
+  Enter goes from the search box to the results.
 - **Sort** by clicking a column header. Click again to reverse it.
 - **Open** a resource by clicking its name, or by selecting the row and
   pressing Enter. The *Workspace* column jumps to that workspace.
@@ -37,6 +38,11 @@ is slow to answer, a *Waiting for GeoServer* box appears with *Cancel*. A
 server that went away never freezes QGIS. A save waits the same way; its
 request is already sent, so after a *Cancel* it may still be applied, and
 the tab reloads once GeoServer answers.
+
+In a form, a name that is taken, a layer that is not on the server or a
+zoom range with one end is refused before the form closes, with what you
+typed still there. Enter in a list's picker adds the name. Esc or *Cancel*
+asks before throwing an edit away.
 
 Every delete asks first and says what else goes with it. GeoServer deletes
 recursively: a workspace takes its stores, layers and styles along.
@@ -379,9 +385,10 @@ Row actions:
 - **Seed or truncate…** renders the missing tiles (*Seed*), renders them all
   again (*Reseed*) or deletes them (*Truncate*), for one gridset, format and
   zoom range. On the *Advanced* tab, limit it to an area, or to one
-  parameter value (the parameter `STYLES`, the value `population`). Type
-  the area, or take it from the map view, a layer or a bookmark. It is sent
-  in the gridset's CRS. GeoWebCache runs it in the
+  parameter value (the parameter `STYLES`, the value `population`). Take
+  the area from the map view, a layer or a bookmark, or type it in QGIS's
+  order: xmin, xmax, ymin, ymax. It is sent in the gridset's CRS. A
+  *Truncate* asks first, as the row action does. GeoWebCache runs it in the
   background, and the task list opens.
 - **Tasks** shows the layer's running tasks, refreshed every two seconds,
   with how many tiles are done. *Stop all* ends them.

@@ -61,7 +61,12 @@ from geoserver_manager.toolbelt.log_handler import PlgLogger
 from geoserver_manager.toolbelt.payload import as_list, name_of, unwrap
 from geoserver_manager.toolbelt.preferences import PlgOptionsManager
 from geoserver_manager.toolbelt.probe import probe
-from geoserver_manager.toolbelt.rest import PartlySaved, raw_rest, summarise_body
+from geoserver_manager.toolbelt.rest import (
+    Abandoned,
+    PartlySaved,
+    raw_rest,
+    summarise_body,
+)
 
 # Listing a nested resource needs one GET per parent plus one per item. Eight
 # parallel requests keep that bearable. They run inside a _FetchTask, so they
@@ -75,18 +80,6 @@ _ELIDED_AFTER = 24
 # A read that answers within this many seconds never shows the waiting box, so
 # a healthy server looks exactly as it did when reads ran inline.
 _WAIT_BEFORE_BOX = 0.3
-
-
-class _Abandoned(Exception):
-    """The user stopped waiting (the waiting box's Cancel).
-
-    `write` is set when what they stopped waiting for was a save: it runs on
-    in its thread, so the change may still land.
-    """
-
-    def __init__(self, write=False):
-        super().__init__()
-        self.write = write
 
 
 class _Stop:
@@ -317,6 +310,14 @@ class GeoServerMainDialog(
                 and self._addressable(selected)
             ):
                 self._name_click_callback(selected[0])
+            return
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            # Never the dialog's default button: Enter in the search box
+            # opened the Add form. From the search, Enter goes to the results,
+            # where the next one opens the row.
+            if self.focusWidget() is self.searchBox and self.resultsTable.rowCount():
+                self.resultsTable.setFocus()
+                self.resultsTable.selectRow(0)
             return
         if (
             key == Qt.Key.Key_Delete
@@ -1716,7 +1717,7 @@ class GeoServerMainDialog(
         """
         try:
             action()
-        except (_Abandoned, PartlySaved):
+        except (Abandoned, PartlySaved):
             raise
         except Exception as error:
             raise PartlySaved(f"{done}: {self._error_text(error)}") from error
@@ -1738,7 +1739,7 @@ class GeoServerMainDialog(
             self.log(str(e), log_level=Qgis.MessageLevel.Warning)
             self._reload_current_tab()
             return False
-        except _Abandoned as abandoned:
+        except Abandoned as abandoned:
             # The user pressed Cancel: they know. A save goes on regardless.
             if abandoned.write:
                 self.show_warning_message(
@@ -1784,7 +1785,7 @@ class GeoServerMainDialog(
         lands. The box being application-modal is what makes the nested event
         loop safe: no click can reach the dialog, a form or QGIS while a read
         is outstanding, so nothing can start a second one or clear `self.gs`.
-        Cancel raises _Abandoned. The request itself runs to the library's
+        Cancel raises Abandoned. The request itself runs to the library's
         own timeout and its answer is dropped. `stop`, a threading.Event, is
         set on Cancel for work that can stop early (a fan-out). `write` marks
         a save: it still lands after a Cancel, so _run_action says so and the
@@ -1831,13 +1832,33 @@ class GeoServerMainDialog(
                             stop.set()
                         if write:
                             thread.finished.connect(self._reload_current_tab)
-                        raise _Abandoned(write)
+                        raise Abandoned(write)
             finally:
                 box.close()
                 box.deleteLater()
         if "error" in outcome:
             raise outcome["error"]
         return outcome["value"]
+
+    def _form_check(self, check):
+        """A form's `validate`: check(values) behind the waiting box, before
+        the form closes.
+
+        A refusal (a name that is taken) then stays in the form, with what
+        was typed: checked after it closed, a whole PostGIS form had to be
+        typed again, its password included. check() only reads; the save
+        runs after the form closed, as before, and checks again.
+        """
+
+        def validate(values):
+            try:
+                self._wait_for(lambda: check(values))
+            except (ValueError, Abandoned):
+                raise
+            except Exception as error:
+                raise ValueError(self._error_text(error)) from error
+
+        return validate
 
     def _wait_for_save(self, action):
         """_wait_for for a write: after a Cancel it still lands, and says so."""
@@ -1950,7 +1971,7 @@ class GeoServerMainDialog(
         """
         try:
             self._wait_for(read)
-        except _Abandoned:
+        except Abandoned:
             return
         except Exception as error:  # the reason is what the user needs
             self.show_warning_message(

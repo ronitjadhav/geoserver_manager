@@ -834,6 +834,7 @@ class CoverageStoreTabMixin:
             fields=self._coverage_store_fields(workspace_names),
             parent=self,
             ok_label=translate("CoverageStoreTabMixin", "Create"),
+            validate=self._form_check(self._check_new_coverage_store),
         )
         dlg.on_value_changed(
             "type", lambda store_type: self._on_store_type_changed(dlg, store_type)
@@ -1066,6 +1067,26 @@ class CoverageStoreTabMixin:
             folder=folder,
             after=after,
             on_done=on_done,
+        )
+
+    def _check_new_coverage_store(self, values):
+        """What the Add form would be refused for, before anything is sent: a
+        name a URL would eat, a store that exists (a raster upload may
+        replace it, Replace ticked), a layer of that name elsewhere. Reads
+        only: the form runs it before it closes."""
+        name, ws_name = values["name"], values["workspace"]
+        self._require_safe_name(name)
+        if values["type"] != QGIS_RASTER:
+            self._refuse_existing_store(ws_name, name)
+            return
+        if not values.get("replace"):
+            self._refuse_existing_store(
+                ws_name,
+                name,
+                translate("CoverageStoreTabMixin", "Tick Replace to overwrite it."),
+            )
+        self._refuse_layer_clash(
+            ws_name, name, values.get("replace"), "coverage", "GeoTIFF"
         )
 
     def _refuse_existing_store(self, ws_name, name, hint=""):

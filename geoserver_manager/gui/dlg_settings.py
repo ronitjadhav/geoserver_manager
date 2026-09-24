@@ -422,6 +422,23 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         self.lbl_profile_note.setWordWrap(True)
         self.lbl_profile_note.setStyleSheet(f"color: {hint_colour(self.palette())};")
         self.formLayout.insertRow(1, self.lbl_profile_note)
+        # Built after the .ui, the row came last on Tab, after Reset.
+        chain = (
+            self.cmb_profile,
+            self.btn_profile_add,
+            self.btn_profile_remove,
+            self.txt_gs_url,
+            self.txt_gs_username,
+            self.txt_gs_password,
+            self.opt_verify_tls,
+            self.btn_test_connection,
+            self.btn_help,
+            self.btn_report,
+            self.opt_debug,
+            self.btn_reset,
+        )
+        for first, then in zip(chain, chain[1:]):
+            QWidget.setTabOrder(first, then)
         self.cmb_profile.currentTextChanged.connect(self._on_profile_changed)
         self.btn_profile_add.clicked.connect(self._add_profile)
         self.btn_profile_remove.clicked.connect(self._remove_profile)

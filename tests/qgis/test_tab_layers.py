@@ -1538,6 +1538,27 @@ class TestStyleFromQgis(unittest.TestCase):
         with patch.object(tab_layers, "ResourceFormDialog", Accepting):
             self.dlg._style_from_qgis(row_data)
 
+    def test_with_no_matching_layer_nothing_is_preselected(self):
+        # The first layer was: its style pushed as an unrelated layer's
+        # default (review 2026-09-24).
+        from qgis.PyQt.QtWidgets import QDialog
+
+        from geoserver_manager.gui import tab_layers
+
+        self.add_layer("rivers")
+        opened = []
+
+        class Looking(ResourceFormDialog):
+            def exec(inner):
+                opened.append(inner)
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_layers, "ResourceFormDialog", Looking):
+            self.dlg._style_from_qgis(["roads", "topp", "VECTOR", "pg", "line"])
+        self.assertIsNone(opened[0].get_values()["qgis_layer"])
+        opened[0]._on_accept()
+        self.assertFalse(opened[0].result())  # Save asks for a layer
+
     def test_the_matching_project_layer_is_found_by_name(self):
         from tests.qgis.test_sld import point_layer
 

@@ -512,6 +512,20 @@ class WorkspaceTabMixin:
         path = self.gs.rest_service.rest_endpoints.workspace(old_name)
         self._raw_rest("put", path, json=Workspace(new_name, isolated).put_payload())
 
+    def _check_new_workspace(self, values):
+        """Refuse a name a URL would eat, or one taken. Reads only: the Add
+        form runs it before it closes, the save again."""
+        name = values["name"]
+        self._require_safe_name(name)
+        # create_workspace upserts, so an existing name would silently
+        # reconfigure the live workspace and report it as created
+        if self._resource_exists(self.gs.get_workspace, name):
+            raise ValueError(
+                translate("WorkspaceTabMixin", "Workspace '{}' already exists.").format(
+                    name
+                )
+            )
+
     def _save_workspace(self, values, old_name=None):
         """Create (old_name None) or update a workspace from form values.
 
@@ -523,14 +537,7 @@ class WorkspaceTabMixin:
             # A new name goes into a REST path: refuse what a URL would eat.
             self._require_safe_name(name)
         if old_name is None:
-            # create_workspace upserts, so an existing name would silently
-            # reconfigure the live workspace and report it as created
-            if self._resource_exists(self.gs.get_workspace, name):
-                raise ValueError(
-                    translate(
-                        "WorkspaceTabMixin", "Workspace '{}' already exists."
-                    ).format(name)
-                )
+            self._check_new_workspace(values)
             self._check(self.gs.create_workspace(name, isolated=values["isolated"]))
             if (values.get("uri") or "").strip():
                 try:
@@ -572,6 +579,7 @@ class WorkspaceTabMixin:
             fields=self._workspace_fields(),
             parent=self,
             ok_label=translate("WorkspaceTabMixin", "Create"),
+            validate=self._form_check(self._check_new_workspace),
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return

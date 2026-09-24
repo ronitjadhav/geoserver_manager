@@ -25,11 +25,11 @@ from qgis.PyQt.QtCore import QCoreApplication, Qt
 from qgis.PyQt.QtWidgets import QApplication, QDialog
 
 from geoserver_manager.__about__ import __title__
-from geoserver_manager.gui.dlg_main import _Abandoned
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.icons import icon
 from geoserver_manager.toolbelt.log_handler import PlgLogger
 from geoserver_manager.toolbelt.qgis_export import geoserver_name
+from geoserver_manager.toolbelt.rest import Abandoned
 from geoserver_manager.toolbelt.sld import apply_sld_to_layer, layer_to_sld
 
 # Not a QObject, so self.tr() is not available; the context is this class.
@@ -466,7 +466,7 @@ class LayerTreeMenu:
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             return True, fn()
-        except _Abandoned:
+        except Abandoned:
             return False, None  # the user pressed Cancel: nothing to report
         except Exception as error:  # noqa: BLE001 (anything, reported as text)
             detail = dlg._error_text(error)
