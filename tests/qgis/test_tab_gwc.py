@@ -347,10 +347,21 @@ class TestDocument(unittest.TestCase):
             },
         )
 
+    def test_a_gridset_listed_twice_is_refused(self):
+        # The second row was dropped without a word, with its zoom range.
+        values = {
+            "enabled": True,
+            "gridsets": grid("EPSG:4326 = 0-12\nEPSG:4326 = 3-5"),
+            "formats": fmts("image/png"),
+        }
+        with self.assertRaises(ValueError) as caught:
+            GwcTabMixin._gwc_xml_with_values(STATES_XML, values)
+        self.assertIn("EPSG:4326", str(caught.exception))
+
     def test_saving_rewrites_only_what_the_form_owns(self):
         values = {
             "enabled": False,
-            "gridsets": grid("EPSG:4326 = 0-12\nWebMercatorQuad\n\nEPSG:4326"),
+            "gridsets": grid("EPSG:4326 = 0-12\nWebMercatorQuad"),
             "formats": fmts("image/png"),
             "meta_width": 3,
             "meta_height": 3,
@@ -366,8 +377,7 @@ class TestDocument(unittest.TestCase):
             [s.findtext("gridSetName") for s in root.findall("gridSubsets/gridSubset")],
             ["EPSG:4326", "WebMercatorQuad"],
         )
-        # the kept gridset keeps its zoom bounds (the first line naming it
-        # wins); the new one is bare
+        # the kept gridset keeps its zoom bounds; the new one is bare
         self.assertEqual(root.find("gridSubsets/gridSubset").findtext("zoomStop"), "12")
         self.assertIsNone(root.findall("gridSubsets/gridSubset")[1].find("zoomStop"))
         self.assertEqual(

@@ -57,16 +57,26 @@ class ListTable(QWidget):
     :param choices: what the picker offers for the first column. Typing a
         name not listed is allowed: GeoServer, not this list, decides.
     :param ordered: rows can be moved up and down; their order is the value.
+    :param unique: a name is listed once; adding it again selects its row.
+        A group may hold a layer twice (with two styles), a cache a gridset
+        once: GeoWebCache kept the first and dropped the other silently.
     """
 
     changed = pyqtSignal()
 
     def __init__(
-        self, columns, choices=(), ordered=False, read_only=False, parent=None
+        self,
+        columns,
+        choices=(),
+        ordered=False,
+        read_only=False,
+        parent=None,
+        unique=False,
     ):
         super().__init__(parent)
         self._columns = [dict(column) for column in columns]
         self._read_only = read_only
+        self._unique = unique
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -193,12 +203,20 @@ class ListTable(QWidget):
 
     # -- Buttons -------------------------------------------------------------
 
+    def pending(self):
+        """A name picked or typed but not added yet, or ""."""
+        return "" if self._read_only else self.picker.currentText().strip()
+
     def _add_picked(self):
         name = self.picker.currentText().strip()
         if not name:
             return
-        self._append([name])
-        self.table.selectRow(self.table.rowCount() - 1)
+        listed = [self._cell(index, 0) for index in range(self.table.rowCount())]
+        if self._unique and name in listed:
+            self.table.selectRow(listed.index(name))
+        else:
+            self._append([name])
+            self.table.selectRow(self.table.rowCount() - 1)
         self.picker.setCurrentIndex(-1)
         self.picker.clearEditText()
 

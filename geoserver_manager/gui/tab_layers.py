@@ -544,7 +544,7 @@ class LayerTabMixin:
         type, a coverage or a cascaded layer, by the row's type and store."""
         name, ws_name, kind, store = row_data[0], row_data[1], row_data[2], row_data[3]
         if kind == VECTOR:
-            return self._check(self.gs.get_feature_type(ws_name, store, name))
+            return self._feature_type_detail(ws_name, store, name)
         if kind == RASTER:
             return self._coverage_detail(ws_name, store, name)
         if kind in (WMS, WMTS):
@@ -552,6 +552,17 @@ class LayerTabMixin:
         raise ValueError(
             translate("LayerTabMixin", "Unsupported layer type '{}'").format(kind)
         )
+
+    def _feature_type_detail(self, ws_name, store, name):
+        """One feature type, as GeoServer stores it.
+
+        TODO(#50): upstream: get_feature_type() exists, but FeatureType drops
+        cqlFilter, and title when an internationalTitle is set (row 63). The
+        edit form then showed an existing filter as empty, and emptying the
+        field changed nothing. Workaround: GET the feature type path.
+        """
+        path = self.gs.rest_service.rest_endpoints.featuretype(ws_name, store, name)
+        return self._raw_rest("get", path).json().get("featureType") or {}
 
     def _show_layer_info(self, row_data):
         """Open a layer: an edit form for a vector or a raster, a view for a
@@ -1264,7 +1275,12 @@ class LayerTabMixin:
                 if sld is not None:
                     self._push_qgis_style(name, ws_name, sld, name, True)
 
-            if self._run_action(finish, failure):
+            done = translate(
+                "LayerTabMixin",
+                "Layer '{}' is published, but its title, keywords or style "
+                "could not be set",
+            ).format(name)
+            if self._run_action(lambda: self._partly_saved(finish, done), failure):
                 self.show_success_message(
                     translate("LayerTabMixin", "Layer '{}' published.").format(name)
                 )
@@ -1460,6 +1476,7 @@ class LayerTabMixin:
                     "key": "others",
                     "label": translate("LayerTabMixin", "Other styles"),
                     "type": "table",
+                    "unique": True,
                     "default": list(others),
                     "choices": choices,
                     "columns": [{"label": translate("LayerTabMixin", "Style")}],

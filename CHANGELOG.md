@@ -377,6 +377,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **Editing a datastore no longer breaks it.** An empty connection parameter
+  (a PostGIS store's "Session startup SQL", say) was saved as the text
+  "None", which GeoServer then ran on every connection, and the store
+  stopped loading. A parameter left as it was is now sent back exactly as
+  stored.
+- **An empty row is not saved.** A keyword row added and left empty was
+  saved as "NULL", and a seed parameter with no value was sent as "None".
+- **A layer's CQL filter shows in its edit form, and can be cleared.** It
+  opened empty, so a filtered layer looked unfiltered.
+- **A publish whose data landed says so** when its title, keywords or style
+  could not be set, instead of "Failed to publish" (a retry then said the
+  store exists).
+- **A stored number beyond a field's range is kept:** 200 cascaded
+  connections were saved back as 128 by an unrelated edit.
+- **A name picked but not added stops Save** with a message, instead of
+  being dropped. A gridset, format or style cannot be listed twice; a second
+  gridset row was dropped with its zoom range.
 - **Forms resize properly.** A form that is too tall for the screen, or a
   dialog made smaller, now scrolls. Before, the help text overlapped the
   next field, and a tall form could not shrink to fit a laptop screen. A

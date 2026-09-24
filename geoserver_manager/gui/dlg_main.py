@@ -686,6 +686,13 @@ class GeoServerMainDialog(
             if task.isCanceled() and not completed:
                 on_cancel(task)
                 outcome = "cancelled"
+            elif isinstance(error, PartlySaved):
+                # The data is on the server and a later step failed: a plain
+                # "Failed to publish" hid it, and a retry said "exists".
+                self.show_warning_message(str(error))
+                self.log(str(error), log_level=Qgis.MessageLevel.Warning)
+                self._reload_current_tab()
+                outcome = "done"
             elif error is not None:
                 detail = self._error_text(error)
                 self.show_error_message(f"{failure_message}: {detail}")
@@ -1618,6 +1625,19 @@ class GeoServerMainDialog(
         )
         return False
 
+    def _partly_saved(self, action, done):
+        """Run what follows a step that already changed the server.
+
+        What it raises becomes PartlySaved: `done` says what is saved, the
+        error what was not, and _run_action warns and reloads.
+        """
+        try:
+            action()
+        except (_Abandoned, PartlySaved):
+            raise
+        except Exception as error:
+            raise PartlySaved(f"{done}: {self._error_text(error)}") from error
+
     def _run_action(self, action, failure_message):
         """Run a server action under a wait cursor and report if it fails.
 
@@ -2082,10 +2102,12 @@ class GeoServerMainDialog(
                     raw_rest(
                         client, "put", url, params=params, data=body, headers=headers
                     )
+                if task is not None:
+                    # The file is stored: a Cancel from now on comes too late,
+                    # and a failing `after` is a PartlySaved, not a failure.
+                    task.completed = True
                 if after is not None:
                     after(client)
-                if task is not None:
-                    task.completed = True  # a Cancel from now on comes too late
             finally:
                 if folder is not None:
                     shutil.rmtree(folder, ignore_errors=True)

@@ -110,6 +110,13 @@ _SECRET_WORDS = (
 )
 
 
+def _shown(key, value):
+    """A parameter as the form shows it: secrets masked, an empty one blank."""
+    if _is_secret(key):
+        return _MASKED
+    return "" if value is None else str(value)
+
+
 def _is_secret(key):
     """A parameter to mask: `passwd`, `WFSDataStoreFactory:PASSWORD`, an access
     or account key, a secret or a token; not a bare `key`, which would hide
@@ -849,7 +856,7 @@ class DatastoreTabMixin:
             # map (removed lines remove keys); a masked value keeps the original.
             edited = self._parse_params(values.get("raw_params"))
             merged = {
-                key: (conn_params.get(key, "") if value == _MASKED else value)
+                key: self._kept(conn_params, key, value)
                 for key, value in edited.items()
             }
 
@@ -909,10 +916,20 @@ class DatastoreTabMixin:
     @staticmethod
     def _masked(params):
         """The parameters to show: secrets as the mask, never their value."""
-        return {
-            key: (_MASKED if _is_secret(key) else value)
-            for key, value in sorted(params.items())
-        }
+        return {key: _shown(key, value) for key, value in sorted(params.items())}
+
+    @staticmethod
+    def _kept(conn_params, key, value):
+        """What to send for an edited parameter: the stored value while the
+        row still shows what the form prefilled, else what was typed.
+
+        The table only holds text. An untouched row sent back as text turned
+        an empty parameter into "None", which GeoServer then ran as the
+        session startup SQL of every connection, and a number into a string.
+        """
+        if key in conn_params and value == _shown(key, conn_params[key]).strip():
+            return conn_params[key]
+        return value
 
     @staticmethod
     def _other_params(ds_type, conn_params):
@@ -939,7 +956,7 @@ class DatastoreTabMixin:
         for key, value in edited.items():
             if key in owned:
                 continue
-            result[key] = conn_params.get(key, "") if value == _MASKED else value
+            result[key] = self._kept(conn_params, key, value)
         return result
 
     def _rename_datastore(self, workspace_name, old_name, new_name):

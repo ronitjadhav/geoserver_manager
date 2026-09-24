@@ -163,6 +163,9 @@ class FakeGS:
             def coverage(inner, ws, store, name):
                 return f"{BASE}/workspaces/{ws}/coveragestores/{store}/coverages/{name}.json"
 
+            def featuretype(inner, ws, store, name):
+                return f"{BASE}/workspaces/{ws}/datastores/{store}/featuretypes/{name}.json"
+
             def wmsstores(inner, ws):
                 return f"{BASE}/workspaces/{ws}/wmsstores.json"
 
@@ -221,6 +224,11 @@ class FakeGS:
             return ({"wmtsLayer": detail}, 200)
         if path.endswith("/coveragestores/sfdem/coverages/sfdem.json"):
             return ({"coverage": COVERAGE}, 200)
+        if "/featuretypes/" in path:
+            # As GeoServer answers it; a subclass's get_feature_type() says what.
+            parts = path[len(f"{BASE}/workspaces/") : -len(".json")].split("/")
+            detail, status = self.get_feature_type(parts[0], parts[2], parts[4])
+            return ({"featureType": detail}, status)
         raise AssertionError(f"unexpected GET {path}")
 
     # -- the library calls the tab still makes --
@@ -448,6 +456,29 @@ class TestEveryLayerType(unittest.TestCase):
         self.assertIsNone(form.get_widget("layer"))
         form = self.opened(self.dlg._show_layer_info, self.rows["tiles"])
         self.assertEqual(form.get_widget("native_name").text(), "topp:states")
+
+    def test_a_vector_layers_cql_filter_and_title_are_shown(self):
+        # The library's FeatureType drops cqlFilter, and the title when an
+        # internationalTitle is set: the form showed an existing filter as
+        # empty, and emptying the field changed nothing.
+        stored = dict(
+            DETAIL,
+            cqlFilter="name = 'a'",
+            title="Roads",
+            internationalTitle={"fr": "Routes"},
+        )
+        gs = self.dlg.gs
+        gs.get_feature_type = lambda ws, ds, name: (
+            {k: v for k, v in stored.items() if k not in ("cqlFilter", "title")},
+            200,
+        )
+        answer = gs.answer
+        gs.answer = lambda path: (
+            ({"featureType": stored}, 200) if "/featuretypes/" in path else answer(path)
+        )
+        form = self.opened(self.dlg._show_layer_info, self.rows["tasmania_roads"])
+        self.assertEqual(form.get_widget("cql_filter").text(), "name = 'a'")
+        self.assertEqual(form.get_widget("title").text(), "Roads")
 
     def test_a_vector_layer_keeps_the_feature_type_view(self):
         form = self.opened(self.dlg._show_layer_info, self.rows["tasmania_roads"])
@@ -1758,6 +1789,22 @@ class TestPublishQgisLayer(unittest.TestCase):
 
     def sent(self, verb):
         return [call for call in self.dlg.gs.style_calls if call[0] == verb]
+
+    def test_a_failed_metadata_step_says_the_layer_is_published(self):
+        # The GeoPackage is stored and the layer live; "Failed to publish"
+        # hid that, and a retry then said it exists.
+        self.add_layer()
+        warnings = []
+        self.dlg.show_warning_message = warnings.append
+
+        def refuse(*args):
+            raise RuntimeError("HTTP 500: boom")
+
+        self.dlg._set_feature_type_metadata = refuse
+        self.dlg._publish_qgis_layer(self.values(title="Roads"))
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("is published, but its title", warnings[0])
+        self.assertIn("boom", warnings[0])
 
     def test_the_geopackage_is_put_under_the_normalised_name(self):
         self.add_layer()

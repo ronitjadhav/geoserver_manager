@@ -86,11 +86,16 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   it, the ciphertext is accepted back, and removing authentication needs JSON `null` for `user` and
   `password`: an empty string is stored as an encrypted empty password, and the store then fails to load.
   `POST …/{datastores|coveragestores}/{s}/reset` makes GeoServer re-read a store; cascaded stores have no
-  reset (404).
+  reset (404). **An empty connection parameter** is written `{"@key": "Session startup SQL"}`, with no
+  `$`, and the library reads it as `None`. Sent back as the text "None", GeoServer ran it as the startup
+  SQL of every connection and the store stopped loading. The form shows it blank, and a row left as it
+  was prefilled goes back as stored, number or `None` alike.
 - **Editing a layer is one partial resource PUT** (row 53 of #50). Measured on 2.28.5: a
   `PUT …/featuretypes/{ft}.json` or `…/coverages/{c}.json` with only some of title, abstract, keywords,
   srs, projectionPolicy, enabled, advertised, cqlFilter and name merges and keeps the rest (bounds,
-  attributes, grid, bands). An empty title, abstract, keyword list or filter clears it. A rename carries
+  attributes, grid, bands). An empty title, abstract, keyword list or filter clears it. The library's
+  `FeatureType` drops `cqlFilter`, and `title` when an `internationalTitle` is set, so the edit form reads
+  the feature type with a raw GET (row 63). A rename carries
   the layer groups that use the layer and its GWC layer along (the native name stays). `enabled` is the
   resource's: `/rest/layers` ignores it. `?recalculate=nativebbox,latlonbbox` recomputes both boxes, and
   `POST …/{ft|c}/reset` makes GeoServer re-read the source. The other allowed styles are the layer's

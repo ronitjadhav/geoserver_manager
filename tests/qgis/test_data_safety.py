@@ -232,15 +232,23 @@ class TestAnUntouchedSaveChangesNothing(unittest.TestCase):
         )
         self.assertEqual(form.get_values()["level"], "MY_LOGGING")
 
-    def test_a_meta_tile_beyond_the_spinbox_range_survives(self):
-        from geoserver_manager.gui.tab_gwc import GwcTabMixin
+    def test_a_stored_number_beyond_a_spinbox_range_survives(self):
+        # Clamped by the spinbox, an untouched Save wrote the clamped value
+        # back: a 32x32 meta-tile, 200 cascaded connections (review 2026-09-24).
+        from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 
-        fields = GwcTabMixin._fields_that_hold(
-            SyncDialog()._gwc_fields([]), {"meta_width": 32, "gutter": 250}
+        stored = {"meta_width": 32, "gutter": 250}
+        form = ResourceFormDialog(
+            title="t", fields=SyncDialog()._gwc_fields([]), values=stored
         )
-        maxima = {field["key"]: field.get("max") for field in fields}
-        self.assertGreaterEqual(maxima["meta_width"], 32)
-        self.assertGreaterEqual(maxima["gutter"], 250)
+        self.assertEqual(form.get_values()["meta_width"], 32)
+        self.assertEqual(form.get_values()["gutter"], 250)
+        cascaded = ResourceFormDialog(
+            title="t",
+            fields=SyncDialog()._cascaded_store_info_fields(),
+            values={"max_connections": 200},
+        )
+        self.assertEqual(cascaded.get_values()["max_connections"], 200)
 
     def test_a_new_own_wms_starts_from_the_global_limits(self):
         from geoserver_manager.gui.tab_workspaces import WorkspaceTabMixin

@@ -33,7 +33,7 @@ from geoserver_manager.toolbelt.qgis_export import (
     reprojection_target,
     require_crs,
 )
-from geoserver_manager.toolbelt.rest import raw_rest
+from geoserver_manager.toolbelt.rest import PartlySaved, raw_rest
 
 # Store types offered by the Add form: the ones GeoServer ships without an
 # extension (NetCDF, GRIB and the like need one), plus the upload of a raster
@@ -1027,6 +1027,11 @@ class CoverageStoreTabMixin:
             # The feature type's shape; a partial coverage PUT merges it too.
             metadata["keywords"] = {"string": keywords}
         metadata_path = endpoints.coverage(ws_name, name, name)
+        partly = translate(
+            "CoverageStoreTabMixin",
+            "Raster '{}' is published, but its title, abstract and keywords "
+            "could not be set",
+        ).format(name)
 
         def after(client):
             if metadata:
@@ -1034,7 +1039,10 @@ class CoverageStoreTabMixin:
                 # and grid read from the file stay. TODO(#50): update_coverage(
                 # ws, store, name, title=…, abstract=…); create_coverage()
                 # POSTs a new one (row 32).
-                raw_rest(client, "put", metadata_path, json={"coverage": metadata})
+                try:
+                    raw_rest(client, "put", metadata_path, json={"coverage": metadata})
+                except Exception as error:  # the raster itself is published
+                    raise PartlySaved(f"{partly}: {error}") from error
 
         def published(_result):
             self.show_success_message(
