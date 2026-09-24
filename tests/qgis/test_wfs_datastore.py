@@ -240,8 +240,8 @@ class TestWfsForm(unittest.TestCase):
             {},
             {K + "PASSWORD": "crypt1:SECRET", "passwd": "crypt1:PG", "user": "u"},
         )
-        self.assertNotIn("crypt1", values["raw_params"])
-        self.assertIn("user = u", values["raw_params"])
+        self.assertNotIn("crypt1", "".join(values["raw_params"].values()))
+        self.assertEqual(values["raw_params"]["user"], "u")
 
 
 if __name__ == "__main__":

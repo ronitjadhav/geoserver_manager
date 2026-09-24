@@ -286,8 +286,8 @@ class TestDatastoreUpdate(unittest.TestCase):
         values = self.dlg._datastore_form_values("ws", "shp", "Shapefile", {}, stored)
         self.assertEqual(values["type"], "Shapefile")  # never shown as PostGIS
         self.assertEqual(values["pg_port"], 5432)
-        self.assertIn("url = file:data/shapes", values["raw_params"])
-        self.assertNotIn("SECRET", values["raw_params"])  # secrets masked
+        self.assertEqual(values["raw_params"]["url"], "file:data/shapes")
+        self.assertEqual(values["raw_params"]["passwd"], "••••")  # secrets masked
 
     def test_connection_params_tolerates_odd_payloads(self):
         self.assertEqual(self.dlg._connection_params("not a dict"), {})
@@ -591,7 +591,7 @@ class TestUnsupportedTypeDialog(unittest.TestCase):
             self.assertIn(key, form._hidden_keys)
         self.assertNotIn("raw_params", form._hidden_keys)
         editor = form.get_widget("raw_params")
-        self.assertIn("host = oracle.example.org", editor.toPlainText())
+        self.assertEqual(editor.map()["host"], "oracle.example.org")
         self.assertFalse(editor.isReadOnly())  # it is an editor, not a view
         save = form._button_box.button(QDialogButtonBox.StandardButton.Ok)
         self.assertFalse(save.isHidden())  # any type can be saved now
@@ -702,17 +702,14 @@ class TestGenericParameterEditor(unittest.TestCase):
 
         self.dlg.gs = FakeGS()
 
-    def test_parse_round_trips_and_ignores_noise(self):
-        text = "url = file:data/shapes\n\n# a comment\ncharset = UTF-8\nkey with = sign = a=b\n"
+    def test_pairs_are_stripped_and_a_blank_key_is_dropped(self):
+        # A key/value table, not text: no line can lack its "=" any more.
         self.assertEqual(
-            self.dlg._parse_params(text),
-            {"url": "file:data/shapes", "charset": "UTF-8", "key with": "sign = a=b"},
+            self.dlg._parse_params(
+                {" url ": " file:data/shapes ", "": "orphan", "a = b": "c"}
+            ),
+            {"url": "file:data/shapes", "a = b": "c"},
         )
-
-    def test_parse_rejects_a_line_without_equals(self):
-        with self.assertRaises(ValueError) as ctx:
-            self.dlg._parse_params("url = ok\njust words\n")
-        self.assertIn("Line 2", str(ctx.exception))
 
     def test_editor_is_authoritative_but_keeps_masked_secrets(self):
         stored = {
@@ -726,11 +723,11 @@ class TestGenericParameterEditor(unittest.TestCase):
             "workspace": "topp",
             "name": "cascaded",
             "description": "",
-            "raw_params": (
-                "host = new.example.org\n"
-                "port = 5000\n"
-                "passwd = ••••\n"  # 'obsolete' removed
-            ),
+            "raw_params": {  # 'obsolete' removed
+                "host": "new.example.org",
+                "port": "5000",
+                "passwd": "••••",
+            },
         }
 
         self.dlg._update_datastore_from_values(values, detail, stored)
@@ -747,15 +744,6 @@ class TestGenericParameterEditor(unittest.TestCase):
             self.sent["datastore_type"], "Oracle NG"
         )  # server's type, not the combo
         self.assertIs(self.sent["enabled"], False)  # still disabled
-
-    def test_bad_line_never_reaches_the_server(self):
-        with self.assertRaises(ValueError):
-            self.dlg._update_datastore_from_values(
-                {"workspace": "w", "name": "n", "raw_params": "no equals here"},
-                {"type": "Oracle NG"},
-                {"host": "old.example.org"},
-            )
-        self.assertEqual(self.sent, {})
 
 
 class TestErrorText(unittest.TestCase):

@@ -34,6 +34,10 @@ Supported field types:
     - "spinbox"   -> QSpinBox (optional "min", "max", "default")
     - "textarea"  -> QPlainTextEdit
     - "file"      -> QLineEdit + Browse button (optional "filter", e.g. "Styles (*.sld)")
+    - "list"      -> QgsListWidget: a list of strings, typed (keywords)
+    - "keyvalue"  -> QgsKeyValueWidget: a {key: value} dict (parameters)
+    - "table"     -> ListTable: rows picked from "choices", with typed
+                     "columns", in order when "ordered" (a group's layers)
     - "image"     -> QLabel showing a picture set later with
                      set_image(key, pixmap, text); "placeholder" is shown until
                      then and "max_height" caps the picture (default 240). It is
@@ -63,7 +67,8 @@ Field options:
     - wide (bool): span the whole form, without a label beside the widget
 """
 
-from qgis.PyQt.QtCore import QCoreApplication, Qt
+from qgis.gui import QgsKeyValueWidget, QgsListWidget
+from qgis.PyQt.QtCore import QCoreApplication, QMetaType, Qt
 from qgis.PyQt.QtGui import QFontDatabase, QPixmap
 from qgis.PyQt.QtWidgets import (
     QCheckBox,
@@ -84,6 +89,7 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
+from geoserver_manager.gui.list_table import ListTable
 from geoserver_manager.gui.theme import hint_colour, invalid_field_colour
 
 
@@ -350,6 +356,39 @@ class ResourceFormDialog(QDialog):
                 container.setEnabled(False)
             return container
 
+        if ftype == "list":
+            w = QgsListWidget(QMetaType.Type.QString)
+            w.setList([str(item) for item in (value or [])])
+            w.setReadOnly(read_only)
+            w.setMaximumHeight(field.get("max_height", 160))
+            # QGIS's own .ui sets 300 px, wider than the form's field column:
+            # its add and remove buttons were pushed out of sight.
+            w.setMinimumWidth(0)
+            return w
+
+        if ftype == "keyvalue":
+            w = QgsKeyValueWidget()
+            w.setMap({str(k): str(v) for k, v in (value or {}).items()})
+            w.setReadOnly(read_only)
+            w.setMaximumHeight(field.get("max_height", 200))
+            w.setMinimumWidth(0)  # as for "list": its buttons stay in view
+            return w
+
+        if ftype == "table":
+            w = ListTable(
+                field["columns"],
+                field.get("choices", ()),
+                ordered=field.get("ordered", False),
+                read_only=read_only,
+            )
+            w.set_rows(value or [])
+            w.setMinimumHeight(field.get("min_height", 160))
+            # Uncapped by default: a table is its tab's content and fills it;
+            # a cap left the spare height between the table and its help.
+            if field.get("max_height"):
+                w.setMaximumHeight(field["max_height"])
+            return w
+
         if ftype == "image":
             w = QLabel(field.get("placeholder", ""))
             w.setWordWrap(True)
@@ -399,6 +438,18 @@ class ResourceFormDialog(QDialog):
                 result[key] = widget.toPlainText().strip()
             elif ftype == "file":
                 result[key] = widget.path_edit.text().strip()
+            elif ftype == "list":
+                result[key] = [
+                    str(item).strip() for item in widget.list() if str(item).strip()
+                ]
+            elif ftype == "keyvalue":
+                result[key] = {
+                    str(k).strip(): str(v)
+                    for k, v in widget.map().items()
+                    if str(k).strip()
+                }
+            elif ftype == "table":
+                result[key] = widget.rows()
         return result
 
     def set_field_visible(self, key, visible):
@@ -441,6 +492,12 @@ class ResourceFormDialog(QDialog):
             widget = self._widgets[key]
             if isinstance(widget, QPlainTextEdit):
                 widget.setPlainText(value)
+            elif isinstance(widget, ListTable):
+                widget.set_rows(value)
+            elif isinstance(widget, QgsListWidget):
+                widget.setList(list(value))
+            elif isinstance(widget, QgsKeyValueWidget):
+                widget.setMap(dict(value))
             else:
                 widget.setText(value)
                 widget.setCursorPosition(0)

@@ -164,9 +164,9 @@ class TestWmsFormValues(unittest.TestCase):
 
     def test_string_lists_are_flattened_for_the_form(self):
         values = WorkspaceTabMixin._wms_form_values(NE_WMS)
-        self.assertEqual(values["wms_keywords"], "WMS, GEOSERVER")
+        self.assertEqual(values["wms_keywords"], ["WMS", "GEOSERVER"])
         # the codes come back as numbers, and must still read as codes
-        self.assertEqual(values["wms_srs"], "4326, 3857")
+        self.assertEqual(values["wms_srs"], ["4326", "3857"])
 
     def test_limits_are_integers_for_the_spinboxes(self):
         values = WorkspaceTabMixin._wms_form_values(NE_WMS)
@@ -177,8 +177,8 @@ class TestWmsFormValues(unittest.TestCase):
         values = WorkspaceTabMixin._wms_form_values(
             {"keywords": {"string": "solo"}, "srs": 4326}
         )
-        self.assertEqual(values["wms_keywords"], "solo")
-        self.assertEqual(values["wms_srs"], "4326")
+        self.assertEqual(values["wms_keywords"], ["solo"])
+        self.assertEqual(values["wms_srs"], ["4326"])
 
     def test_no_settings_means_the_workspace_uses_the_global_ones(self):
         values = WorkspaceTabMixin._wms_form_values(None)
@@ -294,7 +294,7 @@ class TestWorkspaceDialog(unittest.TestCase):
         self.assertEqual(
             form.get_widget("wms_title").text(), "GeoServer Natural Earth Maps"
         )
-        self.assertEqual(form.get_widget("wms_srs").text(), "4326, 3857")
+        self.assertEqual(form.get_widget("wms_srs").list(), ["4326", "3857"])
         self.assertEqual(form.get_widget("wms_max_rendering_time").value(), 60)
         self.assertNotIn("wms_title", form._hidden_keys)
 

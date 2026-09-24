@@ -21,7 +21,13 @@ from qgis.PyQt.QtWidgets import QApplication, QDialog, QMessageBox
 from geoserver_manager.gui.dlg_preview import LayerPreviewDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.scope import PENDING
-from geoserver_manager.toolbelt.payload import bbox_text, keyword_list, text_of, unwrap
+from geoserver_manager.toolbelt.payload import (
+    bbox_text,
+    keyword_list,
+    text_of,
+    unwrap,
+    words,
+)
 from geoserver_manager.toolbelt.qgis_export import (
     export_to_geopackage,
     geoserver_name,
@@ -381,7 +387,7 @@ class LayerTabMixin:
             "advertised": bool(detail.get("advertised", True)),
             "title": text_of(detail.get("title")),
             "abstract": text_of(detail.get("abstract")),
-            "keywords": ", ".join(str(k) for k in keywords),
+            "keywords": [str(k) for k in keywords],
             "cql_filter": detail.get("cqlFilter") or "",
             "bbox": bounds,
             "attributes": attribute_text,
@@ -422,8 +428,7 @@ class LayerTabMixin:
             {
                 "key": "keywords",
                 "label": translate("LayerTabMixin", "Keywords"),
-                "type": "text",
-                "placeholder": translate("LayerTabMixin", "Comma-separated"),
+                "type": "list",
             },
             {
                 "key": "srs",
@@ -615,9 +620,6 @@ class LayerTabMixin:
         the bounds in the same request. Pure, so the mapping is testable.
         """
 
-        def keywords(text):
-            return [word.strip() for word in (text or "").split(",") if word.strip()]
-
         def srs(text):
             code = str(text or "").strip().upper().removeprefix("EPSG:")
             return f"EPSG:{code}"
@@ -637,8 +639,8 @@ class LayerTabMixin:
             before.get("cql_filter") or ""
         ):
             body["cqlFilter"] = after.get("cql_filter") or ""
-        if keywords(after.get("keywords")) != keywords(before.get("keywords")):
-            body["keywords"] = {"string": keywords(after.get("keywords"))}
+        if words(after.get("keywords")) != words(before.get("keywords")):
+            body["keywords"] = {"string": words(after.get("keywords"))}
         if srs(after.get("srs")) != srs(before.get("srs")):
             body["srs"] = srs(after.get("srs"))
         recalculate = "srs" in body or "projectionPolicy" in body
@@ -824,9 +826,8 @@ class LayerTabMixin:
             {
                 "key": "keywords",
                 "label": translate("LayerTabMixin", "Keywords"),
-                "type": "text",
+                "type": "list",
                 "group": translate("LayerTabMixin", "Metadata"),
-                "placeholder": translate("LayerTabMixin", "Optional, comma-separated"),
             },
             {
                 "key": "qgis_layer",
@@ -1305,11 +1306,7 @@ class LayerTabMixin:
         the SRS, bounding box and attributes GeoServer computed from the upload
         survive, which create_feature_type() would overwrite with a template.
         """
-        keywords = [
-            keyword.strip()
-            for keyword in (values.get("keywords") or "").split(",")
-            if keyword.strip()
-        ]
+        keywords = words(values.get("keywords"))
         metadata = {}
         if values.get("title"):
             metadata["title"] = values["title"]
@@ -1346,7 +1343,7 @@ class LayerTabMixin:
                     "The SRS must be an EPSG code number, such as 3857 or 4326.",
                 )
             )
-        keywords = [k.strip() for k in (values.get("keywords") or "").split(",")]
+        keywords = words(values.get("keywords"))
         # TODO(#50): the facade's create_feature_type(epsg=...) fills both
         # bounding boxes from utils.EPSG_BBOX, which knows 2056, 4326 and 3857
         # only: any other code raised KeyError before a request was sent, and
@@ -1366,7 +1363,7 @@ class LayerTabMixin:
                     projection_policy="FORCE_DECLARED",
                     title=values.get("title") or None,
                     abstract=values.get("abstract") or None,
-                    keywords=[k for k in keywords if k] or None,
+                    keywords=keywords or None,
                 )
             )
         )
@@ -1400,10 +1397,11 @@ class LayerTabMixin:
         A workspace style is referenced by its qualified name, "ws:style".
         """
         choices = [self._name_of(st) for st in self._fetch_list(self.gs.get_styles)]
-        choices += [
-            f"{workspace_name}:{self._name_of(st)}"
-            for st in self._fetch_list(self.gs.get_styles, workspace_name)
-        ]
+        if workspace_name:  # the global scope has no workspace styles of its own
+            choices += [
+                f"{workspace_name}:{self._name_of(st)}"
+                for st in self._fetch_list(self.gs.get_styles, workspace_name)
+            ]
         return sorted(choices)
 
     def _set_layer_style(self, row_data):
@@ -1447,33 +1445,24 @@ class LayerTabMixin:
                 {
                     "key": "others",
                     "label": translate("LayerTabMixin", "Other styles"),
-                    "type": "textarea",
-                    "default": "\n".join(others),
+                    "type": "table",
+                    "default": list(others),
+                    "choices": choices,
+                    "columns": [{"label": translate("LayerTabMixin", "Style")}],
                     "help": translate(
                         "LayerTabMixin",
-                        "One per line: the styles a client may also ask for. "
-                        "Empty for none.",
+                        "The styles a client may also ask for. Empty for none.",
                     ),
-                },
-                {
-                    "key": "add_other",
-                    "label": translate("LayerTabMixin", "Add a style"),
-                    "type": "combo",
-                    "options": [""] + choices,
-                    "help": translate("LayerTabMixin", "Appends to the list above."),
                 },
             ],
             parent=self,
             ok_label=translate("LayerTabMixin", "Set styles"),
         )
-        self._wire_style_picker(dlg)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         values = dlg.get_values()
         style = values["style"]
-        wanted = [
-            line.strip() for line in values["others"].splitlines() if line.strip()
-        ]
+        wanted = [name.strip() for name in values["others"] if name.strip()]
         wanted = list(dict.fromkeys(s for s in wanted if s != style))  # no repeats
         unknown = [s for s in wanted if s not in choices]
         if unknown:
@@ -1506,23 +1495,6 @@ class LayerTabMixin:
                 translate("LayerTabMixin", "Styles of '{}' saved.").format(name)
             )
             self._load_layers()
-
-    @staticmethod
-    def _wire_style_picker(dlg):
-        """Picking a style appends it to the other styles, then resets."""
-        combo, text = dlg.get_widget("add_other"), dlg.get_widget("others")
-
-        def append(picked):
-            if not picked:
-                return
-            lines = [line for line in text.toPlainText().splitlines() if line.strip()]
-            if picked not in lines:
-                text.setPlainText("\n".join(lines + [picked]))
-            combo.blockSignals(True)
-            combo.setCurrentIndex(0)
-            combo.blockSignals(False)
-
-        combo.currentTextChanged.connect(append)
 
     # -- Style from QGIS -------------------------------------------------------
 

@@ -257,6 +257,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- **Lists are edited as lists, not typed into text boxes.** A layer group's
+  layers are rows picked from the server's layers and groups, each with a
+  style picker, reordered with arrows; a cached layer's gridsets and formats
+  are picked the same way, with the zoom range as two spinboxes. Keywords
+  and the WMS SRS list use QGIS's own list editor, and connection and seed
+  parameters its key and value table. The `name = style`, `= 0-12` and
+  `key = value` syntaxes are gone.
 - **Tabs load much faster on a large server.** A tab used to fetch every
   row's details (type, enabled, format, mode…) before showing any, one
   request per row. The names now show at once, and the details follow for

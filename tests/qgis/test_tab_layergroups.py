@@ -24,6 +24,16 @@ from tests.qgis.sync_dialog import SyncDialog
 
 start_app()
 
+
+def rows(text):
+    """The group form's rows from a compact "layer = style" notation, one per line."""
+    return [
+        [name.strip(), style.strip()]
+        for name, _, style in (line.partition("=") for line in text.splitlines())
+        if name.strip()
+    ]
+
+
 # A group as GeoServer really answers it: the abstract under "abstractTxt",
 # per-publishable styles parallel to the publishables, computed bounds.
 TASMANIA = {
@@ -167,6 +177,9 @@ class FakeGS:
             return ([{"name": "roads_group"}], 200)
         return ([], 200)
 
+    def get_styles(self, workspace_name=None):
+        return ([{"name": "simple_roads"}, {"name": "line"}], 200)
+
     def get_style_definition(self, name, workspace_name=None):
         self.calls.append(("get_style_definition", name, workspace_name))
         if name in ("simple_roads", "disputed"):
@@ -244,10 +257,10 @@ class TestGroupDetail(unittest.TestCase):
         self.assertEqual(values["mode"], "Single")
         self.assertEqual(values["workspace"], GLOBAL)
         self.assertEqual(
-            values["layers"].splitlines(),
+            values["layers"],
             [
-                "topp:tasmania_state_boundaries",
-                "topp:tasmania_roads = simple_roads",
+                ["topp:tasmania_state_boundaries", ""],
+                ["topp:tasmania_roads", "simple_roads"],
             ],
         )
         self.assertIn("143.83, -43.64 → 148.47, -39.57", values["bounds"])
@@ -256,7 +269,7 @@ class TestGroupDetail(unittest.TestCase):
     def test_a_single_publishable_and_a_nested_group_are_not_lost(self):
         values = LayerGroupTabMixin._group_form_values(SOLO, "solo", GLOBAL)
         # The edit form's own syntax: a group is named like a layer.
-        self.assertEqual(values["layers"].splitlines(), ["tasmania"])
+        self.assertEqual(values["layers"], [["tasmania", ""]])
         self.assertEqual(values["bounds"], "")
         self.assertEqual(values["abstract"], "")
 
@@ -277,7 +290,7 @@ class TestGroupDetail(unittest.TestCase):
         self.assertTrue(form.get_widget("mode").isEnabled())
         self.assertTrue(form.get_widget("name").isReadOnly())  # copyable, not greyed
         # The group itself is not offered as one of its own members.
-        pick = form.get_widget("pick")
+        pick = form.get_widget("layers").picker
         offered = [pick.itemText(i) for i in range(pick.count())]
         self.assertIn("solo", offered)
         self.assertNotIn("tasmania", offered)
@@ -309,7 +322,7 @@ class TestCreateLayerGroup(unittest.TestCase):
                 "mode": "SINGLE",
                 "title": "New",
                 "abstract": "Why it exists",
-                "layers": "topp:tasmania_roads\nnurc:mosaic\n",
+                "layers": rows("topp:tasmania_roads\nnurc:mosaic\n"),
             }
         )
         (_verb, path, kwargs) = self.posted()[0]
@@ -339,7 +352,7 @@ class TestCreateLayerGroup(unittest.TestCase):
                 "name": "ws_group",
                 "workspace": "topp",
                 "mode": "NAMED",
-                "layers": "tasmania_roads\ntopp:states",
+                "layers": rows("tasmania_roads\ntopp:states"),
             }
         )
         (_verb, path, kwargs) = self.posted()[0]
@@ -359,7 +372,7 @@ class TestCreateLayerGroup(unittest.TestCase):
                     "name": "ws_group",
                     "workspace": "topp",
                     "mode": "NAMED",
-                    "layers": "tasmania_roads\nne:coastlines",
+                    "layers": rows("tasmania_roads\nne:coastlines"),
                 }
             )
         self.assertIn("ne:coastlines", str(caught.exception))
@@ -371,10 +384,12 @@ class TestCreateLayerGroup(unittest.TestCase):
                 "name": "styled",
                 "workspace": GLOBAL,
                 "mode": "SINGLE",
-                "layers": (
-                    "topp:tasmania_state_boundaries\n"
-                    "topp:tasmania_roads = simple_roads\n"
-                    "ne:coastlines = ne:disputed"
+                "layers": rows(
+                    (
+                        "topp:tasmania_state_boundaries\n"
+                        "topp:tasmania_roads = simple_roads\n"
+                        "ne:coastlines = ne:disputed"
+                    )
                 ),
             }
         )
@@ -400,14 +415,16 @@ class TestCreateLayerGroup(unittest.TestCase):
                     "name": "styled",
                     "workspace": GLOBAL,
                     "mode": "SINGLE",
-                    "layers": "topp:tasmania_roads = no_such_style",
+                    "layers": rows("topp:tasmania_roads = no_such_style"),
                 }
             )
         self.assertIn("no_such_style", str(caught.exception))
         self.assertEqual(self.posted(), [])
 
     def test_parsing_keeps_the_order_and_qualifies_bare_names(self):
-        layers, styles = self.dlg._parse_group_layers(" b:two = s2 \n\none\n", "topp")
+        layers, styles = self.dlg._parse_group_layers(
+            rows(" b:two = s2 \n\none\n"), "topp"
+        )
         self.assertEqual(layers, ["b:two", "topp:one"])
         self.assertEqual(styles, ["s2", ""])
 
@@ -419,7 +436,7 @@ class TestCreateLayerGroup(unittest.TestCase):
                     "name": "tasmania",
                     "workspace": GLOBAL,
                     "mode": "SINGLE",
-                    "layers": "topp:tasmania_roads",
+                    "layers": rows("topp:tasmania_roads"),
                 }
             )
         self.assertEqual(self.posted(), [])
@@ -431,25 +448,34 @@ class TestCreateLayerGroup(unittest.TestCase):
                     "name": "empty_group",
                     "workspace": GLOBAL,
                     "mode": "SINGLE",
-                    "layers": "  \n\n",
+                    "layers": rows("  \n\n"),
                 }
             )
         self.assertEqual(self.posted(), [])
 
-    def test_the_picker_appends_to_the_ordered_list(self):
+    def test_the_layers_are_picked_ordered_and_styled_in_a_table(self):
+        # One layer per line in a text box, "= style" typed by hand, was the
+        # form's only way; now a picker adds rows and buttons reorder them.
         dlg = ResourceFormDialog(
-            title="t", fields=self.dlg._group_fields(["topp"], ["a:one", "b:two"])
+            title="t",
+            fields=self.dlg._group_fields(
+                ["topp"], ["a:one", "b:two"], styles=["line", "simple_roads"]
+            ),
         )
-        dlg.get_widget("pick").currentTextChanged.connect(
-            lambda choice: self.dlg._append_group_layer(dlg, choice)
-        )
-        dlg.get_widget("pick").setCurrentText("b:two")
-        dlg.get_widget("pick").setCurrentText("b:two")  # same layer twice
-        dlg.get_widget("pick").setCurrentText("a:one")
+        table = dlg.get_widget("layers")
+        for name in ("b:two", "b:two", "a:one"):  # the same layer twice is fine
+            table.picker.setEditText(name)
+            table._add_picked()
+        table.table.cellWidget(2, 1).setCurrentText("line")
+        table.table.selectRow(2)
+        table._up()
         self.assertEqual(
-            dlg.get_values()["layers"].splitlines(), ["b:two", "b:two", "a:one"]
+            dlg.get_values()["layers"],
+            [["b:two", ""], ["a:one", "line"], ["b:two", ""]],
         )
-        self.assertEqual(dlg.get_widget("pick").currentIndex(), 0)
+        style = table.table.cellWidget(0, 1)
+        offered = [style.itemText(i) for i in range(style.count())]
+        self.assertEqual(offered, ["", "line", "simple_roads"])
 
 
 class TestEditLayerGroup(unittest.TestCase):
@@ -488,12 +514,12 @@ class TestEditLayerGroup(unittest.TestCase):
         bounds.assert_not_called()
 
     def test_nothing_changed_sends_nothing(self):
-        saved, puts, _bounds = self.save(layers=self.before["layers"] + "\n\n")
+        saved, puts, _bounds = self.save(layers=self.before["layers"] + [["", ""]])
         self.assertFalse(saved)
         self.assertEqual(puts, [])
 
     def test_new_layers_carry_a_style_each_and_fresh_bounds(self):
-        _saved, puts, bounds = self.save(layers="nurc:mosaic\nsolo")
+        _saved, puts, bounds = self.save(layers=rows("nurc:mosaic\nsolo"))
         group = puts[0][2]["json"]["layerGroup"]
         self.assertEqual(
             group["publishables"]["published"],
@@ -508,7 +534,7 @@ class TestEditLayerGroup(unittest.TestCase):
 
     def test_an_unknown_name_is_refused_since_geoserver_drops_it(self):
         with self.assertRaises(ValueError) as caught:
-            self.save(layers="topp:tasmania_roads\nno_such_group")
+            self.save(layers=rows("topp:tasmania_roads\nno_such_group"))
         self.assertIn("no_such_group", str(caught.exception))
         self.assertEqual([call for call in self.dlg.gs.calls if call[0] == "PUT"], [])
 
@@ -570,7 +596,7 @@ class TestCreateNestedAndEarthObservation(unittest.TestCase):
 
     def test_a_nested_group_is_sent_with_its_type_and_styles(self):
         # Without styles, GeoServer answers 500 for a group holding a group.
-        group = self.create(layers="tasmania\ntopp:tasmania_roads")
+        group = self.create(layers=rows("tasmania\ntopp:tasmania_roads"))
         self.assertEqual(
             [item["@type"] for item in group["publishables"]["published"]],
             ["layerGroup", "layer"],
@@ -583,7 +609,7 @@ class TestCreateNestedAndEarthObservation(unittest.TestCase):
         ):
             group = self.create(
                 mode="Earth Observation Tree",
-                layers="topp:tasmania_roads",
+                layers=rows("topp:tasmania_roads"),
                 root_layer="topp:tasmania_roads",
                 root_style="",
             )
@@ -595,7 +621,7 @@ class TestCreateNestedAndEarthObservation(unittest.TestCase):
             with self.assertRaises(ValueError) as caught:
                 self.create(
                     mode="Earth Observation Tree",
-                    layers="topp:tasmania_roads",
+                    layers=rows("topp:tasmania_roads"),
                     root_layer="topp:tasmania_roads",
                     root_style="",
                 )

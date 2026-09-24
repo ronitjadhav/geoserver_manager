@@ -285,6 +285,7 @@ class TestShippedFrenchLocale(unittest.TestCase):
             "LayerTreeMenu",
             "QgisExport",
             "LayerPreviewDialog",
+            "ListTable",
             "ResourceFormDialog",
             "wdg_geoserver_manager_settings",
         }

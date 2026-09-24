@@ -21,6 +21,17 @@ from geoserver_manager.toolbelt.dependencies import BUNDLED_WHLS
 from tests.qgis.sync_dialog import SyncDialog
 
 start_app()
+
+
+def rows(text):
+    """The group form's rows from a compact "layer = style" notation, one per line."""
+    return [
+        [name.strip(), style.strip()]
+        for name, _, style in (line.partition("=") for line in text.splitlines())
+        if name.strip()
+    ]
+
+
 # _put_workspace builds its payload with the library's Workspace model, so the
 # bundled wheel has to be importable here too (conftest does this under pytest).
 for whl in BUNDLED_WHLS:
@@ -138,7 +149,7 @@ class TestNamesAreCheckedBeforeAnyRequest(unittest.TestCase):
                     "name": "a#b",
                     "workspace": GLOBAL,
                     "mode": "Single",
-                    "layers": "topp:states",
+                    "layers": rows("topp:states"),
                 }
             )
         self.assertEqual(self.gs.calls, [])
@@ -256,7 +267,7 @@ class TestLayerGroupModesAndLayers(unittest.TestCase):
                 "name": "g",
                 "workspace": GLOBAL,
                 "mode": "Named Tree",
-                "layers": "topp:states",
+                "layers": rows("topp:states"),
             }
         )
         post = [call for call in self.gs.calls if call[0] == "POST"][0]
@@ -269,7 +280,7 @@ class TestLayerGroupModesAndLayers(unittest.TestCase):
                     "name": "g",
                     "workspace": "topp",
                     "mode": "Single",
-                    "layers": "states\nroadz",
+                    "layers": rows("states\nroadz"),
                 },
                 known_layers=["topp:states"],
             )

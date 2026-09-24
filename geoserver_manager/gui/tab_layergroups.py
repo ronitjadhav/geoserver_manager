@@ -242,10 +242,10 @@ class LayerGroupTabMixin:
     def _group_form_values(cls, detail, name, workspace_label):
         """Prefill for the edit dialog, in the form's own layer syntax. Pure."""
         styles = cls._group_styles(detail)
-        lines = []
-        for index, (layer_name, _kind) in enumerate(cls._group_layers(detail)):
-            style = styles[index] if index < len(styles) else ""
-            lines.append(f"{layer_name} = {style}" if style else layer_name)
+        rows = [
+            [layer_name, styles[index] if index < len(styles) else ""]
+            for index, (layer_name, _kind) in enumerate(cls._group_layers(detail))
+        ]
 
         return {
             "name": name,
@@ -259,7 +259,7 @@ class LayerGroupTabMixin:
             # A group GeoServer has never re-saved has no flags: both default on.
             "enabled": detail.get("enabled", True) is not False,
             "advertised": detail.get("advertised", True) is not False,
-            "layers": "\n".join(lines),
+            "layers": rows,
             "root_layer": (detail.get("rootLayer") or {}).get("name", ""),
             "root_style": (detail.get("rootLayerStyle") or {}).get("name", ""),
             "bounds": bbox_text(detail.get("bounds")),
@@ -273,6 +273,7 @@ class LayerGroupTabMixin:
                 self._group_detail(name, scope(workspace_label)),
                 self._all_layer_names(),
                 self._all_group_names(),
+                self._style_choices(scope(workspace_label)),
             ),
             translate("LayerGroupTabMixin", "Failed to load layer group '{}'").format(
                 name
@@ -280,7 +281,7 @@ class LayerGroupTabMixin:
         )
         if fetched is None:
             return
-        detail, layer_names, group_names = fetched
+        detail, layer_names, group_names, style_names = fetched
         before = self._group_form_values(detail, name, workspace_label)
         own = f"{scope(workspace_label)}:{name}" if scope(workspace_label) else name
 
@@ -299,6 +300,7 @@ class LayerGroupTabMixin:
                 ),
                 self._same_workspace(scope(workspace_label), layer_names),
                 edit_mode=True,
+                styles=style_names,
             ),
             values=before,
             parent=self,
@@ -405,7 +407,7 @@ class LayerGroupTabMixin:
             return list(names)
         return [name for name in names if name.startswith(f"{workspace_name}:")]
 
-    def _group_publishables(self, text, workspace_name, known_layers, known_groups):
+    def _group_publishables(self, rows, workspace_name, known_layers, known_groups):
         """The layer list as GeoServer publishables, and the styles beside it.
 
         GeoServer drops a name it does not know, answering 200, so every line
@@ -413,7 +415,7 @@ class LayerGroupTabMixin:
         ponytail: a group named like a layer cannot be listed; GeoServer allows
         it, add a marker to the syntax when someone needs it.
         """
-        layers, styles = self._parse_group_layers(text, workspace_name)
+        layers, styles = self._parse_group_layers(rows, workspace_name)
         if not layers:
             raise ValueError(
                 translate("LayerGroupTabMixin", "List at least one layer.")
@@ -560,7 +562,7 @@ class LayerGroupTabMixin:
     # -- Create ----------------------------------------------------------------
 
     def _group_fields(
-        self, workspace_names, pickable, root_layers=None, edit_mode=False
+        self, workspace_names, pickable, root_layers=None, edit_mode=False, styles=()
     ):
         """Field definitions for the create and the edit dialog.
 
@@ -612,31 +614,28 @@ class LayerGroupTabMixin:
                 "type": "textarea",
             },
             {
-                "key": "pick",
-                "label": translate("LayerGroupTabMixin", "Add a layer"),
-                "type": "combo",
-                "options": [_PICK] + list(pickable),
-                "group": translate("LayerGroupTabMixin", "Layers"),
-                "help": translate(
-                    "LayerGroupTabMixin",
-                    "Appends to the list below; the groups come after the layers",
-                ),
-            },
-            {
                 "key": "layers",
                 "label": translate("LayerGroupTabMixin", "Layers"),
-                "type": "textarea",
+                "type": "table",
+                "ordered": True,
                 "required": True,
+                "wide": True,
                 "group": translate("LayerGroupTabMixin", "Layers"),
-                "placeholder": (
-                    "topp:tasmania_state_boundaries\ntopp:tasmania_roads = simple_roads"
-                ),
+                "choices": list(pickable),
+                "columns": [
+                    {"label": translate("LayerGroupTabMixin", "Layer or group")},
+                    {
+                        "label": translate("LayerGroupTabMixin", "Style"),
+                        "type": "combo",
+                        # Blank: the layer's own default style.
+                        "options": [""] + list(styles),
+                        "placeholder": translate("LayerGroupTabMixin", "(default)"),
+                    },
+                ],
                 "help": translate(
                     "LayerGroupTabMixin",
-                    "One layer or group per line, in drawing order: the first "
-                    "line is drawn first, at the bottom. Reorder by editing the "
-                    'text. Add "= style" to a line to publish that layer with a '
-                    "style other than its own default.",
+                    "In drawing order: the first row is drawn first, at the "
+                    "bottom. A blank style is the layer's own default.",
                 ),
             },
             {
@@ -693,10 +692,7 @@ class LayerGroupTabMixin:
         return fields
 
     def _wire_group_form(self, dlg):
-        """Connect the picker, and show the root fields for Earth Observation."""
-        dlg.get_widget("pick").currentTextChanged.connect(
-            lambda choice: self._append_group_layer(dlg, choice)
-        )
+        """Show the root fields for an Earth Observation group only."""
 
         def show_root(label):
             for key in ("root_layer", "root_style"):
@@ -705,13 +701,6 @@ class LayerGroupTabMixin:
         mode = dlg.get_widget("mode")
         mode.currentTextChanged.connect(show_root)
         show_root(mode.currentText())
-
-    def _append_group_layer(self, dlg, choice):
-        """Append the picked layer to the ordered list, then reset the picker."""
-        if choice == _PICK:
-            return
-        dlg.get_widget("layers").appendPlainText(choice)
-        dlg.get_widget("pick").setCurrentIndex(0)  # re-fires with _PICK, ignored above
 
     def _all_group_names(self):
         """Every group's name as a publishable spells it: bare when global,
@@ -740,12 +729,13 @@ class LayerGroupTabMixin:
                 self._get_workspace_names(),
                 self._all_layer_names(),
                 self._all_group_names(),
+                self._style_choices(None),
             ),
             translate("LayerGroupTabMixin", "Failed to load the workspaces and layers"),
         )
         if fetched is None:
             return
-        workspace_names, layer_names, group_names = fetched
+        workspace_names, layer_names, group_names, style_names = fetched
 
         dlg = ResourceFormDialog(
             title=translate("LayerGroupTabMixin", "Create a Layer Group"),
@@ -755,7 +745,10 @@ class LayerGroupTabMixin:
                 "bounds from the layers it contains.",
             ),
             fields=self._group_fields(
-                workspace_names, layer_names + group_names, layer_names
+                workspace_names,
+                layer_names + group_names,
+                layer_names,
+                styles=style_names,
             ),
             parent=self,
             ok_label=translate("LayerGroupTabMixin", "Create"),
@@ -783,24 +776,22 @@ class LayerGroupTabMixin:
             self._load_layer_groups()
 
     @staticmethod
-    def _parse_group_layers(text, workspace_name):
-        """Parse the ordered layer list into (layers, styles).
+    def _parse_group_layers(rows, workspace_name):
+        """The form's rows as (layers, styles), in drawing order.
 
-        One layer per line, `workspace:layer` or `workspace:layer = style`,
-        the same `key = value` shape the datastore parameter editor uses. The
-        styles are parallel to the layers, "" where the layer keeps its own
-        default style, and a bare layer name takes the group's workspace.
+        A row is [layer, style]; the styles are parallel to the layers, ""
+        where the layer keeps its own default style, and a bare layer name
+        takes the group's workspace.
         """
         layers, styles = [], []
-        for line in text.splitlines():
-            if not line.strip():
+        for row in rows or ():
+            name = (row[0] or "").strip()
+            if not name:
                 continue
-            name, _, style = line.partition("=")
-            name = name.strip()
             if ":" not in name and workspace_name:
                 name = f"{workspace_name}:{name}"
             layers.append(name)
-            styles.append(style.strip())
+            styles.append((row[1] if len(row) > 1 else "").strip())
         return layers, styles
 
     def _check_styles_exist(self, styles):

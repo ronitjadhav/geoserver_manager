@@ -512,7 +512,7 @@ class TestLayerDetailPrefill(unittest.TestCase):
 
         self.assertEqual(values["native_name"], "tasmania_roads")
         self.assertEqual(values["projection_policy"], "FORCE_DECLARED")
-        self.assertEqual(values["keywords"], "Roads, Tasmania")
+        self.assertEqual(values["keywords"], ["Roads", "Tasmania"])
         self.assertIn("145.19", values["bbox"])
         self.assertIn("(EPSG:4326)", values["bbox"])  # one format on every tab
         self.assertIn("the_geom : MultiLineString", values["attributes"])
@@ -527,7 +527,7 @@ class TestLayerDetailPrefill(unittest.TestCase):
         self.assertEqual(values["name"], "l")
         self.assertEqual(values["bbox"], "-")
         self.assertEqual(values["attributes"], "-")
-        self.assertEqual(values["keywords"], "")
+        self.assertEqual(values["keywords"], [])
 
     def test_handles_translated_title_and_single_attribute(self):
         detail = {
@@ -540,7 +540,7 @@ class TestLayerDetailPrefill(unittest.TestCase):
         )
 
         self.assertIn("en: Roads", values["title"])
-        self.assertEqual(values["keywords"], "Solo")
+        self.assertEqual(values["keywords"], ["Solo"])
         self.assertEqual(values["attributes"], "geom : Point")
 
 
@@ -571,7 +571,7 @@ class TestLibraryPayloadShape(unittest.TestCase):
         values = GeoServerMainDialog._layer_form_values(
             ["tasmania_roads", "topp", "VECTOR", "taz_shapes", ""], self.LIBRARY_SHAPE
         )
-        self.assertEqual(values["keywords"], "Roads, Tasmania")
+        self.assertEqual(values["keywords"], ["Roads", "Tasmania"])
         self.assertIn("the_geom : MultiLineString", values["attributes"])
         self.assertIn("TYPE : String", values["attributes"])
 
@@ -579,7 +579,7 @@ class TestLibraryPayloadShape(unittest.TestCase):
         values = GeoServerMainDialog._layer_form_values(
             ["tasmania_roads", "topp", "VECTOR", "taz_shapes", ""], DETAIL
         )
-        self.assertEqual(values["keywords"], "Roads, Tasmania")
+        self.assertEqual(values["keywords"], ["Roads", "Tasmania"])
         self.assertIn("the_geom : MultiLineString", values["attributes"])
 
     def test_attribute_without_a_binding(self):
@@ -1271,8 +1271,8 @@ class TestSetLayerStyle(unittest.TestCase):
                 opened.append(inner)
                 for key, value in edits.items():
                     widget = inner.get_widget(key)
-                    if hasattr(widget, "setPlainText"):
-                        widget.setPlainText(value)
+                    if hasattr(widget, "set_rows"):  # a table: its rows
+                        widget.set_rows(value)
                     else:
                         widget.setCurrentText(value)
                 return QDialog.DialogCode.Accepted
@@ -1284,7 +1284,7 @@ class TestSetLayerStyle(unittest.TestCase):
         return opened[0]
 
     def test_the_other_styles_are_listed_and_written_through_the_library(self):
-        form = self.run_form(others="population\ntopp:roads_ws")
+        form = self.run_form(others=["population", "topp:roads_ws"])
         self.assertEqual(self.set_calls, [])  # the default did not change
         self.assertEqual(
             self.update_calls,
@@ -1300,18 +1300,21 @@ class TestSetLayerStyle(unittest.TestCase):
                 )
             ],
         )
-        self.assertIn("population", form.get_widget("others").toPlainText())
+        self.assertIn("population", form.get_widget("others").rows())
 
-    def test_the_picker_appends_to_the_list(self):
-        form = self.run_form(add_other="topp:roads_ws")
-        self.assertEqual(
-            form.get_widget("others").toPlainText(), "population\ntopp:roads_ws"
-        )
+    def test_the_picker_offers_the_styles_and_adds_a_row(self):
+        form = self.run_form()
+        table = form.get_widget("others")
+        offered = [table.picker.itemText(i) for i in range(table.picker.count())]
+        self.assertIn("topp:roads_ws", offered)
+        table.picker.setEditText("topp:roads_ws")
+        table._add_picked()
+        self.assertEqual(table.rows(), ["population", "topp:roads_ws"])
 
     def test_an_unknown_style_is_refused_and_nothing_is_written(self):
         errors = []
         self.dlg.show_error_message = errors.append
-        self.run_form(others="no_such_style")
+        self.run_form(others=["no_such_style"])
         self.assertIn("no_such_style", errors[0])
         self.assertEqual((self.set_calls, self.update_calls), ([], []))
 

@@ -25,7 +25,7 @@ from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.scope import PENDING
-from geoserver_manager.toolbelt.payload import bbox_text, changed, keyword_list
+from geoserver_manager.toolbelt.payload import bbox_text, changed, keyword_list, words
 from geoserver_manager.toolbelt.qgis_export import (
     export_to_geotiff,
     geoserver_name,
@@ -1006,11 +1006,7 @@ class CoverageStoreTabMixin:
         metadata = {
             key: values[key] for key in ("title", "abstract") if values.get(key)
         }
-        keywords = [
-            word.strip()
-            for word in (values.get("keywords") or "").split(",")
-            if word.strip()
-        ]
+        keywords = words(values.get("keywords"))
         if keywords:
             # The feature type's shape; a partial coverage PUT merges it too.
             metadata["keywords"] = {"string": keywords}

@@ -21,6 +21,26 @@ from tests.qgis.sync_dialog import SyncDialog
 
 start_app()
 
+
+def grid(text):
+    """Gridset rows from a compact "name = from-to" notation, one per line."""
+    rows = []
+    for line in text.splitlines():
+        name, _, zoom = line.partition("=")
+        if not name.strip():
+            continue
+        start, _, stop = zoom.strip().partition("-")
+        rows.append(
+            [name.strip(), int(start) if start else None, int(stop) if stop else None]
+        )
+    return rows
+
+
+def fmts(text):
+    """Format rows from one MIME type per line."""
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
 # A cached layer as GET /gwc/rest/layers/topp:states.json hands it back on 2.28.5
 STATES = {
     "GeoServerLayer": {
@@ -298,8 +318,8 @@ class TestDocument(unittest.TestCase):
                 "name": "topp:states",
                 "enabled": True,
                 # The first gridset has published zoom levels 0-12.
-                "gridsets": "EPSG:4326 = 0-12\nEPSG:900913",
-                "formats": "image/png\nimage/jpeg",
+                "gridsets": grid("EPSG:4326 = 0-12\nEPSG:900913"),
+                "formats": fmts("image/png\nimage/jpeg"),
                 "meta_width": 4,
                 "meta_height": 4,
                 "expire_cache": 0,
@@ -315,8 +335,8 @@ class TestDocument(unittest.TestCase):
     def test_saving_rewrites_only_what_the_form_owns(self):
         values = {
             "enabled": False,
-            "gridsets": "EPSG:4326 = 0-12\nWebMercatorQuad\n\nEPSG:4326",
-            "formats": "image/png",
+            "gridsets": grid("EPSG:4326 = 0-12\nWebMercatorQuad\n\nEPSG:4326"),
+            "formats": fmts("image/png"),
             "meta_width": 3,
             "meta_height": 3,
             "expire_cache": 3600,
@@ -352,10 +372,11 @@ class TestDocument(unittest.TestCase):
         )
 
     def test_a_zoom_range_is_written_and_a_plain_line_clears_it(self):
-        base = {"formats": "image/png"}
+        base = {"formats": fmts("image/png")}
         root = ElementTree.fromstring(
             GwcTabMixin._gwc_xml_with_values(
-                STATES_XML, dict(base, gridsets="EPSG:4326 = 3-9\nEPSG:900913 = 0-18")
+                STATES_XML,
+                dict(base, gridsets=grid("EPSG:4326 = 3-9\nEPSG:900913 = 0-18")),
             )
         )
         subsets = root.findall("gridSubsets/gridSubset")
@@ -365,22 +386,23 @@ class TestDocument(unittest.TestCase):
         )
         root = ElementTree.fromstring(
             GwcTabMixin._gwc_xml_with_values(
-                STATES_XML, dict(base, gridsets="EPSG:4326")
+                STATES_XML, dict(base, gridsets=grid("EPSG:4326"))
             )
         )
         self.assertIsNone(root.find("gridSubsets/gridSubset/zoomStart"))
 
     def test_a_bad_zoom_range_is_refused(self):
-        for line in ("EPSG:4326 = 12", "EPSG:4326 = 9-3", "EPSG:4326 = a-b"):
-            with self.assertRaises(ValueError, msg=line):
+        # Only one end given, or the first after the last.
+        for row in (["EPSG:4326", 12, None], ["EPSG:4326", 9, 3]):
+            with self.assertRaises(ValueError, msg=row):
                 GwcTabMixin._gwc_xml_with_values(
-                    STATES_XML, {"formats": "image/png", "gridsets": line}
+                    STATES_XML, {"formats": ["image/png"], "gridsets": [row]}
                 )
 
     def test_parameter_filters_are_replaced_from_their_xml(self):
         values = {
-            "gridsets": "EPSG:4326",
-            "formats": "image/png",
+            "gridsets": grid("EPSG:4326"),
+            "formats": fmts("image/png"),
             "filters": (
                 "<stringParameterFilter><key>CQL_FILTER</key><defaultValue/>"
                 "<values><string>A=1</string></values></stringParameterFilter>"
@@ -398,10 +420,10 @@ class TestDocument(unittest.TestCase):
             )
 
     def test_an_empty_gridset_or_format_list_is_refused(self):
-        values = {"gridsets": "", "formats": "image/png"}
+        values = {"gridsets": grid(""), "formats": fmts("image/png")}
         with self.assertRaises(ValueError):
             GwcTabMixin._gwc_xml_with_values(STATES_XML, values)
-        values = {"gridsets": "EPSG:4326", "formats": "  \n"}
+        values = {"gridsets": grid("EPSG:4326"), "formats": fmts("  \n")}
         with self.assertRaises(ValueError):
             GwcTabMixin._gwc_xml_with_values(STATES_XML, values)
 
@@ -436,8 +458,8 @@ class TestActions(unittest.TestCase):
         values = {
             "layer": "topp:roads",
             "enabled": True,
-            "gridsets": "EPSG:4326\nEPSG:900913",
-            "formats": "image/png\nimage/jpeg",
+            "gridsets": grid("EPSG:4326\nEPSG:900913"),
+            "formats": fmts("image/png\nimage/jpeg"),
             "meta_width": 4,
             "meta_height": 4,
             "expire_cache": 0,
@@ -462,8 +484,8 @@ class TestActions(unittest.TestCase):
     def test_creating_refuses_a_layer_that_is_cached_already(self):
         values = {
             "layer": "topp:states",
-            "gridsets": "EPSG:4326",
-            "formats": "image/png",
+            "gridsets": grid("EPSG:4326"),
+            "formats": fmts("image/png"),
         }
         with self.assertRaises(ValueError):
             self.dlg._create_gwc_layer_from_values(values)
@@ -514,17 +536,20 @@ class TestActions(unittest.TestCase):
             ["sf:archsites", "spearfish", "topp:overview", "topp:roads"],
         )
         values = form.get_values()
-        self.assertEqual(values["gridsets"], "EPSG:4326\nEPSG:900913")
+        self.assertEqual(values["gridsets"], grid("EPSG:4326\nEPSG:900913"))
         # the template's STYLES filter shows, so an untouched form keeps it
         self.assertIn("<key>STYLES</key>", values["filters"])
-        self.assertEqual(values["formats"], "image/png\nimage/jpeg")
+        self.assertEqual(values["formats"], fmts("image/png\nimage/jpeg"))
         self.assertEqual((values["meta_width"], values["meta_height"]), (4, 4))
-        # the picker appends to the textarea and resets itself
-        form.get_widget("add_gridset").setCurrentText("WebMercatorQuad")
+        # the table's picker offers the server's gridsets and adds a row
+        table = form.get_widget("gridsets")
+        offered = [table.picker.itemText(i) for i in range(table.picker.count())]
+        self.assertIn("WebMercatorQuad", offered)
+        table.picker.setEditText("WebMercatorQuad")
+        table._add_picked()
         self.assertEqual(
-            form.get_values()["gridsets"], "EPSG:4326\nEPSG:900913\nWebMercatorQuad"
+            form.get_values()["gridsets"][-1], ["WebMercatorQuad", None, None]
         )
-        self.assertEqual(form.get_widget("add_gridset").currentText(), "")
 
     def test_nothing_to_add_is_a_warning_not_an_empty_dialog(self):
         self.gs.cached = [
@@ -547,7 +572,7 @@ class TestActions(unittest.TestCase):
         self.assertEqual(form.windowTitle(), "Tile cache of 'topp:states'")
         values = form.get_values()
         self.assertEqual(values["name"], "topp:states")
-        self.assertEqual(values["gridsets"], "EPSG:4326 = 0-12\nEPSG:900913")
+        self.assertEqual(values["gridsets"], grid("EPSG:4326 = 0-12\nEPSG:900913"))
         self.assertTrue(values["enabled"])
         ok = QDialogButtonBox.StandardButton.Ok
         self.assertEqual(form._button_box.button(ok).text(), "Save")  # an edit
@@ -572,7 +597,11 @@ class TestNamesInPaths(unittest.TestCase):
     def test_a_name_the_paths_cannot_carry_is_refused_before_any_request(self):
         with self.assertRaises(ValueError):
             self.dlg._create_gwc_layer_from_values(
-                {"layer": "topp/roads", "gridsets": "EPSG:4326", "formats": "image/png"}
+                {
+                    "layer": "topp/roads",
+                    "gridsets": grid("EPSG:4326"),
+                    "formats": fmts("image/png"),
+                }
             )
         self.assertEqual([c for c in self.dlg.gs.calls if c[0] == "PUT"], [])
 
@@ -589,7 +618,7 @@ class TestSeed(unittest.TestCase):
         "zoom_stop": 6,
         "threads": 3,
         "bounds": "",
-        "parameters": "",
+        "parameters": {},
     }
 
     def test_the_request_names_everything_gwc_needs(self):
@@ -611,7 +640,7 @@ class TestSeed(unittest.TestCase):
 
     def test_an_area_and_parameters_narrow_the_task(self):
         values = dict(
-            self.VALUES, bounds="-125, 24 -66,50", parameters="STYLES = population"
+            self.VALUES, bounds="-125, 24 -66,50", parameters={"STYLES": "population"}
         )
         request = GwcTabMixin._seed_request("topp:states", values)["seedRequest"]
         self.assertEqual(request["bounds"], {"coords": {"double": [-125, 24, -66, 50]}})

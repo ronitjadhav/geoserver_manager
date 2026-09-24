@@ -346,14 +346,15 @@ class DatastoreTabMixin:
             {
                 "key": "raw_params",
                 "label": translate("DatastoreTabMixin", "Connection parameters"),
-                "type": "textarea",
+                "type": "keyvalue",
                 "visible": False,
                 "group": connection,
+                "max_height": 320,
                 "help": translate(
                     "DatastoreTabMixin",
-                    "One 'key = value' per line, exactly as GeoServer stores them. "
-                    "Lines you remove are removed on the server; a masked password "
-                    "(••••) is kept as it is unless you replace it.",
+                    "Exactly as GeoServer stores them. A parameter you remove is "
+                    "removed on the server; a masked password (••••) is kept as "
+                    "it is unless you replace it.",
                 ),
             },
             # --- PMTiles fields ---
@@ -551,14 +552,15 @@ class DatastoreTabMixin:
                 {
                     "key": "other_params",
                     "label": translate("DatastoreTabMixin", "Other parameters"),
-                    "type": "textarea",
+                    "type": "keyvalue",
                     "group": translate("DatastoreTabMixin", "Advanced"),
+                    "max_height": 320,
                     "help": translate(
                         "DatastoreTabMixin",
-                        "What the Connection tab does not show (pool sizes, timeouts, "
-                        "Loose bbox, ...), one 'key = value' per line. Lines you "
-                        "remove are removed on the server; a masked password (••••) "
-                        "is kept unless you replace it.",
+                        "What the Connection tab does not show (pool sizes, "
+                        "timeouts, Loose bbox, ...). A parameter you remove is "
+                        "removed on the server; a masked password (••••) is kept "
+                        "unless you replace it.",
                     ),
                 },
             )
@@ -697,18 +699,13 @@ class DatastoreTabMixin:
         dlg.set_field_visible("other_params", False)
 
     @staticmethod
-    def _parse_params(text):
-        """Parse 'key = value' lines back into a dict. Raises ValueError on a bad line."""
-        params = {}
-        for number, raw in enumerate(text.splitlines(), start=1):
-            line = raw.strip()
-            if not line or line.startswith("#"):
-                continue
-            if "=" not in line:
-                raise ValueError(f"Line {number} is not 'key = value': {raw!r}")
-            key, value = line.split("=", 1)
-            params[key.strip()] = value.strip()
-        return params
+    def _parse_params(pairs):
+        """The form's key/value pairs as a dict, keys and values stripped."""
+        return {
+            str(key).strip(): str(value).strip()
+            for key, value in (pairs or {}).items()
+            if str(key).strip()
+        }
 
     def _wire_type_combo(self, dlg, initial_type=None, locked=False):
         """Show only the connection fields that belong to the selected type.
@@ -802,9 +799,7 @@ class DatastoreTabMixin:
                     workspace_name=ws,
                     datastore_name=name,
                     datastore_type=custom,
-                    connection_parameters=self._parse_params(
-                        values.get("raw_params", "")
-                    ),
+                    connection_parameters=self._parse_params(values.get("raw_params")),
                     description=description,
                 )
             )
@@ -873,7 +868,7 @@ class DatastoreTabMixin:
         else:
             # Generic editor: what the user left in the textarea is the whole
             # map (removed lines remove keys); a masked value keeps the original.
-            edited = self._parse_params(values.get("raw_params", ""))
+            edited = self._parse_params(values.get("raw_params"))
             merged = {
                 key: (conn_params.get(key, "") if value == _MASKED else value)
                 for key, value in edited.items()
@@ -933,24 +928,30 @@ class DatastoreTabMixin:
         return port
 
     @staticmethod
-    def _other_params_text(ds_type, conn_params):
-        """The parameters a typed form does not own, as 'key = value' lines."""
+    def _masked(params):
+        """The parameters to show: secrets as the mask, never their value."""
+        return {
+            key: (_MASKED if _is_secret(key) else value)
+            for key, value in sorted(params.items())
+        }
+
+    @staticmethod
+    def _other_params(ds_type, conn_params):
+        """The parameters a typed form does not own, secrets masked."""
         skip = set(_OWNED_PARAMS.get(ds_type, ())) | set(_HIDDEN_PARAMS)
-        return "\n".join(
-            f"{key} = {_MASKED if _is_secret(key) else value}"
-            for key, value in sorted(conn_params.items())
-            if key not in skip
+        return DatastoreTabMixin._masked(
+            {key: value for key, value in conn_params.items() if key not in skip}
         )
 
-    def _merge_other_params(self, merged, conn_params, ds_type, text):
-        """Apply the Other parameters textarea onto the merged map.
+    def _merge_other_params(self, merged, conn_params, ds_type, pairs):
+        """Apply the Other parameters table onto the merged map.
 
-        A removed line removes the key, a masked value keeps the stored one,
+        A removed row removes the key, a masked value keeps the stored one,
         and a key the typed fields own is theirs: those are written last.
         """
         owned = set(_OWNED_PARAMS[ds_type]) | set(_HIDDEN_PARAMS)
         shown = {key for key in conn_params if key not in owned}
-        edited = self._parse_params(text)
+        edited = self._parse_params(pairs)
         result = {
             key: value
             for key, value in merged.items()
@@ -1050,12 +1051,9 @@ class DatastoreTabMixin:
             "wfs_lenient": str(conn_params.get(_WFS_KEY + "LENIENT", "true")).lower()
             == "true",
             # Typed stores: what their form does not own; secrets masked
-            "other_params": DatastoreTabMixin._other_params_text(ds_type, conn_params),
+            "other_params": DatastoreTabMixin._other_params(ds_type, conn_params),
             # Generic editor for types without dedicated fields; secrets masked
-            "raw_params": "\n".join(
-                f"{key} = {_MASKED if _is_secret(key) else value}"
-                for key, value in sorted(conn_params.items())
-            ),
+            "raw_params": DatastoreTabMixin._masked(conn_params),
         }
 
     def _show_datastore_info(self, row_data):

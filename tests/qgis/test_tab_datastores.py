@@ -97,14 +97,16 @@ class TestDatastoreEdit(unittest.TestCase):
         self.dlg._raw_rest.assert_not_called()
 
     def test_other_parameters_list_what_the_form_does_not_own(self):
-        text = self.dlg._other_params_text("PostGIS", STORED)
-        self.assertEqual(text, "Loose bbox = true\nmax connections = 10")
+        self.assertEqual(
+            self.dlg._other_params("PostGIS", STORED),
+            {"Loose bbox": "true", "max connections": "10"},
+        )
 
     def test_other_parameters_edit_remove_and_keep_owned_keys(self):
         # max connections changed, Loose bbox removed, a new key added, and a
         # line naming an owned key is ignored: the typed field wins.
         merged = self.update(
-            other_params="max connections = 20\nfetch size = 500\nhost = evil"
+            other_params={"max connections": "20", "fetch size": "500", "host": "evil"}
         )["connection_parameters"]
         self.assertEqual(merged["max connections"], "20")
         self.assertEqual(merged["fetch size"], "500")
@@ -115,9 +117,9 @@ class TestDatastoreEdit(unittest.TestCase):
 
     def test_a_masked_other_parameter_keeps_the_stored_value(self):
         stored = dict(STORED, **{"proxy password": "crypt1:X"})
-        text = self.dlg._other_params_text("PostGIS", stored)
-        self.assertIn(f"proxy password = {_MASKED}", text)
-        merged = self.dlg._merge_other_params(dict(stored), stored, "PostGIS", text)
+        shown = self.dlg._other_params("PostGIS", stored)
+        self.assertEqual(shown["proxy password"], _MASKED)
+        merged = self.dlg._merge_other_params(dict(stored), stored, "PostGIS", shown)
         self.assertEqual(merged["proxy password"], "crypt1:X")
 
 
@@ -133,7 +135,7 @@ class TestOtherType(unittest.TestCase):
                 "name": "props",
                 "type": _OTHER,
                 "custom_type": " Properties ",
-                "raw_params": "directory = file:data/props",
+                "raw_params": {"directory": "file:data/props"},
                 "description": "",
             }
         )
@@ -151,7 +153,7 @@ class TestOtherType(unittest.TestCase):
                     "name": "props",
                     "type": _OTHER,
                     "custom_type": "",
-                    "raw_params": "",
+                    "raw_params": {},
                     "description": "",
                 }
             )
