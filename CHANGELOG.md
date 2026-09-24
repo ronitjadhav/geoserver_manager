@@ -257,6 +257,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- **Tabs load much faster on a large server.** A tab used to fetch every
+  row's details (type, enabled, format, mode…) before showing any, one
+  request per row. The names now show at once, and the details follow for
+  the page on screen only: 147 styles took 158 requests, and now take 31.
 - Every row action has a tooltip saying what it does, and every edit ends
   in "… saved."; layer groups are named `workspace:group` in delete
   confirmations, like layers.

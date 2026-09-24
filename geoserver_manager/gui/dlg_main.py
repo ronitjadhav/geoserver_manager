@@ -46,7 +46,7 @@ from qgis.PyQt.QtWidgets import (
 
 from geoserver_manager.__about__ import __title__
 from geoserver_manager.gui.icons import icon
-from geoserver_manager.gui.scope import scope
+from geoserver_manager.gui.scope import PENDING, scope
 from geoserver_manager.gui.tab_cascaded import CascadedStoreTabMixin
 from geoserver_manager.gui.tab_coveragestores import CoverageStoreTabMixin
 from geoserver_manager.gui.tab_datastores import DatastoreTabMixin
@@ -195,6 +195,11 @@ class GeoServerMainDialog(
         self._task = None  # the running _FetchTask, if any
         self._upload = None  # the running upload task, its own slot: _run_upload
         self._side = None  # a quiet side task (a dialog's legend): _run_quietly
+        # The visible page's detail cells, fetched after the names: _fill_details
+        self._detail = None
+        self._row_detail = None  # row -> its detail cells; runs in a worker
+        self._detail_columns = ()  # the columns _row_detail fills
+        self._table_generation = 0  # bumped per table: a late fill is dropped
         # A running batch of deletes: its own slot, so a tab switch or F5 (which
         # supersede `_task`) cannot stop it half way without a word.
         self._delete = None
@@ -740,6 +745,9 @@ class GeoServerMainDialog(
         if self._task is not None:
             self._task.user_cancelled = user
             self._task.cancel()
+        # Its worker reads self.gs too (invariant 10): stopped with the load.
+        if self._detail is not None:
+            self._detail.cancel()
 
     def _loading(self):
         """True while a background load, an upload or a delete batch runs."""
@@ -957,6 +965,10 @@ class GeoServerMainDialog(
         # The cells that end up in REST paths: the name and the workspace.
         # A tab with others (the Layers tab's store) or none sets it after.
         self._path_columns = (0, 1)
+        # A tab that lists names first sets these after, like _path_columns.
+        self._row_detail = None
+        self._detail_columns = ()
+        self._table_generation += 1
         # Loaders call this before fetching, so drop the previous rows here too:
         # a fetch that raises must not leave them to be repainted under the new
         # headers (see _reset_table_state).
@@ -1043,6 +1055,10 @@ class GeoServerMainDialog(
     def _on_header_clicked(self, column):
         """Sort the rows by this column; a second click reverses the order."""
         is_actions = self._row_actions and column == self.resultsTable.columnCount() - 1
+        if column in self._detail_columns and not self._complete_rows(
+            self._filtered_rows
+        ):
+            return  # sorting on a column needs every row's value
         if not is_actions:
             same = self._sort is not None and self._sort[0] == column
             self._sort = (column, same and not self._sort[1])
@@ -1128,6 +1144,8 @@ class GeoServerMainDialog(
                     + [widget.sizeHint().width() for widget in widgets if widget]
                 ),
             )
+
+        self._fill_details(page_rows)
 
         # Update pagination controls
         self.lbl_page_number.setText(str(self._current_page + 1))
@@ -1393,6 +1411,98 @@ class GeoServerMainDialog(
             value = value.strip().lower() == "true"
         return self.tr("Yes") if value else self.tr("No")
 
+    # -- Details, page by page (#58) ------------------------------------------
+
+    def _pending(self, row):
+        """True while a row's detail cells are not fetched yet."""
+        return any(
+            column < len(row) and row[column] == PENDING
+            for column in self._detail_columns
+        )
+
+    def _apply_details(self, rows, results):
+        """Write fetched cells into the rows, in place. Returns the failures.
+
+        The row lists are shared by _all_rows, _filtered_rows and the row
+        actions' closures, so each of them sees the filled row.
+        """
+        failures = []
+        for row, (cells, error) in zip(rows, results):
+            if error is not None:
+                # Named as the tabs name them: ws:name, bare when global or
+                # when the name is qualified already (the tile cache's).
+                ws = scope(row[1]) if len(row) > 1 else None
+                label = row[0] if ws is None or ":" in row[0] else f"{ws}:{row[0]}"
+                failures.append((label, error))
+                cells = ("-",) * len(self._detail_columns)
+            for column, value in zip(self._detail_columns, cells):
+                row[column] = value
+        return failures
+
+    def _repaint_details(self):
+        """Refresh the visible detail cells, keeping the selection."""
+        start = self._current_page * self._page_size
+        for index in range(self.resultsTable.rowCount()):
+            if start + index >= len(self._filtered_rows):
+                break
+            row = self._filtered_rows[start + index]
+            for column in self._detail_columns:
+                item = self.resultsTable.item(index, column)
+                if item is not None and column < len(row):
+                    item.setText("-" if row[column] is None else str(row[column]))
+
+    def _fill_details(self, rows):
+        """Fetch the pending detail cells of these rows in the background.
+
+        A tab used to GET every item for its summary columns before showing
+        a single row: 10,000 requests for 200 workspaces of 50 stores, again
+        on every tab switch. The names come first, then only the page shown.
+        """
+        todo = [row for row in rows if self._pending(row)]
+        if not todo or self._row_detail is None:
+            return
+        if self._detail is not None:
+            self._detail.cancel()  # a newer page, sort or filter: this one wins
+        generation, detail = self._table_generation, self._row_detail
+
+        def work(task):
+            return self._fan_out(detail, todo, task)
+
+        def landed(results):
+            if generation != self._table_generation:
+                return  # another tab's table now
+            self._report_partial_failures(self._apply_details(todo, results))
+            self._repaint_details()
+
+        self._launch_task(
+            "_detail",
+            self.tr("Failed to load the details"),
+            work,
+            landed,
+            lambda task: None,
+            quiet=True,
+        )
+
+    def _complete_rows(self, rows):
+        """Fetch the pending cells of these rows now, waiting. False on failure.
+
+        What a row action, a sort on a detail column or a search needs: the
+        row's full values, not the marker.
+        """
+        todo = [row for row in rows if self._pending(row)]
+        if not todo or self._row_detail is None:
+            return True
+        detail = self._row_detail
+        results = self._fetch(
+            lambda: self._fan_out(detail, todo),
+            self.tr("Failed to load the details"),
+        )
+        if results is None:
+            return False
+        self._report_partial_failures(self._apply_details(todo, results))
+        self._repaint_details()
+        return True
+
     def _addressable(self, rows):
         """True unless a row's name cannot go into a REST path; then say so.
 
@@ -1403,7 +1513,12 @@ class GeoServerMainDialog(
         ponytail: refused, not quoted; the library builds paths from raw names
         (issue #50 row 50), and quoting only the plugin's side would double-
         quote wherever it already does. Quote everywhere once the library does.
+
+        A row whose details are still pending gets them first: its actions
+        read them (the Layers tab's store and type).
         """
+        if not self._complete_rows(rows):
+            return False
         for row in rows:
             for column in self._path_columns:
                 value = row[column] if column < len(row) else None

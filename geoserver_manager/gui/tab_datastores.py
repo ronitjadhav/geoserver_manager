@@ -12,6 +12,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.gui.scope import PENDING
 from geoserver_manager.toolbelt.rest import PartlySaved
 
 # Datastore types this form has dedicated fields for. Every other type still
@@ -173,6 +174,8 @@ class DatastoreTabMixin:
                 self.actions_column_label(),
             ]
         )
+        self._row_detail = lambda row: self._datastore_summary(row[1], row[0])
+        self._detail_columns = (2, 3)
         self._start_load(
             translate("DatastoreTabMixin", "Failed to load datastores"),
             self._fetch_datastore_rows,
@@ -188,19 +191,9 @@ class DatastoreTabMixin:
             if error is None
             for ds_name in ds_names
         ]
-        details = self._fan_out(
-            lambda pair: self._datastore_summary(*pair), pairs, task
-        )
-        rows = [
-            [ds_name, ws_name, *(summary or ("-", "-"))]
-            for (ws_name, ds_name), (summary, _error) in zip(pairs, details)
-        ]
+        # Type and Enabled follow for the page shown (#58): one GET per store.
+        rows = [[ds_name, ws_name, PENDING, PENDING] for ws_name, ds_name in pairs]
         failures = [(ws, err) for ws, (_names, err) in zip(ws_names, listed) if err]
-        failures += [
-            (f"{ws}/{ds}", err)
-            for (ws, ds), (_summary, err) in zip(pairs, details)
-            if err
-        ]
         return rows, failures
 
     def _datastore_names(self, workspace_name):

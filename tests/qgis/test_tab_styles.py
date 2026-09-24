@@ -823,9 +823,8 @@ class TestFormatAndVersionColumns(unittest.TestCase):
     def test_rows_carry_the_format_and_the_sld_version(self):
         dlg = SyncDialog()
         dlg.gs = FakeGS()
-        rows, failures = dlg._fetch_style_rows()
-        self.assertEqual(failures, [])
-        by_name = {row[0]: row for row in rows}
+        dlg._load_styles()  # the page's details fill as it shows
+        by_name = {row[0]: row for row in dlg._all_rows}
         self.assertEqual(by_name["population"], ["population", GLOBAL, "sld", "1.0.0"])
         self.assertEqual(by_name["generic"][2], "css")
         self.assertEqual(by_name["roads_style"][:2], ["roads_style", "topp"])

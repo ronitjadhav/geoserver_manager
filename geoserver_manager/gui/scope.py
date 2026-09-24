@@ -11,6 +11,11 @@ at which docs/development/conventions.md says a shared helper stops living insid
 
 GLOBAL = "(global)"
 
+# A detail cell not fetched yet: tabs list names at once and the summary
+# columns of the visible page follow (issue #58). Shown as it is. Here, not
+# in dlg_main, because the tabs need it and dlg_main imports them.
+PENDING = "…"
+
 
 def scope(workspace_label):
     """Workspace name for the API, or None for the global scope."""

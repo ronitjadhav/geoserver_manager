@@ -467,7 +467,10 @@ The full details go to the QGIS log panel, on the *GeoServer Manager* tab.
 ## Good to know
 
 - Nothing is cached. Every tab switch and every *Refresh* fetches the list
-  again.
+  again. The names come first; the other columns of the page on screen follow
+  a moment later (shown as "…" until then), so a large server does not load
+  every row's details up front. The search box matches the columns loaded so
+  far; sorting on a column loads it for every row first.
 - Deleting a store created from an upload leaves the uploaded file in
   GeoServer's data directory.
 - The plugin's TLS setting does not reach QGIS's own WMS and WFS layers. A
