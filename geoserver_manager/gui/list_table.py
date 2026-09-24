@@ -31,6 +31,19 @@ from geoserver_manager.gui.icons import icon
 translate = QCoreApplication.translate
 
 
+def short_combo(combo):
+    """Size a combo box to a few words rather than to its longest entry.
+
+    A form is never narrower than its fields' minimum, so one long layer
+    or style name widened the whole dialog past a laptop screen. The combo
+    still grows with the form; a long entry is elided until then.
+    """
+    combo.setSizeAdjustPolicy(
+        QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+    )
+    combo.setMinimumContentsLength(12)
+
+
 class ListTable(QWidget):
     """Rows of values, the first one an item picked or typed.
 
@@ -71,6 +84,7 @@ class ListTable(QWidget):
         layout.addWidget(self.table)
 
         self.picker = QComboBox()
+        short_combo(self.picker)
         self.picker.setEditable(True)  # completion, and names not listed
         self.picker.addItems(list(choices))
         self.picker.setCurrentIndex(-1)
@@ -141,6 +155,7 @@ class ListTable(QWidget):
             kind = spec.get("type", "text")
             if kind == "combo":
                 cell = QComboBox()
+                short_combo(cell)
                 cell.setEditable(True)
                 cell.addItems(list(spec.get("options", ())))
                 cell.setCurrentText("" if value is None else str(value))

@@ -165,6 +165,80 @@ class TestResourceFormHeight(unittest.TestCase):
         dlg.close()
 
 
+class TestResourceFormResize(unittest.TestCase):
+    """A resized form scrolls or grows; it never squeezes or overlaps."""
+
+    def show(self, fields, size=None):
+        from qgis.PyQt.QtWidgets import QApplication
+
+        dlg = ResourceFormDialog(title="t", fields=fields)
+        dlg.show()
+        if size:
+            dlg.resize(*size)
+        QApplication.processEvents()
+        self.addCleanup(dlg.close)
+        return dlg
+
+    def test_hidden_rows_leave_no_gap(self):
+        # A datastore form hides the other types' parameters: Qt 5 kept
+        # their row spacing, and the tab opened on a blank band.
+        fields = [
+            {"key": f"h{i}", "label": "Hidden", "type": "text", "visible": False}
+            for i in range(10)
+        ] + [{"key": "shown", "label": "Shown", "type": "text"}]
+        dlg = self.show(fields)
+        self.assertLess(dlg.get_widget("shown").parentWidget().y(), 20)
+
+    def test_a_tall_form_scrolls_instead_of_squeezing(self):
+        # Laid out straight in the dialog, it could not be shorter than all
+        # its rows, and wrapped help was drawn over the next row.
+        fields = [
+            {"key": f"f{i}", "label": "Field", "type": "text", "help": "A hint"}
+            for i in range(30)
+        ]
+        dlg = self.show(fields, size=(460, 300))
+        page = dlg._field_page["f0"]
+        self.assertEqual(dlg.height(), 300)
+        self.assertGreater(page.verticalScrollBar().maximum(), 0)
+        field = dlg.get_widget("f0")
+        self.assertGreaterEqual(field.height(), field.sizeHint().height())
+
+    def test_a_list_grows_with_the_dialog_and_keeps_its_help_close(self):
+        fields = [
+            {
+                "key": "rows",
+                "label": "Rows",
+                "type": "table",
+                "columns": [{"label": "Name"}],
+                "help": "Uncapped: takes the height.",
+            },
+            {"key": "words", "label": "Words", "type": "list", "help": "Capped."},
+        ]
+        dlg = self.show(fields, size=(700, 900))
+        table, words = dlg.get_widget("rows"), dlg.get_widget("words")
+        self.assertGreater(table.height(), 300)
+        wrapper = words.parentWidget().layout()
+        help_label = wrapper.itemAt(1).widget()
+        self.assertLess(help_label.y() - words.geometry().bottom(), 10)
+
+    def test_a_long_choice_does_not_widen_the_form(self):
+        # A long layer or style name once set the whole dialog's width.
+        fields = [{"key": "c", "label": "C", "type": "combo", "options": ["x" * 300]}]
+        dlg = self.show(fields)
+        self.assertLess(dlg.minimumSizeHint().width(), 600)
+
+    def test_a_missing_field_below_the_fold_is_scrolled_into_view(self):
+        fields = [
+            {"key": f"f{i}", "label": "Field", "type": "text"} for i in range(30)
+        ] + [{"key": "last", "label": "Last", "type": "text", "required": True}]
+        dlg = self.show(fields, size=(460, 300))
+        page = dlg._field_page["last"]
+        dlg._on_accept()
+        last = dlg.get_widget("last")
+        top = last.mapTo(page.viewport(), last.rect().topLeft()).y()
+        self.assertTrue(0 <= top < page.viewport().height())
+
+
 class TestLongTextOpensAtItsStart(unittest.TestCase):
     def test_a_long_value_shows_its_beginning(self):
         # A long title or URL used to open scrolled to its end.

@@ -29,8 +29,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Seed, reseed and truncate** part of a layer's tile cache: one gridset,
   format and zoom range, optionally one area or one parameter value. A task
   list follows the progress and can stop the tasks.
-- **Zoom levels and parameter filters** of a cached layer are editable: a
-  gridset line takes `= 0-12`, and the filters (STYLES, CQL_FILTER, TIME...)
+- **Zoom levels and parameter filters** of a cached layer are editable: each
+  gridset has a zoom range, and the filters (STYLES, CQL_FILTER, TIME...)
   are edited as GeoWebCache's XML.
 - **CSS and YSLD styles** can be created, edited and copied, like SLD and
   MBStyle (each needs its GeoServer extension). *Apply to a QGIS layer*
@@ -355,6 +355,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **Forms resize properly.** A form that is too tall for the screen, or a
+  dialog made smaller, now scrolls. Before, the help text overlapped the
+  next field, and a tall form could not shrink to fit a laptop screen. A
+  bigger dialog now gives the extra height to its tables and lists, not to
+  a blank area below them. A datastore's Connection tab no longer opens on
+  a blank band left by the other types' hidden fields. A long layer or
+  style name no longer widens the whole form. At the window's minimum
+  width, the tab list on the left no longer gets a horizontal scroll bar.
 - A save that did its first step and failed a later one (a workspace
   created but its namespace URI refused, a datastore renamed but not saved, a
   cascaded store created without its credentials) now says what was saved,
