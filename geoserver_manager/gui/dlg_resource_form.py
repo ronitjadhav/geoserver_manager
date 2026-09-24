@@ -30,7 +30,10 @@ For edit mode, pass existing values:
 Supported field types:
     - "text"      -> QLineEdit
     - "checkbox"  -> QCheckBox
-    - "combo"     -> QComboBox (provide "options": ["a", "b", ...])
+    - "combo"     -> QComboBox (provide "options": ["a", "b", ...]). An option
+                     can be (label, value): the label is shown, and can be
+                     translated; the value is what get_values() returns and
+                     on_value_changed() passes, the one the code compares
     - "spinbox"   -> QSpinBox (optional "min", "max", "default")
     - "textarea"  -> QPlainTextEdit
     - "file"      -> QgsFileWidget (optional "filter", e.g. "Styles (*.sld)")
@@ -321,8 +324,7 @@ class ResourceFormDialog(QDialog):
 
             # on_change callback for combo widgets
             if field.get("type") == "combo" and field.get("on_change"):
-                cb = field["on_change"]
-                widget.currentTextChanged.connect(cb)
+                self.on_value_changed(field["key"], field["on_change"])
             elif field.get("type") == "layer" and field.get("on_change"):
                 widget.layerChanged.connect(field["on_change"])
 
@@ -369,10 +371,11 @@ class ResourceFormDialog(QDialog):
         if ftype == "combo":
             w = QComboBox()
             short_combo(w)
-            options = field.get("options", [])
-            w.addItems(options)
-            if value and value in options:
-                w.setCurrentText(str(value))
+            for option in field.get("options", []):
+                label, data = option if isinstance(option, tuple) else (option, None)
+                w.addItem(label, data)
+            if value:
+                self._select(w, value)
             if read_only:
                 w.setEnabled(False)
             return w
@@ -582,7 +585,7 @@ class ResourceFormDialog(QDialog):
             elif ftype == "checkbox":
                 result[key] = widget.isChecked()
             elif ftype == "combo":
-                result[key] = widget.currentText()
+                result[key] = self._combo_value(widget)
             elif ftype == "spinbox":
                 result[key] = widget.value()
             elif ftype == "textarea" and isinstance(widget, QgsCodeEditor):
@@ -677,9 +680,33 @@ class ResourceFormDialog(QDialog):
                 widget.setList(list(value))
             elif isinstance(widget, QgsKeyValueWidget):
                 widget.setMap(dict(value))
+            elif isinstance(widget, QComboBox):
+                self._select(widget, value)
             else:
                 widget.setText(value)
                 widget.setCursorPosition(0)
+
+    def on_value_changed(self, key, callback):
+        """Call callback(value) when a combo changes: its value, not its label."""
+        widget = self._widgets[key]
+        widget.currentIndexChanged.connect(
+            lambda _index: callback(self._combo_value(widget))
+        )
+
+    @staticmethod
+    def _combo_value(combo):
+        """A combo's value: the option's own when it has one, else its text."""
+        data = combo.currentData()
+        return combo.currentText() if data is None else data
+
+    @staticmethod
+    def _select(combo, value):
+        """Show the option of this value, or of this text."""
+        index = combo.findData(value)
+        if index < 0:
+            index = combo.findText(str(value))
+        if index >= 0:
+            combo.setCurrentIndex(index)
 
     def get_widget(self, key):
         """Return the widget for a field by key.

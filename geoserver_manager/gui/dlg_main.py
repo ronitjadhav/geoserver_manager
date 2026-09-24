@@ -46,7 +46,7 @@ from qgis.PyQt.QtWidgets import (
 
 from geoserver_manager.__about__ import __title__
 from geoserver_manager.gui.icons import icon
-from geoserver_manager.gui.scope import PENDING, scope
+from geoserver_manager.gui.scope import GLOBAL, PENDING, global_label, scope
 from geoserver_manager.gui.tab_cascaded import CascadedStoreTabMixin
 from geoserver_manager.gui.tab_coveragestores import CoverageStoreTabMixin
 from geoserver_manager.gui.tab_datastores import DatastoreTabMixin
@@ -199,6 +199,7 @@ class GeoServerMainDialog(
         self._detail = None
         self._row_detail = None  # row -> its detail cells; runs in a worker
         self._detail_columns = ()  # the columns _row_detail fills
+        self._cell_display = {}  # column -> label for a value (see _setup_table)
         self._table_generation = 0  # bumped per table: a late fill is dropped
         # A running batch of deletes: its own slot, so a tab switch or F5 (which
         # supersede `_task`) cannot stop it half way without a word.
@@ -973,6 +974,9 @@ class GeoServerMainDialog(
         # A tab that lists names first sets these after, like _path_columns.
         self._row_detail = None
         self._detail_columns = ()
+        # {column: value -> label} for cells that show a value the code
+        # reads (the Layers type, a cached layer's id) in words (#91).
+        self._cell_display = {}
         self._table_generation += 1
         # Loaders call this before fetching, so drop the previous rows here too:
         # a fetch that raises must not leave them to be repainted under the new
@@ -1038,10 +1042,16 @@ class GeoServerMainDialog(
         """Filter _all_rows by the current search text, then show page."""
         search = self.searchBox.text().lower()
         if search:
+            # What the cell shows, and what it holds: "raster" finds a
+            # "RASTER" layer shown as "Raster", as it did before.
             self._filtered_rows = [
                 row
                 for row in self._all_rows
-                if any(search in str(v).lower() for v in row)
+                if any(
+                    search in text.lower()
+                    for column, value in enumerate(row)
+                    for text in (str(value), self._cell_label(column, value))
+                )
             ]
         else:
             self._filtered_rows = list(self._all_rows)
@@ -1049,8 +1059,11 @@ class GeoServerMainDialog(
             column, descending = self._sort
 
             def sort_key(row):
+                # As shown: a cached layer sorts by its name, not its workspace.
                 value = row[column] if column < len(row) else None
-                return ("" if value is None else str(value)).casefold()
+                return (
+                    "" if value is None else self._cell_label(column, value)
+                ).casefold()
 
             self._filtered_rows.sort(key=sort_key, reverse=descending)
         self._show_sort_indicator()
@@ -1084,6 +1097,15 @@ class GeoServerMainDialog(
             )
             header.setSortIndicator(column, order)
 
+    def _cell_label(self, column, value):
+        """What a cell shows for the value its row holds."""
+        if value is None:
+            return "-"
+        if value == GLOBAL:
+            return global_label()
+        shown = self._cell_display.get(column)
+        return shown(str(value)) if shown else str(value)
+
     @property
     def _total_pages(self):
         """Total number of pages for the current filtered rows."""
@@ -1105,12 +1127,12 @@ class GeoServerMainDialog(
         self.resultsTable.setRowCount(len(page_rows))
         for row_idx, values in enumerate(page_rows):
             for col, val in enumerate(values):
-                text = "-" if val is None else str(val)
+                text = self._cell_label(col, val)
                 item = QTableWidgetItem(text)
                 # "(global)" in a Workspace column has nowhere to go, so it is
                 # not drawn as a link (the click skips it too).
                 is_link = self._cell_click_callback(col) is not None and (
-                    col == 0 or scope(text) is not None
+                    col == 0 or scope("-" if val is None else str(val)) is not None
                 )
                 if is_link:
                     # Styled as a link; the click itself is handled by
@@ -1454,7 +1476,7 @@ class GeoServerMainDialog(
             for column in self._detail_columns:
                 item = self.resultsTable.item(index, column)
                 if item is not None and column < len(row):
-                    item.setText("-" if row[column] is None else str(row[column]))
+                    item.setText(self._cell_label(column, row[column]))
 
     def _fill_details(self, rows):
         """Fetch the pending detail cells of these rows in the background.

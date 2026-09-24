@@ -283,6 +283,16 @@ class TestListing(unittest.TestCase):
         self.assertEqual(self.dlg.resultsTable.columnCount(), 6)
         self.assertEqual(self.dlg.btn_add.text(), "Add a Layer to the Cache")
 
+    def test_the_name_cell_leaves_the_workspace_to_its_column(self):
+        # "topp:states" beside "topp"; the actions still get the whole id.
+        self.dlg._load_gwc_layers()
+        names = [
+            self.dlg.resultsTable.item(row, 0).text()
+            for row in range(self.dlg.resultsTable.rowCount())
+        ]
+        self.assertEqual(names, ["layer", "tasmania", "states"])
+        self.assertEqual(self.dlg._all_rows[2][0], "topp:states")
+
     def test_the_workspace_column_links_except_for_a_global_group(self):
         opened = []
         self.dlg._show_workspace_info = lambda row: opened.append(row)
@@ -616,7 +626,7 @@ class TestSeed(unittest.TestCase):
     GET lists [done, total, seconds left, id, state] per task."""
 
     VALUES = {
-        "type": "Truncate",
+        "type": "truncate",
         "gridset": "EPSG:4326",
         "format": "image/png",
         "zoom_start": 2,
@@ -682,7 +692,7 @@ class TestSeed(unittest.TestCase):
     def test_the_form_starts_the_task_then_opens_the_monitor(self):
         dlg = SyncDialog()
         dlg.gs = FakeGS()
-        values = dict(self.VALUES, type="Seed")
+        values = dict(self.VALUES, type="seed")
 
         class Accepting(ResourceFormDialog):
             def exec(inner):

@@ -262,6 +262,40 @@ class TestResourceFormResize(unittest.TestCase):
         self.assertTrue(0 <= top < page.viewport().height())
 
 
+class TestKeyedOptions(unittest.TestCase):
+    """A combo shows a label and hands back its value, so the label can be
+    translated without breaking the code that compares it (#91)."""
+
+    def test_the_value_comes_back_and_the_label_is_shown(self):
+        seen = []
+        dlg = ResourceFormDialog(
+            title="t",
+            fields=[
+                {
+                    "key": "source",
+                    "label": "Source",
+                    "type": "combo",
+                    "options": [("Une table", "table"), ("Une couche", "qgis")],
+                }
+            ],
+        )
+        combo = dlg.get_widget("source")
+        dlg.on_value_changed("source", seen.append)
+        self.assertEqual(combo.currentText(), "Une table")
+        self.assertEqual(dlg.get_values()["source"], "table")
+        dlg.set_values({"source": "qgis"})
+        self.assertEqual(combo.currentText(), "Une couche")
+        self.assertEqual(seen, ["qgis"])
+
+    def test_plain_options_still_hand_back_their_text(self):
+        dlg = ResourceFormDialog(
+            title="t",
+            fields=[{"key": "t", "label": "T", "type": "combo", "options": ["a", "b"]}],
+            values={"t": "b"},
+        )
+        self.assertEqual(dlg.get_values()["t"], "b")
+
+
 class TestCrsPicker(unittest.TestCase):
     def test_the_button_fills_the_code_from_qgis_crs_picker(self):
         from unittest.mock import patch

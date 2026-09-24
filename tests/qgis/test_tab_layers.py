@@ -295,6 +295,22 @@ class TestLayersTab(unittest.TestCase):
         self.assertEqual(gets.count(f"{BASE}/layers.json"), 1)
         self.assertEqual([path for path in gets if "/datastores/" in path], [])
 
+    def test_the_type_reads_in_words_and_the_row_keeps_geoservers(self):
+        # "VECTOR" and "WMS" beside every other tab's readable names; the row
+        # actions read the enum, so only the cell changes (#91).
+        self.dlg._load_layers()
+        shown = [
+            self.dlg.resultsTable.item(row, 2).text()
+            for row in range(self.dlg.resultsTable.rowCount())
+        ]
+        self.assertEqual(
+            shown, ["Cascaded WMS", "Raster", "Cascaded WMTS", "Vector", "Vector"]
+        )
+        self.assertEqual(self.dlg._all_rows[0][2], "WMS")
+        self.dlg.searchBox.setText("cascaded")  # what the cell says
+        self.dlg._apply_filter()
+        self.assertEqual(len(self.dlg._filtered_rows), 2)
+
     def test_a_wmts_layer_finds_its_store_among_the_workspaces_stores(self):
         # GeoServer 2.28.5 writes no href for a wmtsLayer resource
         self.dlg._load_layers()

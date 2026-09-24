@@ -55,6 +55,22 @@ STORE_TYPES = (
     QGIS_RASTER,
 )
 
+
+def _store_type_label(kind):
+    """A store type as the Add form shows it: GeoServer's own names stay,
+    the plugin's descriptions are translated (#91)."""
+    return {
+        COG: translate("CoverageStoreTabMixin", "GeoTIFF (COG)"),
+        MOSAIC_DIRECTORY: translate(
+            "CoverageStoreTabMixin", "ImageMosaic (server directory)"
+        ),
+        MOSAIC_ZIP: translate("CoverageStoreTabMixin", "ImageMosaic (properties ZIP)"),
+        QGIS_RASTER: translate(
+            "CoverageStoreTabMixin", "A raster layer from this QGIS project"
+        ),
+    }.get(kind, kind)
+
+
 # A cloud-optimised GeoTIFF is a GeoTIFF store plus this metadata entry; the
 # library turns {"cogSettings": …} into GeoServer's {"@key": "CogSettings.Key"}
 # wrapper itself. Needs GeoServer's COG extension installed server-side.
@@ -685,7 +701,7 @@ class CoverageStoreTabMixin:
                 "key": "type",
                 "label": translate("CoverageStoreTabMixin", "Type"),
                 "type": "combo",
-                "options": list(STORE_TYPES),
+                "options": [(_store_type_label(kind), kind) for kind in STORE_TYPES],
                 "default": GEOTIFF,
             },
             {
@@ -819,8 +835,8 @@ class CoverageStoreTabMixin:
             parent=self,
             ok_label=translate("CoverageStoreTabMixin", "Create"),
         )
-        dlg.get_widget("type").currentTextChanged.connect(
-            lambda store_type: self._on_store_type_changed(dlg, store_type)
+        dlg.on_value_changed(
+            "type", lambda store_type: self._on_store_type_changed(dlg, store_type)
         )
         dlg.get_widget("qgis_layer").layerChanged.connect(
             lambda layer: self._prefill_store_name(dlg, layer)

@@ -91,10 +91,10 @@ on the server.
 | Other... | any other type GeoServer has (Properties, CSV, Oracle...), typed by its name |
 
 ```{figure} ../static/screenshots/datastore-add.png
-:alt: The Add a Datastore form, with name, workspace, type and description, and a Connection tab
+:alt: The Add a Datastore form: name, workspace, type and description, then the fields of the chosen type
 :width: 420px
 
-The connection details go on the *Connection* tab.
+The fields of the chosen type show right under it.
 ```
 
 *Other...* and any type the plugin has no form for get a table of parameters

@@ -16,7 +16,7 @@ from qgis.PyQt.QtGui import QPixmap
 from qgis.PyQt.QtWidgets import QDialog, QFileDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.gui.scope import GLOBAL, PENDING, scope
+from geoserver_manager.gui.scope import GLOBAL, PENDING, global_label, scope
 from geoserver_manager.toolbelt.payload import unwrap
 from geoserver_manager.toolbelt.sld import (
     SLD_1_0,
@@ -625,7 +625,7 @@ class StyleTabMixin:
                 "key": "workspace",
                 "label": translate("StyleTabMixin", "Workspace"),
                 "type": "combo",
-                "options": [GLOBAL] + list(workspace_names),
+                "options": [(global_label(), GLOBAL)] + list(workspace_names),
                 "help": translate(
                     "StyleTabMixin",
                     "Global styles can be used by layers of every workspace",
@@ -635,7 +635,11 @@ class StyleTabMixin:
                 "key": "source",
                 "label": translate("StyleTabMixin", "Source"),
                 "type": "combo",
-                "options": [_SOURCE_PASTE, _SOURCE_FILE, _SOURCE_QGIS],
+                "options": [
+                    (translate("StyleTabMixin", "Paste"), _SOURCE_PASTE),
+                    (translate("StyleTabMixin", "From file"), _SOURCE_FILE),
+                    (translate("StyleTabMixin", "From a QGIS layer"), _SOURCE_QGIS),
+                ],
             },
             {
                 "key": "format",
@@ -712,8 +716,8 @@ class StyleTabMixin:
             parent=self,
             ok_label=translate("StyleTabMixin", "Upload"),
         )
-        dlg.get_widget("source").currentTextChanged.connect(
-            lambda source: self._on_style_source_changed(dlg, source)
+        dlg.on_value_changed(
+            "source", lambda source: self._on_style_source_changed(dlg, source)
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -926,7 +930,7 @@ class StyleTabMixin:
                     "key": "workspace",
                     "label": translate("StyleTabMixin", "Workspace"),
                     "type": "combo",
-                    "options": [GLOBAL] + list(workspace_names),
+                    "options": [(global_label(), GLOBAL)] + list(workspace_names),
                     "default": row_data[1],
                 },
             ],
