@@ -278,7 +278,9 @@ when left blank).
 ```
 
 The *Workspace* column shows `(global)` for a group that belongs to no
-workspace. **Add to QGIS** loads a group as a WMS layer.
+workspace. **Preview** shows a group on a map of its own, with feature info
+on a click, and leaves the project alone. **Add to QGIS** loads it as a WMS
+layer.
 
 **Click a name** to edit a group: its mode, title, abstract, layers, order
 and styles, whether it is enabled and advertised, and an Earth Observation

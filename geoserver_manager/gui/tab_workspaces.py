@@ -53,6 +53,11 @@ class WorkspaceTabMixin:
                 "delete",
                 translate("WorkspaceTabMixin", "Delete"),
                 self._delete_workspace,
+                translate(
+                    "WorkspaceTabMixin",
+                    "Delete: remove the workspace and everything in it, stores, "
+                    "layers and styles (asks first).",
+                ),
             ),
         ]
         self._setup_table(
@@ -678,7 +683,7 @@ class WorkspaceTabMixin:
             ),
         ):
             self.show_success_message(
-                translate("WorkspaceTabMixin", "Workspace '{}' updated.").format(
+                translate("WorkspaceTabMixin", "Workspace '{}' saved.").format(
                     values["name"]
                 )
             )
