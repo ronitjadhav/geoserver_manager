@@ -31,17 +31,19 @@ from geoserver_manager.gui.icons import icon
 translate = QCoreApplication.translate
 
 
-def short_combo(combo):
-    """Size a combo box to a few words rather than to its longest entry.
+def short_combo(combo, length=30):
+    """Size a combo box to `length` characters rather than to its longest entry.
 
     A form is never narrower than its fields' minimum, so one long layer
-    or style name widened the whole dialog past a laptop screen. The combo
-    still grows with the form; a long entry is elided until then.
+    or style name widened the whole dialog past a laptop screen. Thirty fit
+    a form's own choices ("A layer from this QGIS project"); a table cell
+    takes fewer. The combo still grows with the form; a longer entry is
+    elided until then.
     """
     combo.setSizeAdjustPolicy(
         QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
     )
-    combo.setMinimumContentsLength(12)
+    combo.setMinimumContentsLength(length)
 
 
 class ListTable(QWidget):
@@ -84,7 +86,7 @@ class ListTable(QWidget):
         layout.addWidget(self.table)
 
         self.picker = QComboBox()
-        short_combo(self.picker)
+        short_combo(self.picker, 12)
         self.picker.setEditable(True)  # completion, and names not listed
         self.picker.addItems(list(choices))
         self.picker.setCurrentIndex(-1)
@@ -155,7 +157,7 @@ class ListTable(QWidget):
             kind = spec.get("type", "text")
             if kind == "combo":
                 cell = QComboBox()
-                short_combo(cell)
+                short_combo(cell, 12)
                 cell.setEditable(True)
                 cell.addItems(list(spec.get("options", ())))
                 cell.setCurrentText("" if value is None else str(value))

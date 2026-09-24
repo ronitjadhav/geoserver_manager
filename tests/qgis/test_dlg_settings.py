@@ -11,7 +11,7 @@ Usage from the repo root folder:
 from unittest.mock import patch
 
 from qgis.core import Qgis
-from qgis.PyQt.QtWidgets import QMessageBox
+from qgis.PyQt.QtWidgets import QLineEdit, QMessageBox
 from qgis.testing import start_app, unittest
 
 from geoserver_manager.gui.dlg_settings import ConfigOptionsPage
@@ -252,6 +252,14 @@ class TestProfiles(unittest.TestCase):
         page.apply()
         self.assertEqual(self.store["idA"], ("ua", "pa"))
         self.assertEqual(self.manager.profiles[0]["auth_cfg_id"], "idA")
+
+    def test_the_password_can_be_shown_to_check_it(self):
+        from qgis.gui import QgsPasswordLineEdit
+
+        self.assertIsInstance(self.page.txt_gs_password, QgsPasswordLineEdit)
+        self.assertEqual(
+            self.page.txt_gs_password.echoMode(), QLineEdit.EchoMode.Password
+        )
 
     def test_blanking_both_fields_on_purpose_still_forgets_them(self):
         self.page.txt_gs_username.setText("")

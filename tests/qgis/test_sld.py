@@ -127,21 +127,13 @@ class TestStyleableProjectLayers(unittest.TestCase):
     def tearDown(self):
         QgsProject.instance().removeAllMapLayers()
 
-    def test_lists_project_layers_with_their_kind_sorted(self):
-        QgsProject.instance().addMapLayer(point_layer("zebra"))
-        QgsProject.instance().addMapLayer(point_layer("Alpha"))
-        labels = [label for label, _layer in styleable_project_layers()]
-        self.assertEqual(labels, ["Alpha  (vector)", "zebra  (vector)"])
+    def test_lists_the_vector_and_raster_layers(self):
+        layer = point_layer("towns")
+        QgsProject.instance().addMapLayer(layer)
+        self.assertEqual(styleable_project_layers(), [layer])
 
     def test_an_empty_project_is_an_empty_list(self):
         self.assertEqual(styleable_project_layers(), [])
-
-    def test_the_layer_objects_come_back_with_the_labels(self):
-        layer = point_layer("towns")
-        QgsProject.instance().addMapLayer(layer)
-        ((label, found),) = styleable_project_layers()
-        self.assertEqual(label, "towns  (vector)")
-        self.assertIs(found, layer)
 
 
 if __name__ == "__main__":

@@ -103,7 +103,8 @@ class TestReadOnlyAndWideFields(unittest.TestCase):
         self.assertTrue(dlg.get_widget("name").hasFrame())  # editable stays a box
 
     def test_a_wide_code_field_spans_the_form_without_wrapping(self):
-        from qgis.PyQt.QtWidgets import QPlainTextEdit
+        from qgis.gui import QgsCodeEditorHTML
+        from qgis.PyQt.Qsci import QsciScintilla
 
         dlg = ResourceFormDialog(
             title="t",
@@ -113,15 +114,37 @@ class TestReadOnlyAndWideFields(unittest.TestCase):
                     "label": "Definition",
                     "type": "textarea",
                     "wide": True,
-                    "code": True,
+                    "code": "xml",
                 }
             ],
+            values={"body": "<sld/>"},
         )
         label, _row = dlg._row_widgets["body"]
         self.assertTrue(label.isHidden())
-        self.assertEqual(
-            dlg.get_widget("body").lineWrapMode(), QPlainTextEdit.LineWrapMode.NoWrap
+        body = dlg.get_widget("body")
+        # QGIS's editor: highlighted, the user's code colours and font.
+        self.assertIsInstance(body, QgsCodeEditorHTML)
+        self.assertEqual(body.wrapMode(), QsciScintilla.WrapMode.WrapNone)
+        self.assertEqual(dlg.get_values()["body"], "<sld/>")
+        dlg.set_values({"body": "<other/>"})
+        self.assertEqual(dlg.get_values()["body"], "<other/>")
+
+    def test_passwords_and_files_use_qgis_widgets(self):
+        # A password can be checked with QGIS's eye toggle, and a file
+        # dropped on its box is taken.
+        from qgis.gui import QgsFileWidget, QgsPasswordLineEdit
+
+        dlg = ResourceFormDialog(
+            title="t",
+            fields=[
+                {"key": "pw", "label": "P", "type": "text", "echo_password": True},
+                {"key": "f", "label": "F", "type": "file", "filter": "SLD (*.sld)"},
+            ],
+            values={"pw": "secret", "f": "/tmp/a.sld"},
         )
+        self.assertIsInstance(dlg.get_widget("pw"), QgsPasswordLineEdit)
+        self.assertIsInstance(dlg.get_widget("f"), QgsFileWidget)
+        self.assertEqual(dlg.get_values(), {"pw": "secret", "f": "/tmp/a.sld"})
 
 
 # ############################################################################
@@ -237,6 +260,67 @@ class TestResourceFormResize(unittest.TestCase):
         last = dlg.get_widget("last")
         top = last.mapTo(page.viewport(), last.rect().topLeft()).y()
         self.assertTrue(0 <= top < page.viewport().height())
+
+
+class TestCrsPicker(unittest.TestCase):
+    def test_the_button_fills_the_code_from_qgis_crs_picker(self):
+        from unittest.mock import patch
+
+        from qgis.core import QgsCoordinateReferenceSystem
+
+        from geoserver_manager.gui import dlg_resource_form
+
+        shown = []
+
+        class Picker:
+            def __init__(self, parent):
+                pass
+
+            def setCrs(self, crs):  # noqa: N802
+                shown.append(crs.authid())
+
+            def exec(self):
+                return True
+
+            def crs(self):
+                return QgsCoordinateReferenceSystem("EPSG:3857")
+
+        dlg = ResourceFormDialog(
+            title="t",
+            fields=[{"key": "srs", "label": "SRS", "type": "text", "crs": True}],
+            values={"srs": "4326"},  # a bare code, as the publish form takes it
+        )
+        edit = dlg.get_widget("srs")
+        (action,) = edit.actions()
+        with patch.object(dlg_resource_form, "QgsProjectionSelectionDialog", Picker):
+            action.trigger()
+        self.assertEqual(shown, ["EPSG:4326"])  # opened on the current code
+        self.assertEqual(dlg.get_values()["srs"], "EPSG:3857")
+
+    def test_a_code_qgis_does_not_know_can_still_be_typed(self):
+        dlg = ResourceFormDialog(
+            title="t",
+            fields=[{"key": "srs", "label": "SRS", "type": "text", "crs": True}],
+            values={"srs": "EPSG:900913"},
+        )
+        self.assertEqual(dlg.get_values()["srs"], "EPSG:900913")
+
+
+class TestExtentField(unittest.TestCase):
+    def test_an_area_reads_as_its_corners_in_the_forms_crs(self):
+        from qgis.core import QgsCoordinateReferenceSystem, QgsRectangle
+        from qgis.PyQt.QtWidgets import QLineEdit
+
+        dlg = ResourceFormDialog(
+            title="t", fields=[{"key": "area", "label": "Area", "type": "extent"}]
+        )
+        self.assertEqual(dlg.get_values()["area"], "")
+        dlg.set_extent_crs("area", "EPSG:4326")
+        self.assertEqual(dlg.get_widget("area").findChild(QLineEdit).text(), "")
+        dlg.get_widget("area").setOutputExtentFromUser(
+            QgsRectangle(1.5, 2, 3, 4), QgsCoordinateReferenceSystem("EPSG:4326")
+        )
+        self.assertEqual(dlg.get_values()["area"], "1.5, 2.0, 3.0, 4.0")
 
 
 class TestLongTextOpensAtItsStart(unittest.TestCase):

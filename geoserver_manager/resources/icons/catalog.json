@@ -249,6 +249,13 @@
       "purpose": "An arrow down: move the selected row one place later.",
       "status": "custom",
       "asset": "icons/move-down.svg"
+    },
+    "pick-crs": {
+      "label": "Pick a CRS",
+      "category": "Forms",
+      "purpose": "A globe: open QGIS's CRS picker to fill an SRS code.",
+      "status": "custom",
+      "asset": "icons/pick-crs.svg"
     }
   }
 }

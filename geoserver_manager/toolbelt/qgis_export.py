@@ -119,53 +119,6 @@ def export_to_geopackage(layer, path, table_name, target_crs=None):
     return path
 
 
-def unique_labels(entries):
-    """[(label, layer)] with no two labels alike, sorted.
-
-    Two project layers may share a name and a kind; a picker that offers the
-    same label twice hands the first layer to whoever picked the second. The
-    duplicates get the tail of the layer id, which QGIS keeps unique.
-    """
-    entries = list(entries)  # a generator would be spent by the count
-    counts = {}
-    for label, _layer in entries:
-        counts[label] = counts.get(label, 0) + 1
-    labelled = [
-        (f"{label} [{layer.id()[-6:]}]" if counts[label] > 1 else label, layer)
-        for label, layer in entries
-    ]
-    return sorted(labelled, key=lambda entry: entry[0].lower())
-
-
-def raster_project_layers():
-    """The project's file-based rasters, as [(label, layer)]: what can be uploaded.
-
-    GDAL-provided layers only: a WMS or XYZ layer has no file to send, and the
-    raster writer would only render it at screen resolution. The label carries
-    the CRS, which is what the upload is going to declare.
-    """
-    from qgis.core import QgsMapLayer, QgsProject
-
-    return unique_labels(
-        (f"{layer.name()}  ({layer.crs().authid() or 'no CRS'})", layer)
-        for layer in QgsProject.instance().mapLayers().values()
-        if layer.type() == QgsMapLayer.LayerType.RasterLayer
-        and layer.providerType() == "gdal"
-    )
-
-
-def raster_layer_by_label(label):
-    """The layer a `raster_project_layers` label points at.
-
-    Raises ValueError when it has left the project since the form was filled;
-    a dialog can sit open for a long time.
-    """
-    for candidate, layer in raster_project_layers():
-        if candidate == label:
-            return layer
-    raise ValueError(f"Layer '{label}' is no longer in the project.")
-
-
 def local_geotiff_path(layer):
     """The layer's own file when it is a plain local GeoTIFF, else None.
 

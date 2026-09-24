@@ -105,7 +105,8 @@ know:
 
 - A rename keeps its feature types, layers, layer groups and tile cache.
 - The password field is always blank. GeoServer only returns it encrypted.
-  Leave it empty to keep the stored password, or type a new one.
+  Leave it empty to keep the stored password, or type a new one. The eye in
+  the box shows what you typed.
 - The *Advanced* tab lists every other connection parameter (pool size,
   timeouts, Loose bbox...) in a table. Change, add or remove a row there; a
   removed row removes the parameter.
@@ -192,7 +193,8 @@ WMTS.
 **Publish a Layer** has two sources:
 
 - **A table in a datastore:** pick the workspace, datastore and table. Give
-  the EPSG code of its SRS, then optionally a title, an abstract and keywords.
+  the EPSG code of its SRS (type it, or look it up with the globe button in
+  the box), then optionally a title, an abstract and keywords.
 - **A layer from this QGIS project:** a vector is uploaded as a GeoPackage, a
   raster as a GeoTIFF. GeoServer creates the store and the layer in one go.
   A vector's QGIS symbology becomes its default style.
@@ -240,6 +242,8 @@ Click a layer's name to edit it. The first tab holds what you can change:
   stop finding it.
 - **Title**, **Abstract** and **Keywords**: what the capabilities show.
 - **SRS** and **Projection policy**: changing either recomputes the bounds.
+  The globe button in the SRS box opens QGIS's CRS picker. A code QGIS does
+  not know, such as `EPSG:900913`, can still be typed.
 - **Enabled**: off stops GeoServer serving the layer, and keeps it.
 - **Advertised**: off leaves it out of the capabilities, but it is still
   served to whoever names it.
@@ -315,12 +319,16 @@ Styles decide how GeoServer draws a layer.
   SLD and its images.
 - **From a QGIS layer:** the layer's symbology, exported as SLD.
 
+The QGIS layer is picked from QGIS's own layer list, with each layer's icon.
+Two layers with the same name are two entries.
+
 CSS, YSLD and MBStyle need their GeoServer extension. Without it, GeoServer
 refuses the style and the message says so.
 
 **Click a name** to view the style, with the legend GeoServer draws for it.
 The dialog opens on the *Definition* tab: edit it and save to replace the
-style on the server. If GeoServer cannot read it, the message gives the
+style on the server. It is QGIS's code editor, with line numbers, folding
+and highlighting for SLD, CSS and MBStyle, in your QGIS code editor colours. If GeoServer cannot read it, the message gives the
 line and column. The *Details* tab holds its format, version and legend,
 and its name: rename a style there, and the layers and groups using it keep
 it.
@@ -369,7 +377,9 @@ Row actions:
 - **Seed or truncate…** renders the missing tiles (*Seed*), renders them all
   again (*Reseed*) or deletes them (*Truncate*), for one gridset, format and
   zoom range. On the *Advanced* tab, limit it to an area, or to one
-  parameter value (the parameter `STYLES`, the value `population`). GeoWebCache runs it in the
+  parameter value (the parameter `STYLES`, the value `population`). Type
+  the area, or take it from the map view, a layer or a bookmark. It is sent
+  in the gridset's CRS. GeoWebCache runs it in the
   background, and the task list opens.
 - **Tasks** shows the layer's running tasks, refreshed every two seconds,
   with how many tiles are done. *Stop all* ends them.

@@ -242,6 +242,17 @@ class GwcTabMixin:
         payload = self._raw_rest("get", endpoints.gridsets()).json()
         return sorted(str(name) for name in self._as_list(payload))
 
+    def _gridset_crs(self, name):
+        """The CRS a gridset's coordinates are in ("EPSG:900913"), or None.
+
+        TODO(#50): nothing in the library reads a gridset's definition
+        (row 47). Workaround: GET its XML.
+        """
+        base = self.gs.rest_service.gwc_endpoints.base_url
+        text = self._raw_rest("get", f"{base}/gridsets/{quote(name, safe='')}.xml").text
+        number = ElementTree.fromstring(text).findtext("srs/number")
+        return f"EPSG:{number}" if number else None
+
     def _uncached_layer_names(self):
         """Published layers and layer groups GeoWebCache does not cache."""
         base = self.gs.rest_service.rest_endpoints.base_url
@@ -684,7 +695,7 @@ class GwcTabMixin:
                 "key": "filters",
                 "label": translate("GwcTabMixin", "Parameter filters"),
                 "type": "textarea",
-                "code": True,
+                "code": "xml",
                 "group": translate("GwcTabMixin", "Parameter filters"),
                 "min_height": 200,
                 "help": translate(
@@ -891,7 +902,7 @@ class GwcTabMixin:
             )
         return "\n".join(lines)
 
-    def _seed_fields(self, gridsets, formats):
+    def _seed_fields(self, gridsets, formats, canvas=None):
         """Field definitions for the seed form."""
         return [
             {
@@ -949,12 +960,13 @@ class GwcTabMixin:
             {
                 "key": "bounds",
                 "label": translate("GwcTabMixin", "Only this area"),
-                "type": "text",
-                "placeholder": translate("GwcTabMixin", "minx, miny, maxx, maxy"),
+                "type": "extent",
+                "canvas": canvas,
                 "group": translate("GwcTabMixin", "Advanced"),
                 "help": translate(
                     "GwcTabMixin",
-                    "In the gridset's own units. Empty: the layer's whole extent.",
+                    "Typed, or taken from the map view, a layer or a bookmark; "
+                    "sent in the gridset's CRS. Not set: the layer's whole extent.",
                 ),
             },
             {
@@ -973,16 +985,24 @@ class GwcTabMixin:
     def _seed_gwc_layer(self, row_data):
         """Seed, reseed or truncate part of a layer's cache, then watch it."""
         name = row_data[0]
-        xml_text = self._fetch(
-            lambda: self._gwc_layer_xml(name),
+
+        def load():
+            current = self._gwc_form_values(self._gwc_layer_xml(name))
+            # Each gridset's CRS: an area picked on the map is sent in it.
+            crs = {row[0]: self._gridset_crs(row[0]) for row in current["gridsets"]}
+            return current, crs
+
+        fetched = self._fetch(
+            load,
             translate("GwcTabMixin", "Failed to load the tile cache of '{}'").format(
                 name
             ),
         )
-        if xml_text is None:
+        if fetched is None:
             return
-        current = self._gwc_form_values(xml_text)
-        gridsets = [row[0] for row in current["gridsets"]]
+        current, crs = fetched
+        gridsets = list(crs)
+        canvas = self.iface.mapCanvas() if getattr(self, "iface", None) else None
         dlg = ResourceFormDialog(
             title=translate("GwcTabMixin", "Seed or Truncate '{}'").format(name),
             description=translate(
@@ -990,10 +1010,14 @@ class GwcTabMixin:
                 "GeoWebCache runs the task in the background; the task list "
                 "opens next and shows its progress.",
             ),
-            fields=self._seed_fields(gridsets, current["formats"]),
+            fields=self._seed_fields(gridsets, current["formats"], canvas),
             parent=self,
             ok_label=translate("GwcTabMixin", "Start"),
         )
+        dlg.get_widget("gridset").currentTextChanged.connect(
+            lambda gridset: dlg.set_extent_crs("bounds", crs.get(gridset))
+        )
+        dlg.set_extent_crs("bounds", crs.get(dlg.get_widget("gridset").currentText()))
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         values = dlg.get_values()

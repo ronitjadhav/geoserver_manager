@@ -33,11 +33,18 @@ Supported field types:
     - "combo"     -> QComboBox (provide "options": ["a", "b", ...])
     - "spinbox"   -> QSpinBox (optional "min", "max", "default")
     - "textarea"  -> QPlainTextEdit
-    - "file"      -> QLineEdit + Browse button (optional "filter", e.g. "Styles (*.sld)")
+    - "file"      -> QgsFileWidget (optional "filter", e.g. "Styles (*.sld)")
     - "list"      -> QgsListWidget: a list of strings, typed (keywords)
     - "keyvalue"  -> QgsKeyValueWidget: a {key: value} dict (parameters)
     - "table"     -> ListTable: rows picked from "choices", with typed
                      "columns", in order when "ordered" (a group's layers)
+    - "layer"     -> QgsMapLayerComboBox: a layer of the QGIS project, the
+                     value being the layer itself. Vector and raster layers,
+                     or "raster_files": rasters GDAL reads from a file;
+                     "show_crs" adds each layer's CRS
+    - "extent"    -> QgsExtentWidget: an area, typed or taken from "canvas"
+                     (the map view), a layer or a bookmark, in the CRS set by
+                     set_extent_crs(); "minx, miny, maxx, maxy", or "" unset
     - "image"     -> QLabel showing a picture set later with
                      set_image(key, pixmap, text); "placeholder" is shown until
                      then and "max_height" caps the picture (default 240). It is
@@ -50,6 +57,8 @@ Field options:
     - required (bool): mark as mandatory (default False)
     - url (bool): when filled, must start with http:// or https://; OK keeps
                   the dialog open and says so, like a missing required field
+    - crs (bool): a "text" field holding an SRS code, with a button that
+                  looks one up in QGIS's CRS picker
     - default: default value
     - help (str): hint text shown below the widget
     - placeholder (str): placeholder text for text/textarea
@@ -65,25 +74,36 @@ Field options:
       "table"'s height bounds. A textarea is at most 120 px by default, a
       list 160 and a key/value list 200; a table is uncapped. None uncaps:
       the widget then grows with the dialog, as a style's body does
-    - code (bool): a "textarea" of markup: fixed font, no line wrapping
+    - code (bool or str): a "textarea" of markup, in QGIS's code editor:
+      "xml", "css" or "json" highlight it, True is plain (a log)
     - wide (bool): span the whole form, without a label beside the widget
 """
 
-from qgis.gui import QgsKeyValueWidget, QgsListWidget
+from qgis.core import Qgis, QgsCoordinateReferenceSystem, QgsProviderRegistry
+from qgis.gui import (
+    QgsCodeEditor,
+    QgsCodeEditorCSS,
+    QgsCodeEditorHTML,
+    QgsCodeEditorJson,
+    QgsExtentWidget,
+    QgsFileWidget,
+    QgsKeyValueWidget,
+    QgsListWidget,
+    QgsMapLayerComboBox,
+    QgsPasswordLineEdit,
+    QgsProjectionSelectionDialog,
+)
 from qgis.PyQt.QtCore import QCoreApplication, QMetaType, QSize, Qt
-from qgis.PyQt.QtGui import QFontDatabase, QPixmap
+from qgis.PyQt.QtGui import QPixmap
 from qgis.PyQt.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
-    QFileDialog,
     QFormLayout,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPlainTextEdit,
-    QPushButton,
     QScrollArea,
     QSizePolicy,
     QSpinBox,
@@ -92,8 +112,17 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
+from geoserver_manager.gui.icons import icon
 from geoserver_manager.gui.list_table import ListTable, short_combo
 from geoserver_manager.gui.theme import hint_colour, invalid_field_colour
+
+# QGIS has no XML editor; its HTML one reads SLD and GeoWebCache's XML well,
+# and text that is not markup simply stays plain.
+_CODE_EDITORS = {
+    "xml": QgsCodeEditorHTML,
+    "css": QgsCodeEditorCSS,
+    "json": QgsCodeEditorJson,
+}
 
 
 class _FormPage(QScrollArea):
@@ -294,6 +323,8 @@ class ResourceFormDialog(QDialog):
             if field.get("type") == "combo" and field.get("on_change"):
                 cb = field["on_change"]
                 widget.currentTextChanged.connect(cb)
+            elif field.get("type") == "layer" and field.get("on_change"):
+                widget.layerChanged.connect(field["on_change"])
 
         page = _FormPage(container)
         for field in fields:
@@ -309,9 +340,9 @@ class ResourceFormDialog(QDialog):
         read_only = field.get("read_only", False)
 
         if ftype == "text":
-            w = QLineEdit()
-            if field.get("echo_password"):
-                w.setEchoMode(QLineEdit.EchoMode.Password)
+            # QGIS's own password box: hidden, with a toggle to check what
+            # was typed. It is a QLineEdit, so the rest reads it the same.
+            w = QgsPasswordLineEdit() if field.get("echo_password") else QLineEdit()
             if value:
                 w.setText(str(value))
                 # From its start: a long title or URL opened on its tail.
@@ -324,6 +355,8 @@ class ResourceFormDialog(QDialog):
                 # copied, and detail views are made of these (bounds, URLs).
                 w.setReadOnly(True)
                 self._looks_read_only(w)
+            elif field.get("crs"):
+                self._add_crs_picker(w)
             return w
 
         if ftype == "checkbox":
@@ -354,13 +387,20 @@ class ResourceFormDialog(QDialog):
                 w.setReadOnly(True)
             return w
 
+        if ftype == "textarea" and field.get("code"):
+            # QGIS's code editor: highlighting, line numbers, no wrapping in
+            # the middle of an attribute, and the user's code font and
+            # colours. It has no placeholder: a field's help says it.
+            w = _CODE_EDITORS.get(field["code"], QgsCodeEditor)()
+            w.setLineNumbersVisible(True)
+            if value:
+                w.setText(str(value))
+            w.setReadOnly(read_only)
+            self._grows(w, field, min_height=None, max_height=120)
+            return w
+
         if ftype == "textarea":
             w = QPlainTextEdit()
-            if field.get("code"):
-                # Markup reads as written: a fixed font, and no wrapping in
-                # the middle of an attribute.
-                w.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
-                w.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
             self._grows(w, field, min_height=None, max_height=120)
             if value:
                 w.setPlainText(str(value))
@@ -373,30 +413,16 @@ class ResourceFormDialog(QDialog):
             return w
 
         if ftype == "file":
-            container = QWidget()
-            row = QHBoxLayout(container)
-            row.setContentsMargins(0, 0, 0, 0)
-            edit = QLineEdit()
+            # QGIS's own: a Browse button, and a file dropped on it is taken.
+            w = QgsFileWidget()
+            w.setDialogTitle(field["label"])
+            w.setFilter(field.get("filter", ""))
             if value:
-                edit.setText(str(value))
+                w.setFilePath(str(value))
             if field.get("placeholder"):
-                edit.setPlaceholderText(field["placeholder"])
-            browse = QPushButton(self.tr("Browse…"))
-
-            def pick(_checked=False, edit=edit, field=field):
-                path, _selected = QFileDialog.getOpenFileName(
-                    self, field["label"], edit.text(), field.get("filter", "")
-                )
-                if path:
-                    edit.setText(path)
-
-            browse.clicked.connect(pick)
-            row.addWidget(edit)
-            row.addWidget(browse)
-            container.path_edit = edit  # read back by get_values()
-            if read_only:
-                container.setEnabled(False)
-            return container
+                w.lineEdit().setPlaceholderText(field["placeholder"])
+            w.setReadOnly(read_only)
+            return w
 
         if ftype == "list":
             w = QgsListWidget(QMetaType.Type.QString)
@@ -429,6 +455,43 @@ class ResourceFormDialog(QDialog):
             self._grows(w, field, min_height=160)
             return w
 
+        if ftype == "layer":
+            # QGIS's own picker: the layers' icons, the project as it is
+            # now, and two layers of one name are still two entries.
+            w = QgsMapLayerComboBox()
+            short_combo(w)
+            if field.get("raster_files"):
+                w.setFilters(Qgis.LayerFilter.RasterLayer)
+                # A WMS or XYZ layer has no file to send.
+                w.setExcludedProviders(
+                    [
+                        key
+                        for key in QgsProviderRegistry.instance().providerList()
+                        if key != "gdal"
+                    ]
+                )
+            else:
+                # QGIS reads and writes SLD for these two kinds only.
+                w.setFilters(
+                    Qgis.LayerFilter.VectorLayer | Qgis.LayerFilter.RasterLayer
+                )
+            w.setShowCrs(field.get("show_crs", False))
+            if value is not None:
+                w.setLayer(value)
+            w.setEnabled(not read_only)
+            return w
+
+        if ftype == "extent":
+            w = QgsExtentWidget(None, QgsExtentWidget.WidgetStyle.CondensedStyle)
+            w.setNullValueAllowed(True, self.tr("Not set"))
+            w.clear()
+            if field.get("canvas") is not None:
+                # Not drawn on it: the form is modal, and hiding it to draw
+                # would end it.
+                w.setMapCanvas(field["canvas"], False)
+            w.setEnabled(not read_only)
+            return w
+
         if ftype == "image":
             w = QLabel(field.get("placeholder", ""))
             w.setWordWrap(True)
@@ -441,6 +504,30 @@ class ResourceFormDialog(QDialog):
 
         # A typo in a field spec must not become a silent text box.
         raise ValueError(f"Unknown field type {ftype!r} for {key!r}")
+
+    def _add_crs_picker(self, edit):
+        """A button in the box that fills it from QGIS's CRS picker.
+
+        The code stays typed text: GeoServer declares codes QGIS does not
+        know (EPSG:900913), which a picker-only field would lose.
+        """
+        action = edit.addAction(
+            icon("pick-crs"), QLineEdit.ActionPosition.TrailingPosition
+        )
+        action.setToolTip(self.tr("Pick a CRS"))
+
+        def pick():
+            dialog = QgsProjectionSelectionDialog(self)
+            code = edit.text().strip()
+            current = QgsCoordinateReferenceSystem(
+                code if ":" in code else f"EPSG:{code}"
+            )
+            if current.isValid():
+                dialog.setCrs(current)
+            if dialog.exec():
+                edit.setText(dialog.crs().authid())
+
+        action.triggered.connect(pick)
 
     @staticmethod
     def _grows(widget, field, min_height=100, max_height=None):
@@ -498,10 +585,12 @@ class ResourceFormDialog(QDialog):
                 result[key] = widget.currentText()
             elif ftype == "spinbox":
                 result[key] = widget.value()
+            elif ftype == "textarea" and isinstance(widget, QgsCodeEditor):
+                result[key] = widget.text().strip()
             elif ftype == "textarea":
                 result[key] = widget.toPlainText().strip()
             elif ftype == "file":
-                result[key] = widget.path_edit.text().strip()
+                result[key] = widget.filePath().strip()
             elif ftype == "list":
                 result[key] = [
                     str(item).strip() for item in widget.list() if str(item).strip()
@@ -514,6 +603,21 @@ class ResourceFormDialog(QDialog):
                 }
             elif ftype == "table":
                 result[key] = widget.rows()
+            elif ftype == "layer":
+                result[key] = widget.currentLayer()
+            elif ftype == "extent":
+                box = widget.outputExtent()
+                corners = (
+                    box.xMinimum(),
+                    box.yMinimum(),
+                    box.xMaximum(),
+                    box.yMaximum(),
+                )
+                result[key] = (
+                    ", ".join(repr(value) for value in corners)
+                    if widget.isValid()
+                    else ""
+                )
         return result
 
     def set_field_visible(self, key, visible):
@@ -530,6 +634,15 @@ class ResourceFormDialog(QDialog):
             self._hidden_keys.discard(key)
         else:
             self._hidden_keys.add(key)
+
+    def set_extent_crs(self, key, authid):
+        """The CRS an "extent" field's area is given in; a picked one follows."""
+        widget = self._widgets[key]
+        was_set = widget.isValid()
+        widget.setOutputCrs(QgsCoordinateReferenceSystem(authid or ""))
+        if not was_set:
+            # QGIS then shows the empty box transformed, a 300-digit number.
+            widget.clear()
 
     def set_image(self, key, pixmap, text=""):
         """Show a picture in an "image" field, or, without one, the text that
@@ -556,6 +669,8 @@ class ResourceFormDialog(QDialog):
             widget = self._widgets[key]
             if isinstance(widget, QPlainTextEdit):
                 widget.setPlainText(value)
+            elif isinstance(widget, QgsCodeEditor):
+                widget.setText(value)
             elif isinstance(widget, ListTable):
                 widget.set_rows(value)
             elif isinstance(widget, QgsListWidget):
@@ -650,7 +765,7 @@ class ResourceFormDialog(QDialog):
                 )
                 if bad_url:
                     reason = self.tr("'{}' must start with http:// or https://.")
-                elif field.get("type") == "combo" and widget.count() == 0:
+                elif field.get("type") in ("combo", "layer") and widget.count() == 0:
                     reason = self.tr("'{}' has nothing to choose from.")
                 else:
                     reason = self.tr("'{}' is required.")
