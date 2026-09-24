@@ -616,3 +616,15 @@ class TestRowActionTooltips(unittest.TestCase):
             [action.toolTip() for action in actions if not action.isSeparator()],
             ["Preview: the browser may ask", "Delete"],
         )
+
+
+class TestNarrowWindow(unittest.TestCase):
+    def test_the_navigation_is_never_narrower_than_its_entries(self):
+        # At the window's minimum width the splitter gave the list 140 px,
+        # less than "Coverage Stores", and it grew a horizontal scroll bar.
+        dlg = SyncDialog()
+        dlg.resize(dlg.minimumSize())
+        dlg.show()
+        QApplication.processEvents()
+        self.addCleanup(dlg.close)
+        self.assertFalse(dlg.navList.horizontalScrollBar().isVisible())

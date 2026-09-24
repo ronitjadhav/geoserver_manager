@@ -121,7 +121,7 @@ def main():
         settle(app)
         # The offscreen screen is 400 px tall at 2x, which caps the form's own
         # growth; a real screen does not, so grow it here the same way.
-        form.resize(form.width(), form.layout().totalHeightForWidth(form.width()))
+        form.resize(form.width(), form.needed_height())
         if target.get("prepare"):
             target.pop("prepare")(form)
         settle(app)

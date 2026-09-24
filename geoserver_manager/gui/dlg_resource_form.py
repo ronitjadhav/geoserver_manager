@@ -61,14 +61,16 @@ Field options:
     - on_change (callable): for "combo" fields, called with (new_value)
       when the selection changes
     - visible (bool): initial visibility (default True)
-    - max_height / min_height (int): a "textarea"'s height bounds (default at
-      most 120 px); a document to edit, like a style, wants more
+    - max_height / min_height (int): a "textarea", "list", "keyvalue" or
+      "table"'s height bounds. A textarea is at most 120 px by default, a
+      list 160 and a key/value list 200; a table is uncapped. None uncaps:
+      the widget then grows with the dialog, as a style's body does
     - code (bool): a "textarea" of markup: fixed font, no line wrapping
     - wide (bool): span the whole form, without a label beside the widget
 """
 
 from qgis.gui import QgsKeyValueWidget, QgsListWidget
-from qgis.PyQt.QtCore import QCoreApplication, QMetaType, Qt
+from qgis.PyQt.QtCore import QCoreApplication, QMetaType, QSize, Qt
 from qgis.PyQt.QtGui import QFontDatabase, QPixmap
 from qgis.PyQt.QtWidgets import (
     QCheckBox,
@@ -82,6 +84,7 @@ from qgis.PyQt.QtWidgets import (
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSpinBox,
     QTabWidget,
@@ -89,8 +92,40 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
-from geoserver_manager.gui.list_table import ListTable
+from geoserver_manager.gui.list_table import ListTable, short_combo
 from geoserver_manager.gui.theme import hint_colour, invalid_field_colour
+
+
+class _FormPage(QScrollArea):
+    """A form that scrolls when the dialog is too small, rather than squeeze.
+
+    Laid out straight in a tab, a form ignored the height its wrapped help
+    needs at a narrower width, and the rows were drawn over each other; a
+    tall form also could not shrink to fit a short screen. Qt's own size hint
+    for a scroll area stops at 24 lines, so the form's is used: a form that
+    fits the screen opens without a scroll bar.
+    """
+
+    def __init__(self, form):
+        super().__init__()
+        self.setWidget(form)
+        self.setWidgetResizable(True)
+        self.setFrameShape(QScrollArea.Shape.NoFrame)
+        # The dialog is never narrower than the form: no sideways scrolling.
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # The tab's own background: setWidget() makes the form paint its own.
+        self.viewport().setAutoFillBackground(False)
+        form.setAutoFillBackground(False)
+
+    def sizeHint(self):  # noqa: N802 (Qt's own spelling)
+        return self.widget().sizeHint()
+
+    def minimumSizeHint(self):  # noqa: N802
+        width = self.widget().minimumSizeHint().width()
+        return QSize(
+            width + self.verticalScrollBar().sizeHint().width(),
+            super().minimumSizeHint().height(),
+        )
 
 
 class ResourceFormDialog(QDialog):
@@ -117,7 +152,6 @@ class ResourceFormDialog(QDialog):
         """
         super().__init__(parent)
         self.setWindowTitle(title)
-        self.setMinimumWidth(450)
 
         self._fields = fields
         self._widgets = {}  # key -> widget
@@ -129,6 +163,11 @@ class ResourceFormDialog(QDialog):
 
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
+        # A floor, not an explicit minimum: that one would stop the layout
+        # raising it to the form's own, and a scrolled page narrower than
+        # its form cuts the fields off at the right.
+        margins = layout.contentsMargins()
+        layout.addStrut(450 - margins.left() - margins.right())
 
         # Header
         title_label = QLabel(title)
@@ -147,7 +186,7 @@ class ResourceFormDialog(QDialog):
         groups = self._collect_groups(fields)
 
         self._tabs = None
-        self._field_page = {}  # key -> tab page, to reveal validation errors
+        self._field_page = {}  # key -> its page, to reveal validation errors
 
         if len(groups) == 1:
             # Single group: no tabs needed
@@ -159,12 +198,9 @@ class ResourceFormDialog(QDialog):
             for group_name, group_fields in groups.items():
                 page = self._build_form(group_fields, values)
                 self._tabs.addTab(page, group_name)
-                for field in group_fields:
-                    self._field_page[field["key"]] = page
             layout.addWidget(self._tabs)
-
-        # Stretch to push buttons to the bottom
-        layout.addStretch()
+        # No stretch below: the page takes the height a user gives the
+        # dialog, and a table or a list in it grows with it.
 
         # Buttons
         self._button_box = QDialogButtonBox(
@@ -198,13 +234,16 @@ class ResourceFormDialog(QDialog):
         return groups
 
     def _build_form(self, fields, values):
-        """Build a QWidget containing a QFormLayout for the given fields."""
+        """A scrolling page holding a QFormLayout for the given fields."""
         container = QWidget()
         form = QFormLayout(container)
         form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
         form.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         form.setHorizontalSpacing(12)
-        form.setVerticalSpacing(8)
+        # The rows' own margins space them, not the layout: Qt 5 keeps the
+        # spacing of a hidden row, and a datastore form hides a dozen (the
+        # other types' parameters), which opened its tab on a blank band.
+        form.setVerticalSpacing(0)
 
         for field in fields:
             widget = self._create_widget(field, values)
@@ -215,12 +254,13 @@ class ResourceFormDialog(QDialog):
             if field.get("required"):
                 label_text += " *"
             label = QLabel(label_text)
+            label.setContentsMargins(0, 4, 0, 4)
 
             # Build a wrapper that stacks the widget + optional help text
             wrapper_widget = QWidget()
             wrapper = QVBoxLayout(wrapper_widget)
             wrapper.setSpacing(2)
-            wrapper.setContentsMargins(0, 0, 0, 0)
+            wrapper.setContentsMargins(0, 4, 0, 4)
             wrapper.addWidget(widget)
 
             help_text = field.get("help")
@@ -255,7 +295,10 @@ class ResourceFormDialog(QDialog):
                 cb = field["on_change"]
                 widget.currentTextChanged.connect(cb)
 
-        return container
+        page = _FormPage(container)
+        for field in fields:
+            self._field_page[field["key"]] = page
+        return page
 
     def _create_widget(self, field, values):
         """Instantiate the appropriate widget for a field definition."""
@@ -292,6 +335,7 @@ class ResourceFormDialog(QDialog):
 
         if ftype == "combo":
             w = QComboBox()
+            short_combo(w)
             options = field.get("options", [])
             w.addItems(options)
             if value and value in options:
@@ -317,9 +361,7 @@ class ResourceFormDialog(QDialog):
                 # the middle of an attribute.
                 w.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
                 w.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-            w.setMaximumHeight(field.get("max_height", 120))
-            if field.get("min_height"):
-                w.setMinimumHeight(field["min_height"])
+            self._grows(w, field, min_height=None, max_height=120)
             if value:
                 w.setPlainText(str(value))
             placeholder = field.get("placeholder")
@@ -360,7 +402,7 @@ class ResourceFormDialog(QDialog):
             w = QgsListWidget(QMetaType.Type.QString)
             w.setList([str(item) for item in (value or [])])
             w.setReadOnly(read_only)
-            w.setMaximumHeight(field.get("max_height", 160))
+            self._grows(w, field, max_height=160)
             # QGIS's own .ui sets 300 px, wider than the form's field column:
             # its add and remove buttons were pushed out of sight.
             w.setMinimumWidth(0)
@@ -370,7 +412,7 @@ class ResourceFormDialog(QDialog):
             w = QgsKeyValueWidget()
             w.setMap({str(k): str(v) for k, v in (value or {}).items()})
             w.setReadOnly(read_only)
-            w.setMaximumHeight(field.get("max_height", 200))
+            self._grows(w, field, max_height=200)
             w.setMinimumWidth(0)  # as for "list": its buttons stay in view
             return w
 
@@ -382,11 +424,9 @@ class ResourceFormDialog(QDialog):
                 read_only=read_only,
             )
             w.set_rows(value or [])
-            w.setMinimumHeight(field.get("min_height", 160))
             # Uncapped by default: a table is its tab's content and fills it;
             # a cap left the spare height between the table and its help.
-            if field.get("max_height"):
-                w.setMaximumHeight(field["max_height"])
+            self._grows(w, field, min_height=160)
             return w
 
         if ftype == "image":
@@ -401,6 +441,30 @@ class ResourceFormDialog(QDialog):
 
         # A typo in a field spec must not become a silent text box.
         raise ValueError(f"Unknown field type {ftype!r} for {key!r}")
+
+    @staticmethod
+    def _grows(widget, field, min_height=100, max_height=None):
+        """Height bounds of a list or a text box; "max_height": None uncaps.
+
+        Uncapped, it takes the height a user gives the dialog: a form row
+        only grows when its widget expands. Capped, it does not ask for
+        more, or its row would take the height anyway and drift its help
+        away from it. The minimum keeps a few rows in view; a smaller
+        dialog scrolls instead of squeezing the list down to its header.
+        """
+        min_height = field.get("min_height", min_height)
+        if min_height:
+            widget.setMinimumHeight(min_height)
+        max_height = field.get("max_height", max_height)
+        policy = widget.sizePolicy()
+        if max_height:
+            widget.setMaximumHeight(max_height)
+            # Not Preferred: a widget with a layout still expands when a
+            # child does, as ListTable's table does.
+            policy.setVerticalPolicy(QSizePolicy.Policy.Maximum)
+        else:
+            policy.setVerticalPolicy(QSizePolicy.Policy.Expanding)
+        widget.setSizePolicy(policy)
 
     @staticmethod
     def _looks_read_only(widget):
@@ -515,13 +579,31 @@ class ResourceFormDialog(QDialog):
 
         A top-level window ignores height-for-width: its size comes from the
         size hint, which assumes one line per label. On a high-DPI screen the
-        rows were then squeezed and the help text cut off.
+        rows were then squeezed and the help text cut off. Up to the screen:
+        a taller form scrolls.
         """
         super().showEvent(event)
-        needed = self.layout().totalHeightForWidth(self.width())
+        needed = self.needed_height()
         screen = self.screen().availableGeometry().height() if self.screen() else needed
         if self.height() < needed:
             self.resize(self.width(), min(needed, screen))
+
+    def needed_height(self):
+        """The height that shows the whole form, at the current width."""
+        needed = self.layout().totalHeightForWidth(self.width())
+        # A page's hint is its form at the form's own width. At the page's,
+        # wrapped help can need more, and the form would open scrolled.
+        # (Not height-for-width on the page: the dialog's layout would take
+        # that as its minimum, and a short screen could not scroll it.)
+        pages = set(self._field_page.values())
+        if pages:
+            current = self._tabs.currentWidget() if self._tabs else next(iter(pages))
+            width = current.viewport().width()
+            forms = [page.widget() for page in pages]
+            hinted = max(form.sizeHint().height() for form in forms)
+            wraps = max(max(form.heightForWidth(width), 0) for form in forms)
+            needed += max(wraps - hinted, 0)
+        return needed
 
     def hide_save_button(self):
         """Hide the Save button, leaving only Cancel (for view-only dialogs)."""
@@ -556,10 +638,12 @@ class ResourceFormDialog(QDialog):
                 and not value.strip().startswith(("http://", "https://"))
             )
             if (field.get("required") and not value) or bad_url:
-                # Bring the offending field on screen: it may sit on another tab
-                if self._tabs is not None and key in self._field_page:
-                    self._tabs.setCurrentWidget(self._field_page[key])
+                # Bring the offending field on screen: it may sit on another
+                # tab, or below the fold of a scrolled page.
                 widget = self._widgets[key]
+                if self._tabs is not None:
+                    self._tabs.setCurrentWidget(self._field_page[key])
+                self._field_page[key].ensureWidgetVisible(widget)
                 widget.setFocus()
                 widget.setStyleSheet(
                     f"border: 1px solid {invalid_field_colour(self.palette())};"

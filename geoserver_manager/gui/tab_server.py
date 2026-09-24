@@ -539,7 +539,7 @@ class ServerTabMixin:
                     "code": True,
                     "wide": True,
                     "min_height": 420,
-                    "max_height": 16777215,
+                    "max_height": None,  # grow with the dialog
                 }
             ],
             values={"log": tail},

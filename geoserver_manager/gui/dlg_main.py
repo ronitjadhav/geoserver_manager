@@ -849,6 +849,11 @@ class GeoServerMainDialog(
             item = QListWidgetItem(icon(icon_name, self.navList.palette()), label)
             item.setToolTip(self._tab_help().get(label, ""))
             self.navList.addItem(item)
+        # Never narrower than its longest entry: at the window's minimum
+        # width the splitter gave it 140 px, and a scroll bar appeared.
+        self.leftPanel.setMinimumWidth(
+            max(140, self.navList.sizeHintForColumn(0) + 2 * self.navList.frameWidth())
+        )
         if self.navList.count():
             # Reopen on the tab this profile left open, if it still exists:
             # TABS can gain and lose entries between versions.

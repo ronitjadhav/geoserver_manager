@@ -341,7 +341,7 @@ class StyleTabMixin:
                 "required": editable,
                 "group": translate("StyleTabMixin", "Definition"),
                 "min_height": 320,
-                "max_height": 16777215,  # QWIDGETSIZE_MAX: grow with the dialog
+                "max_height": None,  # grow with the dialog
                 "code": True,
                 "wide": True,
                 "help": (
