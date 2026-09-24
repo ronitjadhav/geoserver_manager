@@ -331,7 +331,7 @@ class LayerTreeMenu:
     def _sld_body(dlg, style):
         """The SLD of a style named 'workspace:style' or 'style' (global)."""
         workspace, _, name = style.rpartition(":")
-        return dlg._sld_of(name, workspace or None, label=style)
+        return dlg._sld_of(name, workspace or None)
 
     def apply_style(self, layer):
         """Load the matching server layer's style into this project layer."""

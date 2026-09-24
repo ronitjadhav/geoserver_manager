@@ -207,7 +207,34 @@ class StyleTabMixin:
             self._style_body(name, workspace_name, style_format),
         )
 
-    def _sld_of(self, name, workspace_name, label=None):
+    def _style_as_stored(self, name, workspace_name):
+        """(definition, format, body), the body as the file GeoServer keeps.
+
+        `{style}.sld` serves an SLD 1.1 style as its 1.0 rendition, so Copy
+        stored a 1.0 conversion and Save to disk wrote one. The stored file is
+        the resource under styles/ (measured on 2.28.5). Runs in a worker.
+        TODO(#50): no call for a style's stored file in the library (row 58).
+        """
+        definition, style_format, body = self._style_with_body(name, workspace_name)
+        filename = definition.get("filename")
+        if (
+            style_format == "sld"
+            and self._language_version(definition).startswith("1.1")
+            and filename
+        ):
+            folder = (
+                f"workspaces/{quote(workspace_name, safe='')}/styles"
+                if workspace_name
+                else "styles"
+            )
+            base = self.gs.rest_service.rest_endpoints.base_url
+            response = self._raw_rest(
+                "get", f"{base}/resource/{folder}/{quote(filename, safe='')}"
+            )
+            body = response.content.decode("utf-8", errors="replace")
+        return definition, style_format, body
+
+    def _sld_of(self, name, workspace_name):
         """A style's SLD, what QGIS reads. Runs in a worker.
 
         A CSS, YSLD or MBStyle style comes back as GeoServer's own conversion:
@@ -447,13 +474,18 @@ class StyleTabMixin:
             return
 
         def save():
+            if new_name != name:
+                # Before the body: a taken name used to fail the save after
+                # the new body was already live on every layer using it.
+                self._require_safe_name(new_name)
+                self._refuse_taken_style(new_name, workspace_name)
             if new_body != body.strip():
                 self._save_style_body(name, workspace_name, style_format, new_body)
             if new_name != name:
                 self._rename_style(name, workspace_name, new_name)
 
         if self._run_action(
-            save,
+            lambda: self._wait_for(save),
             translate("StyleTabMixin", "Failed to save style '{}'").format(name),
         ):
             self.show_success_message(
@@ -720,9 +752,9 @@ class StyleTabMixin:
                     self.gs.create_style_from_file(name, str(path), workspace_name)
                 )
                 return
-            self._create_style(
-                name, workspace_name, style_format, path.read_text(encoding="utf-8")
-            )
+            # Bytes, as the file is: an ISO-8859-1 SLD failed to decode, and one
+            # that did was re-encoded under its own encoding declaration.
+            self._create_style(name, workspace_name, style_format, path.read_bytes())
         elif source == _SOURCE_QGIS:
             self._create_sld_style(
                 name, workspace_name, layer_to_sld(self._picked_layer(values))
@@ -741,8 +773,9 @@ class StyleTabMixin:
         a body GeoServer refuses leaves nothing. Creating the definition
         first left an empty style behind, and the retry "already exists".
         """
+        data = body if isinstance(body, bytes) else body.encode("utf-8")
         content_type = (
-            sld_content_type(body)
+            sld_content_type(data.decode("utf-8", errors="replace"))
             if style_format == "sld"
             else _CONTENT_TYPES[style_format]
         )
@@ -752,7 +785,7 @@ class StyleTabMixin:
             "post",
             collection,
             params={"name": name},
-            data=body.encode("utf-8"),
+            data=data,
             headers={"Content-Type": content_type},
         )
 
@@ -844,7 +877,7 @@ class StyleTabMixin:
         """Write a style's body to a file the user picks."""
         name, workspace_name = row_data[0], scope(row_data[1])
         fetched = self._fetch(
-            lambda: self._style_with_body(name, workspace_name),
+            lambda: self._style_as_stored(name, workspace_name),
             translate("StyleTabMixin", "Failed to load style '{}'").format(name),
         )
         if fetched is None:
@@ -929,7 +962,7 @@ class StyleTabMixin:
         """Create `target` from the body of `name`, in the same format."""
         self._require_safe_name(target)
         self._refuse_taken_style(target, target_ws)
-        _definition, style_format, body = self._style_with_body(name, workspace_name)
+        _definition, style_format, body = self._style_as_stored(name, workspace_name)
         if style_format not in _CONTENT_TYPES:
             raise ValueError(
                 translate("StyleTabMixin", "A {} style cannot be copied here.").format(
@@ -1012,9 +1045,25 @@ class StyleTabMixin:
                 users.append(
                     translate("StyleTabMixin", "{} (other style)").format(layer)
                 )
-        for group in self._all_group_names():
-            group_ws, _, bare = group.rpartition(":")
-            detail = self._group_detail(bare, group_ws or None)
+        groups = self._all_group_names()
+        for group, (detail, error) in zip(
+            groups,
+            self._fan_out(
+                lambda qualified: self._group_detail(
+                    qualified.rpartition(":")[2], qualified.rpartition(":")[0] or None
+                ),
+                groups,
+                None,
+            ),
+        ):
+            if error:
+                # Listed like an unreadable layer: one bad group failed it all.
+                users.append(
+                    translate("StyleTabMixin", "{} (could not be read: {})").format(
+                        group, self._error_text(error)
+                    )
+                )
+                continue
             root = (detail.get("rootLayerStyle") or {}).get("name")
             if reference in self._group_styles(detail) or root == reference:
                 users.append(

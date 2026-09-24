@@ -278,8 +278,11 @@ class LayerGroupTabMixin:
             ),
             fields=self._group_fields(
                 [workspace_label],
-                layer_names + [group for group in group_names if group != own],
-                layer_names,
+                self._same_workspace(
+                    scope(workspace_label),
+                    layer_names + [group for group in group_names if group != own],
+                ),
+                self._same_workspace(scope(workspace_label), layer_names),
                 edit_mode=True,
             ),
             values=before,
@@ -287,6 +290,22 @@ class LayerGroupTabMixin:
             ok_label=translate("LayerGroupTabMixin", "Save"),
         )
         self._wire_group_form(dlg)
+        for key, international in (
+            ("title", "internationalTitle"),
+            ("abstract", "internationalAbstract"),
+        ):
+            if detail.get(international):
+                # Shown as "en: …; fr: …", which a save would store as the
+                # plain title, in every language. Kept read-only instead.
+                widget = dlg.get_widget(key)
+                widget.setReadOnly(True)
+                widget.setToolTip(
+                    translate(
+                        "LayerGroupTabMixin",
+                        "Translated in several languages: edit it in GeoServer's "
+                        "web interface.",
+                    )
+                )
         if detail.get("mode") == "EO":
             # GeoServer refuses every way of clearing the root layer (measured
             # on 2.28.5), so an Earth Observation group cannot change mode.
@@ -366,6 +385,13 @@ class LayerGroupTabMixin:
         )
         return True
 
+    @staticmethod
+    def _same_workspace(workspace_name, names):
+        """The names a group in this workspace may hold: all, for a global one."""
+        if not workspace_name:
+            return list(names)
+        return [name for name in names if name.startswith(f"{workspace_name}:")]
+
     def _group_publishables(self, text, workspace_name, known_layers, known_groups):
         """The layer list as GeoServer publishables, and the styles beside it.
 
@@ -381,6 +407,15 @@ class LayerGroupTabMixin:
             )
         published = []
         for layer in layers:
+            if workspace_name and not layer.startswith(f"{workspace_name}:"):
+                # GeoServer answers a bare 500 for it, after the form closed.
+                raise ValueError(
+                    translate(
+                        "LayerGroupTabMixin",
+                        "'{}' is in another workspace. A group in '{}' can only "
+                        "hold that workspace's layers and groups.",
+                    ).format(layer, workspace_name)
+                )
             if known_layers is None or layer in known_layers:
                 published.append({"@type": "layer", "name": layer})
             elif layer in known_groups or layer.partition(":")[2] in known_groups:
@@ -669,9 +704,20 @@ class LayerGroupTabMixin:
         """Every group's name as a publishable spells it: bare when global,
         "workspace:group" otherwise. Raises on HTTP errors."""
         names = list(self._global_group_names())
-        for ws_name in self._get_workspace_names():
-            groups = self._fetch_list(self.gs.get_layer_groups, ws_name)
-            names.extend(f"{ws_name}:{self._name_of(group)}" for group in groups)
+        workspaces = self._get_workspace_names()
+        # One workspace that cannot be listed (a name like "w#x") used to fail
+        # Create and Edit for every group; now it only loses its own groups.
+        for ws_name, (groups, error) in zip(
+            workspaces,
+            self._fan_out(
+                lambda ws: self._fetch_list(
+                    self.gs.get_layer_groups, quote(ws, safe="")
+                ),
+                workspaces,
+            ),
+        ):
+            if error is None:
+                names.extend(f"{ws_name}:{self._name_of(group)}" for group in groups)
         return names
 
     def _add_layer_group(self):

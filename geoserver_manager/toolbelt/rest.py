@@ -54,6 +54,15 @@ def raw_rest(client, method, path, **kwargs):
     return response
 
 
+class PartlySaved(Exception):
+    """A save whose first step happened and a later one failed.
+
+    Its text says what was saved and what was not. _run_action shows it as a
+    warning and reloads the tab: a plain "Failed to create" had hidden that
+    the resource existed, and a retry then said "already exists".
+    """
+
+
 class UploadCancelled(Exception):
     """Raised inside ProgressReader.read() when the caller asked to stop.
 

@@ -14,6 +14,7 @@ from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.toolbelt.payload import bbox_text, changed, keyword_list
+from geoserver_manager.toolbelt.rest import PartlySaved
 
 # GeoServer's own `type` values. The Type column carries them, and every
 # action reads the row's type to pick the WMS or the WMTS endpoint.
@@ -548,6 +549,7 @@ class CascadedStoreTabMixin:
                     "label": translate("CascadedStoreTabMixin", "GetCapabilities URL"),
                     "type": "text",
                     "required": True,
+                    "url": True,
                     "placeholder": "https://example.org/geoserver/wms?service=WMS"
                     "&version=1.3.0&request=GetCapabilities",
                     "help": translate(
@@ -645,7 +647,16 @@ class CascadedStoreTabMixin:
         )
         extras = self._cascaded_store_changes(defaults, dict(defaults, **values))
         if extras:
-            self._put_cascaded_store(ws, name, kind, extras)
+            try:
+                self._put_cascaded_store(ws, name, kind, extras)
+            except Exception as error:
+                raise PartlySaved(
+                    translate(
+                        "CascadedStoreTabMixin",
+                        "Cascaded store '{}' created, but its credentials and "
+                        "limits could not be set: {}",
+                    ).format(name, self._error_text(error))
+                ) from error
 
     # -- Info -----------------------------------------------------------------
 
@@ -666,6 +677,7 @@ class CascadedStoreTabMixin:
                 "label": translate("CascadedStoreTabMixin", "GetCapabilities URL"),
                 "type": "text",
                 "required": True,
+                "url": True,
                 "help": translate(
                     "CascadedStoreTabMixin",
                     "As GeoServer reaches it, from its own machine, not from yours.",
@@ -754,7 +766,7 @@ class CascadedStoreTabMixin:
         detail, published = fetched
         before = self._cascaded_store_form_values(detail, ws_name, kind, published)
         dlg = ResourceFormDialog(
-            title=translate("CascadedStoreTabMixin", "Cascaded Store '{}'").format(
+            title=translate("CascadedStoreTabMixin", "Edit Cascaded Store '{}'").format(
                 name
             ),
             fields=self._cascaded_store_info_fields(),

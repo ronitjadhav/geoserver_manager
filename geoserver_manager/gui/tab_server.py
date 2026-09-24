@@ -22,6 +22,7 @@ from qgis.PyQt.QtWidgets import QDialog, QDialogButtonBox
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.toolbelt.payload import changed, keyword_list
+from geoserver_manager.toolbelt.rest import summarise_body
 
 # Strings are looked up in this file's own context: self.tr() would resolve
 # against GeoServerMainDialog instead (see docs/development/architecture.md).
@@ -309,7 +310,9 @@ class ServerTabMixin:
             if value is None:
                 values[key] = ""
         if kind == "global":
-            values["num_decimals"] = int(settings.get("numDecimals") or 8)
+            # 8 only when unset: "or 8" also turned a stored 0 into 8.
+            decimals = settings.get("numDecimals")
+            values["num_decimals"] = 8 if decimals in (None, "") else int(decimals)
             for key in ("use_headers_proxy", "verbose", "verbose_exceptions"):
                 values[key] = bool(values[key])
         if kind == "logging":
@@ -508,10 +511,20 @@ class ServerTabMixin:
 
     def _show_server_log(self, location):
         """The end of GeoServer's log file, read in the background."""
+        location = (location or "logs/geoserver.log").strip()
+        if location.startswith("/") or ":" in location.split("/")[0]:
+            # The REST resource API only reaches the data directory.
+            self.show_warning_message(
+                translate(
+                    "ServerTabMixin",
+                    "The log is written to {}, outside GeoServer's data directory, "
+                    "which the REST API cannot read. Open it on the server.",
+                ).format(location)
+            )
+            return
         client = self.gs.rest_service.rest_client
         path = "{}/resource/{}".format(
-            self.gs.rest_service.rest_endpoints.base_url,
-            (location or "logs/geoserver.log").lstrip("/"),
+            self.gs.rest_service.rest_endpoints.base_url, location
         )
         tail = self._fetch(
             lambda: self._log_tail(client, path),
@@ -560,7 +573,9 @@ class ServerTabMixin:
             timeout=30,
         ) as response:
             if response.status_code >= 400:
-                raise RuntimeError(f"HTTP {response.status_code}")
+                raise RuntimeError(
+                    f"HTTP {response.status_code}: {summarise_body(response.text)}"
+                )
             chunks, size = deque(), 0
             for chunk in response.iter_content(64 * 1024):
                 chunks.append(chunk)

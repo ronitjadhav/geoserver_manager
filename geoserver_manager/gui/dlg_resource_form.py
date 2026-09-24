@@ -44,6 +44,8 @@ Field options:
     - label (str): display label
     - type (str): widget type (see above)
     - required (bool): mark as mandatory (default False)
+    - url (bool): when filled, must start with http:// or https://; OK keeps
+                  the dialog open and says so, like a missing required field
     - default: default value
     - help (str): hint text shown below the widget
     - placeholder (str): placeholder text for text/textarea
@@ -484,13 +486,19 @@ class ResourceFormDialog(QDialog):
 
         values = self.get_values()
         for field in self._fields:
-            if not field.get("required"):
-                continue
             key = field["key"]
             if key in self._hidden_keys:  # not applicable to the current form
                 continue
             value = values[key]
-            if not value:
+            # A URL field keeps the dialog open on a bad value: checked after
+            # it closed, the edits were thrown away with the error.
+            bad_url = (
+                field.get("url")
+                and isinstance(value, str)
+                and value.strip()
+                and not value.strip().startswith(("http://", "https://"))
+            )
+            if (field.get("required") and not value) or bad_url:
                 # Bring the offending field on screen: it may sit on another tab
                 if self._tabs is not None and key in self._field_page:
                     self._tabs.setCurrentWidget(self._field_page[key])
@@ -499,7 +507,9 @@ class ResourceFormDialog(QDialog):
                 widget.setStyleSheet(
                     f"border: 1px solid {invalid_field_colour(self.palette())};"
                 )
-                if field.get("type") == "combo" and widget.count() == 0:
+                if bad_url:
+                    reason = self.tr("'{}' must start with http:// or https://.")
+                elif field.get("type") == "combo" and widget.count() == 0:
                     reason = self.tr("'{}' has nothing to choose from.")
                 else:
                     reason = self.tr("'{}' is required.")

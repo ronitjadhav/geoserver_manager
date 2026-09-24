@@ -112,6 +112,9 @@ class FakeGS:
             rest_client = Client()
             rest_endpoints = Endpoints()
 
+            def resource_exists(inner, path):
+                return Client().get(path).status_code == 200
+
         self.rest_service = Rest()
 
     def get_workspaces(self):

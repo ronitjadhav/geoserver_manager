@@ -17,8 +17,8 @@ from geoserver_manager.__about__ import __title__
 # ##################################
 
 
-class PlgLogger(logging.Handler):
-    """Python logging handler supercharged with QGIS useful methods."""
+class PlgLogger:
+    """Log to the QGIS message log, and optionally to the message bar."""
 
     @staticmethod
     def log(

@@ -339,6 +339,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- A save that did its first step and failed a later one (a workspace
+  created but its namespace URI refused, a datastore renamed but not saved, a
+  cascaded store created without its credentials) now says what was saved,
+  as a warning, and reloads the table. It used to say only "Failed", and a
+  retry met "already exists".
+- Clearing a Shapefile's charset, or a workspace's namespace URI (back to
+  `http://name`), now takes effect.
+- Copy and Save to disk keep an SLD 1.1 style as it is stored, not as its
+  1.0 rendition.
+- Renaming a style to a taken name is refused before the new body is saved.
+- An SLD file in another encoding than UTF-8 uploads as it is.
+- *Used by* lists a layer group it cannot read instead of failing whole.
+- A translated layer group title or abstract stays read-only in its form, so
+  a save no longer flattens it into every language.
+- A workspace layer group refuses another workspace's layer before GeoServer
+  answers with a bare error; its picker offers only its own.
+- One workspace whose groups cannot be listed no longer breaks creating and
+  editing every layer group.
+- Pushing the style of a layer removed from the project meanwhile is an error
+  banner, not a Python traceback.
+- A failed symbology export no longer leaves the temporary GeoPackage behind.
+- A bad GetCapabilities URL keeps the form open with the reason.
+- Secret-looking connection parameters (access keys, account keys, tokens)
+  are masked under *Other parameters*.
+- A stored "Decimals" of 0 no longer shows as 8, and a log file outside the
+  data directory is said, not requested.
+- The plugin zip no longer carries the translation sources, a third of its
+  installed size: QGIS reads only the compiled files.
 - The seed task list updates on a slow server too: it asked again every
   2 seconds and dropped each answer that took longer, and a dead server
   collected a new pending request each time. *Stop all* now says it worked.
