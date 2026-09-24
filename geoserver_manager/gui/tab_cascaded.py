@@ -91,16 +91,30 @@ class CascadedStoreTabMixin:
                 "browse-resources",
                 translate("CascadedStoreTabMixin", "Cascaded layers"),
                 self._show_cascaded_layers,
+                translate(
+                    "CascadedStoreTabMixin",
+                    "The store's published layers, and the remote layers it could "
+                    "publish",
+                ),
             ),
             (
                 "publish-layer",
                 translate("CascadedStoreTabMixin", "Publish a layer"),
                 self._publish_cascaded_layer,
+                translate(
+                    "CascadedStoreTabMixin",
+                    "Publish one of the remote server's layers through this store",
+                ),
             ),
             (
                 "delete",
                 translate("CascadedStoreTabMixin", "Delete"),
                 self._delete_cascaded_store,
+                translate(
+                    "CascadedStoreTabMixin",
+                    "Delete: remove the store and the layers cascaded through it "
+                    "(asks first).",
+                ),
             ),
         ]
         self._setup_table(

@@ -19,6 +19,7 @@ from qgis.core import (
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
+from geoserver_manager.gui.dlg_preview import LayerPreviewDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.scope import GLOBAL, scope
 from geoserver_manager.toolbelt.payload import bbox_text, text_of, unwrap
@@ -90,9 +91,23 @@ class LayerGroupTabMixin:
         }
         self._row_actions = [
             (
+                "preview-map",
+                translate("LayerGroupTabMixin", "Preview"),
+                self._preview_group,
+                translate(
+                    "LayerGroupTabMixin",
+                    "The group on a map of its own, with feature info on a click; "
+                    "the project is not touched",
+                ),
+            ),
+            (
                 "add-to-qgis",
                 translate("LayerGroupTabMixin", "Add to QGIS"),
                 self._add_group_to_qgis,
+                translate(
+                    "LayerGroupTabMixin",
+                    "Add the group to this QGIS project as one WMS layer",
+                ),
             ),
             (
                 "preview-browser",
@@ -108,6 +123,10 @@ class LayerGroupTabMixin:
                 "delete",
                 translate("LayerGroupTabMixin", "Delete"),
                 self._delete_layer_group,
+                translate(
+                    "LayerGroupTabMixin",
+                    "Delete: remove the group; its layers stay (asks first).",
+                ),
             ),
         ]
         self._setup_table(
@@ -324,9 +343,7 @@ class LayerGroupTabMixin:
         )
         if saved:
             self.show_success_message(
-                translate("LayerGroupTabMixin", "Layer group '{}' updated.").format(
-                    name
-                )
+                translate("LayerGroupTabMixin", "Layer group '{}' saved.").format(name)
             )
             self._load_layer_groups()
 
@@ -899,6 +916,48 @@ class LayerGroupTabMixin:
                 ).format(name)
             )
 
+    def _preview_group(self, row_data):
+        """Show the group on a map of its own, like the Layers tab's Preview.
+
+        Nothing reaches the project. The map opens on the group's bounds,
+        which GeoServer may store in a projected CRS: they are reprojected.
+        """
+        name, workspace_name = row_data[0], scope(row_data[1])
+        qualified = f"{workspace_name}:{name}" if workspace_name else name
+        detail = self._fetch(
+            lambda: self._group_detail(name, workspace_name),
+            translate("LayerGroupTabMixin", "Failed to load layer group '{}'").format(
+                name
+            ),
+        )
+        if detail is None:
+            return
+        rect = self._box_in(
+            detail.get("bounds") or {}, QgsCoordinateReferenceSystem("EPSG:4326")
+        )
+        bbox = (
+            (rect.xMinimum(), rect.yMinimum(), rect.xMaximum(), rect.yMaximum())
+            if rect is not None
+            else None
+        )
+
+        def build():
+            settings = self.plg_settings.get_plg_settings()
+            uri, provider = self._layer_uri(
+                "WMS", settings.geoserver_url, qualified, settings.geoserver_auth_cfg_id
+            )
+            # An invalid layer is not an error here: the window explains it.
+            return QgsRasterLayer(uri, qualified, provider)
+
+        layer = self._fetch(
+            build,
+            translate(
+                "LayerGroupTabMixin", "Could not build the preview of '{}'"
+            ).format(name),
+        )
+        if layer is not None:
+            LayerPreviewDialog(qualified, layer, bbox, parent=self).show()
+
     def _preview_group_in_browser(self, row_data):
         """Open GeoServer's own preview of the group, on its bounds.
 
@@ -939,7 +998,8 @@ class LayerGroupTabMixin:
             translate("LayerGroupTabMixin", "layer group"),
             [
                 (
-                    f"{row[1]}/{row[0]}",
+                    # As the Layers tab names them; a global group has no prefix.
+                    f"{scope(row[1])}:{row[0]}" if scope(row[1]) else row[0],
                     lambda name=row[0], ws=scope(row[1]): self._do_delete_group(
                         name, ws
                     ),

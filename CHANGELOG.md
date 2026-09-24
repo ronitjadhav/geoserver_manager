@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   plugin asks GeoServer to open it, and a warning gives GeoServer's reason
   when it cannot (a wrong host, password, path or URL).
 - **Reset** on datastores and coverage stores makes GeoServer re-read them.
+- **Preview a layer group** on a map of its own, as the Layers tab previews a
+  layer, opened on the group's bounds.
 - **Workspaces:** set the namespace URI, and give a workspace its own WFS,
   WCS and WMTS settings (on or off, title, abstract, keywords; WFS maximum
   features), as it already could for WMS. New own settings start from the
@@ -255,6 +257,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- Every row action has a tooltip saying what it does, and every edit ends
+  in "… saved."; layer groups are named `workspace:group` in delete
+  confirmations, like layers.
 - Contributor documentation now uses public instructions throughout. Removed
   private workflow references and corrected stale installation and setup guidance.
 

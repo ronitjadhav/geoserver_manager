@@ -671,6 +671,7 @@ class TestPreviewInBrowser(unittest.TestCase):
     def setUp(self):
         class Settings:
             geoserver_url = "http://gs/geoserver"
+            geoserver_auth_cfg_id = ""
 
         class PlgSettings:
             def get_plg_settings(inner):
@@ -721,5 +722,37 @@ class TestPreviewInBrowser(unittest.TestCase):
         self.dlg.show_warning_message = lambda t: None
         self.dlg._load_layer_groups()
         labels = [action[1] for action in self.dlg._row_actions]
-        self.assertEqual(labels, ["Add to QGIS", "Preview in a browser", "Delete"])
-        self.assertIn("log in", self.dlg._row_actions[1][3])
+        self.assertEqual(
+            labels, ["Preview", "Add to QGIS", "Preview in a browser", "Delete"]
+        )
+        self.assertIn("log in", self.dlg._row_actions[2][3])
+        # Every action says what it does, as on the Layers tab.
+        self.assertTrue(all(len(action) > 3 for action in self.dlg._row_actions))
+
+    def test_the_in_qgis_preview_opens_on_the_reprojected_bounds(self):
+        # spearfish's bounds are in EPSG:26713; the preview map is lon/lat.
+        opened = []
+        detail = {
+            "bounds": {
+                "minx": 589425.9,
+                "maxx": 609518.7,
+                "miny": 4913959.2,
+                "maxy": 4928082.9,
+                "crs": {"@class": "projected", "$": "EPSG:26713"},
+            }
+        }
+        self.dlg._group_detail = lambda name, ws: detail
+        with (
+            patch.object(
+                tab_layergroups,
+                "LayerPreviewDialog",
+                lambda name, layer, bbox, parent: opened.append((name, bbox))
+                or type("D", (), {"show": lambda inner: None})(),
+            ),
+            patch.object(tab_layergroups, "QgsRasterLayer", lambda *args: object()),
+        ):
+            self.dlg._preview_group(["spearfish", GLOBAL])
+        ((name, bbox),) = opened
+        self.assertEqual(name, "spearfish")
+        self.assertAlmostEqual(bbox[0], -103.87, places=1)
+        self.assertAlmostEqual(bbox[3], 44.5, places=1)

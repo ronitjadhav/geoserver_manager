@@ -126,6 +126,11 @@ class StyleTabMixin:
                 "delete",
                 translate("StyleTabMixin", "Delete"),
                 self._delete_style,
+                translate(
+                    "StyleTabMixin",
+                    "Delete: remove the style and its file; layers that used it "
+                    "fall back to the default style (asks first).",
+                ),
             ),
         ]
         self._setup_table(

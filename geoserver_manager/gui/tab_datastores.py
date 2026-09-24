@@ -157,6 +157,11 @@ class DatastoreTabMixin:
                 "delete",
                 translate("DatastoreTabMixin", "Delete"),
                 self._delete_datastore,
+                translate(
+                    "DatastoreTabMixin",
+                    "Delete: remove the store, its feature types and their layers "
+                    "(asks first). The data itself stays.",
+                ),
             ),
         ]
         self._setup_table(
@@ -1119,7 +1124,7 @@ class DatastoreTabMixin:
             ),
         ):
             self.show_success_message(
-                translate("DatastoreTabMixin", "Datastore '{}' updated.").format(
+                translate("DatastoreTabMixin", "Datastore '{}' saved.").format(
                     values["name"]
                 )
             )
