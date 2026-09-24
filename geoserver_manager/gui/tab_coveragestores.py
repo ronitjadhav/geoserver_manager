@@ -24,6 +24,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.gui.scope import PENDING
 from geoserver_manager.toolbelt.payload import bbox_text, changed, keyword_list
 from geoserver_manager.toolbelt.qgis_export import (
     export_to_geotiff,
@@ -167,6 +168,8 @@ class CoverageStoreTabMixin:
                 self.actions_column_label(),
             ]
         )
+        self._row_detail = self._coverage_store_cells
+        self._detail_columns = (2, 3)
         self._start_load(
             translate("CoverageStoreTabMixin", "Failed to load coverage stores"),
             self._fetch_coverage_store_rows,
@@ -185,21 +188,8 @@ class CoverageStoreTabMixin:
                 continue
             stores.extend((ws_name, name) for name in names)
 
-        rows = []
-        for (ws_name, name), (summary, error) in zip(
-            stores,
-            self._fan_out(
-                lambda store: self._coverage_store_summary(*store), stores, task
-            ),
-        ):
-            if error:
-                # Keep the row, as Datastores does: a store that cannot be read
-                # is the one the user most needs to see, and to delete.
-                failures.append((f"{ws_name}/{name}", error))
-                rows.append([name, ws_name, "-", "-"])
-                continue
-            store_type, coverage_count = summary
-            rows.append([name, ws_name, store_type, str(coverage_count)])
+        # Type and Coverages follow for the page shown (#58): two GETs a store.
+        rows = [[name, ws_name, PENDING, PENDING] for ws_name, name in stores]
         return rows, failures
 
     def _coverage_store_names(self, workspace_name):
@@ -215,6 +205,11 @@ class CoverageStoreTabMixin:
             self._name_of(store)
             for store in self._unwrap(payload, "coverageStores", "coverageStore")
         )
+
+    def _coverage_store_cells(self, row):
+        """The Type and Coverages cells of one row. Runs in a worker."""
+        store_type, coverage_count = self._coverage_store_summary(row[1], row[0])
+        return store_type, str(coverage_count)
 
     def _coverage_store_summary(self, workspace_name, name):
         """(type, number of published coverages). Raises on HTTP errors."""

@@ -242,9 +242,12 @@ class TestListing(unittest.TestCase):
     def test_rows_carry_every_cached_layer_and_a_broken_one_is_reported_not_fatal(
         self,
     ):
-        rows, failures = self.dlg._fetch_gwc_rows()
-        self.assertEqual(rows, [BROKEN_ROW, TASMANIA_ROW, STATES_ROW])
-        self.assertEqual([label for label, _ in failures], ["broken:layer"])
+        warnings = []
+        self.dlg.show_warning_message = warnings.append
+        self.dlg._load_gwc_layers()  # the page's details fill as it shows
+        self.assertEqual(self.dlg._all_rows, [BROKEN_ROW, TASMANIA_ROW, STATES_ROW])
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("broken:layer", warnings[0])
         # workspace layers go through the library, a global group cannot
         self.assertIn(("get_gwc_layer", "topp", "states"), self.gs.calls)
         self.assertIn(("GET", "/gwc/rest/layers/tasmania.json", {}), self.gs.calls)

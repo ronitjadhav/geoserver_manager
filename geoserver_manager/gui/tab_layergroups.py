@@ -21,7 +21,7 @@ from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_preview import LayerPreviewDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.gui.scope import GLOBAL, scope
+from geoserver_manager.gui.scope import GLOBAL, PENDING, scope
 from geoserver_manager.toolbelt.payload import bbox_text, text_of, unwrap
 
 # GeoServer's LayerGroupInfo.Mode enum. Spelled out rather than imported from
@@ -138,6 +138,10 @@ class LayerGroupTabMixin:
                 self.actions_column_label(),
             ]
         )
+        self._row_detail = lambda row: tuple(
+            str(cell) for cell in self._group_summary(row[0], row[1])
+        )
+        self._detail_columns = (2, 3)
         self._start_load(
             translate("LayerGroupTabMixin", "Failed to load layer groups"),
             self._fetch_layer_group_rows,
@@ -161,17 +165,9 @@ class LayerGroupTabMixin:
                 continue
             groups.extend((self._name_of(group), ws_name) for group in names)
 
-        # Mode and size are only in the group itself, so one GET per group.
-        rows = []
-        for (name, ws_label), (summary, error) in zip(
-            groups,
-            self._fan_out(lambda group: self._group_summary(*group), groups, task),
-        ):
-            if error:
-                failures.append((f"{ws_label}/{name}", error))
-                continue
-            mode, layer_count = summary
-            rows.append([name, ws_label, mode, str(layer_count)])
+        # Mode and size are only in the group itself: one GET per group, for
+        # the page shown (#58). A group that cannot be read keeps its row.
+        rows = [[name, ws_label, PENDING, PENDING] for name, ws_label in groups]
         return rows, failures
 
     def _global_group_names(self):

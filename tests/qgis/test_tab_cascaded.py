@@ -308,7 +308,10 @@ class TestListing(unittest.TestCase):
 
     def test_rows_carry_both_kinds_and_a_broken_workspace_is_reported_not_fatal(self):
         rows, failures = self.dlg._fetch_cascaded_store_rows()
-        self.assertEqual(rows, [REMOTE_ROW, TILES_ROW])
+        # Names and kinds at once; the detail cells follow per page (#58).
+        self.assertEqual(
+            [row[:3] for row in rows], [r[:3] for r in (REMOTE_ROW, TILES_ROW)]
+        )
         self.assertEqual([label for label, _ in failures], ["broken"])
 
     def test_the_whole_loader_renders_them(self):

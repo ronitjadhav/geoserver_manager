@@ -23,7 +23,7 @@ from qgis.PyQt.QtCore import QCoreApplication, QTimer
 from qgis.PyQt.QtWidgets import QDialog, QDialogButtonBox
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.gui.scope import GLOBAL
+from geoserver_manager.gui.scope import GLOBAL, PENDING
 from geoserver_manager.toolbelt.payload import as_list
 from geoserver_manager.toolbelt.rest import raw_rest
 
@@ -146,6 +146,10 @@ class GwcTabMixin:
                 self.actions_column_label(),
             ]
         )
+        self._row_detail = lambda row: self._gwc_layer_summary(
+            self._gwc_layer_detail(row[0])
+        )
+        self._detail_columns = (2, 3, 4)
         self._start_load(
             translate("GwcTabMixin", "Failed to load the tile cache"),
             self._fetch_gwc_rows,
@@ -154,15 +158,12 @@ class GwcTabMixin:
     def _fetch_gwc_rows(self, task=None):
         """(rows, failures) for the table. Runs in a worker thread."""
         names = self._gwc_layer_names()
-        details = self._fan_out(self._gwc_layer_detail, names, task)
+        # Enabled, gridsets and formats follow for the page shown (#58).
         rows = [
-            [name, self._gwc_workspace(name), *self._gwc_layer_summary(detail)]
-            for name, (detail, _error) in zip(names, details)
+            [name, self._gwc_workspace(name), PENDING, PENDING, PENDING]
+            for name in names
         ]
-        failures = [
-            (name, error) for name, (_detail, error) in zip(names, details) if error
-        ]
-        return rows, failures
+        return rows, []
 
     # -- Reads ----------------------------------------------------------------
 

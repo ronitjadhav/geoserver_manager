@@ -16,7 +16,7 @@ from qgis.PyQt.QtGui import QPixmap
 from qgis.PyQt.QtWidgets import QDialog, QFileDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.gui.scope import GLOBAL, scope
+from geoserver_manager.gui.scope import GLOBAL, PENDING, scope
 from geoserver_manager.toolbelt.payload import unwrap
 from geoserver_manager.toolbelt.sld import (
     SLD_1_0,
@@ -142,6 +142,8 @@ class StyleTabMixin:
                 self.actions_column_label(),
             ]
         )
+        self._row_detail = lambda row: self._style_summary(row[0], scope(row[1]))
+        self._detail_columns = (2, 3)
         self._start_load(
             translate("StyleTabMixin", "Failed to load styles"), self._fetch_style_rows
         )
@@ -169,18 +171,8 @@ class StyleTabMixin:
                 failures.append((ws_name, error))
                 continue
             pairs.extend((self._name_of(style), ws_name) for style in styles)
-        details = self._fan_out(
-            lambda pair: self._style_summary(pair[0], scope(pair[1])), pairs, task
-        )
-        rows = [
-            [name, ws_label, *(summary or ("-", "-"))]
-            for (name, ws_label), (summary, _error) in zip(pairs, details)
-        ]
-        failures += [
-            (f"{ws_label}/{name}", error)
-            for (name, ws_label), (_summary, error) in zip(pairs, details)
-            if error
-        ]
+        # Format and version follow for the page shown (#58).
+        rows = [[name, ws_label, PENDING, PENDING] for name, ws_label in pairs]
         return rows, failures
 
     def _style_summary(self, name, workspace_name):

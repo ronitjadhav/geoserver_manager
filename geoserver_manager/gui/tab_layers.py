@@ -20,6 +20,7 @@ from qgis.PyQt.QtWidgets import QApplication, QDialog, QMessageBox
 
 from geoserver_manager.gui.dlg_preview import LayerPreviewDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.gui.scope import PENDING
 from geoserver_manager.toolbelt.payload import bbox_text, keyword_list, text_of, unwrap
 from geoserver_manager.toolbelt.qgis_export import (
     export_to_geopackage,
@@ -171,6 +172,8 @@ class LayerTabMixin:
             ]
         )
         self._path_columns = (0, 1, 3)  # the store is in the resource's path
+        self._row_detail = lambda row: self._layer_summary(f"{row[1]}:{row[0]}")
+        self._detail_columns = (2, 3, 4)
         self._start_load(
             translate("LayerTabMixin", "Failed to load layers"), self._fetch_layer_rows
         )
@@ -185,16 +188,13 @@ class LayerTabMixin:
         a warning names it.
         """
         names = self._all_layer_names()
-        rows, failures = [], []
-        for qualified, (summary, error) in zip(
-            names, self._fan_out(self._layer_summary, names, task)
-        ):
+        # Type, store and style follow for the page shown (#58); a row action
+        # fetches them first when they are still pending (_addressable).
+        rows = []
+        for qualified in names:
             workspace, _, name = qualified.rpartition(":")
-            if error:
-                failures.append((qualified, error))
-            kind, store, style = summary or ("-", "-", "-")
-            rows.append([name, workspace, kind, store, style])
-        return rows, failures
+            rows.append([name, workspace, PENDING, PENDING, PENDING])
+        return rows, []
 
     def _layers_url(self, qualified_name=None):
         """/rest/layers.json, or one layer's own document under it."""

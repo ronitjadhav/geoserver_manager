@@ -44,6 +44,14 @@ what the code cannot tell you. Python 3.12 (QGIS 3.40 and newer), PyQt5
   progress, *Refresh* turns into *Cancel*, and `finished()` comes back on the GUI thread to
   render. A fetch is `_fetch_<x>_rows(task=None) -> (rows, failures)`; it runs in a worker,
   so it must not touch a widget, and it only gets at the task by passing it to `_fan_out`.
+  A fetch lists **names only** (#58): a column that needs one GET per row holds `scope.PENDING`,
+  and the loader sets, after `_setup_table`, `self._row_detail = row -> cells` (a stateless read,
+  run in a worker) and `self._detail_columns`. `_show_page` then fetches the pending cells of the
+  20 rows on screen in the `_detail` slot, and writes them into the shared row lists in place.
+  A row action, and a sort on a detail column, first complete the rows they need
+  (`_complete_rows`, from `_addressable` and `_on_header_clicked`). A late fill checks
+  `_table_generation`, so it never lands in another tab's table. The search box matches the
+  cells loaded so far. Measured: the Styles tab with 147 styles went from 158 requests to 31.
   Mutations (add / edit) run under `_run_action`, with their requests in `_wait_for`: the
   user is waiting for the dialog they just confirmed, but a hung server must not freeze QGIS
   for the library's 120 s timeout. So the action passed to `_wait_for` makes requests only; a

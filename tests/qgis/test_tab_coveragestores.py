@@ -255,15 +255,15 @@ class TestCoverageStoresTab(unittest.TestCase):
         self.assertTrue(hasattr(self.dlg, "_load_coverage_stores"))
 
     def test_lists_stores_with_their_type_and_published_count(self):
-        rows, failures = self.dlg._fetch_coverage_store_rows()
+        self.dlg._load_coverage_stores()  # the page's details fill as it shows
         self.assertEqual(
-            rows,
+            self.dlg._all_rows,
             [  # workspace order, as get_workspaces gives them
                 ["sfdem", "sf", "GeoTIFF", "1"],
                 ["mosaic", "nurc", "ImageMosaic", "0"],  # created, nothing published
             ],
         )
-        self.assertEqual(failures, [])
+        self.assertEqual(self.warnings, [])
 
     def test_add_without_workspaces_says_so_before_the_form(self):
         self.dlg._get_workspace_names = lambda: []
@@ -287,9 +287,10 @@ class TestCoverageStoresTab(unittest.TestCase):
             return summary(ws_name, name)
 
         self.dlg._coverage_store_summary = broken
-        rows, failures = self.dlg._fetch_coverage_store_rows()
-        self.assertIn(["mosaic", "nurc", "-", "-"], rows)
-        self.assertEqual([label for label, _ in failures], ["nurc/mosaic"])
+        self.dlg._load_coverage_stores()
+        self.assertIn(["mosaic", "nurc", "-", "-"], self.dlg._all_rows)
+        self.assertEqual(len(self.warnings), 1)
+        self.assertIn("nurc:mosaic", self.warnings[0])
 
     def test_a_workspace_without_stores_is_not_a_failure(self):
         # GeoServer answers {"coverageStores": ""}, not a list, not an error.

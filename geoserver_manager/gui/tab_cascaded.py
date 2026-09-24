@@ -13,6 +13,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.gui.scope import PENDING
 from geoserver_manager.toolbelt.payload import bbox_text, changed, keyword_list
 from geoserver_manager.toolbelt.rest import PartlySaved
 
@@ -127,6 +128,10 @@ class CascadedStoreTabMixin:
                 self.actions_column_label(),
             ]
         )
+        self._row_detail = lambda row: self._cascaded_store_summary(
+            self._cascaded_store_detail(row[1], row[0], row[2])
+        )
+        self._detail_columns = (3, 4)
         self._start_load(
             translate("CascadedStoreTabMixin", "Failed to load cascaded stores"),
             self._fetch_cascaded_store_rows,
@@ -142,19 +147,11 @@ class CascadedStoreTabMixin:
             if error is None
             for name, kind in stores
         ]
-        details = self._fan_out(
-            lambda triple: self._cascaded_store_detail(*triple), triples, task
-        )
+        # Enabled and the URL follow for the page shown (#58).
         rows = [
-            [name, ws_name, kind, *self._cascaded_store_summary(detail)]
-            for (ws_name, name, kind), (detail, _error) in zip(triples, details)
+            [name, ws_name, kind, PENDING, PENDING] for ws_name, name, kind in triples
         ]
         failures = [(ws, err) for ws, (_stores, err) in zip(ws_names, listed) if err]
-        failures += [
-            (f"{ws}/{name}", err)
-            for (ws, name, _kind), (_detail, err) in zip(triples, details)
-            if err
-        ]
         return rows, failures
 
     def _cascaded_store_summary(self, detail):
