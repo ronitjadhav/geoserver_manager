@@ -11,6 +11,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.toolbelt.payload import keyword_list, words
 from geoserver_manager.toolbelt.rest import PartlySaved
 
 # GeoServer spells the WMS abstract "abstrct" in its JSON, a typo old enough to
@@ -195,19 +196,18 @@ class WorkspaceTabMixin:
             {
                 "key": "wms_keywords",
                 "label": translate("WorkspaceTabMixin", "Keywords"),
-                "type": "text",
+                "type": "list",
                 "group": group,
-                "help": translate("WorkspaceTabMixin", "Comma separated"),
             },
             {
                 "key": "wms_srs",
                 "label": translate("WorkspaceTabMixin", "SRS list"),
-                "type": "text",
+                "type": "list",
                 "group": group,
                 "help": translate(
                     "WorkspaceTabMixin",
-                    "EPSG codes without the prefix, comma separated (4326, 3857). "
-                    "Empty advertises every SRS GeoServer knows.",
+                    "EPSG codes without the prefix (4326, 3857). Empty "
+                    "advertises every SRS GeoServer knows.",
                 ),
             },
             {
@@ -283,8 +283,8 @@ class WorkspaceTabMixin:
             "wms_enabled": bool(settings.get("enabled", True)),
             "wms_title": settings.get("title") or "",
             "wms_abstract": settings.get(_ABSTRACT) or "",
-            "wms_keywords": cls._joined(settings.get("keywords")),
-            "wms_srs": cls._joined(settings.get("srs")),
+            "wms_keywords": keyword_list(settings.get("keywords")),
+            "wms_srs": keyword_list(settings.get("srs")),
             "wms_max_rendering_time": int(settings.get("maxRenderingTime") or 0),
             "wms_max_rendering_errors": int(settings.get("maxRenderingErrors") or 0),
             "wms_default_locale": settings.get("defaultLocale") or "",
@@ -296,8 +296,8 @@ class WorkspaceTabMixin:
             dlg.set_field_visible(field["key"], own)
 
     @staticmethod
-    def _split(text):
-        return [item.strip() for item in text.split(",") if item.strip()]
+    def _split(value):
+        return words(value)
 
     def _apply_wms_settings(self, workspace_name, values, existed):
         """Create, update or remove one workspace's own WMS settings.
@@ -373,9 +373,8 @@ class WorkspaceTabMixin:
             {
                 "key": f"{service}_keywords",
                 "label": translate("WorkspaceTabMixin", "Keywords"),
-                "type": "text",
+                "type": "list",
                 "group": group,
-                "help": translate("WorkspaceTabMixin", "Comma separated"),
             },
         ]
         if service == "wfs":
@@ -428,7 +427,7 @@ class WorkspaceTabMixin:
             f"{service}_enabled": settings.get("enabled", True) is not False,
             f"{service}_title": settings.get("title") or "",
             f"{service}_abstract": settings.get(_ABSTRACT) or "",
-            f"{service}_keywords": cls._joined(settings.get("keywords")),
+            f"{service}_keywords": keyword_list(settings.get("keywords")),
         }
         if service == "wfs":
             values["wfs_max_features"] = int(settings.get("maxFeatures") or 0)

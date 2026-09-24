@@ -32,6 +32,19 @@ _XML = {"Content-Type": "application/xml"}
 # What GeoServer itself configures when it caches a new layer automatically.
 DEFAULT_GRIDSETS = ("EPSG:4326", "EPSG:900913")
 DEFAULT_FORMATS = ("image/png", "image/jpeg")
+# What the Formats picker offers: the MIME types GeoWebCache caches.
+KNOWN_FORMATS = (
+    "image/png",
+    "image/jpeg",
+    "image/png8",
+    "image/gif",
+    "image/vnd.jpeg-png",
+    "image/vnd.jpeg-png8",
+    "application/vnd.mapbox-vector-tile",
+    "application/json;type=geojson",
+    "application/json;type=topojson",
+    "application/json;type=utfgrid",
+)
 
 # The document GeoServer writes for a new layer, minus the id it fills in
 # itself. The STYLES filter is what lets one cache hold a tile set per style.
@@ -292,40 +305,27 @@ class GwcTabMixin:
     # -- The document ---------------------------------------------------------
 
     @staticmethod
-    def _lines(text):
-        """Non-empty, stripped, de-duplicated lines of a textarea, in order."""
-        lines = []
-        for line in (text or "").splitlines():
-            line = line.strip()
-            if line and line not in lines:
-                lines.append(line)
-        return lines
+    def _gridset_row(row):
+        """(name, (start, stop) or None) of a gridset row [name, from, to].
 
-    @staticmethod
-    def _gridset_line(line):
-        """(name, (start, stop) or None) of a gridset line "EPSG:4326 = 2-10".
-
-        The range is the published zoom levels (zoomStart / zoomStop).
+        The range is the published zoom levels (zoomStart / zoomStop); both
+        blank means every level of the gridset.
         ponytail: the cached levels (min/maxCachedLevel) are left as they are;
-        add them to the syntax when someone needs to cache less than is served.
+        add two columns when someone needs to cache less than is served.
         """
-        name, _, zoom = line.partition("=")
-        name, zoom = name.strip(), zoom.strip()
-        if not zoom:
+        name = (row[0] or "").strip()
+        start = row[1] if len(row) > 1 else None
+        stop = row[2] if len(row) > 2 else None
+        if start is None and stop is None:
             return name, None
-        start, dash, stop = zoom.partition("-")
-        try:
-            levels = (int(start), int(stop))
-        except ValueError:
-            levels = None
-        if not dash or levels is None or not 0 <= levels[0] <= levels[1]:
+        if start is None or stop is None or start > stop:
             raise ValueError(
                 translate(
                     "GwcTabMixin",
-                    "'{}': write the zoom levels as first-last, e.g. 0-12.",
-                ).format(line)
+                    "'{}': give both zoom levels, the first no higher than the last.",
+                ).format(name)
             )
-        return name, levels
+        return name, (int(start), int(stop))
 
     @staticmethod
     def _parse_xml(xml_text):
@@ -349,13 +349,13 @@ class GwcTabMixin:
         return {
             "name": root.findtext("name") or "",
             "enabled": (root.findtext("enabled") or "true").strip().lower() == "true",
-            "gridsets": "\n".join(
-                GwcTabMixin._gridset_text(element)
+            "gridsets": [
+                GwcTabMixin._gridset_cells(element)
                 for element in root.findall("gridSubsets/gridSubset")
-            ),
-            "formats": "\n".join(
+            ],
+            "formats": [
                 element.text or "" for element in root.findall("mimeFormats/string")
-            ),
+            ],
             "meta_width": meta[0] if len(meta) > 0 else 4,
             "meta_height": meta[1] if len(meta) > 1 else 4,
             "expire_cache": number("expireCache"),
@@ -375,13 +375,13 @@ class GwcTabMixin:
         return "\n".join(parts)
 
     @staticmethod
-    def _gridset_text(element):
-        """One gridSubset as a form line, with its zoom range when it has one."""
+    def _gridset_cells(element):
+        """One gridSubset as a form row: [name, from, to], blanks as None."""
         name = element.findtext("gridSetName") or ""
         start, stop = element.findtext("zoomStart"), element.findtext("zoomStop")
         if start is None or stop is None:
-            return name
-        return f"{name} = {start.strip()}-{stop.strip()}"
+            return [name, None, None]
+        return [name, int(start), int(stop)]
 
     @staticmethod
     def _gwc_xml_with_values(xml_text, values):
@@ -393,12 +393,15 @@ class GwcTabMixin:
         clears the gridset's; the filters are replaced only when the form
         has them.
         """
-        # One subset per gridset, the first line naming it winning.
+        # One subset per gridset, the first row naming it winning.
         gridsets = {}
-        for line in GwcTabMixin._lines(values.get("gridsets")):
-            name, levels = GwcTabMixin._gridset_line(line)
-            gridsets.setdefault(name, levels)
-        formats = GwcTabMixin._lines(values.get("formats"))
+        for row in values.get("gridsets") or ():
+            name, levels = GwcTabMixin._gridset_row(row)
+            if name:
+                gridsets.setdefault(name, levels)
+        formats = list(
+            dict.fromkeys(f.strip() for f in values.get("formats") or () if f.strip())
+        )
         if not gridsets:
             raise ValueError(
                 translate("GwcTabMixin", "At least one gridset is required.")
@@ -583,30 +586,42 @@ class GwcTabMixin:
             {
                 "key": "gridsets",
                 "label": translate("GwcTabMixin", "Gridsets"),
-                "type": "textarea",
+                "type": "table",
                 "required": True,
+                "choices": list(gridset_names),
+                "columns": [
+                    {"label": translate("GwcTabMixin", "Gridset")},
+                    {
+                        "label": translate("GwcTabMixin", "From zoom"),
+                        "type": "spin",
+                        "min": 0,
+                        "max": 40,
+                        "none_text": translate("GwcTabMixin", "all"),
+                    },
+                    {
+                        "label": translate("GwcTabMixin", "To zoom"),
+                        "type": "spin",
+                        "min": 0,
+                        "max": 40,
+                        "none_text": translate("GwcTabMixin", "all"),
+                    },
+                ],
                 "help": translate(
                     "GwcTabMixin",
-                    "One per line: the tile grids the layer is cached in. Add "
-                    '"= 0-12" to a line to serve only those zoom levels.',
+                    "The tile grids the layer is cached in. Set the zoom levels "
+                    'to serve only those; "all" serves every level.',
                 ),
-            },
-            {
-                "key": "add_gridset",
-                "label": translate("GwcTabMixin", "Add a gridset"),
-                "type": "combo",
-                "options": [""] + list(gridset_names),
-                "help": translate("GwcTabMixin", "Appends to the list above."),
             },
             {
                 "key": "formats",
                 "label": translate("GwcTabMixin", "Formats"),
-                "type": "textarea",
+                "type": "table",
                 "required": True,
-                "help": translate(
-                    "GwcTabMixin",
-                    "One MIME type per line, e.g. image/png, image/jpeg, image/png8.",
-                ),
+                "choices": list(KNOWN_FORMATS),
+                "columns": [{"label": translate("GwcTabMixin", "Format")}],
+                "min_height": 120,
+                "max_height": 220,
+                "help": translate("GwcTabMixin", "The image or tile formats cached."),
             },
             {
                 "key": "meta_width",
@@ -694,22 +709,6 @@ class GwcTabMixin:
                 field["max"] = max(field.get("max", value), value)
         return fields
 
-    def _wire_gridset_picker(self, dlg):
-        """The Add-a-gridset combo appends its pick to the gridsets textarea."""
-        combo = dlg.get_widget("add_gridset")
-        textarea = dlg.get_widget("gridsets")
-
-        def append(name):
-            if not name:
-                return
-            lines = self._lines(textarea.toPlainText())
-            if name not in lines:
-                lines.append(name)
-                textarea.setPlainText("\n".join(lines))
-            combo.setCurrentIndex(0)
-
-        combo.currentTextChanged.connect(append)
-
     def _show_gwc_layer_info(self, row_data):
         """Open a cached layer's configuration for editing."""
         name = row_data[0]
@@ -736,7 +735,6 @@ class GwcTabMixin:
             values=self._gwc_form_values(xml_text),
             parent=self,
         )
-        self._wire_gridset_picker(dlg)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
@@ -784,13 +782,12 @@ class GwcTabMixin:
             # in the form and an untouched form keeps it.
             values={
                 **self._gwc_form_values(_NEW_LAYER_XML.format(name="")),
-                "gridsets": "\n".join(DEFAULT_GRIDSETS),
-                "formats": "\n".join(DEFAULT_FORMATS),
+                "gridsets": [[name, None, None] for name in DEFAULT_GRIDSETS],
+                "formats": list(DEFAULT_FORMATS),
             },
             parent=self,
             ok_label=translate("GwcTabMixin", "Create"),
         )
-        self._wire_gridset_picker(dlg)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
@@ -849,14 +846,12 @@ class GwcTabMixin:
                     )
                 )
             request["bounds"] = {"coords": {"double": coords}}
-        parameters = [
-            line.partition("=") for line in GwcTabMixin._lines(values.get("parameters"))
-        ]
+        parameters = values.get("parameters") or {}
         if parameters:
             request["parameters"] = {
                 "entry": [
-                    {"string": [key.strip(), value.strip()]}
-                    for key, _, value in parameters
+                    {"string": [key.strip(), str(value).strip()]}
+                    for key, value in parameters.items()
                 ]
             }
         return {"seedRequest": request}
@@ -965,13 +960,12 @@ class GwcTabMixin:
             {
                 "key": "parameters",
                 "label": translate("GwcTabMixin", "Parameters"),
-                "type": "textarea",
-                "placeholder": "STYLES = population",
+                "type": "keyvalue",
                 "group": translate("GwcTabMixin", "Advanced"),
                 "help": translate(
                     "GwcTabMixin",
-                    "One 'KEY = value' per line, for the tiles of one parameter "
-                    "filter value. Empty: the default tiles.",
+                    "A parameter and its value (STYLES, population) for the tiles "
+                    "of one parameter filter value. Empty: the default tiles.",
                 ),
             },
         ]
@@ -988,9 +982,7 @@ class GwcTabMixin:
         if xml_text is None:
             return
         current = self._gwc_form_values(xml_text)
-        gridsets = [
-            self._gridset_line(line)[0] for line in self._lines(current["gridsets"])
-        ]
+        gridsets = [row[0] for row in current["gridsets"]]
         dlg = ResourceFormDialog(
             title=translate("GwcTabMixin", "Seed or Truncate '{}'").format(name),
             description=translate(
@@ -998,7 +990,7 @@ class GwcTabMixin:
                 "GeoWebCache runs the task in the background; the task list "
                 "opens next and shows its progress.",
             ),
-            fields=self._seed_fields(gridsets, self._lines(current["formats"])),
+            fields=self._seed_fields(gridsets, current["formats"]),
             parent=self,
             ok_label=translate("GwcTabMixin", "Start"),
         )

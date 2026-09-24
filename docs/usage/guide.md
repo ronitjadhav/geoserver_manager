@@ -97,8 +97,8 @@ on the server.
 The connection details go on the *Connection* tab.
 ```
 
-*Other...* and any type the plugin has no form for get a plain editor, one
-`key = value` per line, exactly as GeoServer stores it.
+*Other...* and any type the plugin has no form for get a table of parameters
+and their values, exactly as GeoServer stores them.
 
 **Click a name** to edit a store, or to enable or disable it. A few things to
 know:
@@ -107,8 +107,8 @@ know:
 - The password field is always blank. GeoServer only returns it encrypted.
   Leave it empty to keep the stored password, or type a new one.
 - The *Advanced* tab lists every other connection parameter (pool size,
-  timeouts, Loose bbox...) as `key = value` lines. Change, add or remove a
-  line there; a removed line removes the parameter.
+  timeouts, Loose bbox...) in a table. Change, add or remove a row there; a
+  removed row removes the parameter.
 - After a save, the plugin asks GeoServer to open the store. If it cannot (a
   wrong host, password or path), a warning says so at once, with GeoServer's
   reason.
@@ -267,8 +267,10 @@ A layer group publishes several layers as one.
 ```
 
 **Create a Layer Group:** give it a name, title, abstract and mode. Then add
-the layers in order on the *Layers* tab, each with its style. A line can also
-name another group, to nest it. GeoServer works out the bounds. An *Earth
+the layers on the *Layers* tab: pick one (or type its name) and click the
+plus. Each row has a style picker; a blank one keeps the layer's own default.
+The arrows move the selected row up or down. A row can also name another
+group, to nest it. GeoServer works out the bounds. An *Earth
 Observation Tree* also needs a root layer, and its style (the layer's default
 when left blank).
 
@@ -293,7 +295,7 @@ mode.
 :alt: Editing the tasmania layer group, its Layers tab listing the layers in drawing order with their styles
 :width: 420px
 
-One line per layer or group, bottom first; `= style` overrides a layer's own.
+The first row is drawn first, at the bottom; the arrows reorder the rows.
 ```
 
 ## Styles
@@ -352,8 +354,8 @@ The tile cache (GeoWebCache) stores map tiles so they are drawn only once.
 ```
 
 **Click a name** to change how a layer is cached: on or off, its gridsets and
-its image formats. Add `= 0-12` to a gridset line to serve only those zoom
-levels. Meta-tiling, gutter and expiry are on the *Advanced* tab. The
+its image formats, both picked from lists. Set a gridset's *From zoom* and
+*To zoom* to serve only those levels; "all" serves every one. Meta-tiling, gutter and expiry are on the *Advanced* tab. The
 *Parameter filters* tab holds GeoWebCache's filters as XML: which STYLES,
 CQL_FILTER or TIME values get a cache of their own.
 
@@ -367,7 +369,7 @@ Row actions:
 - **Seed or truncate…** renders the missing tiles (*Seed*), renders them all
   again (*Reseed*) or deletes them (*Truncate*), for one gridset, format and
   zoom range. On the *Advanced* tab, limit it to an area, or to one
-  parameter value such as `STYLES = population`. GeoWebCache runs it in the
+  parameter value (the parameter `STYLES`, the value `population`). GeoWebCache runs it in the
   background, and the task list opens.
 - **Tasks** shows the layer's running tasks, refreshed every two seconds,
   with how many tiles are done. *Stop all* ends them.

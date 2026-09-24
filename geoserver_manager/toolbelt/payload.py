@@ -27,7 +27,8 @@ def as_list(value):
     """A GeoWebCache collection: "" when empty, bare when it has one entry."""
     if value in (None, ""):
         return []
-    return [value] if isinstance(value, (dict, str)) else list(value)
+    # Any scalar is one entry: a single SRS comes back as the number 4326.
+    return list(value) if isinstance(value, (list, tuple)) else [value]
 
 
 def keyword_list(value):
@@ -40,6 +41,18 @@ def keyword_list(value):
     if isinstance(value, dict):
         value = value.get("string")
     return [str(keyword) for keyword in as_list(value)]
+
+
+def words(value):
+    """A form's list field as clean strings: a list, or comma or line text.
+
+    The forms edit keywords and SRS lists in a list widget now; the text
+    form stays readable here because the publish paths are fed by several
+    forms and the layer tree.
+    """
+    if isinstance(value, str):
+        value = value.replace("\n", ",").split(",")
+    return [str(item).strip() for item in (value or ()) if str(item).strip()]
 
 
 def text_of(value):

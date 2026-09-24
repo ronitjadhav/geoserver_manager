@@ -21,7 +21,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog, QDialogButtonBox
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.toolbelt.payload import changed, keyword_list
+from geoserver_manager.toolbelt.payload import changed, keyword_list, words
 from geoserver_manager.toolbelt.rest import summarise_body
 
 # Strings are looked up in this file's own context: self.tr() would resolve
@@ -304,7 +304,7 @@ class ServerTabMixin:
         """Prefill for one row's form, from what GeoServer returned. Pure."""
         values = {key: settings.get(rest_key) for key, rest_key in _keys_of(kind)}
         if kind in SERVICES:
-            values["keywords"] = "\n".join(keyword_list(settings.get("keywords")))
+            values["keywords"] = keyword_list(settings.get("keywords"))
             values["enabled"] = settings.get("enabled", True) is not False
         for key, value in values.items():
             if value is None:
@@ -433,8 +433,7 @@ class ServerTabMixin:
             {
                 "key": "keywords",
                 "label": t("ServerTabMixin", "Keywords"),
-                "type": "textarea",
-                "help": t("ServerTabMixin", "One per line"),
+                "type": "list",
             },
         ]
         if kind == "wfs":
@@ -467,14 +466,8 @@ class ServerTabMixin:
         """PUT what changed. False when nothing did. Runs in a worker."""
         if kind in SERVICES:
             body = changed(before, after, _keys_of(kind))
-            if after.get("keywords") != before.get("keywords"):
-                body["keywords"] = {
-                    "string": [
-                        line.strip()
-                        for line in after["keywords"].splitlines()
-                        if line.strip()
-                    ]
-                }
+            if words(after.get("keywords")) != words(before.get("keywords")):
+                body["keywords"] = {"string": words(after.get("keywords"))}
             if not body:
                 return False
             # A service merges a partial PUT (measured on 2.28.5).

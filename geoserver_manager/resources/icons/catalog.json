@@ -221,6 +221,34 @@
       "purpose": "Two stacked server units with a status light: the settings of the whole GeoServer.",
       "status": "custom",
       "asset": "icons/server.svg"
+    },
+    "list-add": {
+      "label": "Add to a list",
+      "category": "Forms",
+      "purpose": "A plus: add the picked or typed name as a new row.",
+      "status": "custom",
+      "asset": "icons/list-add.svg"
+    },
+    "list-remove": {
+      "label": "Remove from a list",
+      "category": "Forms",
+      "purpose": "A minus: remove the selected row.",
+      "status": "custom",
+      "asset": "icons/list-remove.svg"
+    },
+    "move-up": {
+      "label": "Move up",
+      "category": "Forms",
+      "purpose": "An arrow up: move the selected row one place earlier.",
+      "status": "custom",
+      "asset": "icons/move-up.svg"
+    },
+    "move-down": {
+      "label": "Move down",
+      "category": "Forms",
+      "purpose": "An arrow down: move the selected row one place later.",
+      "status": "custom",
+      "asset": "icons/move-down.svg"
     }
   }
 }
