@@ -45,7 +45,8 @@ Supported field types:
     - "layer"     -> QgsMapLayerComboBox: a layer of the QGIS project, the
                      value being the layer itself. Vector and raster layers,
                      or "raster_files": rasters GDAL reads from a file;
-                     "show_crs" adds each layer's CRS
+                     "show_crs" adds each layer's CRS; "allow_empty" starts
+                     with none picked when the value is None
     - "extent"    -> QgsExtentWidget: an area, typed or taken from "canvas"
                      (the map view), a layer or a bookmark, in the CRS set by
                      set_extent_crs(); "minx, miny, maxx, maxy", or "" unset
@@ -96,6 +97,7 @@ from qgis.gui import (
     QgsMapLayerComboBox,
     QgsPasswordLineEdit,
     QgsProjectionSelectionDialog,
+    QgsScrollArea,
 )
 from qgis.PyQt.QtCore import QCoreApplication, QMetaType, QSize, Qt
 from qgis.PyQt.QtGui import QPixmap
@@ -107,10 +109,11 @@ from qgis.PyQt.QtWidgets import (
     QFormLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPlainTextEdit,
-    QScrollArea,
     QSizePolicy,
     QSpinBox,
+    QTableView,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -119,6 +122,7 @@ from qgis.PyQt.QtWidgets import (
 from geoserver_manager.gui.icons import icon
 from geoserver_manager.gui.list_table import ListTable, short_combo
 from geoserver_manager.gui.theme import hint_colour, invalid_field_colour
+from geoserver_manager.toolbelt.rest import Abandoned
 
 # QGIS has no XML editor; its HTML one reads SLD and GeoWebCache's XML well,
 # and text that is not markup simply stays plain.
@@ -129,21 +133,25 @@ _CODE_EDITORS = {
 }
 
 
-class _FormPage(QScrollArea):
+class _FormPage(QgsScrollArea):
     """A form that scrolls when the dialog is too small, rather than squeeze.
 
     Laid out straight in a tab, a form ignored the height its wrapped help
     needs at a narrower width, and the rows were drawn over each other; a
     tall form also could not shrink to fit a short screen. Qt's own size hint
     for a scroll area stops at 24 lines, so the form's is used: a form that
-    fits the screen opens without a scroll bar.
+    fits the screen opens without a scroll bar. QGIS's own scroll area: a
+    plain one let the wheel change a combo or a spin box the cursor passed
+    over while scrolling (a layer's projection policy, which Save then sent).
     """
 
     def __init__(self, form):
         super().__init__()
         self.setWidget(form)
         self.setWidgetResizable(True)
-        self.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.setFrameShape(QgsScrollArea.Shape.NoFrame)
+        # Not a Tab stop of its own: it took the focus when a form opened.
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         # The dialog is never narrower than the form: no sideways scrolling.
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         # The tab's own background: setWidget() makes the form paint its own.
@@ -172,6 +180,7 @@ class ResourceFormDialog(QDialog):
         description=None,
         parent=None,
         ok_label=None,
+        validate=None,
     ):
         """
         :param title: dialog window title.
@@ -182,11 +191,17 @@ class ResourceFormDialog(QDialog):
         :param ok_label: what the primary button does: "Create", "Publish",
             "Upload", "Apply"… Defaults to "Save", which is right for an edit
             and wrong for everything else.
+        :param validate: validate(values), run on Save once the fields are
+            filled: a ValueError keeps the form open with its message, and
+            what was typed. For the checks a save would refuse (a name that
+            is taken): after the form closed, the input was lost.
         """
         super().__init__(parent)
         self.setWindowTitle(title)
 
         self._fields = fields
+        self._validate = validate
+        self._opened_with = None  # the values as shown, taken when first shown
         self._widgets = {}  # key -> widget
         self._row_widgets = {}  # key -> (label_widget, wrapper_widget) for visibility
         # Keys hidden on purpose. Tracked explicitly because Qt reports every
@@ -243,7 +258,7 @@ class ResourceFormDialog(QDialog):
             ok_label or self.tr("Save")
         )
         self._button_box.accepted.connect(self._on_accept)
-        self._button_box.rejected.connect(self.reject)
+        self._button_box.rejected.connect(self._on_cancel)
         # Why the form did not accept: a red border alone says nothing when
         # the field is an empty combo with nothing to pick.
         self._validation_label = QLabel()
@@ -451,6 +466,7 @@ class ResourceFormDialog(QDialog):
             w.setMap(
                 {str(k): "" if v is None else str(v) for k, v in (value or {}).items()}
             )
+            self._fit_keys(w)
             w.setReadOnly(read_only)
             self._grows(w, field, max_height=200)
             w.setMinimumWidth(0)  # as for "list": its buttons stay in view
@@ -491,7 +507,10 @@ class ResourceFormDialog(QDialog):
                     Qgis.LayerFilter.VectorLayer | Qgis.LayerFilter.RasterLayer
                 )
             w.setShowCrs(field.get("show_crs", False))
-            if value is not None:
+            if field.get("allow_empty"):
+                w.setAllowEmptyLayer(True)
+                w.setLayer(value)  # None: nothing picked, Save asks for one
+            elif value is not None:
                 w.setLayer(value)
             w.setEnabled(not read_only)
             return w
@@ -543,6 +562,17 @@ class ResourceFormDialog(QDialog):
                 edit.setText(dialog.crs().authid())
 
         action.triggered.connect(pick)
+
+    @staticmethod
+    def _fit_keys(widget):
+        """Widen a key/value table's key column to its longest key.
+
+        It stayed at a fixed width while the value took the rest: "Batch
+        inse…" even in a wide dialog.
+        """
+        view = widget.findChild(QTableView)
+        if view is not None:
+            view.resizeColumnToContents(0)
 
     @staticmethod
     def _grows(widget, field, min_height=100, max_height=None):
@@ -650,6 +680,11 @@ class ResourceFormDialog(QDialog):
             label, wrapper = self._row_widgets[key]
             label.setVisible(visible)
             wrapper.setVisible(visible)
+            # The dialog keeps the page's old size hints: a store type whose
+            # fields are wider (WFS, Other...) was cut off at the right. No
+            # page yet while the form is being built.
+            if key in self._field_page:
+                self._field_page[key].updateGeometry()
         if visible:
             self._hidden_keys.discard(key)
         else:
@@ -697,6 +732,7 @@ class ResourceFormDialog(QDialog):
                 widget.setList(list(value))
             elif isinstance(widget, QgsKeyValueWidget):
                 widget.setMap(dict(value))
+                self._fit_keys(widget)
             elif isinstance(widget, QComboBox):
                 self._select(widget, value)
             else:
@@ -742,10 +778,35 @@ class ResourceFormDialog(QDialog):
         a taller form scrolls.
         """
         super().showEvent(event)
+        if self._opened_with is None:
+            # After the tab wired and filled the form, before any typing.
+            self._opened_with = self.get_values()
         needed = self.needed_height()
         screen = self.screen().availableGeometry().height() if self.screen() else needed
         if self.height() < needed:
             self.resize(self.width(), min(needed, screen))
+        self._focus_first_field()
+
+    def _focus_first_field(self):
+        """Put the cursor in the first field there is to type in.
+
+        It sat on the tab bar or on nothing: typing did nothing.
+        """
+        page = self._tabs.currentWidget() if self._tabs else None
+        for field in self._fields:
+            key = field["key"]
+            if (
+                (page is not None and self._field_page.get(key) is not page)
+                or key in self._hidden_keys
+                or field.get("read_only")
+                or field.get("type") == "image"
+            ):
+                continue
+            widget = self._widgets[key]
+            target = widget.picker if isinstance(widget, ListTable) else widget
+            if target.isEnabled():
+                target.setFocus()
+                return
 
     def needed_height(self):
         """The height that shows the whole form, at the current width."""
@@ -763,6 +824,36 @@ class ResourceFormDialog(QDialog):
             wraps = max(max(form.heightForWidth(width), 0) for form in forms)
             needed += max(wraps - hinted, 0)
         return needed
+
+    def keyPressEvent(self, event):  # noqa: N802 (Qt's own spelling)
+        if event.key() == Qt.Key.Key_Escape:
+            self._on_cancel()
+            return
+        super().keyPressEvent(event)
+
+    def _on_cancel(self):
+        """Esc or Cancel: ask before an edit is thrown away.
+
+        Esc closed a style's editor with its changes gone, without a word.
+        A form with nothing to save (a viewer) or nothing changed just closes.
+        Only the user's own Esc and Cancel ask: close() goes through reject().
+        """
+        saves = self._button_box.button(QDialogButtonBox.StandardButton.Ok).isVisible()
+        if (
+            saves
+            and self._opened_with is not None
+            and self.get_values() != self._opened_with
+            and QMessageBox.question(
+                self,
+                self.windowTitle(),
+                self.tr("Discard your changes?"),
+                QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            != QMessageBox.StandardButton.Discard
+        ):
+            return
+        self.reject()
 
     def hide_save_button(self):
         """Hide the Save button, leaving only Cancel (for view-only dialogs)."""
@@ -826,4 +917,13 @@ class ResourceFormDialog(QDialog):
                 self._validation_label.show()
                 return
 
+        if self._validate is not None:
+            try:
+                self._validate(values)
+            except Abandoned:
+                return  # the user stopped waiting: the form stays as it is
+            except Exception as error:  # a refusal: say it, keep the input
+                self._validation_label.setText(str(error) or type(error).__name__)
+                self._validation_label.show()
+                return
         self.accept()

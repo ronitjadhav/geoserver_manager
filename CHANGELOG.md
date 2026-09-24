@@ -377,6 +377,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **A refused form keeps what was typed.** A name that is taken, a layer or
+  style not on the server, a zoom range with one end, filters that are not
+  XML or an SRS that is not an EPSG code were refused after the form
+  closed: a whole PostGIS form, its password included, had to be typed
+  again. They are checked on Save, and the form stays open with the reason.
+- **Enter in a list's picker adds the name**, and no longer saves the form.
+  Enter in the search box goes to the results instead of opening the Add
+  form.
+- **Scrolling a form no longer changes its fields:** the wheel changed a
+  combo or a spin box the cursor passed over (a layer's projection policy,
+  which Save then sent).
+- **Fields shown after a type switch are not cut off** at the right (a
+  datastore's WFS or Other..., a coverage store's ImageMosaic ZIP).
+- **Esc or Cancel asks before throwing an edit away**, and a form opens with
+  the cursor in its first field.
+- Parameter names are no longer cut off in key/value tables. *Push style
+  from QGIS* picks no layer when none matches, instead of an unrelated one.
+  *Truncate* from the seed form asks first, like the row action. The seed
+  area's help gives the order QGIS reads a typed area in. The Settings page
+  no longer overlaps at its minimum height, and Tab starts at the profile.
 - **The dialog opened from the layer tree dropped every result.** Closed
   once, then reopened by *Publish to GeoServer*, it never drew its table,
   skipped the upload's title, keywords and style, and stopped a batch after

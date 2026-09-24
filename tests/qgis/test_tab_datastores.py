@@ -63,6 +63,41 @@ class RecordingGS:
         return ("ok", 201)
 
 
+class TestAddFormChecksFirst(unittest.TestCase):
+    def test_a_taken_name_keeps_the_add_form_open(self):
+        # Refused after the form closed, the whole form had to be typed again.
+        from qgis.PyQt.QtWidgets import QDialog
+
+        from geoserver_manager.gui import tab_datastores
+
+        dlg = SyncDialog()
+        dlg.gs = RecordingGS(taken={"pg"})
+        dlg._get_workspace_names = lambda: ["topp"]
+        seen = {}
+
+        class Filling(ResourceFormDialog):
+            def exec(inner):
+                inner.set_values({"type": "PostGIS"})
+                for key, text in (
+                    ("name", "pg"),
+                    ("pg_host", "db"),
+                    ("pg_db", "d"),
+                    ("pg_user", "u"),
+                    ("pg_password", "secret"),
+                ):
+                    inner.get_widget(key).setText(text)
+                inner._on_accept()
+                seen["open"] = not inner.result()
+                seen["said"] = inner._validation_label.text()
+                return QDialog.DialogCode.Rejected
+
+        with mock.patch.object(tab_datastores, "ResourceFormDialog", Filling):
+            dlg._add_datastore()
+        self.assertTrue(seen["open"])
+        self.assertIn("already exists", seen["said"])
+        self.assertEqual(dlg.gs.created, [])
+
+
 class TestDatastoreEdit(unittest.TestCase):
     def setUp(self):
         self.dlg = SyncDialog()

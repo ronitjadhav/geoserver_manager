@@ -139,12 +139,6 @@
             </item>
             <item>
                 <widget class="QGroupBox" name="grp_misc">
-                    <property name="minimumSize">
-                        <size>
-                            <width>0</width>
-                            <height>100</height>
-                        </size>
-                    </property>
                     <property name="locale">
                         <locale language="English" country="UnitedStates"/>
                     </property>

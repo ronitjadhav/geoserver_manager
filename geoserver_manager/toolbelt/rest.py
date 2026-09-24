@@ -63,6 +63,18 @@ class PartlySaved(Exception):
     """
 
 
+class Abandoned(Exception):
+    """The user stopped waiting (the waiting box's Cancel).
+
+    `write` is set when what they stopped waiting for was a save: it runs on
+    in its thread, so the change may still land.
+    """
+
+    def __init__(self, write=False):
+        super().__init__()
+        self.write = write
+
+
 class UploadCancelled(Exception):
     """Raised inside ProgressReader.read() when the caller asked to stop.
 

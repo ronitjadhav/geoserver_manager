@@ -645,6 +645,7 @@ class DatastoreTabMixin:
             fields=self._datastore_fields(workspace_names),
             parent=self,
             ok_label=translate("DatastoreTabMixin", "Create"),
+            validate=self._form_check(self._check_new_datastore),
         )
         self._wire_type_combo(dlg)
         if dlg.exec() != QDialog.DialogCode.Accepted:
@@ -710,15 +711,16 @@ class DatastoreTabMixin:
         if locked:
             type_combo.setEnabled(False)
 
-    def _create_datastore_from_values(self, values):
-        """Call the appropriate library method based on the datastore type."""
-        ws = values["workspace"]
-        name = values["name"]
-        ds_type = values["type"]
-        description = values.get("description") or None
+    def _check_new_datastore(self, values):
+        """Refuse, before anything is sent, a datastore the Add form cannot
+        create. Reads only: the form runs it before it closes."""
+        ws, name = values["workspace"], values["name"]
         # The name goes into a REST path: refuse what a URL would eat.
         self._require_safe_name(name)
-
+        if values["type"] == _OTHER and not (values.get("custom_type") or "").strip():
+            raise ValueError(
+                translate("DatastoreTabMixin", "Give the GeoServer type name.")
+            )
         # create_* upserts, so an existing name would overwrite a live store
         if self._resource_exists(self.gs.get_datastore, ws, name):
             raise ValueError(
@@ -727,6 +729,14 @@ class DatastoreTabMixin:
                     "Datastore '{}' already exists in workspace '{}'.",
                 ).format(name, ws)
             )
+
+    def _create_datastore_from_values(self, values):
+        """Call the appropriate library method based on the datastore type."""
+        ws = values["workspace"]
+        name = values["name"]
+        ds_type = values["type"]
+        description = values.get("description") or None
+        self._check_new_datastore(values)
 
         if ds_type == "PostGIS":
             self._check(
@@ -777,11 +787,7 @@ class DatastoreTabMixin:
                 )
             )
         elif ds_type == _OTHER:
-            custom = (values.get("custom_type") or "").strip()
-            if not custom:
-                raise ValueError(
-                    translate("DatastoreTabMixin", "Give the GeoServer type name.")
-                )
+            custom = values["custom_type"].strip()
             self._check(
                 self.gs.create_datastore(
                     workspace_name=ws,

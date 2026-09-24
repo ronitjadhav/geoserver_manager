@@ -628,3 +628,20 @@ class TestNarrowWindow(unittest.TestCase):
         QApplication.processEvents()
         self.addCleanup(dlg.close)
         self.assertFalse(dlg.navList.horizontalScrollBar().isVisible())
+
+
+class TestEnterInTheSearchBox(unittest.TestCase):
+    def test_it_goes_to_the_results_not_to_the_add_form(self):
+        # btn_add was the dialog's default button: Enter opened "Add a Workspace".
+        dlg = SyncDialog()
+        opened = []
+        dlg._setup_add_button("Add", "", lambda: opened.append(True))
+        dlg._setup_table(["Name"])
+        dlg._populate_rows([["topp"], ["sf"]])
+        dlg.show()
+        self.addCleanup(dlg.close)
+        dlg.searchBox.setFocus()
+        QTest.keyClick(dlg.searchBox, Qt.Key.Key_Return)
+        QApplication.processEvents()
+        self.assertEqual(opened, [])
+        self.assertIs(dlg.focusWidget(), dlg.resultsTable)

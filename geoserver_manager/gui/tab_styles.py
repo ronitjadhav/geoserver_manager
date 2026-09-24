@@ -715,6 +715,7 @@ class StyleTabMixin:
             fields=self._upload_fields(workspace_names),
             parent=self,
             ok_label=translate("StyleTabMixin", "Upload"),
+            validate=self._form_check(self._check_new_style),
         )
         dlg.on_value_changed(
             "source", lambda source: self._on_style_source_changed(dlg, source)
@@ -746,12 +747,18 @@ class StyleTabMixin:
             )
             self._load_styles()
 
+    def _check_new_style(self, values):
+        """Refuse a name a URL would eat, or one taken. Reads only: the form
+        runs it before it closes, the upload again."""
+        name = values["name"].strip()
+        self._require_safe_name(name)
+        # create_style_* upsert (and rewrite the definition's filename)
+        self._refuse_taken_style(name, scope(values["workspace"]))
+
     def _create_style_from_values(self, values):
         """Create a style through the library, refusing to overwrite an existing one."""
         name, workspace_name = values["name"].strip(), scope(values["workspace"])
-        self._require_safe_name(name)
-        # create_style_* upsert (and rewrite the definition's filename)
-        self._refuse_taken_style(name, workspace_name)
+        self._check_new_style(values)
         source = values.get("source")
         if source == _SOURCE_FILE:
             path = Path(values["file"])

@@ -12,7 +12,7 @@ layer's other styles need. This widget does that, on a `QTableWidget`, with the
 plugin's own icons, recoloured with the theme like every other.
 """
 
-from qgis.PyQt.QtCore import QCoreApplication, pyqtSignal
+from qgis.PyQt.QtCore import QCoreApplication, QEvent, Qt, pyqtSignal
 from qgis.PyQt.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -103,7 +103,9 @@ class ListTable(QWidget):
         self.picker.lineEdit().setPlaceholderText(
             translate("ListTable", "Pick or type, then Add")
         )
-        self.picker.lineEdit().returnPressed.connect(self._add_picked)
+        # Enter adds the name, and stops there: left to the key event, it
+        # also reached the dialog's default button and saved the form.
+        self.picker.lineEdit().installEventFilter(self)
 
         buttons = QHBoxLayout()
         buttons.addWidget(self.picker, 1)
@@ -129,6 +131,16 @@ class ListTable(QWidget):
             buttons.addWidget(self.down_button)
         if not read_only:
             layout.addLayout(buttons)
+
+    def eventFilter(self, watched, event):  # noqa: N802 (Qt's own spelling)
+        if (
+            watched is self.picker.lineEdit()
+            and event.type() == QEvent.Type.KeyPress
+            and event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
+        ):
+            self._add_picked()
+            return True
+        return super().eventFilter(watched, event)
 
     def isReadOnly(self):  # noqa: N802 (the name QgsTableWidgetBase uses)
         return self._read_only

@@ -742,6 +742,9 @@ class GwcTabMixin:
             fields=self._gwc_fields(gridset_names),
             values=self._gwc_form_values(xml_text),
             parent=self,
+            # Pure: a zoom range with one end, a gridset twice or filters
+            # that are not XML stay in the form, with the rest of the edit.
+            validate=lambda values: self._gwc_xml_with_values(xml_text, values),
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -853,8 +856,8 @@ class GwcTabMixin:
                 raise ValueError(
                     translate(
                         "GwcTabMixin",
-                        "Write the area as minx, miny, maxx, maxy, in the "
-                        "gridset's own units.",
+                        "The area is not a box: each minimum must be below its "
+                        "maximum.",
                     )
                 )
             request["bounds"] = {"coords": {"double": coords}}
@@ -966,8 +969,9 @@ class GwcTabMixin:
                 "group": translate("GwcTabMixin", "Advanced"),
                 "help": translate(
                     "GwcTabMixin",
-                    "Typed, or taken from the map view, a layer or a bookmark; "
-                    "sent in the gridset's CRS. Not set: the layer's whole extent.",
+                    "Taken from the map view, a layer or a bookmark, or typed in "
+                    "QGIS's order: xmin, xmax, ymin, ymax. Sent in the gridset's "
+                    "CRS. Not set: the layer's whole extent.",
                 ),
             },
             {
@@ -1022,6 +1026,19 @@ class GwcTabMixin:
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         values = dlg.get_values()
+        # A truncate deletes tiles, like the row action, which asks first.
+        if values["type"] == "truncate" and not self._confirm_delete(
+            translate("GwcTabMixin", "the tiles of layer"),
+            [name],
+            verb=translate("GwcTabMixin", "truncate"),
+            cascade=translate(
+                "GwcTabMixin",
+                "The tiles of this gridset, format and zoom range are deleted "
+                "(within the area, if one is set). They are rendered again on "
+                "request.",
+            ),
+        ):
+            return
         if self._run_action(
             lambda: self._wait_for_save(
                 lambda: self._raw_rest(

@@ -618,6 +618,11 @@ class LayerTabMixin:
             fields=self._layer_fields(kind),
             values=values,
             parent=self,
+            validate=self._form_check(
+                lambda after: self._check_layer_edit(
+                    ws_name, self._layer_changes(before, after, kind)[0] or {}
+                )
+            ),
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -681,18 +686,9 @@ class LayerTabMixin:
             return endpoints.coverage(*segments)
         return endpoints.featuretype(*segments)
 
-    def _save_layer(self, row_data, before, after):
-        """Validate, then PUT what changed on the layer's resource.
-
-        TODO(#50): no update_feature_type() or update_coverage() in the
-        library (row 53). create_feature_type() upserts by the *new* name, so a
-        rename would POST a second layer, and it knows no cqlFilter; coverages
-        have no update at all. Workaround: one merging PUT on the resource.
-        """
-        _name, ws_name, kind, store = row_data[0], row_data[1], row_data[2], row_data[3]
-        body, recalculate = self._layer_changes(before, after, kind)
-        if body is None:
-            return
+    def _check_layer_edit(self, ws_name, body):
+        """Refuse an edit GeoServer would take badly. Reads only: the form
+        runs it before it closes, the save again."""
         if "name" in body:
             self._require_safe_name(body["name"])
             base = self.gs.rest_service.rest_endpoints.base_url
@@ -715,6 +711,20 @@ class LayerTabMixin:
                     "The SRS must be an EPSG code number, such as 3857 or 4326.",
                 )
             )
+
+    def _save_layer(self, row_data, before, after):
+        """Validate, then PUT what changed on the layer's resource.
+
+        TODO(#50): no update_feature_type() or update_coverage() in the
+        library (row 53). create_feature_type() upserts by the *new* name, so a
+        rename would POST a second layer, and it knows no cqlFilter; coverages
+        have no update at all. Workaround: one merging PUT on the resource.
+        """
+        _name, ws_name, kind, store = row_data[0], row_data[1], row_data[2], row_data[3]
+        body, recalculate = self._layer_changes(before, after, kind)
+        if body is None:
+            return
+        self._check_layer_edit(ws_name, body)
         wrapper = "coverage" if kind == RASTER else "featureType"
         self._raw_rest(
             "put",
@@ -1490,20 +1500,16 @@ class LayerTabMixin:
             ],
             parent=self,
             ok_label=translate("LayerTabMixin", "Set styles"),
+            validate=lambda values: self._wanted_styles(values, choices),
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         values = dlg.get_values()
         style = values["style"]
-        wanted = [name.strip() for name in values["others"] if name.strip()]
-        wanted = list(dict.fromkeys(s for s in wanted if s != style))  # no repeats
-        unknown = [s for s in wanted if s not in choices]
-        if unknown:
-            self.show_error_message(
-                translate("LayerTabMixin", "No style named {} on the server.").format(
-                    ", ".join(f"'{s}'" for s in unknown)
-                )
-            )
+        try:  # the form checked it already; a caller that skipped it did not
+            wanted = self._wanted_styles(values, choices)
+        except ValueError as error:
+            self.show_error_message(str(error))
             return
         if style == current and sorted(wanted) == sorted(others):
             return
@@ -1528,6 +1534,22 @@ class LayerTabMixin:
                 translate("LayerTabMixin", "Styles of '{}' saved.").format(name)
             )
             self._load_layers()
+
+    @staticmethod
+    def _wanted_styles(values, choices):
+        """The other styles picked, once each, refusing a name not on the
+        server. Pure: the form runs it before it closes."""
+        style = values["style"]
+        wanted = [name.strip() for name in values["others"] if name.strip()]
+        wanted = list(dict.fromkeys(s for s in wanted if s != style))  # no repeats
+        unknown = [s for s in wanted if s not in choices]
+        if unknown:
+            raise ValueError(
+                translate("LayerTabMixin", "No style named {} on the server.").format(
+                    ", ".join(f"'{s}'" for s in unknown)
+                )
+            )
+        return wanted
 
     # -- Style from QGIS -------------------------------------------------------
 
@@ -1573,6 +1595,9 @@ class LayerTabMixin:
                     "label": translate("LayerTabMixin", "QGIS layer"),
                     "type": "layer",
                     "default": match,
+                    # With no match, the first layer was preselected, and its
+                    # style pushed as the default of an unrelated layer.
+                    "allow_empty": True,
                     "required": True,
                     "help": (
                         None

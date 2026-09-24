@@ -72,6 +72,7 @@ what the code cannot tell you. Python 3.12 (QGIS 3.40 and newer), PyQt5
   | `_run_action(fn, failure_message) -> bool` | any mutation: wait cursor, banner + QGIS log on failure |
   | `_fetch(fn, failure_message) -> value \| None` | any read the UI needs before continuing: runs `fn` in a worker thread and waits behind an application-modal *Waiting for GeoServer* box (after 0.3 s) with Cancel, so a dead server cannot freeze QGIS. `in_worker=False` for work on a live QGIS layer. A map layer `fn` builds comes back moved to the GUI thread |
   | `_wait_for(fn) -> value` | the same wait without the reporting: a read inside a handler that does its own (the Publish form's combo refills). `fn` must not touch a widget, nor call `_wait_for` or `_fetch` itself |
+  | `_form_check(check) -> validate` | a form's `validate`: `check(values)` behind the waiting box, on Save, before the form closes, so a refusal (a taken name) keeps what was typed. `check` only reads (`_check_new_datastore`, `_check_new_workspace`...); the save runs after the form closed and checks again. A pure check (group rows, a tile cache edit) is passed as `validate` directly |
   | `_wait_for_save(fn) -> value` | a save's requests under `_run_action`. A Cancel cannot stop a request already sent: the save still lands, so the banner says it may, and the tab reloads once it ends |
   | `_check((content, status))` | unwrap a geoservercloud tuple; raises on ≥ 400 |
   | `_fetch_list(api_method, *args)` | a list endpoint; `[]` when the payload is not a list |

@@ -330,6 +330,17 @@ class TestListValues(unittest.TestCase):
             {"Session startup SQL": "", "max connections": "10"},
         )
 
+    def test_a_parameter_name_is_not_cut_off(self):
+        from qgis.PyQt.QtWidgets import QTableView
+
+        dlg = self.form(
+            [{"key": "p", "label": "P", "type": "keyvalue"}],
+            {"p": {"Expose primary keys": "false", "a": "b"}},
+        )
+        view = dlg.get_widget("p").findChild(QTableView)
+        needed = view.fontMetrics().horizontalAdvance("Expose primary keys")
+        self.assertGreaterEqual(view.horizontalHeader().sectionSize(0), needed)
+
     def test_a_name_picked_but_not_added_stops_save(self):
         dlg = self.form(
             [
@@ -364,6 +375,220 @@ class TestListValues(unittest.TestCase):
         table.picker.setCurrentText("EPSG:4326")
         table._add_picked()
         self.assertEqual(table.rows(), ["EPSG:4326"])
+
+
+class TestKeysAndWheel(unittest.TestCase):
+    """Review of 2026-09-24: each failed before its fix."""
+
+    def test_enter_in_a_list_picker_adds_the_row_and_keeps_the_form(self):
+        # The key also reached the dialog's default button: Save.
+        from qgis.PyQt.QtCore import Qt
+        from qgis.PyQt.QtTest import QTest
+        from qgis.PyQt.QtWidgets import QApplication
+
+        dlg = ResourceFormDialog(
+            title="t",
+            fields=[
+                {
+                    "key": "rows",
+                    "label": "R",
+                    "type": "table",
+                    "choices": ["a"],
+                    "columns": [{"label": "Name"}],
+                }
+            ],
+        )
+        dlg.show()
+        self.addCleanup(dlg.close)
+        edit = dlg.get_widget("rows").picker.lineEdit()
+        edit.setText("a")
+        QTest.keyClick(edit, Qt.Key.Key_Return)
+        QApplication.processEvents()
+        self.assertEqual(dlg.get_values()["rows"], ["a"])
+        self.assertTrue(dlg.isVisible())
+
+    def test_a_form_opens_with_the_cursor_in_its_first_field(self):
+        from qgis.PyQt.QtWidgets import QApplication
+
+        dlg = ResourceFormDialog(
+            title="t",
+            fields=[
+                {"key": "ro", "label": "R", "type": "text", "read_only": True},
+                {"key": "name", "label": "Name", "type": "text"},
+            ],
+        )
+        dlg.show()
+        self.addCleanup(dlg.close)
+        QApplication.processEvents()
+        self.assertIs(dlg.focusWidget(), dlg.get_widget("name"))
+
+    def test_scrolling_over_a_combo_scrolls_the_form_not_the_combo(self):
+        # A layer's projection policy changed under the cursor, and Save sent it.
+        from qgis.PyQt.QtCore import QPoint, QPointF, Qt
+        from qgis.PyQt.QtGui import QWheelEvent
+        from qgis.PyQt.QtWidgets import QApplication
+
+        def wheel(widget):
+            event = QWheelEvent(
+                QPointF(5, 5),
+                QPointF(widget.mapToGlobal(QPoint(5, 5))),
+                QPoint(0, 0),
+                QPoint(0, -120),
+                Qt.MouseButton.NoButton,
+                Qt.KeyboardModifier.NoModifier,
+                Qt.ScrollPhase.NoScrollPhase,
+                False,
+            )
+            QApplication.sendEvent(widget, event)
+            QApplication.processEvents()
+
+        texts = [{"key": f"t{i}", "label": "T", "type": "text"} for i in range(15)]
+        combo = {"key": "c", "label": "C", "type": "combo", "options": ["A", "B"]}
+        dlg = ResourceFormDialog(title="t", fields=texts + [combo] + texts[:0])
+        dlg.resize(460, 300)
+        dlg.show()
+        self.addCleanup(dlg.close)
+        wheel(dlg._field_page["c"].viewport())  # scrolling the form...
+        wheel(dlg.get_widget("c"))  # ...when the cursor reaches the combo
+        self.assertEqual(dlg.get_values()["c"], "A")
+
+    def test_fields_shown_later_widen_the_dialog_instead_of_being_cut(self):
+        # A datastore's WFS or Other... fields went off the right edge.
+        from qgis.PyQt.QtWidgets import QApplication
+
+        from tests.qgis.sync_dialog import SyncDialog
+
+        tab = SyncDialog()
+        dlg = ResourceFormDialog(title="t", fields=tab._datastore_fields(["topp"]))
+        dlg.show()
+        self.addCleanup(dlg.close)
+        dlg.resize(dlg.minimumSizeHint())
+        QApplication.processEvents()
+        tab._on_type_changed(dlg, "Other...")
+        for _ in range(3):
+            QApplication.processEvents()
+        page = dlg._field_page["name"]
+        self.assertGreaterEqual(
+            page.viewport().width(), page.widget().minimumSizeHint().width()
+        )
+
+
+class TestValidateBeforeClosing(unittest.TestCase):
+    """A save's refusal (a taken name) came after the form closed, and the
+    input was lost: a whole PostGIS form, its password included."""
+
+    def form(self, validate):
+        dlg = ResourceFormDialog(
+            title="t",
+            fields=[
+                {"key": "name", "label": "Name", "type": "text", "required": True},
+                {"key": "pw", "label": "P", "type": "text", "echo_password": True},
+            ],
+            values={"name": "roads", "pw": "secret"},
+            validate=validate,
+        )
+        dlg.show()
+        self.addCleanup(dlg.close)
+        return dlg
+
+    def test_a_refusal_keeps_the_form_open_with_its_input(self):
+        def taken(values):
+            raise ValueError(f"'{values['name']}' already exists.")
+
+        dlg = self.form(taken)
+        dlg._on_accept()
+        self.assertFalse(dlg.result())
+        self.assertTrue(dlg.isVisible())
+        self.assertEqual(dlg._validation_label.text(), "'roads' already exists.")
+        self.assertEqual(dlg.get_values(), {"name": "roads", "pw": "secret"})
+
+    def test_a_cancelled_wait_keeps_the_form_open_and_says_nothing(self):
+        from geoserver_manager.toolbelt.rest import Abandoned
+
+        def stopped(values):
+            raise Abandoned()
+
+        dlg = self.form(stopped)
+        dlg._on_accept()
+        self.assertFalse(dlg.result())
+        self.assertTrue(dlg._validation_label.isHidden())
+
+    def test_a_form_that_passes_closes(self):
+        dlg = self.form(lambda values: None)
+        dlg._on_accept()
+        self.assertTrue(dlg.result())
+
+
+class TestEscapeAsksFirst(unittest.TestCase):
+    """Esc closed a style's editor and dropped the edit without a word."""
+
+    def form(self):
+        dlg = ResourceFormDialog(
+            title="t",
+            fields=[{"key": "body", "label": "B", "type": "textarea", "code": "xml"}],
+            values={"body": "<sld/>"},
+        )
+        dlg.show()
+        self.addCleanup(dlg.done, 0)
+        return dlg
+
+    def answer(self, button):
+        from unittest.mock import patch
+
+        from qgis.PyQt.QtWidgets import QMessageBox
+
+        asked = []
+        patcher = patch.object(
+            QMessageBox, "question", lambda *a: asked.append(a) or button
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return asked
+
+    def test_an_edited_form_asks_and_stays_on_cancel(self):
+        from qgis.PyQt.QtWidgets import QMessageBox
+
+        asked = self.answer(QMessageBox.StandardButton.Cancel)
+        dlg = self.form()
+        dlg.set_values({"body": "<changed/>"})
+        dlg._on_cancel()
+        self.assertEqual(len(asked), 1)
+        self.assertTrue(dlg.isVisible())
+
+    def test_the_escape_key_asks_too(self):
+        from qgis.PyQt.QtCore import Qt
+        from qgis.PyQt.QtTest import QTest
+        from qgis.PyQt.QtWidgets import QMessageBox
+
+        asked = self.answer(QMessageBox.StandardButton.Cancel)
+        dlg = self.form()
+        dlg.set_values({"body": "<changed/>"})
+        QTest.keyClick(dlg, Qt.Key.Key_Escape)
+        self.assertEqual(len(asked), 1)
+        self.assertTrue(dlg.isVisible())
+
+    def test_discard_closes_it(self):
+        from qgis.PyQt.QtWidgets import QMessageBox
+
+        self.answer(QMessageBox.StandardButton.Discard)
+        dlg = self.form()
+        dlg.set_values({"body": "<changed/>"})
+        dlg._on_cancel()
+        self.assertFalse(dlg.isVisible())
+
+    def test_an_untouched_form_or_a_viewer_closes_without_asking(self):
+        from qgis.PyQt.QtWidgets import QMessageBox
+
+        asked = self.answer(QMessageBox.StandardButton.Cancel)
+        dlg = self.form()
+        dlg._on_cancel()
+        self.assertFalse(dlg.isVisible())
+        viewer = self.form()
+        viewer.hide_save_button()
+        viewer.set_values({"body": "<changed/>"})
+        viewer._on_cancel()
+        self.assertFalse(viewer.isVisible())
+        self.assertEqual(asked, [])
 
 
 class TestCrsPicker(unittest.TestCase):

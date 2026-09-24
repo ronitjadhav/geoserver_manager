@@ -253,6 +253,19 @@ class TestProfiles(unittest.TestCase):
         self.assertEqual(self.store["idA"], ("ua", "pa"))
         self.assertEqual(self.manager.profiles[0]["auth_cfg_id"], "idA")
 
+    def test_tab_starts_at_the_profile(self):
+        # The profile row is built after the .ui, so it came last: after
+        # Reset, the first widget Tab reached was the URL.
+        from qgis.PyQt.QtCore import Qt
+
+        widget, first = self.page.nextInFocusChain(), None
+        while widget is not self.page:
+            if widget.focusPolicy() & Qt.FocusPolicy.TabFocus and widget.isEnabled():
+                first = widget
+                break
+            widget = widget.nextInFocusChain()
+        self.assertIs(first, self.page.cmb_profile)
+
     def test_the_password_can_be_shown_to_check_it(self):
         from qgis.gui import QgsPasswordLineEdit
 
