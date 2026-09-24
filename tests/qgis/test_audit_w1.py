@@ -148,7 +148,7 @@ class TestNamesAreCheckedBeforeAnyRequest(unittest.TestCase):
                 {
                     "name": "a#b",
                     "workspace": GLOBAL,
-                    "mode": "Single",
+                    "mode": "SINGLE",
                     "layers": rows("topp:states"),
                 }
             )
@@ -184,7 +184,7 @@ class TestWorkspaceEdit(unittest.TestCase):
         self.assertNotIn("coexist", fields["isolated"]["help"])
         asked = []
         self.dlg._confirm_delete = (
-            lambda kind, labels, cascade="", **kw: asked.append(cascade) or False
+            lambda question, labels=(), cascade="": asked.append(cascade) or False
         )
         self.dlg._delete_selected_workspaces([["topp", ""]])
         self.assertIn("coverage stores", asked[0])
@@ -251,22 +251,25 @@ class TestLayerGroupModesAndLayers(unittest.TestCase):
         self.gs = RecordingGS()
         self.dlg.gs = self.gs
 
-    def test_labels_round_trip_to_the_enum(self):
-        for mode in tab_layergroups.MODES:
-            label = tab_layergroups._mode_label(mode)
-            self.assertNotEqual(label, mode, mode)
-            self.assertEqual(tab_layergroups._mode_from_label(label), mode)
-            self.assertEqual(tab_layergroups._mode_from_label(mode), mode)
+    def test_the_form_shows_words_and_hands_back_the_enum(self):
+        # The translated label was stored and read back to the enum (#91).
+        from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+
         options = [f for f in self.dlg._group_fields([], []) if f["key"] == "mode"][0]
-        self.assertEqual(options["options"][0], "Single")
+        self.assertEqual(options["options"][0], ("Single", "SINGLE"))
         self.assertIn("Opaque Container", options["help"])
+        form = ResourceFormDialog(title="t", fields=[options], values={"mode": "EO"})
+        self.assertEqual(
+            form.get_widget("mode").currentText(), "Earth Observation Tree"
+        )
+        self.assertEqual(form.get_values()["mode"], "EO")
 
     def test_the_payload_carries_the_enum_whatever_the_form_showed(self):
         self.dlg._create_layer_group_from_values(
             {
                 "name": "g",
                 "workspace": GLOBAL,
-                "mode": "Named Tree",
+                "mode": "NAMED",
                 "layers": rows("topp:states"),
             }
         )
@@ -279,7 +282,7 @@ class TestLayerGroupModesAndLayers(unittest.TestCase):
                 {
                     "name": "g",
                     "workspace": "topp",
-                    "mode": "Single",
+                    "mode": "SINGLE",
                     "layers": rows("states\nroadz"),
                 },
                 known_layers=["topp:states"],

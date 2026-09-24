@@ -785,7 +785,7 @@ class CascadedStoreTabMixin:
         detail, published = fetched
         before = self._cascaded_store_form_values(detail, ws_name, kind, published)
         dlg = ResourceFormDialog(
-            title=translate("CascadedStoreTabMixin", "Edit Cascaded Store '{}'").format(
+            title=translate("CascadedStoreTabMixin", "Cascaded Store '{}'").format(
                 name
             ),
             fields=self._cascaded_store_info_fields(),
@@ -835,10 +835,9 @@ class CascadedStoreTabMixin:
     def _delete_selected_cascaded_stores(self, selected_rows):
         """Delete one or more cascaded stores after confirmation."""
         self._delete_many(
-            translate("CascadedStoreTabMixin", "cascaded store"),
             [
                 (
-                    f"{row[1]}/{row[0]}",
+                    f"{row[1]}:{row[0]}",
                     lambda ws=row[1], name=row[0], kind=row[2]: (
                         self._do_delete_cascaded_store(ws, name, kind)
                     ),
@@ -846,8 +845,23 @@ class CascadedStoreTabMixin:
                 for row in selected_rows
             ],
             self._load_cascaded_stores,
-            lambda n: translate(
-                "CascadedStoreTabMixin", "%n cascaded store(s)", None, n
+            ask=self._one_or_many(
+                translate(
+                    "CascadedStoreTabMixin",
+                    "Are you sure you want to delete cascaded store '{}'?",
+                ),
+                lambda n: translate(
+                    "CascadedStoreTabMixin",
+                    "Are you sure you want to delete %n cascaded store(s)?",
+                    None,
+                    n,
+                ),
+            ),
+            done=self._one_or_many(
+                translate("CascadedStoreTabMixin", "Cascaded store '{}' deleted."),
+                lambda n: translate(
+                    "CascadedStoreTabMixin", "%n cascaded store(s) deleted.", None, n
+                ),
             ),
             # both library deletes send recurse=true
             cascade=translate(

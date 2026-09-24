@@ -598,7 +598,7 @@ class ServerTabMixin:
                     "key": "action",
                     "label": translate("ServerTabMixin", "Do"),
                     "type": "combo",
-                    "options": [reload_label, reset_label],
+                    "options": [(reload_label, "reload"), (reset_label, "reset")],
                 }
             ],
             parent=self,
@@ -606,7 +606,7 @@ class ServerTabMixin:
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
-        reload = dlg.get_values()["action"] == reload_label
+        reload = dlg.get_values()["action"] == "reload"
         path = "{}/{}".format(
             self.gs.rest_service.rest_endpoints.base_url,
             "reload" if reload else "reset",

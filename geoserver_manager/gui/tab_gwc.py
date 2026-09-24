@@ -1028,9 +1028,10 @@ class GwcTabMixin:
         values = dlg.get_values()
         # A truncate deletes tiles, like the row action, which asks first.
         if values["type"] == "truncate" and not self._confirm_delete(
-            translate("GwcTabMixin", "the tiles of layer"),
-            [name],
-            verb=translate("GwcTabMixin", "truncate"),
+            translate(
+                "GwcTabMixin",
+                "Are you sure you want to truncate the tiles of layer '{}'?",
+            ).format(name),
             cascade=translate(
                 "GwcTabMixin",
                 "The tiles of this gridset, format and zoom range are deleted "
@@ -1137,9 +1138,10 @@ class GwcTabMixin:
         """Drop the layer's cached tiles after confirmation."""
         name = row_data[0]
         if not self._confirm_delete(
-            translate("GwcTabMixin", "the tiles of layer"),
-            [name],
-            verb=translate("GwcTabMixin", "truncate"),
+            translate(
+                "GwcTabMixin",
+                "Are you sure you want to truncate the tiles of layer '{}'?",
+            ).format(name),
             cascade=translate(
                 "GwcTabMixin",
                 "Every tile GeoWebCache stored for this layer is deleted, in every "
@@ -1165,15 +1167,28 @@ class GwcTabMixin:
     def _remove_selected_gwc_layers(self, selected_rows):
         """Stop caching one or more layers after confirmation."""
         self._delete_many(
-            translate("GwcTabMixin", "layer"),
             [
                 (row[0], lambda name=row[0]: self._do_remove_gwc_layer(name))
                 for row in selected_rows
             ],
             self._load_gwc_layers,
-            lambda n: translate("GwcTabMixin", "%n layer(s)", None, n),
-            verb=translate("GwcTabMixin", "stop caching"),
-            done=translate("GwcTabMixin", "removed from the cache"),
+            ask=self._one_or_many(
+                translate(
+                    "GwcTabMixin", "Are you sure you want to stop caching layer '{}'?"
+                ),
+                lambda n: translate(
+                    "GwcTabMixin",
+                    "Are you sure you want to stop caching %n layer(s)?",
+                    None,
+                    n,
+                ),
+            ),
+            done=self._one_or_many(
+                translate("GwcTabMixin", "Layer '{}' removed from the cache."),
+                lambda n: translate(
+                    "GwcTabMixin", "%n layer(s) removed from the cache.", None, n
+                ),
+            ),
             cascade=translate(
                 "GwcTabMixin",
                 "The cached tiles and the cache configuration are removed; the layer "

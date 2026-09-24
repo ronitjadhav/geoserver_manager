@@ -50,11 +50,14 @@ class GeoServerManagerPlugin:
         self.locale: str = QgsSettings().value("locale/userLocale", QLocale().name())[
             0:2
         ]
-        locale_path: Path = (
-            DIR_PLUGIN_ROOT
-            / "resources"
-            / "i18n"
-            / f"{DIR_PLUGIN_ROOT.name}_{self.locale}.qm"  # geoserver_manager_<loc>.qm
+        # A locale the plugin has no translation for falls back to English's:
+        # its plural forms, without which "%n layer(s)" read "(s)".
+        candidates = [
+            DIR_PLUGIN_ROOT / "resources" / "i18n" / f"{DIR_PLUGIN_ROOT.name}_{code}.qm"
+            for code in (self.locale, "en")
+        ]
+        locale_path: Path = next(
+            (path for path in candidates if path.exists()), candidates[0]
         )
         self.log(
             message=f"Translation: {self.locale}, {locale_path}",

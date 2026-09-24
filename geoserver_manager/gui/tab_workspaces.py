@@ -645,9 +645,7 @@ class WorkspaceTabMixin:
         for service, (own, overall) in services.items():
             values.update(self._service_form_values(service, own, overall))
         dlg = ResourceFormDialog(
-            title=translate("WorkspaceTabMixin", "Edit Workspace '{}'").format(
-                old_name
-            ),
+            title=translate("WorkspaceTabMixin", "Workspace '{}'").format(old_name),
             description=translate(
                 "WorkspaceTabMixin",
                 "Rename it, change its namespace URI, toggle isolation, make it "
@@ -737,13 +735,29 @@ class WorkspaceTabMixin:
     def _delete_selected_workspaces(self, selected_rows):
         """Delete one or more workspaces after confirmation."""
         self._delete_many(
-            translate("WorkspaceTabMixin", "workspace"),
             [
                 (row[0], lambda n=row[0]: self._check(self.gs.delete_workspace(n)))
                 for row in selected_rows
             ],
             self._load_workspaces,
-            lambda n: translate("WorkspaceTabMixin", "%n workspace(s)", None, n),
+            ask=self._one_or_many(
+                translate(
+                    "WorkspaceTabMixin",
+                    "Are you sure you want to delete workspace '{}'?",
+                ),
+                lambda n: translate(
+                    "WorkspaceTabMixin",
+                    "Are you sure you want to delete %n workspace(s)?",
+                    None,
+                    n,
+                ),
+            ),
+            done=self._one_or_many(
+                translate("WorkspaceTabMixin", "Workspace '{}' deleted."),
+                lambda n: translate(
+                    "WorkspaceTabMixin", "%n workspace(s) deleted.", None, n
+                ),
+            ),
             # delete_workspace() sends recurse=true
             cascade=translate(
                 "WorkspaceTabMixin",

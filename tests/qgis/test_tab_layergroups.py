@@ -225,13 +225,19 @@ class TestLayerGroupsTab(unittest.TestCase):
             self.dlg._all_rows,
             [
                 # GeoServer's own words for the modes, not the enum
-                ["eo_group", GLOBAL, "Earth Observation Tree", "1"],
-                ["solo", GLOBAL, "Named Tree", "1"],
-                ["tasmania", GLOBAL, "Single", "2"],
-                ["roads_group", "topp", "Container Tree", "1"],
+                ["eo_group", GLOBAL, "EO", "1"],
+                ["solo", GLOBAL, "NAMED", "1"],
+                ["tasmania", GLOBAL, "SINGLE", "2"],
+                ["roads_group", "topp", "CONTAINER", "1"],
             ],
         )
         self.assertEqual(self.warnings, [])
+        # The row keeps the enum; the cell shows it in words.
+        shown = [
+            self.dlg.resultsTable.item(row, 2).text()
+            for row in range(self.dlg.resultsTable.rowCount())
+        ]
+        self.assertIn("Earth Observation Tree", shown)
 
     def test_one_unreadable_workspace_keeps_the_rest(self):
         self.dlg.gs = FakeGS(broken_workspace="topp")
@@ -254,7 +260,7 @@ class TestGroupDetail(unittest.TestCase):
             values["abstract"], "Tasmania from the Digital Chart of the World."
         )
         self.assertEqual(values["title"], "Tasmania")
-        self.assertEqual(values["mode"], "Single")
+        self.assertEqual(values["mode"], "SINGLE")
         self.assertEqual(values["workspace"], GLOBAL)
         self.assertEqual(
             values["layers"],
@@ -540,7 +546,7 @@ class TestEditLayerGroup(unittest.TestCase):
 
     def test_turning_into_earth_observation_sends_the_root(self):
         _saved, puts, _bounds = self.save(
-            mode="Earth Observation Tree",
+            mode="EO",
             root_layer="topp:tasmania_roads",
             root_style="simple_roads",
         )
@@ -553,7 +559,7 @@ class TestEditLayerGroup(unittest.TestCase):
 
     def test_earth_observation_needs_a_root_layer(self):
         with self.assertRaises(ValueError):
-            self.save(mode="Earth Observation Tree", root_layer="(pick a layer)")
+            self.save(mode="EO", root_layer="(pick a layer)")
 
     def test_a_projected_box_is_reprojected_to_lon_lat(self):
         # spearfish, as GeoServer stores it: EPSG:26713, UTM zone 13N.
@@ -586,7 +592,7 @@ class TestCreateNestedAndEarthObservation(unittest.TestCase):
         self.dlg.gs = FakeGS()
 
     def create(self, **values):
-        base = {"name": "g", "workspace": GLOBAL, "mode": "Single"}
+        base = {"name": "g", "workspace": GLOBAL, "mode": "SINGLE"}
         self.dlg._create_layer_group_from_values(
             dict(base, **values), ["topp:tasmania_roads"], ["tasmania"]
         )
@@ -608,7 +614,7 @@ class TestCreateNestedAndEarthObservation(unittest.TestCase):
             self.dlg, "_layer_summary", return_value=("VECTOR", "s", "simple_roads")
         ):
             group = self.create(
-                mode="Earth Observation Tree",
+                mode="EO",
                 layers=rows("topp:tasmania_roads"),
                 root_layer="topp:tasmania_roads",
                 root_style="",
@@ -620,7 +626,7 @@ class TestCreateNestedAndEarthObservation(unittest.TestCase):
         with patch.object(self.dlg, "_layer_summary", return_value=("WMS", "s", "-")):
             with self.assertRaises(ValueError) as caught:
                 self.create(
-                    mode="Earth Observation Tree",
+                    mode="EO",
                     layers=rows("topp:tasmania_roads"),
                     root_layer="topp:tasmania_roads",
                     root_style="",
@@ -632,7 +638,7 @@ class TestDeleteAndAddToQgis(unittest.TestCase):
     def setUp(self):
         self.dlg = SyncDialog()
         self.dlg.gs = FakeGS()
-        self.dlg._confirm_delete = lambda kind, labels, cascade="", **kwargs: True
+        self.dlg._confirm_delete = lambda question, labels=(), cascade="": True
         self.dlg.show_success_message = lambda text: None
         self.dlg.show_error_message = lambda text: self.fail(f"unexpected: {text}")
         self.dlg._load_layer_groups = lambda: None

@@ -326,7 +326,7 @@
           <item>
             <widget class="QPushButton" name="btn_edit_credentials">
               <property name="text">
-                <string>Settings...</string>
+                <string>Settings…</string>
               </property>
             </widget>
           </item>

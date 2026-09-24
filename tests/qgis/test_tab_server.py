@@ -254,7 +254,7 @@ class TestLogAndCatalog(unittest.TestCase):
         dlg = SyncDialog()
         dlg.gs = FakeGS()
         dlg.show_success_message = lambda text: None
-        for choice, endpoint in (("Reload", "/rest/reload"), ("Reset", "/rest/reset")):
+        for choice, endpoint in (("reload", "/rest/reload"), ("reset", "/rest/reset")):
 
             class Choosing(ResourceFormDialog):
                 def exec(inner):

@@ -77,7 +77,11 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         )
 
         # header
-        self.lbl_title.setText(f"{__title__} - Version {__version__}")
+        self.lbl_title.setText(
+            self.tr("{title} - Version {version}").format(
+                title=__title__, version=__version__
+            )
+        )
 
         # customization
         self._refresh_icons()

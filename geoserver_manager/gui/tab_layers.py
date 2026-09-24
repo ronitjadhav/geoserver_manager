@@ -549,6 +549,16 @@ class LayerTabMixin:
             return self._coverage_detail(ws_name, store, name)
         if kind in (WMS, WMTS):
             return self._cascaded_layer_detail(ws_name, store, kind, name)
+        if kind == "-":
+            # Its details could not be read when the page filled: the type
+            # is unknown, not unsupported.
+            raise ValueError(
+                translate(
+                    "LayerTabMixin",
+                    "The details of '{}' could not be read. Refresh the list, "
+                    "then try again.",
+                ).format(name)
+            )
         raise ValueError(
             translate("LayerTabMixin", "Unsupported layer type '{}'").format(kind)
         )
@@ -1106,6 +1116,12 @@ class LayerTabMixin:
             for field in self._publish_fields(workspace_names)
             if field["key"] in ("workspace", "replace", "with_style")
         ]
+        for field in fields:
+            if field["key"] == "replace":
+                # Several layers: "it" read as one of them.
+                field["label"] = translate(
+                    "LayerTabMixin", "Replace those that already exist"
+                )
         listing = "\n".join(
             f"  • {layer.name()} → {name}" for layer, name in zip(layers, names)
         )
@@ -2003,7 +2019,6 @@ class LayerTabMixin:
     def _delete_selected_layers(self, selected_rows):
         """Delete one or more layers, each through its own resource type."""
         self._delete_many(
-            translate("LayerTabMixin", "layer"),
             [
                 (
                     f"{row[1]}:{row[0]}" if row[1] else row[0],
@@ -2014,7 +2029,21 @@ class LayerTabMixin:
                 for row in selected_rows
             ],
             self._load_layers,
-            lambda n: translate("LayerTabMixin", "%n layer(s)", None, n),
+            ask=self._one_or_many(
+                translate(
+                    "LayerTabMixin", "Are you sure you want to delete layer '{}'?"
+                ),
+                lambda n: translate(
+                    "LayerTabMixin",
+                    "Are you sure you want to delete %n layer(s)?",
+                    None,
+                    n,
+                ),
+            ),
+            done=self._one_or_many(
+                translate("LayerTabMixin", "Layer '{}' deleted."),
+                lambda n: translate("LayerTabMixin", "%n layer(s) deleted.", None, n),
+            ),
             # Every resource delete sends recurse=true, which removes the
             # published layer, but GeoServer refuses outright while a layer
             # group still references it (verified against 2.28.5).

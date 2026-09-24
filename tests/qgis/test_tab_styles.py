@@ -303,7 +303,7 @@ class TestStylesTab(unittest.TestCase):
         )
 
     def test_delete_purges_and_recurses(self):
-        self.dlg._confirm_delete = lambda kind, labels, cascade="", **kwargs: True
+        self.dlg._confirm_delete = lambda question, labels=(), cascade="": True
         self.dlg._delete_selected_styles([["roads_style", "topp"], ["generic", GLOBAL]])
         deletes = [c for c in self.dlg.gs.calls if c[0] == "DELETE"]
         self.assertEqual(

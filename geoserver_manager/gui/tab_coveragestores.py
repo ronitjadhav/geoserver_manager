@@ -350,7 +350,7 @@ class CoverageStoreTabMixin:
         detail, published = fetched
         before = self._coverage_store_form_values(detail, published)
         dlg = ResourceFormDialog(
-            title=translate("CoverageStoreTabMixin", "Edit Coverage Store '{}'").format(
+            title=translate("CoverageStoreTabMixin", "Coverage Store '{}'").format(
                 name
             ),
             fields=self._coverage_store_info_fields(),
@@ -736,7 +736,9 @@ class CoverageStoreTabMixin:
                 "type": "file",
                 "required": True,
                 "visible": False,
-                "filter": "ZIP (*.zip);;All files (*)",
+                "filter": translate(
+                    "CoverageStoreTabMixin", "ZIP (*.zip);;All files (*)"
+                ),
                 "help": translate(
                     "CoverageStoreTabMixin",
                     "A ZIP holding indexer.properties, datastore.properties and at "
@@ -1167,10 +1169,9 @@ class CoverageStoreTabMixin:
     def _delete_selected_coverage_stores(self, selected_rows):
         """Delete one or more coverage stores after confirmation."""
         self._delete_many(
-            translate("CoverageStoreTabMixin", "coverage store"),
             [
                 (
-                    f"{row[1]}/{row[0]}",
+                    f"{row[1]}:{row[0]}",
                     lambda name=row[0], ws=row[1]: self._check(
                         self.gs.delete_coverage_store(ws, name)
                     ),
@@ -1178,8 +1179,23 @@ class CoverageStoreTabMixin:
                 for row in selected_rows
             ],
             self._load_coverage_stores,
-            lambda n: translate(
-                "CoverageStoreTabMixin", "%n coverage store(s)", None, n
+            ask=self._one_or_many(
+                translate(
+                    "CoverageStoreTabMixin",
+                    "Are you sure you want to delete coverage store '{}'?",
+                ),
+                lambda n: translate(
+                    "CoverageStoreTabMixin",
+                    "Are you sure you want to delete %n coverage store(s)?",
+                    None,
+                    n,
+                ),
+            ),
+            done=self._one_or_many(
+                translate("CoverageStoreTabMixin", "Coverage store '{}' deleted."),
+                lambda n: translate(
+                    "CoverageStoreTabMixin", "%n coverage store(s) deleted.", None, n
+                ),
             ),
             cascade=translate(
                 "CoverageStoreTabMixin",

@@ -195,68 +195,85 @@ class TestConfirmationVerbs(unittest.TestCase):
 
     def setUp(self):
         self.dlg = SyncDialog()
-        self.dlg.gs = object()
+        self.dlg.gs = type("GS", (), {"delete_workspace": lambda s, n: ("", 200)})()
+        self.dlg._load_workspaces = self.dlg._load_gwc_layers = lambda: None
         self.asked = []
         self.banners = []
         self.dlg.show_success_message = self.banners.append
         self.dlg.show_error_message = self.banners.append
 
-    def ask(self, *args, **kwargs):
+    def ask(self, run):
         def warning(parent, title, text, buttons, default):
             self.asked.append(text)
             return QMessageBox.StandardButton.Yes
 
-        kwargs.setdefault("counted", lambda n: f"{n} things")
         with patch.object(QMessageBox, "warning", staticmethod(warning)):
-            self.dlg._delete_many(*args, **kwargs)
+            run()
 
     def test_a_delete_reads_as_before(self):
-        self.ask(
-            "workspace",
-            [("topp", lambda: None)],
-            lambda: None,
-            cascade="Layers go too.\n\n",
-        )
+        self.ask(lambda: self.dlg._delete_selected_workspaces([["topp", "uri"]]))
         self.assertIn("delete workspace 'topp'?", self.asked[0])
-        self.assertIn("Layers go too.\n\nThis action cannot be undone.", self.asked[0])
-        self.assertNotIn(
-            "\n\n\n", self.asked[0]
-        )  # the separator lives in one place now
+        self.assertIn("This action cannot be undone.", self.asked[0])
+        self.assertNotIn("\n\n\n", self.asked[0])  # one separator, in one place
         self.assertEqual(self.banners, ["Workspace 'topp' deleted."])
 
     def test_the_tab_can_say_what_it_really_does(self):
+        self.dlg._do_remove_gwc_layer = lambda name: None
         self.ask(
-            "layer",
-            [("topp:states", lambda: None)],
-            lambda: None,
-            verb="stop caching",
-            done="removed from the cache",
+            lambda: self.dlg._remove_selected_gwc_layers([["topp:states", "topp"]])
         )
         self.assertIn("stop caching layer 'topp:states'?", self.asked[0])
         self.assertNotIn("delete", self.asked[0].split("This action")[0])
         self.assertEqual(self.banners, ["Layer 'topp:states' removed from the cache."])
 
+    def test_the_sentences_are_whole_so_a_translation_can_agree(self):
+        # Glued from "delete", "workspace" and the name, French could not
+        # agree its words or order them (review 2026-09-24).
+        words = dict(
+            ask=self.dlg._one_or_many("Supprimer l'espace '{}' ?", lambda n: f"{n} ?"),
+            done=self.dlg._one_or_many("Espace '{}' supprimé.", lambda n: f"{n}."),
+        )
+        self.ask(
+            lambda: self.dlg._delete_many(
+                [("topp", lambda: None)], lambda: None, **words
+            )
+        )
+        self.assertTrue(self.asked[0].startswith("Supprimer l'espace 'topp' ?"))
+        self.assertEqual(self.banners, ["Espace 'topp' supprimé."])
+
     def test_failures_name_the_item_and_the_reason(self):
         def boom():
             raise RuntimeError("HTTP 403: referenced by layer group 'x'")
 
-        self.ask("style", [("a", boom), ("b", lambda: None)], lambda: None)
+        self.dlg.gs = type(
+            "GS",
+            (),
+            {"delete_workspace": lambda s, n: boom() if n == "a" else ("", 200)},
+        )()
+        self.ask(lambda: self.dlg._delete_selected_workspaces([["a", ""], ["b", ""]]))
         self.assertEqual(len(self.banners), 1)
         self.assertIn("a: HTTP 403: referenced by layer group 'x'", self.banners[0])
 
     def test_several_resources_are_counted_by_the_tab_not_with_s(self):
         """Issue #60: "3 workspace(s)" cannot be right in any locale; each tab
-        hands in its own plural string, translated with the count.
+        hands in its own plural sentence, translated with the count.
         """
+        self.dlg.gs = type("GS", (), {"delete_workspace": lambda s, n: ("", 200)})()
         self.ask(
-            "workspace",
-            [("a", lambda: None), ("b", lambda: None), ("c", lambda: None)],
-            lambda: None,
-            counted=lambda n: f"{n} workspaces",
+            lambda: self.dlg._delete_selected_workspaces(
+                [["a", ""], ["b", ""], ["c", ""]]
+            )
         )
-        self.assertIn("delete 3 workspaces?", self.asked[0])
-        self.assertEqual(self.banners, ["3 workspaces deleted."])
-        self.assertNotIn("(s)", self.asked[0] + self.banners[0])
+        self.assertIn("  • a\n  • b\n  • c", self.asked[0])
+        self.assertTrue(self.banners[0].startswith("3 workspace"))
+
+
+WORDS = dict(
+    ask=GeoServerMainDialog._one_or_many("Delete '{}'?", lambda n: f"Delete {n}?"),
+    done=GeoServerMainDialog._one_or_many(
+        "'{}' deleted.", lambda n: f"{n} styles deleted."
+    ),
+)
 
 
 class TestDeletesRunInATask(unittest.TestCase):
@@ -266,10 +283,7 @@ class TestDeletesRunInATask(unittest.TestCase):
         dlg._confirm_delete = lambda *args, **kwargs: True
         reloaded = []
         dlg._delete_many(
-            "style",
-            [("a", lambda: time.sleep(0.2))],
-            lambda: reloaded.append(1),
-            lambda n: f"{n} styles",
+            [("a", lambda: time.sleep(0.2))], lambda: reloaded.append(1), **WORDS
         )
         self.assertIsNotNone(dlg._delete)  # still running when the call returned
         self.assertTrue(spin_until(lambda: reloaded == [1]))
@@ -281,13 +295,12 @@ class TestDeletesRunInATask(unittest.TestCase):
         self.done, self.reloaded, self.said = [], [], []
         dlg.show_success_message = dlg.show_warning_message = self.said.append
         dlg._delete_many(
-            "style",
             [
                 (f"s{i}", lambda i=i: time.sleep(pause) or self.done.append(i))
                 for i in range(count)
             ],
             lambda: self.reloaded.append(1),
-            lambda n: f"{n} styles",
+            **WORDS,
         )
         return dlg
 
@@ -318,7 +331,7 @@ class TestDeletesRunInATask(unittest.TestCase):
 
     def test_a_second_batch_waits_for_the_first(self):
         dlg = self.start(count=3)
-        dlg._delete_many("style", [("x", lambda: None)], lambda: None, lambda n: "")
+        dlg._delete_many([("x", lambda: None)], lambda: None, **WORDS)
         self.assertTrue(any("already running" in text for text in self.said))
         spin_until(lambda: dlg._delete is None)
 

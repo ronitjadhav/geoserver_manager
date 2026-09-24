@@ -319,6 +319,12 @@ class TestLayersTab(unittest.TestCase):
         self.dlg._apply_filter()
         self.assertEqual(len(self.dlg._filtered_rows), 2)
 
+    def test_a_row_whose_details_failed_says_so(self):
+        # The action said "Unsupported layer type '-'" (review 2026-09-24).
+        with self.assertRaises(ValueError) as caught:
+            self.dlg._layer_resource(["roads", "topp", "-", "-", "-"])
+        self.assertIn("could not be read", str(caught.exception))
+
     def test_a_wmts_layer_finds_its_store_among_the_workspaces_stores(self):
         # GeoServer 2.28.5 writes no href for a wmtsLayer resource
         self.dlg._load_layers()
@@ -366,8 +372,8 @@ class TestLayersTab(unittest.TestCase):
         self.dlg._load_layers()
         confirmed = {}
         self.dlg._confirm_delete = (
-            lambda kind, labels, cascade="", **kwargs: confirmed.update(
-                kind=kind, labels=labels, cascade=cascade
+            lambda question, labels=(), cascade="": confirmed.update(
+                question=question, labels=labels, cascade=cascade
             )
             or True
         )
