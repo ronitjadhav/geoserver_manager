@@ -296,6 +296,76 @@ class TestKeyedOptions(unittest.TestCase):
         self.assertEqual(dlg.get_values()["t"], "b")
 
 
+class TestListValues(unittest.TestCase):
+    """What a list, key/value or table field hands back (review 2026-09-24)."""
+
+    def form(self, fields, values=None):
+        return ResourceFormDialog(title="t", fields=fields, values=values)
+
+    def test_an_empty_row_is_not_a_keyword_named_null(self):
+        from qgis.PyQt.QtWidgets import QToolButton
+
+        dlg = self.form(
+            [{"key": "k", "label": "K", "type": "list"}], {"k": ["roads", "  "]}
+        )
+        # + pressed, then Esc: QGIS's row holds a NULL, whose str() is "NULL"
+        dlg.get_widget("k").findChild(QToolButton, "addButton").click()
+        self.assertEqual(dlg.get_values()["k"], ["roads"])
+
+    def test_a_value_never_typed_is_blank_not_none(self):
+        from qgis.core import NULL
+
+        dlg = self.form([{"key": "p", "label": "P", "type": "keyvalue"}])
+        dlg.get_widget("p").setMap({"STYLES": NULL, "": "x"})
+        self.assertEqual(dlg.get_values()["p"], {"STYLES": ""})
+
+    def test_an_empty_parameter_opens_blank(self):
+        # GeoServer writes one without a value; the library reads it as None.
+        dlg = self.form(
+            [{"key": "p", "label": "P", "type": "keyvalue"}],
+            {"p": {"Session startup SQL": None, "max connections": 10}},
+        )
+        self.assertEqual(
+            dlg.get_values()["p"],
+            {"Session startup SQL": "", "max connections": "10"},
+        )
+
+    def test_a_name_picked_but_not_added_stops_save(self):
+        dlg = self.form(
+            [
+                {
+                    "key": "t",
+                    "label": "Styles",
+                    "type": "table",
+                    "choices": ["a"],
+                    "columns": [{"label": "Style"}],
+                }
+            ]
+        )
+        dlg.get_widget("t").picker.setCurrentText("a")
+        dlg._on_accept()
+        self.assertFalse(dlg.result())
+        self.assertIn("'a' is picked in 'Styles'", dlg._validation_label.text())
+
+    def test_a_unique_list_does_not_take_a_name_twice(self):
+        dlg = self.form(
+            [
+                {
+                    "key": "t",
+                    "label": "T",
+                    "type": "table",
+                    "unique": True,
+                    "columns": [{"label": "Gridset"}],
+                }
+            ],
+            {"t": ["EPSG:4326"]},
+        )
+        table = dlg.get_widget("t")
+        table.picker.setCurrentText("EPSG:4326")
+        table._add_picked()
+        self.assertEqual(table.rows(), ["EPSG:4326"])
+
+
 class TestCrsPicker(unittest.TestCase):
     def test_the_button_fills_the_code_from_qgis_crs_picker(self):
         from unittest.mock import patch

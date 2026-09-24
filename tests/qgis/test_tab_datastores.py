@@ -115,6 +115,23 @@ class TestDatastoreEdit(unittest.TestCase):
         self.assertEqual(merged["namespace"], "http://topp")
         self.assertEqual(merged["passwd"], "crypt1:PG")
 
+    def test_an_untouched_row_goes_back_as_stored(self):
+        # An empty parameter came back as "None", which GeoServer then ran as
+        # the session startup SQL of every connection; a number became text.
+        stored = dict(STORED, **{"Session startup SQL": None, "max connections": 10})
+        form = ResourceFormDialog(
+            title="t",
+            fields=[{"key": "p", "label": "P", "type": "keyvalue"}],
+            values={"p": self.dlg._other_params("PostGIS", stored)},
+        )
+        pairs = form.get_values()["p"]
+        merged = self.dlg._merge_other_params(dict(stored), stored, "PostGIS", pairs)
+        self.assertIsNone(merged["Session startup SQL"])
+        self.assertEqual(merged["max connections"], 10)
+        pairs["Session startup SQL"] = "SET search_path TO x"  # an edit is sent
+        merged = self.dlg._merge_other_params(dict(stored), stored, "PostGIS", pairs)
+        self.assertEqual(merged["Session startup SQL"], "SET search_path TO x")
+
     def test_a_masked_other_parameter_keeps_the_stored_value(self):
         stored = dict(STORED, **{"proxy password": "crypt1:X"})
         shown = self.dlg._other_params("PostGIS", stored)

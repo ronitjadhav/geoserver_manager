@@ -1020,6 +1020,41 @@ class TestRasterUploadRunsInATask(RasterFixture):
         )
         self.assertEqual(self.dlg.btn_refresh.text(), "Refresh")
 
+    def test_a_failed_metadata_put_says_the_raster_is_published(self):
+        # The data was stored; "Failed to publish" hid it, and a retry then
+        # said the store exists.
+        layer = self.add_layer("dem")
+        warnings, outcomes = [], []
+        self.dlg.show_warning_message = warnings.append
+        client = self.dlg.gs.rest_service.rest_client
+        put = client.put
+
+        def refuse_metadata(path, **kwargs):
+            if path.endswith("/coverages/dem.json"):
+                raise RuntimeError("HTTP 500: boom")
+            return put(path, **kwargs)
+
+        client.put = refuse_metadata
+        self.dlg._publish_qgis_raster(
+            {
+                "name": "dem",
+                "workspace": "sf",
+                "qgis_layer": layer,
+                "replace": False,
+                "title": "Elevation",
+            },
+            on_done=outcomes.append,
+        )
+        waited = 0
+        while self.dlg._loading() and waited < 20000:
+            QTest.qWait(20)
+            waited += 20
+        self.assertEqual(self.errors, [])
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("is published, but its title", warnings[0])
+        self.assertIn("boom", warnings[0])
+        self.assertEqual(outcomes, ["done"])
+
     def test_the_viewer_prefers_the_abstract_over_the_generated_description(self):
         both = {"abstract": "Written by hand", "description": "Generated from GeoTIFF"}
         self.assertEqual(

@@ -40,7 +40,8 @@ Supported field types:
     - "list"      -> QgsListWidget: a list of strings, typed (keywords)
     - "keyvalue"  -> QgsKeyValueWidget: a {key: value} dict (parameters)
     - "table"     -> ListTable: rows picked from "choices", with typed
-                     "columns", in order when "ordered" (a group's layers)
+                     "columns", in order when "ordered" (a group's layers),
+                     each name once when "unique" (gridsets, formats)
     - "layer"     -> QgsMapLayerComboBox: a layer of the QGIS project, the
                      value being the layer itself. Vector and raster layers,
                      or "raster_files": rasters GDAL reads from a file;
@@ -382,10 +383,16 @@ class ResourceFormDialog(QDialog):
 
         if ftype == "spinbox":
             w = QSpinBox()
-            w.setMinimum(field.get("min", 0))
-            w.setMaximum(field.get("max", 99999))
-            if value is not None:
-                w.setValue(int(value))
+            number = None if value is None else int(value)
+            low, high = field.get("min", 0), field.get("max", 99999)
+            if number is not None:
+                # Never narrower than the stored value: clamped, it was
+                # written back by an untouched Save (200 cascaded connections
+                # became 128, a 32x32 meta-tile 20x20).
+                low, high = min(low, number), max(high, number)
+            w.setRange(low, high)
+            if number is not None:
+                w.setValue(number)
             if read_only:
                 w.setReadOnly(True)
             return w
@@ -439,7 +446,11 @@ class ResourceFormDialog(QDialog):
 
         if ftype == "keyvalue":
             w = QgsKeyValueWidget()
-            w.setMap({str(k): str(v) for k, v in (value or {}).items()})
+            # An empty parameter comes back from the library as None: blank,
+            # not the text "None".
+            w.setMap(
+                {str(k): "" if v is None else str(v) for k, v in (value or {}).items()}
+            )
             w.setReadOnly(read_only)
             self._grows(w, field, max_height=200)
             w.setMinimumWidth(0)  # as for "list": its buttons stay in view
@@ -451,6 +462,7 @@ class ResourceFormDialog(QDialog):
                 field.get("choices", ()),
                 ordered=field.get("ordered", False),
                 read_only=read_only,
+                unique=field.get("unique", False),
             )
             w.set_rows(value or [])
             # Uncapped by default: a table is its tab's content and fills it;
@@ -595,14 +607,19 @@ class ResourceFormDialog(QDialog):
             elif ftype == "file":
                 result[key] = widget.filePath().strip()
             elif ftype == "list":
+                # A row added and left empty holds a NULL, whose str() is
+                # "NULL": it was saved as a keyword.
                 result[key] = [
-                    str(item).strip() for item in widget.list() if str(item).strip()
+                    item.strip()
+                    for item in widget.list()
+                    if isinstance(item, str) and item.strip()
                 ]
             elif ftype == "keyvalue":
+                # A value never typed is None, which went out as "None".
                 result[key] = {
-                    str(k).strip(): str(v)
+                    k.strip(): v if isinstance(v, str) else ""
                     for k, v in widget.map().items()
-                    if str(k).strip()
+                    if isinstance(k, str) and k.strip()
                 }
             elif ftype == "table":
                 result[key] = widget.rows()
@@ -779,7 +796,9 @@ class ResourceFormDialog(QDialog):
                 and value.strip()
                 and not value.strip().startswith(("http://", "https://"))
             )
-            if (field.get("required") and not value) or bad_url:
+            # A name picked but not added: Save used to drop it without a word.
+            pending = field.get("type") == "table" and self._widgets[key].pending()
+            if (field.get("required") and not value) or bad_url or pending:
                 # Bring the offending field on screen: it may sit on another
                 # tab, or below the fold of a scrolled page.
                 widget = self._widgets[key]
@@ -790,13 +809,20 @@ class ResourceFormDialog(QDialog):
                 widget.setStyleSheet(
                     f"border: 1px solid {invalid_field_colour(self.palette())};"
                 )
-                if bad_url:
-                    reason = self.tr("'{}' must start with http:// or https://.")
+                if pending:
+                    widget.picker.setFocus()
+                    text = self.tr(
+                        "'{}' is picked in '{}' but not added: press Add, or clear it."
+                    ).format(pending, field["label"])
+                elif bad_url:
+                    text = self.tr("'{}' must start with http:// or https://.")
                 elif field.get("type") in ("combo", "layer") and widget.count() == 0:
-                    reason = self.tr("'{}' has nothing to choose from.")
+                    text = self.tr("'{}' has nothing to choose from.")
                 else:
-                    reason = self.tr("'{}' is required.")
-                self._validation_label.setText(reason.format(field["label"]))
+                    text = self.tr("'{}' is required.")
+                if not pending:
+                    text = text.format(field["label"])
+                self._validation_label.setText(text)
                 self._validation_label.show()
                 return
 

@@ -407,12 +407,19 @@ class GwcTabMixin:
         clears the gridset's; the filters are replaced only when the form
         has them.
         """
-        # One subset per gridset, the first row naming it winning.
+        # One subset per gridset: a second row naming one was dropped
+        # silently, with its zoom range.
         gridsets = {}
         for row in values.get("gridsets") or ():
             name, levels = GwcTabMixin._gridset_row(row)
+            if name in gridsets:
+                raise ValueError(
+                    translate("GwcTabMixin", "Gridset '{}' is listed twice.").format(
+                        name
+                    )
+                )
             if name:
-                gridsets.setdefault(name, levels)
+                gridsets[name] = levels
         formats = list(
             dict.fromkeys(f.strip() for f in values.get("formats") or () if f.strip())
         )
@@ -601,6 +608,7 @@ class GwcTabMixin:
                 "key": "gridsets",
                 "label": translate("GwcTabMixin", "Gridsets"),
                 "type": "table",
+                "unique": True,
                 "required": True,
                 "choices": list(gridset_names),
                 "columns": [
@@ -630,6 +638,7 @@ class GwcTabMixin:
                 "key": "formats",
                 "label": translate("GwcTabMixin", "Formats"),
                 "type": "table",
+                "unique": True,
                 "required": True,
                 "choices": list(KNOWN_FORMATS),
                 "columns": [{"label": translate("GwcTabMixin", "Format")}],
@@ -710,19 +719,6 @@ class GwcTabMixin:
             },
         ]
 
-    @staticmethod
-    def _fields_that_hold(fields, values):
-        """Widen a spinbox's maximum to the stored value. Pure.
-
-        A 32x32 meta-tile or a 250 px gutter (possible over REST) was clamped
-        by the spinbox to 20 and 100, and an untouched Save wrote those back.
-        """
-        for field in fields:
-            value = values.get(field["key"])
-            if field.get("type") == "spinbox" and isinstance(value, int):
-                field["max"] = max(field.get("max", value), value)
-        return fields
-
     def _show_gwc_layer_info(self, row_data):
         """Open a cached layer's configuration for editing."""
         name = row_data[0]
@@ -743,9 +739,7 @@ class GwcTabMixin:
                 "How GeoWebCache caches this layer. Changes apply to the tiles "
                 "rendered from now on; Truncate clears what is cached already.",
             ),
-            fields=self._fields_that_hold(
-                self._gwc_fields(gridset_names), self._gwc_form_values(xml_text)
-            ),
+            fields=self._gwc_fields(gridset_names),
             values=self._gwc_form_values(xml_text),
             parent=self,
         )

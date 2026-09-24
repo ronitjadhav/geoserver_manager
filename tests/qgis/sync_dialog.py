@@ -13,6 +13,7 @@ care about the threading itself use the real dialog; see
 """
 
 from geoserver_manager.gui.dlg_main import GeoServerMainDialog
+from geoserver_manager.toolbelt.rest import PartlySaved
 
 
 class SyncDialog(GeoServerMainDialog):
@@ -34,6 +35,12 @@ class SyncDialog(GeoServerMainDialog):
         # and _run_upload come through here.
         try:
             result = work(None)
+        except PartlySaved as e:  # as the real dialog: saved, then a step failed
+            self.show_warning_message(str(e))
+            self._reload_current_tab()
+            if on_done is not None:
+                on_done("done")
+            return
         except Exception as e:
             detail = self._error_text(e)
             self.show_error_message(f"{failure_message}: {detail}")
