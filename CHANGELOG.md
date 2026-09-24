@@ -377,6 +377,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **The dialog opened from the layer tree dropped every result.** Closed
+  once, then reopened by *Publish to GeoServer*, it never drew its table,
+  skipped the upload's title, keywords and style, and stopped a batch after
+  its first layer.
+- **Cancel acts at once.** It waited for a hung request to return, up to two
+  minutes. A load cancelled from QGIS's task bar says so, instead of an
+  empty table reading "Nothing here yet".
+- **A save no longer freezes QGIS:** starting, stopping or truncating a
+  seed, saving or adding a cached layer, uploading or copying a style and
+  publishing a cascaded layer or a coverage ran on the interface thread.
+  A save whose waiting box was cancelled says it may still be applied, and
+  the tab reloads once GeoServer answers.
+- **Paging or sorting during a Refresh** no longer marks healthy rows as
+  failed, and Cancel on a sort by a detail column stops its requests.
+- **A sign-in page mid-session** (an expired SSO session) is named as such,
+  not shown as raw markup or "Expecting value: line 1 column 1".
+- A sort by a detail column is dropped after a reload, instead of an arrow
+  on a column that sorts nothing.
 - **Editing a datastore no longer breaks it.** An empty connection parameter
   (a PostGIS store's "Session startup SQL", say) was saved as the text
   "None", which GeoServer then ran on every connection, and the store

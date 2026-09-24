@@ -458,8 +458,10 @@ class CascadedStoreTabMixin:
         native = values["native_name"]
         name = (values.get("name") or "").strip() or native.rsplit(":", 1)[-1]
         if self._run_action(
-            lambda: self._create_cascaded_layer(
-                ws_name, store_name, kind, native, name
+            lambda: self._wait_for_save(
+                lambda: self._create_cascaded_layer(
+                    ws_name, store_name, kind, native, name
+                )
             ),
             translate("CascadedStoreTabMixin", "Failed to publish '{}'").format(native),
         ):
@@ -608,7 +610,7 @@ class CascadedStoreTabMixin:
 
         values = dlg.get_values()
         if self._run_action(
-            lambda: self._wait_for(
+            lambda: self._wait_for_save(
                 lambda: self._create_cascaded_store_from_values(values)
             ),
             translate(
@@ -800,7 +802,7 @@ class CascadedStoreTabMixin:
             )
             return
         if self._run_action(
-            lambda: self._wait_for(
+            lambda: self._wait_for_save(
                 lambda: self._put_cascaded_store(ws_name, name, kind, body)
             ),
             translate(

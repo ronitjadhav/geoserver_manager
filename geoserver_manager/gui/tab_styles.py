@@ -482,7 +482,7 @@ class StyleTabMixin:
                 self._rename_style(name, workspace_name, new_name)
 
         if self._run_action(
-            lambda: self._wait_for(save),
+            lambda: self._wait_for_save(save),
             translate("StyleTabMixin", "Failed to save style '{}'").format(name),
         ):
             self.show_success_message(
@@ -723,11 +723,21 @@ class StyleTabMixin:
             return
 
         values = dlg.get_values()
+        failure = translate("StyleTabMixin", "Failed to upload style '{}'").format(
+            values["name"]
+        )
+        if values.get("source") == _SOURCE_QGIS:
+            # The export reads a live QGIS layer, so it stays on the GUI thread
+            # (invariant 9); the upload is then a pasted SLD, off it.
+            sld = self._fetch(
+                lambda: layer_to_sld(values["qgis_layer"]), failure, in_worker=False
+            )
+            if sld is None:
+                return
+            values = dict(values, source=_SOURCE_PASTE, format="sld", sld=sld)
         if self._run_action(
-            lambda: self._create_style_from_values(values),
-            translate("StyleTabMixin", "Failed to upload style '{}'").format(
-                values["name"]
-            ),
+            lambda: self._wait_for_save(lambda: self._create_style_from_values(values)),
+            failure,
         ):
             self.show_success_message(
                 translate("StyleTabMixin", "Style '{}' uploaded.").format(
@@ -942,7 +952,9 @@ class StyleTabMixin:
         values = dlg.get_values()
         target, target_ws = values["name"].strip(), scope(values["workspace"])
         if self._run_action(
-            lambda: self._copy_style_to(name, workspace_name, target, target_ws),
+            lambda: self._wait_for_save(
+                lambda: self._copy_style_to(name, workspace_name, target, target_ws)
+            ),
             translate("StyleTabMixin", "Failed to copy style '{}'").format(name),
         ):
             self.show_success_message(

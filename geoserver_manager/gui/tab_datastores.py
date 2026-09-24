@@ -652,7 +652,9 @@ class DatastoreTabMixin:
 
         values = dlg.get_values()
         if self._run_action(
-            lambda: self._wait_for(lambda: self._create_datastore_from_values(values)),
+            lambda: self._wait_for_save(
+                lambda: self._create_datastore_from_values(values)
+            ),
             translate("DatastoreTabMixin", "Failed to create datastore '{}'").format(
                 values["name"]
             ),
@@ -1101,7 +1103,7 @@ class DatastoreTabMixin:
 
         values = dlg.get_values()
         if self._run_action(
-            lambda: self._wait_for(
+            lambda: self._wait_for_save(
                 lambda: self._update_datastore_from_values(
                     values, detail, conn_params, old_name=ds_name
                 )
@@ -1133,7 +1135,7 @@ class DatastoreTabMixin:
             quote(ws_name, safe=""), quote(name, safe="")
         )
         if self._run_action(
-            lambda: self._wait_for(
+            lambda: self._wait_for_save(
                 lambda: self._raw_rest("post", path.removesuffix(".json") + "/reset")
             ),
             translate("DatastoreTabMixin", "Failed to reset '{}'").format(name),

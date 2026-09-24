@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 
 from qgis.core import Qgis, QgsApplication, QgsTask
 from qgis.gui import QgsMessageBar
-from qgis.PyQt import uic
+from qgis.PyQt import sip, uic
 from qgis.PyQt.QtCore import (
     QByteArray,
     QCoreApplication,
@@ -78,7 +78,32 @@ _WAIT_BEFORE_BOX = 0.3
 
 
 class _Abandoned(Exception):
-    """The user stopped waiting for a read (the waiting box's Cancel)."""
+    """The user stopped waiting (the waiting box's Cancel).
+
+    `write` is set when what they stopped waiting for was a save: it runs on
+    in its thread, so the change may still land.
+    """
+
+    def __init__(self, write=False):
+        super().__init__()
+        self.write = write
+
+
+class _Stop:
+    """Stands in for a QgsTask where a loop only asks isCanceled().
+
+    _fan_out stops between rounds when its task is cancelled; a waited-for
+    fan-out has no task, so the waiting box's Cancel sets this instead.
+    """
+
+    def __init__(self, event):
+        self._event = event
+
+    def isCanceled(self):  # noqa: N802 (QgsTask's spelling)
+        return self._event.is_set()
+
+    def setProgress(self, _value):  # noqa: N802
+        pass
 
 
 class _ReadThread(QThread):
@@ -121,6 +146,9 @@ class _FetchTask(QgsTask):
         # Set by _cancel_load: tells "the user pressed Cancel" apart from
         # "another load superseded this one".
         self.user_cancelled = False
+        # Set by _cancel_load for a load that a newer one replaced: that one
+        # says nothing. Any other cancel (QGIS's task bar) says "cancelled".
+        self.superseded = False
 
     def run(self):
         """Worker thread. No widget may be touched from here."""
@@ -306,6 +334,15 @@ class GeoServerMainDialog(
 
     # -- Settings persistence -----------------------------------------------
 
+    def showEvent(self, event):  # noqa: N802 (Qt's own spelling)
+        # Shown again after Close, by any route: the toolbar, or the layer
+        # tree's Publish, which shows the dialog without reconnecting. Reset
+        # only in refresh_ui, _closing stayed set there and every result that
+        # landed afterwards (the table, the upload's title and style, the
+        # next layer of a batch) was dropped as if the dialog were gone.
+        self._closing = False
+        super().showEvent(event)
+
     def closeEvent(self, event):
         # A running task would call back into widgets that are on their way out.
         # An upload is left to finish: stopping it mid-body would leave a
@@ -455,10 +492,6 @@ class GeoServerMainDialog(
         self._set_status(self.tr("Connecting…"), "busy")
         self.setWindowTitle(__title__)
         self._fill_profile_switcher()
-        # Reopened after Close: closeEvent set _closing so a late finish would
-        # stay away from dying widgets. A new connection means we are alive
-        # again. Without this the dialog worked exactly once per QGIS session.
-        self._closing = False
         # Stop the running load *before* dropping the client its worker reads.
         self._cancel_load()
         self.gs = None
@@ -576,8 +609,10 @@ class GeoServerMainDialog(
         def cancelled(task):
             if on_cancel is not None:
                 on_cancel(task)
-            elif task.user_cancelled:
-                self.show_warning_message(self.tr("Loading cancelled."))
+            elif not task.superseded:
+                # QGIS's task bar has a Cancel too: the table it leaves empty
+                # read "Nothing here yet", as if the server had nothing.
+                self._say_load_cancelled()
 
         self._launch_task(
             "_task", failure_message, work, on_success, cancelled, busy_text=busy_text
@@ -649,6 +684,8 @@ class GeoServerMainDialog(
         """
 
         def finished(task, ok, result, error):
+            if sip.isdeleted(self):
+                return  # the plugin was unloaded while it ran
             if getattr(self, slot) is not task:
                 # A newer task took over the slot: that one owns the table and
                 # the Cancel button now.
@@ -750,12 +787,32 @@ class GeoServerMainDialog(
                 running.user_cancelled = True
                 running.cancel()
                 return
-        if self._task is not None:
-            self._task.user_cancelled = user
-            self._task.cancel()
+        task = self._task
+        if task is not None:
+            task.user_cancelled = user
+            task.superseded = not user
+            if user:
+                # cancel() only sets a flag, which the worker reads between
+                # requests: a hung one kept the button on Cancel for up to two
+                # minutes. Let go of the task first; its finish, late or
+                # inside cancel() for one not started, finds the slot empty
+                # and stays quiet.
+                self._task = None
+            task.cancel()
+            if user:
+                self._say_load_cancelled()
         # Its worker reads self.gs too (invariant 10): stopped with the load.
         if self._detail is not None:
             self._detail.cancel()
+
+    def _say_load_cancelled(self):
+        """The table stays as the cancelled load left it: say why it is empty."""
+        self._set_loading(self._loading())
+        if not self._loading() and not self._all_rows:
+            self.lbl_page_info.setText(
+                self.tr("Loading cancelled. Refresh to try again.")
+            )
+        self.show_warning_message(self.tr("Loading cancelled."))
 
     def _loading(self):
         """True while a background load, an upload or a delete batch runs."""
@@ -1062,6 +1119,14 @@ class GeoServerMainDialog(
             ]
         else:
             self._filtered_rows = list(self._all_rows)
+        if (
+            self._sort is not None
+            and self._sort[0] in self._detail_columns
+            and any(self._pending(row) for row in self._filtered_rows)
+        ):
+            # After a reload that column is pending again: the arrow stayed
+            # on it while the rows sat in name order.
+            self._sort = None
         if self._sort is not None:
             column, descending = self._sort
 
@@ -1493,7 +1558,9 @@ class GeoServerMainDialog(
         on every tab switch. The names come first, then only the page shown.
         """
         todo = [row for row in rows if self._pending(row)]
-        if not todo or self._row_detail is None:
+        if not todo or self._row_detail is None or self.gs is None:
+            # No client during a Refresh: the rows were read as failed, and
+            # a warning listed them. The load that follows fills them.
             return
         if self._detail is not None:
             self._detail.cancel()  # a newer page, sort or filter: this one wins
@@ -1526,10 +1593,15 @@ class GeoServerMainDialog(
         todo = [row for row in rows if self._pending(row)]
         if not todo or self._row_detail is None:
             return True
-        detail = self._row_detail
+        if not self._require_connection():
+            return False
+        detail, stop = self._row_detail, threading.Event()
+        # The waiting box's Cancel stops the fan-out between rounds: it kept
+        # GETting every remaining row after the sort was dropped.
         results = self._fetch(
-            lambda: self._fan_out(detail, todo),
+            lambda: self._fan_out(detail, todo, _Stop(stop)),
             self.tr("Failed to load the details"),
+            stop=stop,
         )
         if results is None:
             return False
@@ -1592,6 +1664,17 @@ class GeoServerMainDialog(
         layer group 'tasmania'"). TODO(#50): a library that raised with the
         body would make this unnecessary.
         """
+        # By name: requests raises its own subclass, of simplejson's when that
+        # is installed, which is not json's.
+        if isinstance(error, ValueError) and type(error).__name__ == "JSONDecodeError":
+            # A .json() on a sign-in page, which a proxy or an SSO answers
+            # with 200 once the session expires: "Expecting value: line 1
+            # column 1 (char 0)" said nothing about it.
+            return QCoreApplication.translate(
+                "GeoServerMainDialog",
+                "GeoServer answered with something that is not its REST API "
+                "(a sign-in page?)",
+            )
         response = getattr(error, "response", None)
         # One line, markup reduced to its title: a Tomcat stack trace is not an
         # explanation, and an XML error document still says something.
@@ -1655,8 +1738,15 @@ class GeoServerMainDialog(
             self.log(str(e), log_level=Qgis.MessageLevel.Warning)
             self._reload_current_tab()
             return False
-        except _Abandoned:
-            # The user pressed Cancel: they know, and there is nothing to report.
+        except _Abandoned as abandoned:
+            # The user pressed Cancel: they know. A save goes on regardless.
+            if abandoned.write:
+                self.show_warning_message(
+                    self.tr(
+                        "Stopped waiting. GeoServer may still apply the change: "
+                        "the tab reloads once it answers."
+                    )
+                )
             return False
         except Exception as e:
             detail = self._error_text(e)
@@ -1668,7 +1758,7 @@ class GeoServerMainDialog(
         finally:
             self.unsetCursor()
 
-    def _fetch(self, action, failure_message, in_worker=True):
+    def _fetch(self, action, failure_message, in_worker=True, stop=None):
         """_run_action for reads: return the value, or None after reporting.
 
         The read runs in a worker thread (see _wait_for), so a server that
@@ -1676,12 +1766,16 @@ class GeoServerMainDialog(
         on a live QGIS layer, which must stay on the GUI thread (invariant 9).
         """
         result = []
-        run = self._wait_for if in_worker else (lambda fn: fn())
+        run = (
+            (lambda fn: self._wait_for(fn, stop=stop))
+            if in_worker
+            else (lambda fn: fn())
+        )
         if self._run_action(lambda: result.append(run(action)), failure_message):
             return result[0]
         return None
 
-    def _wait_for(self, action):
+    def _wait_for(self, action, write=False, stop=None):
         """Run action() in a worker thread and return its value, or raise its error.
 
         A fast answer returns under the wait cursor, as before. After
@@ -1691,7 +1785,10 @@ class GeoServerMainDialog(
         loop safe: no click can reach the dialog, a form or QGIS while a read
         is outstanding, so nothing can start a second one or clear `self.gs`.
         Cancel raises _Abandoned. The request itself runs to the library's
-        own timeout and its answer is dropped.
+        own timeout and its answer is dropped. `stop`, a threading.Event, is
+        set on Cancel for work that can stop early (a fan-out). `write` marks
+        a save: it still lands after a Cancel, so _run_action says so and the
+        tab reloads once the thread ends, showing whether it did.
 
         A QObject result (a map layer) is moved to the GUI thread before it
         is handed back, because a layer built in a worker belongs to it.
@@ -1711,7 +1808,8 @@ class GeoServerMainDialog(
             finally:
                 done.set()
 
-        _ReadThread(work).start()
+        thread = _ReadThread(work)
+        thread.start()
         if not done.wait(_WAIT_BEFORE_BOX):
             box = QProgressDialog(
                 self.tr("Waiting for GeoServer…"),
@@ -1729,13 +1827,21 @@ class GeoServerMainDialog(
                 while not done.wait(0.05):
                     QCoreApplication.processEvents()
                     if box.wasCanceled():
-                        raise _Abandoned()
+                        if stop is not None:
+                            stop.set()
+                        if write:
+                            thread.finished.connect(self._reload_current_tab)
+                        raise _Abandoned(write)
             finally:
                 box.close()
                 box.deleteLater()
         if "error" in outcome:
             raise outcome["error"]
         return outcome["value"]
+
+    def _wait_for_save(self, action):
+        """_wait_for for a write: after a Cancel it still lands, and says so."""
+        return self._wait_for(action, write=True)
 
     def _raw_rest(self, method, path, **kwargs):
         """Call the REST client directly for what geoservercloud has no method for.
@@ -1768,8 +1874,9 @@ class GeoServerMainDialog(
         """
         result = self._check(api_method(*args))
         if not isinstance(result, list):
+            # A sign-in page came out as its whole markup in the banner.
             raise RuntimeError(
-                f"Unexpected response (not a JSON list): {str(result)[:200]}"
+                f"Unexpected response (not a JSON list): {summarise_body(str(result))}"
             )
         return result
 

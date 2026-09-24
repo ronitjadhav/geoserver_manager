@@ -580,7 +580,7 @@ class WorkspaceTabMixin:
         warning = []
         if self._run_action(
             lambda: warning.append(
-                self._wait_for(lambda: self._save_workspace(values))
+                self._wait_for_save(lambda: self._save_workspace(values))
             ),
             translate("WorkspaceTabMixin", "Failed to create workspace '{}'").format(
                 values["name"]
@@ -671,7 +671,7 @@ class WorkspaceTabMixin:
         if self._run_action(
             # Up to ten requests: in a worker, so a hung server cannot freeze QGIS.
             lambda: warning.append(
-                self._wait_for(
+                self._wait_for_save(
                     lambda: self._save_workspace_and_wms(
                         values, old_name, had_wms, had, uri
                     )

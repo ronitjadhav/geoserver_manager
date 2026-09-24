@@ -627,7 +627,9 @@ class LayerTabMixin:
         if self._run_action(
             # In the worker, behind the waiting box: a slow server must not
             # freeze QGIS on Save either.
-            lambda: self._wait_for(lambda: self._save_layer(row_data, before, after)),
+            lambda: self._wait_for_save(
+                lambda: self._save_layer(row_data, before, after)
+            ),
             translate("LayerTabMixin", "Failed to save layer '{}'").format(name),
         ):
             self.show_success_message(
@@ -752,7 +754,7 @@ class LayerTabMixin:
             )
 
         if self._run_action(
-            lambda: self._wait_for(update),
+            lambda: self._wait_for_save(update),
             translate("LayerTabMixin", "Failed to update '{}' from its data").format(
                 name
             ),
@@ -1042,7 +1044,7 @@ class LayerTabMixin:
             return
         published = values["table"]
         if self._run_action(
-            lambda: self._wait_for(lambda: self._publish_table(values)),
+            lambda: self._wait_for_save(lambda: self._publish_table(values)),
             translate("LayerTabMixin", "Failed to publish '{}'").format(published),
         ):
             self.show_success_message(
@@ -1271,7 +1273,7 @@ class LayerTabMixin:
                 self._set_feature_type_metadata(ws_name, name, values)
 
             def finish():
-                self._wait_for(server_side)  # requests, off the GUI thread
+                self._wait_for_save(server_side)  # requests, off the GUI thread
                 if sld is not None:
                     self._push_qgis_style(name, ws_name, sld, name, True)
 
@@ -1519,7 +1521,7 @@ class LayerTabMixin:
                 )
 
         if self._run_action(
-            lambda: self._wait_for(save),
+            lambda: self._wait_for_save(save),
             translate("LayerTabMixin", "Failed to set the styles of '{}'").format(name),
         ):
             self.show_success_message(
@@ -1686,7 +1688,7 @@ class LayerTabMixin:
                     )
                 )
 
-        self._wait_for(write)
+        self._wait_for_save(write)
         return True
 
     def _confirm_replace_style(self, style_name, workspace_name):

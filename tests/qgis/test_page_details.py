@@ -22,6 +22,7 @@ start_app()
 class TestPageDetails(unittest.TestCase):
     def setUp(self):
         self.dlg = SyncDialog()
+        self.dlg.gs = object()  # connected: without a client nothing is filled
         self.asked = []
         self.dlg._setup_table(["Name", "Workspace", "Type"])
         self.dlg._row_detail = lambda row: self.asked.append(row[0]) or (
@@ -71,6 +72,27 @@ class TestPageDetails(unittest.TestCase):
         self.dlg._setup_table(["Name", "Other"])  # the user moved on
         on_success(results)
         self.assertEqual(self.rows[0][2], PENDING)
+
+    def test_nothing_is_fetched_while_a_refresh_has_no_client(self):
+        # Paging during F5 read every row as failed: dashes, and a warning
+        # listing healthy rows (review 2026-09-24).
+        warnings = []
+        self.dlg.show_warning_message = warnings.append
+        self.dlg.gs = None
+        self.dlg._populate_rows(self.rows)
+        self.assertEqual(self.asked, [])
+        self.assertEqual(self.rows[0][2], PENDING)
+        self.assertEqual(warnings, [])
+
+    def test_a_sort_on_a_detail_column_is_dropped_when_its_cells_are_pending(self):
+        # After a reload the arrow stayed on the column while the rows sat
+        # in name order.
+        self.dlg._populate_rows(self.rows)
+        self.dlg._on_header_clicked(2)
+        self.assertEqual(self.dlg._sort, (2, False))
+        reloaded = [[f"store{n:02}", "topp", PENDING] for n in range(45)]
+        self.dlg._populate_rows(reloaded)
+        self.assertIsNone(self.dlg._sort)
 
     def test_a_row_that_cannot_be_read_gets_dashes_and_one_warning(self):
         warnings = []

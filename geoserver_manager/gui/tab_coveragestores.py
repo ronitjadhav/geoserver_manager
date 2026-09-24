@@ -364,7 +364,7 @@ class CoverageStoreTabMixin:
         if not body:
             return
         if self._run_action(
-            lambda: self._wait_for(
+            lambda: self._wait_for_save(
                 lambda: self._save_coverage_store(ws_name, name, body)
             ),
             translate(
@@ -409,7 +409,7 @@ class CoverageStoreTabMixin:
             quote(ws_name, safe=""), quote(name, safe="")
         )
         if self._run_action(
-            lambda: self._wait_for(
+            lambda: self._wait_for_save(
                 lambda: self._raw_rest("post", path.removesuffix(".json") + "/reset")
             ),
             translate("CoverageStoreTabMixin", "Failed to reset '{}'").format(name),
@@ -667,7 +667,7 @@ class CoverageStoreTabMixin:
             )
 
         if self._run_action(
-            publish,
+            lambda: self._wait_for_save(publish),
             translate("CoverageStoreTabMixin", "Failed to publish '{}'").format(
                 values["native_name"]
             ),
@@ -854,7 +854,7 @@ class CoverageStoreTabMixin:
             self._upload_mosaic_zip(values)
             return
         if self._run_action(
-            lambda: self._wait_for(
+            lambda: self._wait_for_save(
                 lambda: self._create_coverage_store_from_values(values)
             ),
             translate(
