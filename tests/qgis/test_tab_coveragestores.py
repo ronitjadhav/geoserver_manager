@@ -38,8 +38,6 @@ from geoserver_manager.gui.tab_coveragestores import (
 from geoserver_manager.toolbelt.qgis_export import (
     export_to_geotiff,
     local_geotiff_path,
-    raster_layer_by_label,
-    raster_project_layers,
 )
 from tests.qgis.sync_dialog import SyncDialog
 
@@ -786,22 +784,21 @@ class TestLocalGeotiffPath(RasterFixture):
         self.assertIsNone(local_geotiff_path(Wms()))
 
 
-class TestRasterProjectLayers(RasterFixture):
-    def test_lists_gdal_rasters_with_their_crs_sorted_and_nothing_else(self):
-        self.add_layer("zebra", "z.tif")
-        self.add_layer("Alpha", "a.tif")
+class TestRasterPicker(RasterFixture):
+    def test_offers_the_gdal_rasters_with_their_crs_and_nothing_else(self):
+        # The upload sends the file and declares its CRS: a vector, or a
+        # raster with no file behind it, cannot be picked.
+        self.add_layer("dem")
         QgsProject.instance().addMapLayer(
             QgsVectorLayer("Point?crs=EPSG:4326", "points", "memory")
         )
-        labels = [label for label, _layer in raster_project_layers()]
-        self.assertEqual(labels, ["Alpha  (EPSG:4326)", "zebra  (EPSG:4326)"])
-
-    def test_a_label_resolves_to_its_layer_until_it_leaves_the_project(self):
-        layer = self.add_layer("dem")
-        self.assertIs(raster_layer_by_label("dem  (EPSG:4326)"), layer)
-        QgsProject.instance().removeAllMapLayers()
-        with self.assertRaises(ValueError):
-            raster_layer_by_label("dem  (EPSG:4326)")
+        form = ResourceFormDialog(
+            title="t", fields=SyncDialog()._coverage_store_fields(["sf"])
+        )
+        combo = form.get_widget("qgis_layer")
+        self.assertEqual(
+            [combo.itemText(i) for i in range(combo.count())], ["dem [EPSG:4326]"]
+        )
 
 
 class TestPublishQgisRaster(RasterFixture):
@@ -826,7 +823,8 @@ class TestPublishQgisRaster(RasterFixture):
             "name": "My DEM",
             "workspace": "sf",
             "type": tab_coveragestores.QGIS_RASTER,
-            "qgis_layer": "dem  (EPSG:4326)",
+            # The form hands the layer itself; the tests add just the one.
+            "qgis_layer": next(iter(QgsProject.instance().mapLayers().values())),
             "replace": False,
             **extra,
         }
@@ -903,7 +901,7 @@ class TestPublishQgisRaster(RasterFixture):
 
     def test_a_raster_without_a_crs_is_refused_before_anything_is_sent(self):
         self.add_layer("dem", epsg=None)
-        self.dlg._publish_qgis_raster(self.values(qgis_layer="dem  (no CRS)"))
+        self.dlg._publish_qgis_raster(self.values())
         self.assertEqual(len(self.errors), 1)
         self.assertIn("CRS", self.errors[0])
         self.assertEqual(self.puts(), [])
@@ -916,8 +914,7 @@ class TestPublishQgisRaster(RasterFixture):
                 "+ellps=WGS84 +units=m +no_defs"
             )
         )
-        label = next(label for label, _l in tab_coveragestores.raster_project_layers())
-        self.dlg._publish_qgis_raster(self.values(qgis_layer=label))
+        self.dlg._publish_qgis_raster(self.values())
         self.assertEqual(len(self.errors), 1)
         self.assertIn("EPSG", self.errors[0])
         self.assertEqual(self.puts(), [])
@@ -963,12 +960,12 @@ class TestPublishQgisRaster(RasterFixture):
         self.assertEqual(dlg.get_widget("name").text(), "Riviere_DEM")
 
     def test_the_whole_add_flow_ends_in_a_banner_naming_the_layer(self):
-        self.add_layer("dem")
+        layer = self.add_layer("dem")
 
         class Accepting(ResourceFormDialog):
             def exec(inner):
                 inner.get_widget("type").setCurrentText(tab_coveragestores.QGIS_RASTER)
-                inner.get_widget("qgis_layer").setCurrentText("dem  (EPSG:4326)")
+                inner.get_widget("qgis_layer").setLayer(layer)
                 return QDialog.DialogCode.Accepted
 
         with patch.object(tab_coveragestores, "ResourceFormDialog", Accepting):
@@ -997,12 +994,12 @@ class TestRasterUploadRunsInATask(RasterFixture):
         super().tearDown()
 
     def test_the_upload_is_a_task_with_progress_and_the_dialog_stays_usable(self):
-        self.add_layer("dem")
+        layer = self.add_layer("dem")
         self.dlg._publish_qgis_raster(
             {
                 "name": "dem",
                 "workspace": "sf",
-                "qgis_layer": "dem  (EPSG:4326)",
+                "qgis_layer": layer,
                 "replace": False,
             }
         )

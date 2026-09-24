@@ -36,7 +36,6 @@ from geoserver_manager.toolbelt.qgis_export import (
 )
 from geoserver_manager.toolbelt.sld import (
     layer_to_sld,
-    project_layer_by_label,
     styleable_project_layers,
 )
 
@@ -435,6 +434,7 @@ class LayerTabMixin:
                 "label": translate("LayerTabMixin", "SRS (EPSG code)"),
                 "type": "text",
                 "required": True,
+                "crs": True,
                 "help": translate(
                     "LayerTabMixin",
                     "The SRS GeoServer declares for the layer. Changing it "
@@ -799,6 +799,7 @@ class LayerTabMixin:
                 "type": "text",
                 "required": True,
                 "placeholder": translate("LayerTabMixin", "e.g. 3857"),
+                "crs": True,
                 # Required, so on the first tab: on Metadata it bounced the
                 # user there after Publish.
                 "help": translate(
@@ -832,8 +833,7 @@ class LayerTabMixin:
             {
                 "key": "qgis_layer",
                 "label": translate("LayerTabMixin", "QGIS layer"),
-                "type": "combo",
-                "options": [label for label, _layer in styleable_project_layers()],
+                "type": "layer",
                 "required": True,
                 "visible": False,
                 "help": translate(
@@ -893,24 +893,20 @@ class LayerTabMixin:
             dlg.set_field_visible(key, key in wanted)
         if source == _SOURCE_QGIS:
             self._on_publish_layer_picked(
-                dlg, dlg.get_widget("qgis_layer").currentText()
+                dlg, dlg.get_widget("qgis_layer").currentLayer()
             )
 
-    def _on_publish_layer_picked(self, dlg, label):
+    def _on_publish_layer_picked(self, dlg, layer):
         """Suggest the name, and hide what a raster ignores (its symbology)."""
-        self._prefill_publish_name(dlg, label)
-        try:
-            raster = isinstance(project_layer_by_label(label), QgsRasterLayer)
-        except ValueError:  # nothing picked, or the layer left the project
-            raster = False
-        dlg.set_field_visible("with_style", not raster)
+        self._prefill_publish_name(dlg, layer)
+        dlg.set_field_visible("with_style", not isinstance(layer, QgsRasterLayer))
 
     @staticmethod
-    def _prefill_publish_name(dlg, label):
+    def _prefill_publish_name(dlg, layer):
         """Suggest the GeoServer-safe form of the picked layer's name."""
         widget = dlg.get_widget("name")
-        if label and not widget.text().strip():
-            widget.setText(geoserver_name(label.rsplit("  (", 1)[0]))
+        if layer is not None and not widget.text().strip():
+            widget.setText(geoserver_name(layer.name()))
 
     def _refill_publish_combos(self, dlg, workspace=None, datastore=None):
         """Cascade: workspace -> its datastores -> the store's unpublished tables.
@@ -986,21 +982,15 @@ class LayerTabMixin:
         dlg.get_widget("source").currentTextChanged.connect(
             lambda source: self._on_publish_source_changed(dlg, source)
         )
-        dlg.get_widget("qgis_layer").currentTextChanged.connect(
-            lambda label: self._on_publish_layer_picked(dlg, label)
+        dlg.get_widget("qgis_layer").layerChanged.connect(
+            lambda layer: self._on_publish_layer_picked(dlg, layer)
         )
         self._refill_publish_combos(dlg)
         self._on_publish_source_changed(dlg, _SOURCE_TABLE)
         if layer is not None:
             # The layer first: switching the source prefills the name from
             # whichever layer the combo shows at that moment.
-            labels = [
-                label
-                for label, candidate in styleable_project_layers()
-                if candidate is layer
-            ]
-            if labels:
-                dlg.get_widget("qgis_layer").setCurrentText(labels[0])
+            dlg.get_widget("qgis_layer").setLayer(layer)
             dlg.get_widget("source").setCurrentText(_SOURCE_QGIS)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -1183,7 +1173,8 @@ class LayerTabMixin:
             return False
         ws_name = values["workspace"]
         name = geoserver_name(values["name"])
-        layer = layer or self._picked_layer(values)
+        if layer is None:
+            layer = values["qgis_layer"]
         if isinstance(layer, QgsRasterLayer):
             return self._publish_qgis_raster(
                 {
@@ -1500,16 +1491,16 @@ class LayerTabMixin:
 
     @staticmethod
     def _matching_project_layer(layer_name, layers):
-        """The label of the project layer that looks like this GeoServer layer.
+        """The project layer that looks like this GeoServer layer, or None.
 
         Matched on the name, ignoring case and any "workspace:" prefix, because
         that is how a layer added by this plugin (or by QGIS's own browser)
         comes into a project.
         """
         wanted = layer_name.split(":")[-1].casefold()
-        for label, layer in layers:
+        for layer in layers:
             if layer.name().split(":")[-1].casefold() == wanted:
-                return label
+                return layer
         return None
 
     def _style_from_qgis(self, row_data):
@@ -1538,8 +1529,7 @@ class LayerTabMixin:
                 {
                     "key": "qgis_layer",
                     "label": translate("LayerTabMixin", "QGIS layer"),
-                    "type": "combo",
-                    "options": [label for label, _layer in layers],
+                    "type": "layer",
                     "default": match,
                     "required": True,
                     "help": (
@@ -1575,21 +1565,16 @@ class LayerTabMixin:
         values = dlg.get_values()
         # The export reads a live QGIS layer, so it happens here on the GUI
         # thread, before the upload (invariant 9).
-        picked = []
+        layer = values["qgis_layer"]
         sld = self._fetch(
-            # Resolved in here: a layer removed from the project since the form
-            # opened raised a traceback out of this handler.
-            lambda: layer_to_sld(
-                picked.append(self._picked_layer(values)) or picked[0]
-            ),
+            lambda: layer_to_sld(layer),
             translate("LayerTabMixin", "Could not export the symbology of '{}'").format(
-                values.get("qgis_layer", "")
+                layer.name()
             ),
             in_worker=False,
         )
         if sld is None:
             return
-        layer = picked[0]
 
         style_name = geoserver_name(values["style"])
         outcome = {}

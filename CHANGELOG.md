@@ -257,6 +257,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- **QGIS's own widgets where it has one.** A style's definition and the
+  cache's parameter filters open in QGIS's code editor: line numbers,
+  folding, highlighting for SLD, CSS and MBStyle. Password boxes, in the
+  forms and in *Settings*, have QGIS's eye to show what was typed. File
+  fields take a file dropped on them. A QGIS layer is picked from QGIS's
+  layer list, with icons, and two layers of one name are two entries (a
+  picker of labels had handed over the first). An SRS box has a button that
+  looks the code up in QGIS's CRS picker, and still takes a code QGIS does
+  not know. The area to seed is typed or taken from the map view, a layer or
+  a bookmark, in the gridset's CRS, instead of four numbers in a text box.
 - **Lists are edited as lists, not typed into text boxes.** A layer group's
   layers are rows picked from the server's layers and groups, each with a
   style picker, reordered with arrows; a cached layer's gridsets and formats

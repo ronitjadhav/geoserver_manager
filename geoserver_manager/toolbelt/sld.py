@@ -48,37 +48,20 @@ def sld_content_type(sld):
 
 
 def styleable_project_layers():
-    """The project's layers that can carry an SLD, as [(label, layer)].
+    """The project's layers that can carry an SLD: its vector and raster ones.
 
-    Vector and raster layers only: QGIS reads and writes SLD for those, and a
-    mesh or point-cloud layer would just fail later with a worse message.
+    QGIS reads and writes SLD for those, and a mesh or point-cloud layer would
+    just fail later with a worse message. The forms' layer pickers filter the
+    same two kinds.
     """
     from qgis.core import QgsMapLayer, QgsProject
 
-    kinds = {
-        QgsMapLayer.LayerType.VectorLayer: "vector",
-        QgsMapLayer.LayerType.RasterLayer: "raster",
-    }
-    from geoserver_manager.toolbelt.qgis_export import unique_labels
-
-    layers = []
-    for layer in QgsProject.instance().mapLayers().values():
-        kind = kinds.get(layer.type())
-        if kind:
-            layers.append((f"{layer.name()}  ({kind})", layer))
-    return unique_labels(layers)
-
-
-def project_layer_by_label(label):
-    """The project layer a `styleable_project_layers` label points at.
-
-    Raises ValueError when it has left the project since the form was filled;
-    a dialog can sit open for a long time.
-    """
-    for candidate, layer in styleable_project_layers():
-        if candidate == label:
-            return layer
-    raise ValueError(f"Layer '{label}' is no longer in the project.")
+    kinds = (QgsMapLayer.LayerType.VectorLayer, QgsMapLayer.LayerType.RasterLayer)
+    return [
+        layer
+        for layer in QgsProject.instance().mapLayers().values()
+        if layer.type() in kinds
+    ]
 
 
 def layer_to_sld(layer):

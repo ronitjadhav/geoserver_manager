@@ -192,6 +192,11 @@ class FakeGS:
             return Response(text=STATES_XML)
         if path == "/gwc/rest/gridsets.json":
             return Response(list(GRIDSETS))
+        if path.startswith("/gwc/rest/gridsets/"):
+            number = "900913" if "900913" in path else "4326"
+            return Response(
+                text=f"<gridSet><srs><number>{number}</number></srs></gridSet>"
+            )
         if path == "/rest/layers.json":
             return Response(
                 {
@@ -695,6 +700,28 @@ class TestSeed(unittest.TestCase):
         self.assertEqual(posts[0][1], "/gwc/rest/seed/topp:states.json")
         self.assertEqual(posts[0][2]["json"]["seedRequest"]["type"], "seed")
         monitor.assert_called_once_with(STATES_ROW)
+
+    def test_the_area_is_given_in_the_picked_gridsets_crs(self):
+        # Picked on the map or from a layer, it is sent in the gridset's CRS:
+        # the typed "minx, miny, maxx, maxy" box left the units to guess.
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        opened = []
+
+        class Recording(ResourceFormDialog):
+            def exec(inner):
+                opened.append(inner)
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_gwc, "ResourceFormDialog", Recording):
+            dlg._seed_gwc_layer(STATES_ROW)
+        form = opened[0]
+        area = form.get_widget("bounds")
+        form.get_widget("gridset").setCurrentText("EPSG:4326")
+        self.assertEqual(area.outputCrs().authid(), "EPSG:4326")
+        form.get_widget("gridset").setCurrentText("EPSG:900913")
+        self.assertEqual(area.outputCrs().authid(), "EPSG:900913")
+        self.assertEqual(form.get_values()["bounds"], "")  # not set: all of it
 
     def test_a_failed_read_is_shown_in_the_monitor_not_raised(self):
         dlg = SyncDialog()

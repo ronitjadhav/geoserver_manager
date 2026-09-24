@@ -3,7 +3,7 @@
 """
 Audit follow-ups on the Layers and Coverage Stores tabs: names that would
 change a URL's meaning are refused, path segments are quoted, and two project
-layers named alike get distinct picker labels.
+layers named alike are two entries in the layer picker.
 
 Usage from the repo root folder:
 
@@ -16,11 +16,7 @@ from qgis.core import QgsProject, QgsVectorLayer
 from qgis.testing import start_app, unittest
 
 from geoserver_manager.gui.dlg_main import GeoServerMainDialog
-from geoserver_manager.toolbelt.qgis_export import unique_labels
-from geoserver_manager.toolbelt.sld import (
-    project_layer_by_label,
-    styleable_project_layers,
-)
+from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from tests.qgis.sync_dialog import SyncDialog
 
 start_app()
@@ -76,7 +72,7 @@ class TestQuotedPathSegments(unittest.TestCase):
         self.assertTrue(url.startswith("http://gs/geoserver/my%20ws/wms?"), url)
 
 
-class TestPickerLabelsAreUnique(unittest.TestCase):
+class TestLayersNamedAlike(unittest.TestCase):
     def setUp(self):
         self.project = QgsProject.instance()
         self.project.removeAllMapLayers()
@@ -84,40 +80,22 @@ class TestPickerLabelsAreUnique(unittest.TestCase):
     def tearDown(self):
         self.project.removeAllMapLayers()
 
-    def test_two_layers_named_alike_get_two_labels_that_both_resolve(self):
+    def test_two_layers_named_alike_are_two_entries_that_both_resolve(self):
+        # A picker of labels handed the first layer to whoever picked the
+        # second; QGIS's layer combo holds the layers themselves.
         first = QgsVectorLayer("Point?crs=EPSG:4326", "roads", "memory")
         second = QgsVectorLayer("Point?crs=EPSG:4326", "roads", "memory")
         self.project.addMapLayers([first, second])
-        labels = [label for label, _layer in styleable_project_layers()]
-        self.assertEqual(len(set(labels)), 2, labels)
-        self.assertTrue(all(label.startswith("roads  (vector) [") for label in labels))
-        resolved = {project_layer_by_label(label).id() for label in labels}
-        self.assertEqual(resolved, {first.id(), second.id()})
-
-    def test_a_lone_layer_keeps_its_plain_label(self):
-        layer = QgsVectorLayer("Point?crs=EPSG:4326", "roads", "memory")
-        self.project.addMapLayer(layer)
-        self.assertEqual(
-            [label for label, _l in styleable_project_layers()], ["roads  (vector)"]
+        form = ResourceFormDialog(
+            title="t", fields=[{"key": "layer", "label": "L", "type": "layer"}]
         )
-
-    def test_unique_labels_is_pure(self):
-        class Layer:
-            def __init__(self, identifier):
-                self.identifier = identifier
-
-            def id(self):
-                return self.identifier
-
-        entries = [
-            ("b  (vector)", Layer("b_0001")),
-            ("a  (vector)", Layer("a_1")),
-            ("a  (vector)", Layer("a_2")),
-        ]
-        labels = [label for label, _layer in unique_labels(entries)]
-        self.assertEqual(
-            labels, ["a  (vector) [a_1]", "a  (vector) [a_2]", "b  (vector)"]
-        )
+        combo = form.get_widget("layer")
+        self.assertEqual(combo.count(), 2)
+        picked = set()
+        for index in range(2):
+            combo.setCurrentIndex(index)
+            picked.add(form.get_values()["layer"].id())
+        self.assertEqual(picked, {first.id(), second.id()})
 
 
 if __name__ == "__main__":

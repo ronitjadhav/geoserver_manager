@@ -30,8 +30,6 @@ from geoserver_manager.toolbelt.qgis_export import (
     export_to_geotiff,
     geoserver_name,
     local_geotiff_path,
-    raster_layer_by_label,
-    raster_project_layers,
     reprojection_target,
     require_crs,
 )
@@ -735,8 +733,10 @@ class CoverageStoreTabMixin:
             {
                 "key": "qgis_layer",
                 "label": translate("CoverageStoreTabMixin", "QGIS layer"),
-                "type": "combo",
-                "options": [label for label, _layer in raster_project_layers()],
+                "type": "layer",
+                "raster_files": True,
+                # The upload declares it: a raster is never reprojected.
+                "show_crs": True,
                 "required": True,
                 "visible": False,
                 "help": translate(
@@ -779,14 +779,14 @@ class CoverageStoreTabMixin:
         for key in _TYPED_KEYS:
             dlg.set_field_visible(key, key in wanted)
         if store_type == QGIS_RASTER:
-            self._prefill_store_name(dlg, dlg.get_widget("qgis_layer").currentText())
+            self._prefill_store_name(dlg, dlg.get_widget("qgis_layer").currentLayer())
 
     @staticmethod
-    def _prefill_store_name(dlg, label):
+    def _prefill_store_name(dlg, layer):
         """Suggest the GeoServer-safe form of the picked layer's name."""
         widget = dlg.get_widget("name")
-        if label and not widget.text().strip():
-            widget.setText(geoserver_name(label.rsplit("  (", 1)[0]))
+        if layer is not None and not widget.text().strip():
+            widget.setText(geoserver_name(layer.name()))
 
     def _add_coverage_store(self):
         """Create a coverage store."""
@@ -822,8 +822,8 @@ class CoverageStoreTabMixin:
         dlg.get_widget("type").currentTextChanged.connect(
             lambda store_type: self._on_store_type_changed(dlg, store_type)
         )
-        dlg.get_widget("qgis_layer").currentTextChanged.connect(
-            lambda label: self._prefill_store_name(dlg, label)
+        dlg.get_widget("qgis_layer").layerChanged.connect(
+            lambda layer: self._prefill_store_name(dlg, layer)
         )
         self._on_store_type_changed(dlg, GEOTIFF)
         if dlg.exec() != QDialog.DialogCode.Accepted:
@@ -1070,7 +1070,8 @@ class CoverageStoreTabMixin:
         reprojected), and a taken name unless *Replace* is ticked, because the
         PUT would overwrite the store silently.
         """
-        layer = layer or raster_layer_by_label(values["qgis_layer"])
+        if layer is None:
+            layer = values["qgis_layer"]
         if layer.providerType() != "gdal":
             raise ValueError(
                 translate(

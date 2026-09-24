@@ -329,7 +329,7 @@ class TestStyleDialogLayout(unittest.TestCase):
 
 
 class TestFileField(unittest.TestCase):
-    """The form dialog's new 'file' type: a path edit plus Browse."""
+    """The form dialog's 'file' type: QGIS's file widget."""
 
     def test_round_trips_a_path_and_can_be_required(self):
         dlg = ResourceFormDialog(
@@ -339,7 +339,7 @@ class TestFileField(unittest.TestCase):
         dlg.show()
         dlg._on_accept()
         self.assertFalse(dlg.result())  # empty + required -> blocked
-        dlg.get_widget("file").path_edit.setText("/tmp/a.sld")
+        dlg.get_widget("file").setFilePath("/tmp/a.sld")
         self.assertEqual(dlg.get_values()["file"], "/tmp/a.sld")
         dlg._on_accept()
         self.assertTrue(dlg.result())
@@ -452,7 +452,7 @@ class TestStyleFromQgisLayer(unittest.TestCase):
                 "name": "new_towns",
                 "workspace": "topp",
                 "source": "From a QGIS layer",
-                "qgis_layer": "towns  (vector)",
+                "qgis_layer": self.layer,
             }
         )
         self.assertFalse(any(c[0] == "definition" for c in self.dlg.gs.calls))
@@ -463,11 +463,9 @@ class TestStyleFromQgisLayer(unittest.TestCase):
         self.assertIn(b"ff0000", kwargs["data"].lower())  # the symbology travelled
 
     def test_the_source_field_shows_the_projects_layers(self):
-        field = [
-            f for f in self.dlg._upload_fields(["topp"]) if f["key"] == "qgis_layer"
-        ][0]
-        self.assertEqual(field["options"], ["towns  (vector)"])
-        self.assertFalse(field["visible"])  # hidden until that source is picked
+        dlg = ResourceFormDialog(title="t", fields=self.dlg._upload_fields(["topp"]))
+        self.assertIs(dlg.get_widget("qgis_layer").currentLayer(), self.layer)
+        self.assertIn("qgis_layer", dlg._hidden_keys)  # until that source is picked
 
     def test_picking_the_qgis_source_reveals_only_that_field(self):
         dlg = ResourceFormDialog(title="t", fields=self.dlg._upload_fields(["topp"]))
@@ -476,16 +474,12 @@ class TestStyleFromQgisLayer(unittest.TestCase):
         self.assertIn("sld", dlg._hidden_keys)
         self.assertIn("file", dlg._hidden_keys)
 
-    def test_a_layer_that_left_the_project_is_refused(self):
-        with self.assertRaises(ValueError):
-            self.dlg._create_style_from_values(
-                {
-                    "name": "new_gone",
-                    "workspace": GLOBAL,
-                    "source": "From a QGIS layer",
-                    "qgis_layer": "not_in_the_project  (vector)",
-                }
-            )
+    def test_a_layer_that_leaves_the_project_is_no_longer_offered(self):
+        # A picked label used to outlive its layer and fail on Save; QGIS's
+        # combo follows the project.
+        dlg = ResourceFormDialog(title="t", fields=self.dlg._upload_fields(["topp"]))
+        QgsProject.instance().removeAllMapLayers()
+        self.assertIsNone(dlg.get_values()["qgis_layer"])
 
 
 class TestApplyStyleToQgis(unittest.TestCase):

@@ -22,7 +22,6 @@ from geoserver_manager.toolbelt.sld import (
     SLD_1_0,
     apply_sld_to_layer,
     layer_to_sld,
-    project_layer_by_label,
     sld_content_type,
     sld_version,
     styleable_project_layers,
@@ -41,6 +40,8 @@ _CONTENT_TYPES = {
     "mbstyle": "application/vnd.geoserver.mbstyle+json",
 }
 _EDITABLE_FORMATS = tuple(_CONTENT_TYPES)
+# How the form's code editor highlights each format; YSLD stays plain.
+_CODE_LANGUAGES = {"sld": "xml", "css": "css", "mbstyle": "json"}
 # A file's format, from its extension; .zip stays the library's job.
 _FORMAT_OF_SUFFIX = {
     ".sld": "sld",
@@ -326,7 +327,7 @@ class StyleTabMixin:
             value = value.get("version")
         return str(value) if value else ""
 
-    def _style_fields(self, editable, language_version=""):
+    def _style_fields(self, editable, language_version="", style_format="sld"):
         """Field definitions for the style dialog.
 
         The definition comes first, on its own tab: it is the one thing the
@@ -342,7 +343,7 @@ class StyleTabMixin:
                 "group": translate("StyleTabMixin", "Definition"),
                 "min_height": 320,
                 "max_height": None,  # grow with the dialog
-                "code": True,
+                "code": _CODE_LANGUAGES.get(style_format, True),
                 "wide": True,
                 "help": (
                     translate(
@@ -447,7 +448,7 @@ class StyleTabMixin:
                 if editable
                 else None
             ),
-            fields=self._style_fields(editable, language_version),
+            fields=self._style_fields(editable, language_version, style_format),
             values={
                 "name": name,
                 "workspace": row_data[1],
@@ -458,7 +459,6 @@ class StyleTabMixin:
             },
             parent=self,
         )
-        dlg.get_widget("body").setMaximumHeight(400)
         self._load_legend(dlg, name, workspace_name)
         if not editable:
             dlg.hide_save_button()
@@ -652,10 +652,10 @@ class StyleTabMixin:
                 "label": translate("StyleTabMixin", "Style"),
                 "type": "textarea",
                 "required": True,
-                "code": True,
-                "placeholder": translate(
-                    "StyleTabMixin", "Paste the style document here"
-                ),
+                # Highlighted as SLD, the usual paste; CSS or JSON just
+                # stays plain in it.
+                "code": "xml",
+                "help": translate("StyleTabMixin", "Paste the style document here"),
             },
             {
                 "key": "file",
@@ -676,8 +676,7 @@ class StyleTabMixin:
             {
                 "key": "qgis_layer",
                 "label": translate("StyleTabMixin", "QGIS layer"),
-                "type": "combo",
-                "options": [label for label, _layer in styleable_project_layers()],
+                "type": "layer",
                 "required": True,
                 "visible": False,
                 "help": translate(
@@ -754,7 +753,7 @@ class StyleTabMixin:
             self._create_style(name, workspace_name, style_format, path.read_bytes())
         elif source == _SOURCE_QGIS:
             self._create_sld_style(
-                name, workspace_name, layer_to_sld(self._picked_layer(values))
+                name, workspace_name, layer_to_sld(values["qgis_layer"])
             )
         else:
             style_format = (values.get("format") or "sld").lower()
@@ -789,11 +788,6 @@ class StyleTabMixin:
     def _create_sld_style(self, name, workspace_name, sld):
         """Create an SLD style from its body; see _create_style."""
         self._create_style(name, workspace_name, "sld", sld)
-
-    @staticmethod
-    def _picked_layer(values):
-        """The project layer the form's QGIS-layer combo points at."""
-        return project_layer_by_label(values["qgis_layer"])
 
     # -- QGIS <-> GeoServer ----------------------------------------------------
 
@@ -835,8 +829,7 @@ class StyleTabMixin:
                 {
                     "key": "qgis_layer",
                     "label": translate("StyleTabMixin", "QGIS layer"),
-                    "type": "combo",
-                    "options": [label for label, _layer in layers],
+                    "type": "layer",
                     "required": True,
                 }
             ],
@@ -846,7 +839,7 @@ class StyleTabMixin:
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
-        layer = self._picked_layer(dlg.get_values())
+        layer = dlg.get_values()["qgis_layer"]
         outcome = []
         if not self._run_action(
             lambda: outcome.extend(apply_sld_to_layer(layer, sld)),

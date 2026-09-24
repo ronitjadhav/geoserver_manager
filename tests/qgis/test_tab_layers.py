@@ -874,7 +874,7 @@ class TestPublish(unittest.TestCase):
             self.dlg._publish_layer(layer=vector)
         form = opened[0]
         self.assertNotIn("with_style", form._hidden_keys)
-        form.get_widget("qgis_layer").setCurrentText("dem  (raster)")
+        form.get_widget("qgis_layer").setLayer(raster)
         self.assertIn("with_style", form._hidden_keys)
 
     def test_the_layer_tree_can_preselect_a_project_layer(self):
@@ -907,9 +907,7 @@ class TestPublish(unittest.TestCase):
         self.assertEqual(
             form.get_widget("source").currentText(), tab_layers._SOURCE_QGIS
         )
-        self.assertTrue(
-            form.get_widget("qgis_layer").currentText().startswith("Rivières")
-        )
+        self.assertIs(form.get_widget("qgis_layer").currentLayer(), clicked)
         self.assertEqual(form.get_widget("name").text(), "Rivieres")
 
 
@@ -1497,18 +1495,11 @@ class TestStyleFromQgis(unittest.TestCase):
         from tests.qgis.test_sld import point_layer
 
         # a layer added by this plugin keeps GeoServer's "workspace:layer" name
-        layers = [
-            ("topp:roads  (vector)", point_layer("topp:roads")),
-            ("Rivers  (vector)", point_layer("Rivers")),
-        ]
+        roads, rivers = point_layer("topp:roads"), point_layer("Rivers")
+        layers = [roads, rivers]
         # matched ignoring case and any workspace prefix on either side
-        self.assertEqual(
-            self.dlg._matching_project_layer("roads", layers), "topp:roads  (vector)"
-        )
-        self.assertEqual(
-            self.dlg._matching_project_layer("topp:rivers", layers),
-            "Rivers  (vector)",
-        )
+        self.assertIs(self.dlg._matching_project_layer("roads", layers), roads)
+        self.assertIs(self.dlg._matching_project_layer("topp:rivers", layers), rivers)
         self.assertIsNone(self.dlg._matching_project_layer("nothing", layers))
 
     def test_the_push_creates_the_style_and_assigns_it_qualified(self):
@@ -1737,7 +1728,8 @@ class TestPublishQgisLayer(unittest.TestCase):
         base = {
             "source": "A layer from this QGIS project",
             "workspace": "topp",
-            "qgis_layer": "Roads (2024)  (vector)",
+            # The form hands the layer itself: the one of that name here.
+            "qgis_layer": (self.project.mapLayersByName("Roads (2024)") or [None])[0],
             "name": "Roads (2024)",
             "replace": False,
             "with_style": False,
@@ -1850,9 +1842,7 @@ class TestPublishQgisLayer(unittest.TestCase):
             layer = QgsRasterLayer(str(write_raster(folder / "dem.tif")), "dem", "gdal")
             self.assertTrue(layer.isValid())
             self.project.addMapLayer(layer)
-            self.dlg._publish_qgis_layer(
-                self.values(qgis_layer="dem  (raster)", name="dem")
-            )
+            self.dlg._publish_qgis_layer(self.values(qgis_layer=layer, name="dem"))
             puts = self.sent("PUT")
             self.assertEqual(len(puts), 1)
             self.assertTrue(puts[0][1].endswith("/coveragestores/dem/file.geotiff"))
@@ -1904,12 +1894,13 @@ class TestVectorUploadRunsInATask(unittest.TestCase):
 
         from tests.qgis.test_sld import point_layer
 
-        self.project.addMapLayer(point_layer("Roads (2024)", colour="#ff0000"))
+        layer = point_layer("Roads (2024)", colour="#ff0000")
+        self.project.addMapLayer(layer)
         self.dlg._publish_qgis_layer(
             {
                 "source": "A layer from this QGIS project",
                 "workspace": "topp",
-                "qgis_layer": "Roads (2024)  (vector)",
+                "qgis_layer": layer,
                 "name": "Roads (2024)",
                 "replace": False,
                 "with_style": False,
@@ -1980,7 +1971,9 @@ class TestPublishForm(unittest.TestCase):
     def test_a_name_the_user_typed_is_not_overwritten(self):
         form = self.form()
         form.get_widget("name").setText("my_choice")
-        self.dlg._prefill_publish_name(form, "Roads (2024)  (vector)")
+        self.dlg._prefill_publish_name(
+            form, form.get_widget("qgis_layer").currentLayer()
+        )
         self.assertEqual(form.get_widget("name").text(), "my_choice")
 
 
