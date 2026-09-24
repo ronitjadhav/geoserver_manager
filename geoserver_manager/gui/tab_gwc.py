@@ -748,7 +748,9 @@ class GwcTabMixin:
 
         values = dlg.get_values()
         if self._run_action(
-            lambda: self._save_gwc_layer(name, xml_text, values),
+            lambda: self._wait_for_save(
+                lambda: self._save_gwc_layer(name, xml_text, values)
+            ),
             translate("GwcTabMixin", "Failed to save the tile cache of '{}'").format(
                 name
             ),
@@ -801,7 +803,9 @@ class GwcTabMixin:
 
         values = dlg.get_values()
         if self._run_action(
-            lambda: self._create_gwc_layer_from_values(values),
+            lambda: self._wait_for_save(
+                lambda: self._create_gwc_layer_from_values(values)
+            ),
             translate("GwcTabMixin", "Failed to cache '{}'").format(
                 values.get("layer", "")
             ),
@@ -1019,8 +1023,10 @@ class GwcTabMixin:
             return
         values = dlg.get_values()
         if self._run_action(
-            lambda: self._raw_rest(
-                "post", self._seed_path(name), json=self._seed_request(name, values)
+            lambda: self._wait_for_save(
+                lambda: self._raw_rest(
+                    "post", self._seed_path(name), json=self._seed_request(name, values)
+                )
             ),
             translate("GwcTabMixin", "Failed to start the task on '{}'").format(name),
         ):
@@ -1086,8 +1092,10 @@ class GwcTabMixin:
 
         def stop_all():
             if self._run_action(
-                lambda: self._raw_rest(
-                    "post", self._seed_path(name, ""), data={"kill_all": "all"}
+                lambda: self._wait_for_save(
+                    lambda: self._raw_rest(
+                        "post", self._seed_path(name, ""), data={"kill_all": "all"}
+                    )
                 ),
                 translate("GwcTabMixin", "Failed to stop the tasks on '{}'").format(
                     name
@@ -1124,7 +1132,7 @@ class GwcTabMixin:
         ):
             return
         if self._run_action(
-            lambda: self._do_truncate_gwc_layer(name),
+            lambda: self._wait_for_save(lambda: self._do_truncate_gwc_layer(name)),
             translate(
                 "GwcTabMixin", "Failed to truncate the tile cache of '{}'"
             ).format(name),

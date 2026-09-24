@@ -34,7 +34,9 @@ Working with a list:
 
 Opening a form or a details view reads from the server first. If the server
 is slow to answer, a *Waiting for GeoServer* box appears with *Cancel*. A
-server that went away never freezes QGIS.
+server that went away never freezes QGIS. A save waits the same way; its
+request is already sent, so after a *Cancel* it may still be applied, and
+the tab reloads once GeoServer answers.
 
 Every delete asks first and says what else goes with it. GeoServer deletes
 recursively: a workspace takes its stores, layers and styles along.

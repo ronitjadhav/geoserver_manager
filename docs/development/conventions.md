@@ -88,9 +88,10 @@ what the pieces are; this page says how to work on them.
   A response body reaches a banner only through `toolbelt.rest.summarise_body` (first line, 300 chars, markup
   reduced to its title): a Tomcat error page or a proxy login page is not an explanation.
 - **Reopening after Close must work.** `closeEvent` sets `_closing` so a late task finish stays away from dying
-  widgets; `refresh_ui()` resets it and stops the running load *before* dropping `self.gs`, and a finished task
-  frees its slot even while closing. Without that the dialog worked once per QGIS session; `test_audit_fixes.py`
-  closes and reopens.
+  widgets; `showEvent` resets it, whatever reopened the dialog (the layer tree's *Publish* shows it without
+  reconnecting), `refresh_ui()` stops the running load *before* dropping `self.gs`, and a finished task frees
+  its slot even while closing. Without that the dialog worked once per QGIS session; `test_audit_fixes.py` and
+  `test_cancel_and_threads.py` close and reopen.
 - **Tab labels get a tooltip** from `_tab_help()` (GeoServer's words: "WMS and WMTS stores that proxy another
   server's layers"); the label itself stays a logic key ([invariant 11](invariants.md)).
 - Qt6-compatible enums only: `Qt.CursorShape.WaitCursor`, `QDialog.DialogCode.Accepted`,

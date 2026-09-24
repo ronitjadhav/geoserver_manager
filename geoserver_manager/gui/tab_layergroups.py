@@ -759,7 +759,7 @@ class LayerGroupTabMixin:
 
         values = dlg.get_values()
         if self._run_action(
-            lambda: self._wait_for(
+            lambda: self._wait_for_save(
                 lambda: self._create_layer_group_from_values(
                     values, layer_names, group_names
                 )
