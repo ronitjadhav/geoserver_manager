@@ -23,7 +23,10 @@ from qgis.testing import start_app, unittest
 # project
 from geoserver_manager.gui.dlg_main import GeoServerMainDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.gui.tab_datastores import DatastoreTabMixin
+from geoserver_manager.gui.tab_datastores import (
+    _TYPE_SPECIFIC_FIELDS,
+    DatastoreTabMixin,
+)
 from geoserver_manager.toolbelt.rest import UploadCancelled
 from tests.qgis.sync_dialog import SyncDialog
 
@@ -1392,8 +1395,16 @@ class TestFileStoreFormBehaviour(unittest.TestCase):
         return {
             field["key"]
             for field in self.dlg._datastore_fields(["topp"])
-            if field.get("group") and field["key"] not in self.form._hidden_keys
+            if field["key"] in _TYPE_SPECIFIC_FIELDS
+            and field["key"] not in self.form._hidden_keys
         }
+
+    def test_the_add_form_is_one_page_with_the_types_fields_under_it(self):
+        # The fields sat on a Connection tab: after picking PostGIS they had
+        # to be found (#91).
+        self.assertIsNone(self.form._tabs)
+        self.dlg._on_type_changed(self.form, "PostGIS")
+        self.assertNotIn("pg_host", self.form._hidden_keys)
 
     def test_each_type_shows_only_its_own_fields(self):
         self.assertEqual(

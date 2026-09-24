@@ -287,6 +287,7 @@ class TestShippedFrenchLocale(unittest.TestCase):
             "LayerPreviewDialog",
             "ListTable",
             "ResourceFormDialog",
+            "Scope",
             "wdg_geoserver_manager_settings",
         }
         named = {

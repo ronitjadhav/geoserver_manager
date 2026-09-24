@@ -218,7 +218,8 @@ class DatastoreTabMixin:
         :param edit_mode: editing an existing datastore. The workspace is
             fixed and the password has to be re-entered.
         """
-        connection = translate("DatastoreTabMixin", "Connection")
+        # One page: the fields of the picked type show right under Type. On a
+        # tab of their own, picking PostGIS meant going to look for them (#91).
         fields = [
             {
                 "key": "name",
@@ -268,7 +269,6 @@ class DatastoreTabMixin:
                 "type": "text",
                 "required": True,
                 "placeholder": "localhost",
-                "group": connection,
             },
             {
                 "key": "pg_port",
@@ -277,21 +277,18 @@ class DatastoreTabMixin:
                 "default": 5432,
                 "min": 1,
                 "max": 65535,
-                "group": connection,
             },
             {
                 "key": "pg_db",
                 "label": translate("DatastoreTabMixin", "Database"),
                 "type": "text",
                 "required": True,
-                "group": connection,
             },
             {
                 "key": "pg_user",
                 "label": translate("DatastoreTabMixin", "User"),
                 "type": "text",
                 "required": True,
-                "group": connection,
             },
             {
                 "key": "pg_password",
@@ -299,7 +296,6 @@ class DatastoreTabMixin:
                 "type": "text",
                 "required": not edit_mode,
                 "echo_password": True,
-                "group": connection,
                 "help": (
                     translate(
                         "DatastoreTabMixin", "Leave empty to keep the stored password"
@@ -313,7 +309,6 @@ class DatastoreTabMixin:
                 "label": translate("DatastoreTabMixin", "Schema"),
                 "type": "text",
                 "default": "public",
-                "group": connection,
             },
             # --- JNDI fields ---
             {
@@ -323,7 +318,6 @@ class DatastoreTabMixin:
                 "required": True,
                 "placeholder": "java:comp/env/jdbc/mydb",
                 "visible": False,
-                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin", "JNDI name of the database connection pool"
                 ),
@@ -334,7 +328,6 @@ class DatastoreTabMixin:
                 "label": translate("DatastoreTabMixin", "GeoServer type"),
                 "type": "text",
                 "visible": False,
-                "group": connection,
                 "placeholder": translate("DatastoreTabMixin", "e.g. Properties"),
                 "help": translate(
                     "DatastoreTabMixin",
@@ -348,7 +341,6 @@ class DatastoreTabMixin:
                 "label": translate("DatastoreTabMixin", "Connection parameters"),
                 "type": "keyvalue",
                 "visible": False,
-                "group": connection,
                 "max_height": 320,
                 "help": translate(
                     "DatastoreTabMixin",
@@ -365,7 +357,6 @@ class DatastoreTabMixin:
                 "required": True,
                 "placeholder": "file:///mnt/data/tiles.pmtiles",
                 "visible": False,
-                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "Path or URL to the PMTiles file (file://, s3://, gs://, http(s)://)",
@@ -379,7 +370,6 @@ class DatastoreTabMixin:
                 "required": True,
                 "visible": False,
                 "placeholder": "file:data/shapefiles/states.shp",
-                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "A path on the GeoServer machine: relative to its data "
@@ -395,7 +385,6 @@ class DatastoreTabMixin:
                 "placeholder": translate(
                     "DatastoreTabMixin", "Leave empty for GeoServer's default"
                 ),
-                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "How the .dbf attribute text is encoded: UTF-8, or "
@@ -408,7 +397,6 @@ class DatastoreTabMixin:
                 "type": "checkbox",
                 "default": True,
                 "visible": False,
-                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin", "Writes a .qix file next to the data, once"
                 ),
@@ -421,7 +409,6 @@ class DatastoreTabMixin:
                 "required": True,
                 "visible": False,
                 "placeholder": "file:data/ne/natural_earth.gpkg",
-                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "A path on the GeoServer machine. To publish a .gpkg from "
@@ -435,7 +422,6 @@ class DatastoreTabMixin:
                 "type": "checkbox",
                 "default": False,
                 "visible": False,
-                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "Recommended when nothing writes to the file: GeoServer "
@@ -448,7 +434,6 @@ class DatastoreTabMixin:
                 "type": "checkbox",
                 "default": False,
                 "visible": False,
-                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "Publish the tables' primary key as an attribute",
@@ -462,7 +447,6 @@ class DatastoreTabMixin:
                 "required": True,
                 "visible": False,
                 "placeholder": "https://example.com/geoserver/wfs?service=WFS&request=GetCapabilities",
-                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "The remote WFS's capabilities document. Its feature types can "
@@ -478,7 +462,6 @@ class DatastoreTabMixin:
                 "placeholder": translate(
                     "DatastoreTabMixin", "Leave empty for a public service"
                 ),
-                "group": connection,
             },
             {
                 "key": "wfs_password",
@@ -486,7 +469,6 @@ class DatastoreTabMixin:
                 "type": "text",
                 "echo_password": True,
                 "visible": False,
-                "group": connection,
                 "help": (
                     translate(
                         "DatastoreTabMixin", "Leave empty to keep the stored password"
@@ -503,7 +485,6 @@ class DatastoreTabMixin:
                 "min": 0,
                 "max": 3600000,
                 "visible": False,
-                "group": connection,
             },
             {
                 "key": "wfs_max_features",
@@ -513,7 +494,6 @@ class DatastoreTabMixin:
                 "min": 0,
                 "max": 100000000,
                 "visible": False,
-                "group": connection,
                 "help": translate("DatastoreTabMixin", "0 means no limit"),
             },
             {
@@ -522,7 +502,6 @@ class DatastoreTabMixin:
                 "type": "checkbox",
                 "default": True,
                 "visible": False,
-                "group": connection,
                 "help": translate(
                     "DatastoreTabMixin",
                     "Tolerate responses that do not match the remote's schema exactly",
@@ -557,7 +536,7 @@ class DatastoreTabMixin:
                     "max_height": 320,
                     "help": translate(
                         "DatastoreTabMixin",
-                        "What the Connection tab does not show (pool sizes, "
+                        "What the General tab does not show (pool sizes, "
                         "timeouts, Loose bbox, ...). A parameter you remove is "
                         "removed on the server; a masked password (••••) is kept "
                         "unless you replace it.",

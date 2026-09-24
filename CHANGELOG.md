@@ -257,6 +257,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- **Every label can be translated, and the tables read in words.** A form's
+  choices ("A layer from this QGIS project", "From file", "(global)",
+  "(pick a layer)", the seed task and the coverage store types) were also
+  the keys the code compared, so a French interface showed them in
+  English; each now has a label apart from its value. The Layers tab's
+  Type column says *Vector*, *Raster*, *Cascaded WMS* or *Cascaded WMTS*
+  instead of GeoServer's VECTOR or WMS. The Tile Cache names a layer
+  without its workspace, which the column beside it shows. A table filters
+  and sorts on what it shows.
+- **A datastore's connection fields are on the form's first page,** under
+  its type: on a *Connection* tab of their own, picking PostGIS meant going
+  to look for them.
 - **QGIS's own widgets where it has one.** A style's definition and the
   cache's parameter filters open in QGIS's code editor: line numbers,
   folding, highlighting for SLD, CSS and MBStyle. Password boxes, in the

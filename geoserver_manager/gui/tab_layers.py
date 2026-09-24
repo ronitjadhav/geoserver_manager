@@ -74,6 +74,19 @@ VECTOR, RASTER, WMS, WMTS = "VECTOR", "RASTER", "WMS", "WMTS"
 translate = QCoreApplication.translate
 
 
+def _kind_label(kind):
+    """A layer's type in words, as the Type column shows it (#91).
+
+    The row keeps GeoServer's own ("VECTOR", "WMS"): the row actions read it.
+    """
+    return {
+        VECTOR: translate("LayerTabMixin", "Vector"),
+        RASTER: translate("LayerTabMixin", "Raster"),
+        WMS: translate("LayerTabMixin", "Cascaded WMS"),
+        WMTS: translate("LayerTabMixin", "Cascaded WMTS"),
+    }.get(kind, kind)
+
+
 class LayerTabMixin:
     """Mixin that adds the Layers tab: every published layer, of any type."""
 
@@ -179,6 +192,7 @@ class LayerTabMixin:
         self._path_columns = (0, 1, 3)  # the store is in the resource's path
         self._row_detail = lambda row: self._layer_summary(f"{row[1]}:{row[0]}")
         self._detail_columns = (2, 3, 4)
+        self._cell_display = {2: _kind_label}
         self._start_load(
             translate("LayerTabMixin", "Failed to load layers"), self._fetch_layer_rows
         )
@@ -760,7 +774,16 @@ class LayerTabMixin:
                 "key": "source",
                 "label": translate("LayerTabMixin", "Source"),
                 "type": "combo",
-                "options": [_SOURCE_TABLE, _SOURCE_QGIS],
+                "options": [
+                    (
+                        translate("LayerTabMixin", "A table in a datastore"),
+                        _SOURCE_TABLE,
+                    ),
+                    (
+                        translate("LayerTabMixin", "A layer from this QGIS project"),
+                        _SOURCE_QGIS,
+                    ),
+                ],
             },
             {
                 "key": "workspace",
@@ -979,8 +1002,8 @@ class LayerTabMixin:
         dlg.get_widget("datastore").currentTextChanged.connect(
             lambda ds: self._refill_publish_combos(dlg, datastore=ds)
         )
-        dlg.get_widget("source").currentTextChanged.connect(
-            lambda source: self._on_publish_source_changed(dlg, source)
+        dlg.on_value_changed(
+            "source", lambda source: self._on_publish_source_changed(dlg, source)
         )
         dlg.get_widget("qgis_layer").layerChanged.connect(
             lambda layer: self._on_publish_layer_picked(dlg, layer)
@@ -991,7 +1014,7 @@ class LayerTabMixin:
             # The layer first: switching the source prefills the name from
             # whichever layer the combo shows at that moment.
             dlg.get_widget("qgis_layer").setLayer(layer)
-            dlg.get_widget("source").setCurrentText(_SOURCE_QGIS)
+            dlg.set_values({"source": _SOURCE_QGIS})
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 

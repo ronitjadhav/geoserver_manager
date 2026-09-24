@@ -69,12 +69,12 @@ translate = QCoreApplication.translate
 
 
 def _seed_types():
-    """The seed form's task choices, as shown, mapped to GWC's seedRequest type."""
-    return {
-        translate("GwcTabMixin", "Seed"): "seed",
-        translate("GwcTabMixin", "Reseed"): "reseed",
-        translate("GwcTabMixin", "Truncate"): "truncate",
-    }
+    """The seed form's task choices: (label, GWC's seedRequest type)."""
+    return [
+        (translate("GwcTabMixin", "Seed"), "seed"),
+        (translate("GwcTabMixin", "Reseed"), "reseed"),
+        (translate("GwcTabMixin", "Truncate"), "truncate"),
+    ]
 
 
 def _int_or_zero(text):
@@ -163,6 +163,9 @@ class GwcTabMixin:
             self._gwc_layer_detail(row[0])
         )
         self._detail_columns = (2, 3, 4)
+        # "ne:roads" is the id every action sends; the Workspace column
+        # beside it already says "ne" (#91).
+        self._cell_display = {0: lambda name: name.split(":", 1)[-1]}
         self._start_load(
             translate("GwcTabMixin", "Failed to load the tile cache"),
             self._fetch_gwc_rows,
@@ -837,7 +840,7 @@ class GwcTabMixin:
             "name": name,
             "gridSetId": values["gridset"],
             "format": values["format"],
-            "type": _seed_types()[values["type"]],
+            "type": values["type"],
             "zoomStart": start,
             "zoomStop": stop,
             "threadCount": int(values["threads"]),
@@ -909,7 +912,7 @@ class GwcTabMixin:
                 "key": "type",
                 "label": translate("GwcTabMixin", "Task"),
                 "type": "combo",
-                "options": list(_seed_types()),
+                "options": _seed_types(),
                 "help": translate(
                     "GwcTabMixin",
                     "Seed renders the missing tiles, Reseed renders them all again, "

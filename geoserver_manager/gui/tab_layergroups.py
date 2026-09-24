@@ -21,7 +21,7 @@ from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_preview import LayerPreviewDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
-from geoserver_manager.gui.scope import GLOBAL, PENDING, scope
+from geoserver_manager.gui.scope import GLOBAL, PENDING, global_label, scope
 from geoserver_manager.toolbelt.payload import bbox_text, text_of, unwrap
 
 # GeoServer's LayerGroupInfo.Mode enum. Spelled out rather than imported from
@@ -32,7 +32,6 @@ MODES = ("SINGLE", "OPAQUE_CONTAINER", "NAMED", "CONTAINER", "EO")
 
 # First entry of the layer picker. Picking a layer always *changes* the combo's
 # text this way, so the same layer can be appended twice in a row.
-_PICK = "(pick a layer)"
 
 # The collection of each layer type's resources, reachable by workspace alone.
 _RESOURCE_COLLECTIONS = {
@@ -455,7 +454,7 @@ class LayerGroupTabMixin:
         GeoServer requires both. A blank style takes the root layer's default.
         """
         root = (values.get("root_layer") or "").strip()
-        if not root or root == _PICK:
+        if not root:
             raise ValueError(
                 translate(
                     "LayerGroupTabMixin",
@@ -583,7 +582,7 @@ class LayerGroupTabMixin:
                 "label": translate("LayerGroupTabMixin", "Workspace"),
                 "type": "text" if edit_mode else "combo",
                 "read_only": edit_mode,
-                "options": [GLOBAL] + list(workspace_names),
+                "options": [(global_label(), GLOBAL)] + list(workspace_names),
                 "help": translate(
                     "LayerGroupTabMixin",
                     "A global group can mix layers from several workspaces",
@@ -642,7 +641,8 @@ class LayerGroupTabMixin:
                 "key": "root_layer",
                 "label": translate("LayerGroupTabMixin", "Root layer"),
                 "type": "combo",
-                "options": [_PICK]
+                # No value: Save then says a root layer is needed.
+                "options": [(translate("LayerGroupTabMixin", "(pick a layer)"), "")]
                 + list(pickable if root_layers is None else root_layers),
                 "visible": False,
                 "group": translate("LayerGroupTabMixin", "Layers"),

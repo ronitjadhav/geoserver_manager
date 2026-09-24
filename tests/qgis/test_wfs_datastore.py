@@ -14,6 +14,7 @@ Usage from the repo root folder:
 from qgis.testing import start_app, unittest
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.gui.tab_datastores import _TYPE_SPECIFIC_FIELDS
 from tests.qgis.sync_dialog import SyncDialog
 
 start_app()
@@ -188,7 +189,8 @@ class TestWfsForm(unittest.TestCase):
         shown = {
             field["key"]
             for field in fields
-            if field.get("group") and field["key"] not in form._hidden_keys
+            if field["key"] in _TYPE_SPECIFIC_FIELDS
+            and field["key"] not in form._hidden_keys
         }
         self.assertEqual(
             shown,
