@@ -164,6 +164,20 @@ class TestLifecycle(unittest.TestCase):
         settle(lambda: self.dlg._task is None)
         self.assertEqual(landed, ["rows"])
 
+    def test_an_abandoned_save_holds_off_a_refresh_until_it_ends(self):
+        # Its remaining requests read self.gs: a profile switch meanwhile
+        # sent the rest of the save to the other server.
+        self.wait_box_cancels()
+        started = threading.Event()
+        with self.assertRaises(dlg_main.Abandoned):
+            self.dlg._wait_for_save(lambda: started.set() or self.release.wait(5))
+        settle(started.is_set)
+        self.assertTrue(self.dlg._refuse_while_writing())
+        self.assertEqual(self.messages[-1][0], "warning")
+        self.release.set()
+        settle(lambda: not any(thread.write for thread in dlg_main._RUNNING))
+        self.assertFalse(self.dlg._refuse_while_writing())
+
     def test_cancel_lets_go_of_a_hung_load_at_once(self):
         # cancel() only sets a flag: the button stayed on Cancel until the
         # request returned, up to two minutes.

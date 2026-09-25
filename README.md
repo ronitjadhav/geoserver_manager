@@ -94,6 +94,10 @@ For a development install, see [Development](#development) below.
 | Verify the server's TLS certificate | on by default; untick only for a private CA or a self-signed certificate you trust |
 | Test connection | probes the server with the fields as typed, without saving them |
 
+Every setting can also come from an environment variable, `QGIS_GEOSERVER_MANAGER_`
+plus its upper-cased name (`QGIS_GEOSERVER_MANAGER_DEBUG_MODE=true`), which wins
+over the saved value.
+
 Then open the plugin from the toolbar. The status line shows the connected
 server and its version; with two or more profiles, a list beside it switches
 server and reloads the open tab; connection, authentication and HTTP problems are

@@ -109,9 +109,11 @@ class _ReadThread(QThread):
     abandoned read still runs to the library's timeout.
     """
 
-    def __init__(self, work):
+    def __init__(self, work, write=False):
         super().__init__()
         self._work = work
+        # A save: abandoned, it still runs its requests, which read self.gs.
+        self.write = write
         _RUNNING.add(self)
         self.finished.connect(lambda: _RUNNING.discard(self))
 
@@ -580,13 +582,15 @@ class GeoServerMainDialog(
         Their remaining steps read self.gs: swapping the connection under them
         sent the rest of a delete batch (recurse=true) to the other server, and
         a publish's style and metadata too. So the connection waits instead.
+        A save abandoned at the waiting box is the same: its thread goes on.
         """
-        if self._delete is None and self._upload is None:
+        saving = any(thread.write for thread in _RUNNING)
+        if self._delete is None and self._upload is None and not saving:
             return False
         self.show_warning_message(
             self.tr(
-                "A delete or an upload is still running on this server. Let it "
-                "finish, or cancel it, before connecting again."
+                "A delete, an upload or a save is still running on this server. "
+                "Let it finish, or cancel it, before connecting again."
             )
         )
         return True
@@ -1836,7 +1840,7 @@ class GeoServerMainDialog(
             finally:
                 done.set()
 
-        thread = _ReadThread(work)
+        thread = _ReadThread(work, write)
         thread.start()
         if not done.wait(_WAIT_BEFORE_BOX):
             box = QProgressDialog(

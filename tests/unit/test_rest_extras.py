@@ -66,6 +66,12 @@ class TestProgressReaderRewind(unittest.TestCase):
         with self.assertRaises(OSError):
             body.seek(1)
 
+    def test_the_body_can_be_iterated(self):
+        # What `requests` needs to note the start and rewind to it on a
+        # redirect; tests/qgis/test_review_rest.py drives requests itself.
+        body = ProgressReader(io.BytesIO(b"0123456789"), 10)
+        self.assertEqual(list(body), [b"0123456789"])
+
 
 if __name__ == "__main__":
     unittest.main()

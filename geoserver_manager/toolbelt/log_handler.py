@@ -50,15 +50,16 @@ class PlgLogger:
                 push=True,
             )
         """
-        # if not debug mode and not push, let's ignore INFO, SUCCESS and TEST
-        debug_mode = plg_prefs_hdlr.PlgOptionsManager.get_plg_settings().debug_mode
+        # Without debug mode and push, INFO, SUCCESS and TEST are dropped. The
+        # settings (a QgsSettings read and the environment) are consulted for
+        # those only: a warning or an error is kept whatever they say.
+        droppable = not push and (
+            log_level < Qgis.MessageLevel.Warning
+            or log_level > Qgis.MessageLevel.Critical
+        )
         if (
-            not debug_mode
-            and not push
-            and (
-                log_level < Qgis.MessageLevel.Warning
-                or log_level > Qgis.MessageLevel.Critical
-            )
+            droppable
+            and not plg_prefs_hdlr.PlgOptionsManager.get_plg_settings().debug_mode
         ):
             return
 
