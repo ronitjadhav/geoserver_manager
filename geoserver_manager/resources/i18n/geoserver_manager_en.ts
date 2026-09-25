@@ -4005,451 +4005,463 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished" />
     </message>
 </context><context>
+    <name>Sld</name>
+    <message>
+        <location filename="../../toolbelt/sld.py" line="87" />
+        <source>QGIS exported no SLD for '{}'. Its symbology may have no SLD equivalent.</source>
+        <translation type="unfinished" />
+    </message>
+</context><context>
     <name>StyleTabMixin</name>
     <message>
-        <location filename="../../gui/tab_styles.py" line="717" />
-        <location filename="../../gui/tab_styles.py" line="77" />
+        <location filename="../../gui/tab_styles.py" line="727" />
+        <location filename="../../gui/tab_styles.py" line="79" />
         <source>Upload a Style</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="78" />
+        <location filename="../../gui/tab_styles.py" line="80" />
         <source>Upload a style: a pasted document or a file (SLD, CSS, YSLD, MBStyle), or a QGIS layer's symbology</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="958" />
-        <location filename="../../gui/tab_styles.py" line="629" />
-        <location filename="../../gui/tab_styles.py" line="378" />
-        <location filename="../../gui/tab_styles.py" line="143" />
-        <location filename="../../gui/tab_styles.py" line="88" />
+        <location filename="../../gui/tab_styles.py" line="964" />
+        <location filename="../../gui/tab_styles.py" line="639" />
+        <location filename="../../gui/tab_styles.py" line="386" />
+        <location filename="../../gui/tab_styles.py" line="145" />
+        <location filename="../../gui/tab_styles.py" line="90" />
         <source>Workspace</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="93" />
+        <location filename="../../gui/tab_styles.py" line="95" />
         <source>Apply to a QGIS layer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="95" />
+        <location filename="../../gui/tab_styles.py" line="97" />
         <source>Put this server style on a layer of the open project, the same as the layer tree's Apply style from GeoServer, from this end</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="103" />
+        <location filename="../../gui/tab_styles.py" line="105" />
         <source>Save to disk</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="105" />
+        <location filename="../../gui/tab_styles.py" line="107" />
         <source>Write the style's body (SLD, CSS or MBStyle) to a file</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="965" />
-        <location filename="../../gui/tab_styles.py" line="112" />
+        <location filename="../../gui/tab_styles.py" line="971" />
+        <location filename="../../gui/tab_styles.py" line="114" />
         <source>Copy</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="114" />
+        <location filename="../../gui/tab_styles.py" line="116" />
         <source>Copy the style under another name, or into another workspace</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="1020" />
-        <location filename="../../gui/tab_styles.py" line="122" />
+        <location filename="../../gui/tab_styles.py" line="1031" />
+        <location filename="../../gui/tab_styles.py" line="124" />
         <source>Used by</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="124" />
+        <location filename="../../gui/tab_styles.py" line="126" />
         <source>The layers and layer groups that use this style</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="131" />
+        <location filename="../../gui/tab_styles.py" line="133" />
         <source>Delete</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="133" />
+        <location filename="../../gui/tab_styles.py" line="135" />
         <source>Delete: remove the style and its file; layers that used it fall back to the default style (asks first).</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="623" />
-        <location filename="../../gui/tab_styles.py" line="367" />
-        <location filename="../../gui/tab_styles.py" line="142" />
+        <location filename="../../gui/tab_styles.py" line="633" />
+        <location filename="../../gui/tab_styles.py" line="375" />
+        <location filename="../../gui/tab_styles.py" line="144" />
         <source>Name</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="649" />
-        <location filename="../../gui/tab_styles.py" line="385" />
-        <location filename="../../gui/tab_styles.py" line="144" />
+        <location filename="../../gui/tab_styles.py" line="659" />
+        <location filename="../../gui/tab_styles.py" line="393" />
+        <location filename="../../gui/tab_styles.py" line="146" />
         <source>Format</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="145" />
+        <location filename="../../gui/tab_styles.py" line="147" />
         <source>Version</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="152" />
+        <location filename="../../gui/tab_styles.py" line="154" />
         <source>Failed to load styles</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="346" />
-        <location filename="../../gui/tab_styles.py" line="342" />
+        <location filename="../../gui/tab_styles.py" line="354" />
+        <location filename="../../gui/tab_styles.py" line="350" />
         <source>Definition</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="352" />
+        <location filename="../../gui/tab_styles.py" line="360" />
         <source>Edit and Save to replace the style on the server.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="357" />
+        <location filename="../../gui/tab_styles.py" line="365" />
         <source>Read-only: only SLD, CSS, YSLD and MBStyle bodies can be saved here.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="417" />
-        <location filename="../../gui/tab_styles.py" line="410" />
-        <location filename="../../gui/tab_styles.py" line="391" />
-        <location filename="../../gui/tab_styles.py" line="384" />
-        <location filename="../../gui/tab_styles.py" line="377" />
-        <location filename="../../gui/tab_styles.py" line="366" />
+        <location filename="../../gui/tab_styles.py" line="425" />
+        <location filename="../../gui/tab_styles.py" line="418" />
+        <location filename="../../gui/tab_styles.py" line="399" />
+        <location filename="../../gui/tab_styles.py" line="392" />
+        <location filename="../../gui/tab_styles.py" line="385" />
+        <location filename="../../gui/tab_styles.py" line="374" />
         <source>Details</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="370" />
+        <location filename="../../gui/tab_styles.py" line="378" />
         <source>Renaming keeps every layer and group that uses the style.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="392" />
+        <location filename="../../gui/tab_styles.py" line="400" />
         <source>SLD version</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="398" />
+        <location filename="../../gui/tab_styles.py" line="406" />
         <source>Stored as SLD 1.1 (Symbology Encoding), what QGIS exports. GeoServer serves it here as its SLD 1.0 rendition, and saving stores that rendition instead.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="673" />
-        <location filename="../../gui/tab_styles.py" line="411" />
+        <location filename="../../gui/tab_styles.py" line="683" />
+        <location filename="../../gui/tab_styles.py" line="419" />
         <source>File</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="418" />
+        <location filename="../../gui/tab_styles.py" line="426" />
         <source>Legend</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="420" />
+        <location filename="../../gui/tab_styles.py" line="428" />
         <source>Asking GeoServer for the legend…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="423" />
+        <location filename="../../gui/tab_styles.py" line="431" />
         <source>As GeoServer renders it (GetLegendGraphic).</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="900" />
-        <location filename="../../gui/tab_styles.py" line="435" />
+        <location filename="../../gui/tab_styles.py" line="904" />
+        <location filename="../../gui/tab_styles.py" line="443" />
         <source>Failed to load style '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="444" />
+        <location filename="../../gui/tab_styles.py" line="452" />
         <source>Style '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="446" />
+        <location filename="../../gui/tab_styles.py" line="454" />
         <source>Edit the definition and Save to replace it on the server; every layer using the style changes with it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="489" />
+        <location filename="../../gui/tab_styles.py" line="497" />
         <source>Failed to save style '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="492" />
+        <location filename="../../gui/tab_styles.py" line="500" />
         <source>Style '{}' saved.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="516" />
+        <location filename="../../gui/tab_styles.py" line="524" />
         <source>Style '{}' already exists in {}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="587" />
+        <location filename="../../gui/tab_styles.py" line="581" />
+        <source>GeoServer returned no image</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_styles.py" line="597" />
         <source>No published layer to draw the legend with. GetLegendGraphic needs one.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="594" />
+        <location filename="../../gui/tab_styles.py" line="604" />
         <source>No legend: {}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="610" />
+        <location filename="../../gui/tab_styles.py" line="620" />
         <source>GeoServer did not return an image.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="614" />
+        <location filename="../../gui/tab_styles.py" line="624" />
         <source>Failed to load the legend</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="632" />
+        <location filename="../../gui/tab_styles.py" line="642" />
         <source>Global styles can be used by layers of every workspace</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="639" />
+        <location filename="../../gui/tab_styles.py" line="649" />
         <source>Source</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="642" />
+        <location filename="../../gui/tab_styles.py" line="652" />
         <source>Paste</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="643" />
+        <location filename="../../gui/tab_styles.py" line="653" />
         <source>From file</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="644" />
+        <location filename="../../gui/tab_styles.py" line="654" />
         <source>From a QGIS layer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="656" />
+        <location filename="../../gui/tab_styles.py" line="666" />
         <source>CSS, YSLD and MBStyle need their GeoServer extension</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="663" />
+        <location filename="../../gui/tab_styles.py" line="673" />
         <source>Style</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="669" />
+        <location filename="../../gui/tab_styles.py" line="679" />
         <source>Paste the style document here</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="677" />
+        <location filename="../../gui/tab_styles.py" line="687" />
         <source>Styles (*.sld *.zip *.css *.ysld *.yaml *.mbstyle *.json);;All files (*)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="682" />
+        <location filename="../../gui/tab_styles.py" line="692" />
         <source>.sld, a .zip with an SLD and its resources, .css, .ysld or .mbstyle</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="860" />
-        <location filename="../../gui/tab_styles.py" line="690" />
+        <location filename="../../gui/tab_styles.py" line="864" />
+        <location filename="../../gui/tab_styles.py" line="700" />
         <source>QGIS layer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="694" />
+        <location filename="../../gui/tab_styles.py" line="704" />
         <source>The layer's symbology is exported as SLD and uploaded. QGIS writes SLD 1.1, which GeoServer stores as such.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="938" />
-        <location filename="../../gui/tab_styles.py" line="712" />
+        <location filename="../../gui/tab_styles.py" line="944" />
+        <location filename="../../gui/tab_styles.py" line="722" />
         <source>Failed to load the workspaces</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="718" />
+        <location filename="../../gui/tab_styles.py" line="728" />
         <source>Create a style from a document you paste, a file you pick, or the symbology of a layer in this QGIS project.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="725" />
+        <location filename="../../gui/tab_styles.py" line="735" />
         <source>Upload</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="735" />
+        <location filename="../../gui/tab_styles.py" line="745" />
         <source>Failed to upload style '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="752" />
+        <location filename="../../gui/tab_styles.py" line="762" />
         <source>Style '{}' uploaded.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="831" />
+        <location filename="../../gui/tab_styles.py" line="835" />
         <source>Failed to load the SLD of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="840" />
+        <location filename="../../gui/tab_styles.py" line="844" />
         <source>This QGIS project has no vector or raster layer to style.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="851" />
+        <location filename="../../gui/tab_styles.py" line="855" />
         <source>Apply '{}' to a QGIS layer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="852" />
+        <location filename="../../gui/tab_styles.py" line="856" />
         <source>The style is applied to the layer in this project only. The server is not touched.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="866" />
+        <location filename="../../gui/tab_styles.py" line="870" />
         <source>Apply</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="875" />
+        <location filename="../../gui/tab_styles.py" line="879" />
         <source>Failed to apply '{}' to '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="883" />
+        <location filename="../../gui/tab_styles.py" line="887" />
         <source>'{}' now uses the style '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="890" />
+        <location filename="../../gui/tab_styles.py" line="894" />
         <source>QGIS could not read all of '{}': {}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="892" />
+        <location filename="../../gui/tab_styles.py" line="896" />
         <source>no detail given</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="909" />
+        <location filename="../../gui/tab_styles.py" line="913" />
         <source>Save style '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="911" />
+        <location filename="../../gui/tab_styles.py" line="915" />
         <source>{} (*.{});;All files (*)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="919" />
+        <location filename="../../gui/tab_styles.py" line="923" />
         <source>Failed to save '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="922" />
+        <location filename="../../gui/tab_styles.py" line="926" />
         <source>Style '{}' saved as {} ({}).</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="926" />
+        <location filename="../../gui/tab_styles.py" line="932" />
         <source>Style '{}' saved as {}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="943" />
+        <location filename="../../gui/tab_styles.py" line="949" />
         <source>Copy Style '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="944" />
+        <location filename="../../gui/tab_styles.py" line="950" />
         <source>A new style with the same definition. Layers keep the original.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="951" />
+        <location filename="../../gui/tab_styles.py" line="957" />
         <source>New name</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="975" />
+        <location filename="../../gui/tab_styles.py" line="981" />
         <source>Failed to copy style '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="978" />
+        <location filename="../../gui/tab_styles.py" line="984" />
         <source>Style '{}' copied to '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="991" />
+        <location filename="../../gui/tab_styles.py" line="997" />
         <source>A {} style cannot be copied here.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="1002" />
+        <location filename="../../gui/tab_styles.py" line="1012" />
         <source>Failed to find what uses '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="1007" />
+        <location filename="../../gui/tab_styles.py" line="1018" />
         <source>What Uses '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="1009" />
+        <location filename="../../gui/tab_styles.py" line="1020" />
         <source>Editing the style changes all of these. Deleting it moves the layers to GeoServer's default style.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="1015" />
+        <location filename="../../gui/tab_styles.py" line="1026" />
         <source>No layer or group uses this style.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="1086" />
-        <location filename="../../gui/tab_styles.py" line="1054" />
+        <location filename="../../gui/tab_styles.py" line="1098" />
+        <location filename="../../gui/tab_styles.py" line="1066" />
         <source>{} (could not be read: {})</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="1062" />
+        <location filename="../../gui/tab_styles.py" line="1074" />
         <source>{} (default style)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="1070" />
+        <location filename="../../gui/tab_styles.py" line="1082" />
         <source>{} (other style)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="1094" />
+        <location filename="../../gui/tab_styles.py" line="1106" />
         <source>{} (layer group)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="1119" />
+        <location filename="../../gui/tab_styles.py" line="1131" />
         <source>Are you sure you want to delete style '{}'?</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_styles.py" line="1122" />
+        <location filename="../../gui/tab_styles.py" line="1134" />
         <source>Are you sure you want to delete %n style(s)?</source>
         <translation>
             <numerusform>Are you sure you want to delete %n style?</numerusform>
@@ -4457,12 +4469,12 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="1130" />
+        <location filename="../../gui/tab_styles.py" line="1142" />
         <source>Style '{}' deleted.</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_styles.py" line="1131" />
+        <location filename="../../gui/tab_styles.py" line="1143" />
         <source>%n style(s) deleted.</source>
         <translation>
             <numerusform>%n style deleted.</numerusform>
@@ -4470,7 +4482,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_styles.py" line="1133" />
+        <location filename="../../gui/tab_styles.py" line="1145" />
         <source>The style file is removed from the server too, and layers that used it fall back to GeoServer's default style.</source>
         <translation type="unfinished" />
     </message>

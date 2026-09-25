@@ -81,9 +81,14 @@ def layer_to_sld(layer):
             path.unlink()
         path.parent.rmdir()
     if not sld.strip():
+        from qgis.PyQt.QtCore import QCoreApplication
+
         raise RuntimeError(
-            f"QGIS exported no SLD for '{layer.name()}'. Its symbology may have "
-            "no SLD equivalent."
+            QCoreApplication.translate(
+                "Sld",
+                "QGIS exported no SLD for '{}'. Its symbology may have no SLD "
+                "equivalent.",
+            ).format(layer.name())
         )
     return sld
 

@@ -392,6 +392,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **Editing a CSS or YSLD style saves.** The body was sent to a path without
+  its extension, which GeoServer refused.
+- Saving a style's body updates its SLD version in the list; the old one
+  stayed until the next refresh.
+- **Save to disk writes the style as stored.** A style in another encoding
+  came out re-encoded as UTF-8 with replacement characters.
+- Cancelling *Used by* stops the reads of the remaining layers and groups.
+- A style rename sends one request fewer.
+- Two more messages translate: the legend's "no image" fallback and the "QGIS
+  exported no SLD" error.
 - **Editing a layer group waits for GeoServer instead of freezing QGIS:** the
   form's checks (each style, the root layer) ran on the interface thread on
   Save. A Cancel while saving now says the change may still land, and the

@@ -104,6 +104,22 @@ class TestLayerGroupModes(unittest.TestCase):
         self.assertEqual(list(MODES), LayerGroup.modes)
 
 
+class TestStylePathExtensions(unittest.TestCase):
+    def test_the_builder_appends_an_extension_for_three_formats_only(self):
+        """Why tab_styles._style_path swaps the suffix of the .json path: a CSS
+        or YSLD body PUT to the bare path is a 500 "No such style handler"."""
+        from geoservercloud.services.restservice import RestService
+
+        endpoints = RestService.RestEndpoints("/rest")
+        for known in ("json", "sld", "mbstyle"):
+            self.assertEqual(
+                endpoints.style("s", "ws", format=known),
+                f"/rest/workspaces/ws/styles/s.{known}",
+            )
+        for bare in ("css", "ysld"):
+            self.assertEqual(endpoints.style("s", format=bare), "/rest/styles/s")
+
+
 # ############################################################################
 # ####### Stand-alone run ########
 # ################################
