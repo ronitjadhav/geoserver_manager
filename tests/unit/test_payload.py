@@ -62,10 +62,6 @@ class TestSmallOnes(unittest.TestCase):
         self.assertEqual(bbox_text(None), "")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestKeywordsAndText(unittest.TestCase):
     """One parser for every tab: the three copies it replaced disagreed."""
 
@@ -107,3 +103,7 @@ class TestChanged(unittest.TestCase):
             {"url": "b", "description": ""},
         )
         self.assertEqual(changed(before, dict(before), (("url", "url"),)), {})
+
+
+if __name__ == "__main__":
+    unittest.main()

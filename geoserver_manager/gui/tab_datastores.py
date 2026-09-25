@@ -15,8 +15,8 @@ from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.scope import PENDING
 from geoserver_manager.toolbelt.rest import PartlySaved
 
-# Datastore types this form has dedicated fields for. Every other type still
-# opens in the generic "key = value" editor.
+# Datastore types this form has dedicated fields for. Every other type
+# opens in the generic editor: a table of its parameters and their values.
 _SHAPEFILE = "Shapefile"
 _SHAPEFILE_DIRECTORY = "Directory of spatial files (shapefiles)"
 _GEOPACKAGE = "GeoPackage"
@@ -40,7 +40,7 @@ _TYPE_FIELDS = {
     ),
 }
 # Any other GeoServer datastore type (Properties, Oracle, SQL Server, CSV...):
-# its name typed as GeoServer knows it, and its parameters as key = value.
+# its name typed as GeoServer knows it, and its parameters in a key/value table.
 _OTHER = "Other..."
 _TYPE_FIELDS[_OTHER] = ("custom_type", "raw_params")
 _SUPPORTED_TYPES = list(_TYPE_FIELDS)
@@ -222,7 +222,7 @@ class DatastoreTabMixin:
 
         :param workspace_names: list of workspace names for the combo box.
         :param edit_mode: editing an existing datastore. The workspace is
-            fixed and the password has to be re-entered.
+            fixed, and a password left blank keeps the stored one.
         """
         # One page: the fields of the picked type show right under Type. On a
         # tab of their own, picking PostGIS meant going to look for them (#91).
@@ -689,10 +689,10 @@ class DatastoreTabMixin:
     def _show_generic_editor(self, dlg, ds_type):
         """Edit a datastore type the form has no dedicated fields for.
 
-        Shapefile, GeoPackage, Directory, WFS, …: the real type, locked; the
-        type-specific field groups hidden; the stored connection parameters
-        editable as 'key = value' lines. The save path is the same merge as
-        for typed stores, so GeoServer still validates the result.
+        Properties, CSV, Oracle, …: the real type, locked; the typed fields
+        hidden; the stored connection parameters in the key/value table. The
+        save path is the same merge as for typed stores, so GeoServer still
+        validates the result.
         """
         combo = dlg.get_widget("type")
         if combo is not None:
@@ -878,8 +878,8 @@ class DatastoreTabMixin:
                 if key not in params:  # credentials cleared in the form
                     merged.pop(key, None)
         else:
-            # Generic editor: what the user left in the textarea is the whole
-            # map (removed lines remove keys); a masked value keeps the original.
+            # Generic editor: what the user left in the table is the whole map
+            # (a removed row removes its key); an untouched row keeps its value.
             edited = self._parse_params(values.get("raw_params"))
             merged = {
                 key: self._kept(conn_params, key, value)

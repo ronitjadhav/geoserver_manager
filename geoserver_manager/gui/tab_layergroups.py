@@ -13,7 +13,6 @@ from qgis.core import (
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
     QgsProject,
-    QgsRasterLayer,
     QgsRectangle,
 )
 from qgis.PyQt.QtCore import QCoreApplication
@@ -29,9 +28,6 @@ from geoserver_manager.toolbelt.payload import bbox_text, text_of, unwrap
 # has run ensure_dependencies(). test_tab_layergroups asserts it still matches
 # LayerGroup.modes.
 MODES = ("SINGLE", "OPAQUE_CONTAINER", "NAMED", "CONTAINER", "EO")
-
-# First entry of the layer picker. Picking a layer always *changes* the combo's
-# text this way, so the same layer can be appended twice in a row.
 
 # The collection of each layer type's resources, reachable by workspace alone.
 _RESOURCE_COLLECTIONS = {
@@ -234,7 +230,7 @@ class LayerGroupTabMixin:
 
     @classmethod
     def _group_form_values(cls, detail, name, workspace_label):
-        """Prefill for the edit dialog, in the form's own layer syntax. Pure."""
+        """Prefill for the edit dialog: the layers as [name, style] rows. Pure."""
         styles = cls._group_styles(detail)
         rows = [
             [layer_name, styles[index] if index < len(styles) else ""]
@@ -410,10 +406,10 @@ class LayerGroupTabMixin:
     def _group_publishables(self, rows, workspace_name, known_layers, known_groups):
         """The layer list as GeoServer publishables, and the styles beside it.
 
-        GeoServer drops a name it does not know, answering 200, so every line
+        GeoServer drops a name it does not know, answering 200, so every row
         is checked here. A name is a layer first, then a group.
         ponytail: a group named like a layer cannot be listed; GeoServer allows
-        it, add a marker to the syntax when someone needs it.
+        it, add a kind column to the table when someone needs it.
         """
         layers, styles = self._parse_group_layers(rows, workspace_name)
         if not layers:
@@ -490,13 +486,19 @@ class LayerGroupTabMixin:
         their lon/lat box; a nested group gives its own, in any CRS.
         """
         wgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
-        total = None
-        for item in published:
+
+        def box_of(item):
             if item["@type"] == "layerGroup":
                 workspace_name, _, bare = item["name"].rpartition(":")
-                box = self._group_detail(bare, workspace_name or None).get("bounds")
-            else:
-                box = self._layer_lonlat_box(item["name"])
+                return self._group_detail(bare, workspace_name or None).get("bounds")
+            return self._layer_lonlat_box(item["name"])
+
+        total = None
+        # Two GETs a member: in parallel, as the page fills are, instead of
+        # one round trip after another on every save that changed the layers.
+        for box, error in self._fan_out(box_of, published):
+            if error is not None:
+                raise error
             rect = self._box_in(box or {}, wgs84)
             if rect is None:
                 continue
@@ -520,7 +522,11 @@ class LayerGroupTabMixin:
         }
 
     def _layer_lonlat_box(self, qualified_name):
-        """A layer's latLonBoundingBox, read from its resource by workspace."""
+        """A layer's latLonBoundingBox, read from its resource by workspace.
+
+        TODO(#50): the library's Layer keeps only its resource's name, and
+        nothing reads a resource by workspace alone (rows 39 and 57).
+        """
         layer = self._raw_rest("get", self._layers_url(qualified_name)).json()
         layer = layer.get("layer") or {}
         collection = _RESOURCE_COLLECTIONS.get(layer.get("type"), "featuretypes")
@@ -895,21 +901,7 @@ class LayerGroupTabMixin:
         qualified = f"{workspace_name}:{name}" if workspace_name else name
 
         def build():
-            settings = self.plg_settings.get_plg_settings()
-            uri, provider = self._layer_uri(
-                "WMS",
-                settings.geoserver_url,
-                qualified,
-                settings.geoserver_auth_cfg_id,
-            )
-            # The constructor reads the capabilities: a request, so a worker's.
-            layer = QgsRasterLayer(uri, name, provider)
-            if not layer.isValid():
-                raise RuntimeError(
-                    layer.error().message()
-                    or translate("LayerGroupTabMixin", "layer is not valid")
-                )
-            return layer
+            return self._valid_layer(self._server_layer("WMS", qualified, name))
 
         layer = self._fetch(
             build,
@@ -948,16 +940,9 @@ class LayerGroupTabMixin:
             else None
         )
 
-        def build():
-            settings = self.plg_settings.get_plg_settings()
-            uri, provider = self._layer_uri(
-                "WMS", settings.geoserver_url, qualified, settings.geoserver_auth_cfg_id
-            )
-            # An invalid layer is not an error here: the window explains it.
-            return QgsRasterLayer(uri, qualified, provider)
-
+        # An invalid layer is not an error here: the window explains it.
         layer = self._fetch(
-            build,
+            lambda: self._server_layer("WMS", qualified, qualified),
             translate(
                 "LayerGroupTabMixin", "Could not build the preview of '{}'"
             ).format(name),

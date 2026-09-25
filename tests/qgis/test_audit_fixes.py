@@ -460,10 +460,6 @@ class TestTileCacheXml(unittest.TestCase):
         self.assertEqual(tab_gwc._int_or_zero(None), 0)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestYesNo(unittest.TestCase):
     def test_a_boolean_cell_reads_as_words(self):
         dlg = SyncDialog()
@@ -482,3 +478,7 @@ class TestNavTooltips(unittest.TestCase):
         for row in range(dlg.navList.count()):
             item = dlg.navList.item(row)
             self.assertTrue(item.toolTip(), item.text())
+
+
+if __name__ == "__main__":
+    unittest.main()

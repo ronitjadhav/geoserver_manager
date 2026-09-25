@@ -35,18 +35,18 @@ missing library operations and plugin workarounds are tracked in
 
 | Tab | What you can do |
 | :-- | :-------------- |
-| Workspaces | list (the default workspace is marked), create, rename, toggle isolation, set as default, edit the workspace's WMS service settings (title, abstract, keywords, SRS list, …), delete |
-| Datastores | list across every workspace; create PostGIS, PostGIS (JNDI), Shapefile, directory of shapefiles, GeoPackage, PMTiles or Web Feature Server (NG) stores (a remote WFS cascaded), enable or disable one, or any other type through a `key = value` parameter editor; edit (only the fields you change are sent), delete |
+| Workspaces | list (the default workspace is marked), create, rename, change the namespace URI, toggle isolation, set as default, give the workspace its own WMS, WFS, WCS and WMTS settings (on or off, title, abstract, keywords, …), delete |
+| Datastores | list across every workspace; create PostGIS, PostGIS (JNDI), Shapefile, directory of shapefiles, GeoPackage, PMTiles or Web Feature Server (NG) stores (a remote WFS cascaded), enable or disable one, or any other type through a table of its parameters; edit (only the fields you change are sent), reset, delete |
 | Coverage stores | list, create from a GeoTIFF, a COG or an ImageMosaic, or from a raster layer of the open QGIS project, uploaded as a compressed GeoTIFF and published in the same request; browse the coverages of a store, publish a coverage as a layer, delete |
 | Cascaded stores | the WMS and WMTS stores that proxy another server, listed across every workspace; create one from a GetCapabilities URL, publish the layers the remote advertises, inspect and delete them, delete the store |
 | Layers | every layer of the server whatever its type (vector, raster, cascaded WMS/WMTS) with workspace, type, store and default style; publish a table of a datastore, or a layer of the open QGIS project, uploaded as a GeoPackage together with its symbology; change the default style, including one made from a QGIS layer's symbology; add to QGIS as WMS, WMTS or, for a vector, WFS; preview on a map inside QGIS with feature info on click, or in a browser on GeoServer's own OpenLayers page; delete |
-| Layer groups | list global and workspace groups; create and edit them (ordered layers and nested groups with their styles, mode, title, enabled, advertised, an Earth Observation root layer), with their bounds recomputed; add to QGIS, preview in a browser, delete |
+| Layer groups | list global and workspace groups; create and edit them (ordered layers and nested groups with their styles, mode, title, enabled, advertised, an Earth Observation root layer), with their bounds recomputed; add to QGIS, preview on a map inside QGIS or in a browser, delete |
 | Styles | list global and workspace styles; create by pasting SLD, CSS, YSLD or MBStyle, from a file, or from a QGIS layer's symbology; view and edit the definition next to the legend GeoServer renders for it; rename, copy, see what uses a style; apply it to a QGIS layer (any format); save it to disk; delete |
 | Tile cache | what GeoWebCache caches (every layer and layer group, by default) with each layer's gridsets and formats; edit a layer's caching (gridsets and their zoom levels, formats, meta-tiling, expiry, parameter filters); seed, reseed or truncate part of it and follow the tasks; truncate its tiles, remove it from the cache, add an uncached layer |
 | Server | the contact details, global settings (proxy base URL, decimals, verbosity), each service's settings and capabilities URL, the logging profile and the log's last lines, the catalog's reload and reset; each opens GeoServer's own page too |
-| Layer tree | right-click a layer in QGIS for *Push style to GeoServer…* and *Apply style from GeoServer…*; a layer that came from the server is matched through its source, any other by name; the entries say when the plugin is not connected |
+| Layer tree | right-click one or more layers in QGIS for *Publish to GeoServer…*, *Push style to GeoServer…* and *Apply style from GeoServer…*; a layer that came from the server is matched through its source, any other by name; the entries say when the plugin is not connected |
 
-Every list is searchable, sortable by column and paginated (20 per page), and
+Every list is searchable (by the columns loaded so far), sortable by column and paginated (20 per page), and
 loads in the background: QGIS stays usable, and *Cancel* stops a slow one.
 Deletes ask first and name what they cascade to. Keyboard: F5 refreshes, Ctrl+F
 jumps to the search box, Enter opens the selected row, Del deletes the

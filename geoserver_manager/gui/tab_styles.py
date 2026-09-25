@@ -1033,6 +1033,7 @@ class StyleTabMixin:
 
         GeoServer has no endpoint for this, so every layer and group is read:
         one GET each, fanned out. A layer names a workspace style "ws:name".
+        TODO(#50): no get_layers() nor a layer's styles in the library (row 58).
         """
         reference = f"{workspace_name}:{name}" if workspace_name else name
         users = []

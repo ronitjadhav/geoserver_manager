@@ -189,7 +189,8 @@ class FakeGS:
 
     def get_coverage_store(self, workspace_name, name):
         self.calls.append(("get_coverage_store", workspace_name, name))
-        return ({"name": name}, 200 if self.exists else 404)
+        # The library's CoverageStore keeps the type, as GeoServer reports it.
+        return ({"name": name, "type": "GeoTIFF"}, 200 if self.exists else 404)
 
     def get_coverages(self, workspace_name, store_name):
         # The library answers list=all: everything the store can expose.
@@ -888,7 +889,9 @@ class TestPublishQgisRaster(RasterFixture):
     def test_keywords_go_in_the_same_put(self):
         """The Publish form asks for keywords; a raster used to drop them."""
         self.add_layer("dem")
-        self.dlg._publish_qgis_raster(self.values(title="", keywords="dem, , terrain "))
+        self.dlg._publish_qgis_raster(
+            self.values(title="", keywords=["dem", " ", "terrain "])
+        )
         _upload, (_verb, _path, kwargs) = self.puts()
         self.assertEqual(
             kwargs["json"], {"coverage": {"keywords": {"string": ["dem", "terrain"]}}}

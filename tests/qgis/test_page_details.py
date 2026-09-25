@@ -94,6 +94,12 @@ class TestPageDetails(unittest.TestCase):
         self.dlg._populate_rows(reloaded)
         self.assertIsNone(self.dlg._sort)
 
+    def test_a_long_detail_cell_has_its_whole_text_on_hover(self):
+        long_text = "EPSG:4326, EPSG:900913, WebMercatorQuad, GlobalCRS84Pixel"
+        self.dlg._row_detail = lambda row: (long_text,)
+        self.dlg._populate_rows(self.rows)
+        self.assertEqual(self.dlg.resultsTable.item(0, 2).toolTip(), long_text)
+
     def test_a_row_that_cannot_be_read_gets_dashes_and_one_warning(self):
         warnings = []
         self.dlg.show_warning_message = warnings.append

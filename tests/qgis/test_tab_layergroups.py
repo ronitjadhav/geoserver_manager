@@ -16,7 +16,7 @@ from qgis.PyQt.QtWidgets import QDialog
 from qgis.testing import start_app, unittest
 
 # project
-from geoserver_manager.gui import tab_layergroups
+from geoserver_manager.gui import tab_layergroups, tab_layers
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.scope import GLOBAL
 from geoserver_manager.gui.tab_layergroups import LayerGroupTabMixin
@@ -678,7 +678,7 @@ class TestDeleteAndAddToQgis(unittest.TestCase):
 
         self.dlg.plg_settings = PlgSettings()
         with (
-            patch.object(tab_layergroups, "QgsRasterLayer", FakeLayer),
+            patch.object(tab_layers, "QgsRasterLayer", FakeLayer),
             patch.object(tab_layergroups.QgsProject, "instance") as instance,
         ):
             self.dlg._add_group_to_qgis(["tasmania", GLOBAL, "SINGLE", "2"])
@@ -688,13 +688,6 @@ class TestDeleteAndAddToQgis(unittest.TestCase):
         self.assertIn("layers=topp:roads_group&", built[1][0])
         self.assertIn("authcfg=abc123", built[0][0])
         self.assertEqual([provider for _uri, _name, provider in built], ["wms", "wms"])
-
-
-# ############################################################################
-# ####### Stand-alone run ########
-# ################################
-if __name__ == "__main__":
-    unittest.main()
 
 
 class TestPreviewInBrowser(unittest.TestCase):
@@ -781,10 +774,17 @@ class TestPreviewInBrowser(unittest.TestCase):
                 lambda name, layer, bbox, parent: opened.append((name, bbox))
                 or type("D", (), {"show": lambda inner: None})(),
             ),
-            patch.object(tab_layergroups, "QgsRasterLayer", lambda *args: object()),
+            patch.object(tab_layers, "QgsRasterLayer", lambda *args: object()),
         ):
             self.dlg._preview_group(["spearfish", GLOBAL])
         ((name, bbox),) = opened
         self.assertEqual(name, "spearfish")
         self.assertAlmostEqual(bbox[0], -103.87, places=1)
         self.assertAlmostEqual(bbox[3], 44.5, places=1)
+
+
+# ############################################################################
+# ####### Stand-alone run ########
+# ################################
+if __name__ == "__main__":
+    unittest.main()

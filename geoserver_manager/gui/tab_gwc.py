@@ -1041,6 +1041,7 @@ class GwcTabMixin:
         ):
             return
         if self._run_action(
+            # TODO(#50): no seed in the library (row 59).
             lambda: self._wait_for_save(
                 lambda: self._raw_rest(
                     "post", self._seed_path(name), json=self._seed_request(name, values)
@@ -1057,6 +1058,7 @@ class GwcTabMixin:
         and a banner each time would bury the message bar.
         """
         try:
+            # TODO(#50): nor a task list (row 59).
             return self._seed_tasks_text(raw_rest(client, "get", path).json())
         except Exception as error:  # noqa: BLE001 (shown in the dialog)
             return self._error_text(error)
@@ -1110,6 +1112,7 @@ class GwcTabMixin:
 
         def stop_all():
             if self._run_action(
+                # TODO(#50): nor a kill of the tasks (row 59).
                 lambda: self._wait_for_save(
                     lambda: self._raw_rest(
                         "post", self._seed_path(name, ""), data={"kill_all": "all"}

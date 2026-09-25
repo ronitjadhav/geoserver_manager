@@ -170,7 +170,7 @@ class TestServerSaves(unittest.TestCase):
         return self.dlg._save_server_section(kind, before, after)
 
     def test_a_service_sends_only_what_changed(self):
-        self.assertTrue(self.edit("wfs", title="Features", keywords="A\nB\n"))
+        self.assertTrue(self.edit("wfs", title="Features", keywords=["A", "B", ""]))
         ((_verb, path, kwargs),) = self.dlg.gs.puts()
         self.assertEqual(path, "/rest/services/wfs/settings.json")
         self.assertEqual(

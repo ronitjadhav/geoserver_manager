@@ -29,8 +29,9 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   live from the server on every load and every edit dialog.
 - The client strips trailing `/` from the URL itself. It has no timeout parameter at all
   (`TIMEOUT = 120` is a module constant and `RestClient.get` takes no `timeout`), which is why
-  `toolbelt/probe.py` is the one call that uses `requests` directly: a dead host must cost 10 s, not two
-  minutes (row 20 of #50). `verifytls` is the *Verify the server's TLS certificate* setting (default on);
+  `toolbelt/probe.py` uses `requests` directly: a dead host must cost 10 s, not two minutes (row 20 of
+  #50). The Server tab's log view does too (`_log_tail`, row 60): it streams the file and keeps only its end,
+  where the library's client reads a body whole. `verifytls` is the *Verify the server's TLS certificate* setting (default on);
   it catches `requests.exceptions.SSLError` before `OSError` so a private-CA server is reported as a
   certificate problem, not as "is the server running?".
 - **Layers of every type** (rows 39, 48 and 49 of #50): `GET /rest/layers.json` is the one list where vector, raster and cascaded layers
@@ -153,7 +154,7 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   **A cancelled upload** (measured with the body aborted at 1.5 of 18 MB): a first upload leaves *nothing*
   (no store, no coverage, no file), but a *Replace* keeps the store, coverage and layer configured while
   GeoServer has already deleted the previous file, i.e. a layer with no data behind it. So the upload streams
-  through `_run_upload`, `_report_cancelled_raster_upload` GETs the store afterwards and says which of the two
+  through `_run_upload`, and its `on_cancel` (`_store_upload_cancelled`, then `_report_cancelled_upload`) GETs the store afterwards and says which of the two
   happened, and closing the dialog lets an upload finish rather than stopping it. **CRS**: GeoServer declares an
   SRS by EPSG code, so `qgis_export.require_crs()` refuses a layer without a CRS and `reprojection_target()`
   names EPSG:4326 for a CRS without an EPSG code. A vector is reprojected on export

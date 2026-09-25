@@ -295,16 +295,13 @@ class LayerTabMixin:
                 )
         if not replace:
             return
-        path = "{}/workspaces/{}/{}stores/{}.json".format(
-            self.gs.rest_service.rest_endpoints.base_url,
-            quote(ws_name, safe=""),
-            kind,
-            quote(name, safe=""),
-        )
-        if not self.gs.rest_service.resource_exists(path):
+        # Through the library: both store models keep the type (it was a
+        # raw GET, with no TODO and no row in #50 to say why).
+        getter = self.gs.get_datastore if kind == "data" else self.gs.get_coverage_store
+        detail, status = getter(ws_name, name)
+        if status == 404:
             return
-        payload = self._raw_rest("get", path).json()
-        found = (next(iter(payload.values()), {}) or {}).get("type") or "-"
+        found = (self._check((detail, status)) or {}).get("type") or "-"
         if found != store_type:
             raise ValueError(
                 translate(
@@ -959,7 +956,11 @@ class LayerTabMixin:
 
     @staticmethod
     def _prefill_publish_name(dlg, layer):
-        """Suggest the GeoServer-safe form of the picked layer's name."""
+        """Suggest the GeoServer-safe form of the picked layer's name.
+
+        Shared with the Coverage Stores tab's raster upload: every mixin is
+        on the same dialog.
+        """
         widget = dlg.get_widget("name")
         if layer is not None and not widget.text().strip():
             widget.setText(geoserver_name(layer.name()))
@@ -1363,6 +1364,8 @@ class LayerTabMixin:
         A partial feature-type PUT merges (verified on GeoServer 2.28.5), so
         the SRS, bounding box and attributes GeoServer computed from the upload
         survive, which create_feature_type() would overwrite with a template.
+
+        TODO(#50): no update_feature_type() in the library (row 29).
         """
         keywords = words(values.get("keywords"))
         metadata = {}
@@ -1755,6 +1758,32 @@ class LayerTabMixin:
 
     # -- Add to QGIS ----------------------------------------------------------
 
+    def _server_layer(self, protocol, qualified_name, title):
+        """A QGIS layer of one of this server's layers, as WMS, WMTS or WFS.
+
+        The constructor reads the capabilities: a request, so build it in a
+        worker (_fetch). It may be invalid; _valid_layer() makes that an error.
+        """
+        settings = self.plg_settings.get_plg_settings()
+        uri, provider = self._layer_uri(
+            protocol,
+            settings.geoserver_url,
+            qualified_name,
+            settings.geoserver_auth_cfg_id,
+        )
+        layer_class = QgsVectorLayer if provider == "WFS" else QgsRasterLayer
+        return layer_class(uri, title, provider)
+
+    @staticmethod
+    def _valid_layer(layer):
+        """The layer, or a RuntimeError with QGIS's reason when it is invalid."""
+        if not layer.isValid():
+            raise RuntimeError(
+                layer.error().message()
+                or translate("LayerTabMixin", "layer is not valid")
+            )
+        return layer
+
     @staticmethod
     def _layer_uri(protocol, base_url, qualified_name, authcfg=""):
         """Provider URI for one GeoServer layer. Returns (uri, provider_key).
@@ -1902,17 +1931,10 @@ class LayerTabMixin:
         bbox, _srs = self._bbox_from(detail.get("latLonBoundingBox"))
         qualified = f"{ws_name}:{name}" if ws_name else name
 
-        def build():
-            settings = self.plg_settings.get_plg_settings()
-            uri, provider = self._layer_uri(
-                "WMS", settings.geoserver_url, qualified, settings.geoserver_auth_cfg_id
-            )
-            # Reading the capabilities is a request. An invalid layer is not
-            # an error here: the window explains it in place of the map.
-            return QgsRasterLayer(uri, qualified, provider)
-
+        # An invalid layer is not an error here: the window explains it in
+        # place of the map.
         layer = self._fetch(
-            build,
+            lambda: self._server_layer("WMS", qualified, qualified),
             translate("LayerTabMixin", "Could not build the preview of '{}'").format(
                 name
             ),
@@ -1962,28 +1984,13 @@ class LayerTabMixin:
             return
         protocol = dlg.get_values()["protocol"]
 
-        def build():
-            settings = self.plg_settings.get_plg_settings()
-            uri, provider = self._layer_uri(
-                protocol,
-                settings.geoserver_url,
-                f"{ws_name}:{name}",
-                settings.geoserver_auth_cfg_id,
-            )
-            layer_class = QgsVectorLayer if provider == "WFS" else QgsRasterLayer
-            # The constructor reads the capabilities: a request, so a worker's.
-            layer = layer_class(uri, name, provider)
-            if not layer.isValid():
-                # Build first and check, instead of iface.addRasterLayer(), so an
-                # unreachable layer becomes our banner rather than QGIS's modal.
-                raise RuntimeError(
-                    layer.error().message()
-                    or translate("LayerTabMixin", "layer is not valid")
-                )
-            return layer
-
+        # Built and checked here, not through iface.addRasterLayer(), so an
+        # unreachable layer becomes our banner rather than QGIS's modal.
         layer = self._fetch(
-            build, translate("LayerTabMixin", "Could not add '{}' to QGIS").format(name)
+            lambda: self._valid_layer(
+                self._server_layer(protocol, f"{ws_name}:{name}", name)
+            ),
+            translate("LayerTabMixin", "Could not add '{}' to QGIS").format(name),
         )
         if layer is not None:
             QgsProject.instance().addMapLayer(layer)

@@ -76,7 +76,7 @@ class TestDatastoreUpdateContract(unittest.TestCase):
         self.assertEqual(body["type"], "PostGIS")
 
     def test_workspace_rename_payload_shape(self):
-        """_rename_workspace PUTs Workspace(new_name, isolated).put_payload()."""
+        """_put_workspace PUTs Workspace(new_name, isolated).put_payload()."""
         self.assertEqual(
             Workspace("new", True).put_payload(),
             {"workspace": {"name": "new", "isolated": True}},

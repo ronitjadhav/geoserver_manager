@@ -136,10 +136,6 @@ class TestStyleableProjectLayers(unittest.TestCase):
         self.assertEqual(styleable_project_layers(), [])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 # ############################################################################
 # ##### GeoPackage export ########
 # ################################
@@ -182,3 +178,7 @@ class TestExportToGeopackage(unittest.TestCase):
                 point_layer("towns"), self.folder / "no" / "such" / "dir.gpkg", "towns"
             )
         self.assertIn("towns", str(caught.exception))
+
+
+if __name__ == "__main__":
+    unittest.main()
