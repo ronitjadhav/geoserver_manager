@@ -340,7 +340,7 @@ class TestPrimaryButtons(unittest.TestCase):
         dlg.gs = FakeGS()
         dlg.show_warning_message = dlg.show_error_message = lambda text: None
         dlg._all_layer_names = lambda: []
-        dlg._all_group_names = lambda: []
+        dlg._all_group_names = lambda workspace_names=None: []
         dlg._style_choices = lambda workspace_name: []
         ok = QDialogButtonBox.StandardButton.Ok
         seen = {}
