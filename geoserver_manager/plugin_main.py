@@ -9,7 +9,15 @@ from pathlib import Path
 # PyQGIS
 from qgis.core import Qgis, QgsSettings
 from qgis.gui import QgisInterface
-from qgis.PyQt.QtCore import QCoreApplication, QLocale, QTimer, QTranslator, QUrl
+from qgis.PyQt.QtCore import (
+    QCoreApplication,
+    QEvent,
+    QLocale,
+    QObject,
+    QTimer,
+    QTranslator,
+    QUrl,
+)
 from qgis.PyQt.QtGui import QDesktopServices
 from qgis.PyQt.QtWidgets import QAction, QApplication, QMessageBox
 
@@ -29,6 +37,24 @@ from geoserver_manager.toolbelt.preferences import PlgOptionsManager
 # ############################################################################
 # ########## Classes ###############
 # ##################################
+
+
+class _PaletteWatch(QObject):
+    """Calls back when the watched window's palette or style changes.
+
+    An event filter, not the application's palette-changed signal: Qt 6
+    deprecated that signal and PyQt6 does not bind it, so connecting it
+    stopped the plugin from loading on a PyQt6 QGIS.
+    """
+
+    def __init__(self, on_change, window):
+        super().__init__(window)
+        self._on_change = on_change
+
+    def eventFilter(self, _watched, event):  # noqa: N802 (Qt's own spelling)
+        if event.type() in (QEvent.Type.PaletteChange, QEvent.Type.StyleChange):
+            self._on_change()
+        return False
 
 
 class GeoServerManagerPlugin:
@@ -104,7 +130,7 @@ class GeoServerManagerPlugin:
 
         self.action_main = QAction(
             icon("plugin"),
-            self.tr(__title__),
+            __title__,
             self.iface.mainWindow(),
         )
         self.action_main.triggered.connect(self.run)
@@ -123,7 +149,7 @@ class GeoServerManagerPlugin:
         self._help_separator = self.iface.pluginHelpMenu().addSeparator()
         self.action_help_plugin_menu_documentation = QAction(
             icon("plugin", for_menu=True),
-            f"{__title__} - Documentation",
+            self.tr("{} documentation").format(__title__),
             self.iface.mainWindow(),
         )
         self.action_help_plugin_menu_documentation.triggered.connect(
@@ -134,10 +160,12 @@ class GeoServerManagerPlugin:
             self.action_help_plugin_menu_documentation
         )
 
-        self._icon_refresh_timer = QTimer(self.iface.mainWindow())
+        window = self.iface.mainWindow()
+        self._icon_refresh_timer = QTimer(window)
         self._icon_refresh_timer.setSingleShot(True)
         self._icon_refresh_timer.timeout.connect(self._refresh_menu_icons)
-        QApplication.instance().paletteChanged.connect(self._queue_menu_icon_refresh)
+        self._palette_watch = _PaletteWatch(self._queue_menu_icon_refresh, window)
+        window.installEventFilter(self._palette_watch)
         self._refresh_menu_icons()
 
         # -- Layer tree context menu: push / apply the clicked layer's style.
@@ -147,8 +175,8 @@ class GeoServerManagerPlugin:
             self.iface, dialog=lambda: self.main_dialog, open_dialog=self.run
         )
 
-    def _queue_menu_icon_refresh(self, _palette):
-        # QApplication emits before the main window inherits the new palette.
+    def _queue_menu_icon_refresh(self):
+        # Once, after the window's children have the new palette too.
         self._icon_refresh_timer.start(0)
 
     def _refresh_menu_icons(self):
@@ -174,7 +202,8 @@ class GeoServerManagerPlugin:
 
     def unload(self) -> None:
         """Cleans up when plugin is disabled/uninstalled."""
-        QApplication.instance().paletteChanged.disconnect(self._queue_menu_icon_refresh)
+        self.iface.mainWindow().removeEventFilter(self._palette_watch)
+        self._palette_watch.deleteLater()
         self._icon_refresh_timer.stop()
         self._icon_refresh_timer.deleteLater()
         # -- The layer-tree hook first: left connected, it would fire into a
@@ -245,11 +274,21 @@ class GeoServerManagerPlugin:
             if not settings.has_credentials():
                 return
 
-        if not self.main_dialog:
-            self.main_dialog = GeoServerMainDialog(self.iface.mainWindow(), self.iface)
-
+        dialog = self.main_dialog
+        if dialog is None:
+            dialog = self.main_dialog = GeoServerMainDialog(
+                self.iface.mainWindow(), self.iface
+            )
+        if dialog.isVisible() and dialog.gs is not None:
+            # Open and connected: the click brings it forward. It used to
+            # reconnect and reload the tab, or refuse while an upload ran.
+            dialog.raise_()
+            dialog.activateWindow()
+            return
         # refresh_ui only starts the connection probe. It runs in a QgsTask
         # and calls back when it lands, so the window paints straight away
         # even against a host that swallows the SYN (VPN down, firewall DROP).
-        self.main_dialog.show()
-        self.main_dialog.refresh_ui()
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+        dialog.refresh_ui()
