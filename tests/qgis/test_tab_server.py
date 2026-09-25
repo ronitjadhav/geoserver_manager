@@ -13,6 +13,7 @@ Usage from the repo root folder:
 """
 
 import copy
+import threading
 from unittest.mock import patch
 
 from qgis.PyQt.QtWidgets import QDialog
@@ -21,6 +22,7 @@ from qgis.testing import start_app, unittest
 from geoserver_manager.gui import tab_server
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.tab_server import ServerTabMixin
+from geoserver_manager.toolbelt.rest import Abandoned
 from tests.qgis.sync_dialog import SyncDialog
 
 start_app()
@@ -226,6 +228,75 @@ class TestServerSaves(unittest.TestCase):
         self.assertEqual(self.dlg.gs.puts(), [])
 
 
+def _cancel_writes(action, write=False, stop=None):
+    """A _wait_for whose waiting box is cancelled on every write."""
+    if write:
+        raise Abandoned(write)
+    return action()
+
+
+class TestServerFormSaves(unittest.TestCase):
+    """A save is a write: a Cancel on the waiting box says the PUT may still
+    land and reloads the tab. Through _fetch, the read helper, it was silent
+    and the Summary column kept the old value."""
+
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.dlg.gs = FakeGS()
+        self.warnings, self.successes = [], []
+        self.dlg.show_warning_message = self.warnings.append
+        self.dlg.show_success_message = self.successes.append
+
+    def open_and_save(self, row, **changes):
+        class Saving(ResourceFormDialog):
+            def exec(inner):
+                return QDialog.DialogCode.Accepted
+
+            def get_values(inner):
+                return dict(super().get_values(), **changes)
+
+        with patch.object(tab_server, "ResourceFormDialog", Saving):
+            self.dlg._show_server_section(row)
+
+    def test_a_change_is_put_and_reported(self):
+        self.open_and_save(["WFS", "-"], title="Features")
+        ((_verb, path, _kwargs),) = self.dlg.gs.puts()
+        self.assertEqual(path, "/rest/services/wfs/settings.json")
+        self.assertEqual(self.successes, ["'WFS' saved."])
+
+    def test_an_untouched_form_sends_nothing_and_says_nothing(self):
+        self.open_and_save(["WFS", "-"])
+        self.assertEqual(self.dlg.gs.puts(), [])
+        self.assertEqual(self.successes, [])
+
+    def test_a_cancelled_save_says_the_change_may_still_land(self):
+        self.dlg._wait_for = _cancel_writes
+        self.open_and_save(["WFS", "-"], title="Features")
+        self.assertEqual(self.successes, [])
+        self.assertTrue(
+            any("may still apply" in warning for warning in self.warnings),
+            self.warnings,
+        )
+
+    def test_a_cancelled_reload_says_so_too(self):
+        self.dlg._wait_for = _cancel_writes
+
+        class Choosing(ResourceFormDialog):
+            def exec(inner):
+                return QDialog.DialogCode.Accepted
+
+            def get_values(inner):
+                return {"action": "reload"}
+
+        with patch.object(tab_server, "ResourceFormDialog", Choosing):
+            self.dlg._reload_or_reset_catalog()
+        self.assertEqual(self.successes, [])
+        self.assertTrue(
+            any("may still apply" in warning for warning in self.warnings),
+            self.warnings,
+        )
+
+
 class TestLogAndCatalog(unittest.TestCase):
     def test_the_log_keeps_only_its_end(self):
         class Streamed:
@@ -249,6 +320,35 @@ class TestLogAndCatalog(unittest.TestCase):
         self.assertEqual(tail.splitlines()[-1], "line 4999")
         self.assertEqual(len(tail.splitlines()), 10)
         self.assertTrue(get.call_args.kwargs["stream"])
+
+    def test_cancel_stops_the_download(self):
+        # The whole file kept streaming after the waiting box was cancelled.
+        stop = threading.Event()
+        served = []
+
+        class Streamed:
+            status_code = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def iter_content(self, size):
+                for number in range(5000):
+                    served.append(number)
+                    if number == 2:
+                        stop.set()
+                    yield b"x\n"
+
+        class Client:
+            url, auth, verifytls = "http://gs", ("u", "p"), True
+
+        with patch.object(tab_server.requests, "get", return_value=Streamed()):
+            with self.assertRaises(Abandoned):
+                ServerTabMixin._log_tail(Client(), "/rest/resource/x", stop=stop)
+        self.assertEqual(len(served), 3)
 
     def test_reload_and_reset_post_to_their_endpoint(self):
         dlg = SyncDialog()

@@ -892,6 +892,11 @@ class ResourceFormDialog(QDialog):
             return
         self.reject()
 
+    def add_button(self, text):
+        """A button beside Save and Cancel for an action of the form's own
+        (Show the log, Stop all); the caller connects its clicked signal."""
+        return self._button_box.addButton(text, QDialogButtonBox.ButtonRole.ActionRole)
+
     def hide_save_button(self):
         """Hide the Save button, leaving only Cancel (for view-only dialogs)."""
         self._button_box.button(QDialogButtonBox.StandardButton.Ok).setVisible(False)

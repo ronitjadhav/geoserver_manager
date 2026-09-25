@@ -658,6 +658,22 @@ class TestLongTextOpensAtItsStart(unittest.TestCase):
         self.assertEqual(dlg.get_widget("url").cursorPosition(), 0)
 
 
+class TestActionButton(unittest.TestCase):
+    def test_a_form_can_carry_a_button_of_its_own(self):
+        # Show the log, Stop all: two tabs reached into the button box.
+        from qgis.PyQt.QtWidgets import QDialogButtonBox
+
+        dlg = ResourceFormDialog(
+            title="t", fields=[{"key": "n", "label": "N", "type": "text"}]
+        )
+        button = dlg.add_button("Show the log")
+        self.assertIn(button, dlg._button_box.buttons())
+        self.assertEqual(
+            dlg._button_box.buttonRole(button),
+            QDialogButtonBox.ButtonRole.ActionRole,
+        )
+
+
 class TestFormLifetime(unittest.TestCase):
     """A form is freed once its caller is done with it, and not before.
 

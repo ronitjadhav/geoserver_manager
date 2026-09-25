@@ -1923,7 +1923,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="786" />
+        <location filename="../../gui/tab_gwc.py" line="798" />
         <location filename="../../gui/tab_gwc.py" line="96" />
         <source>Add a Layer to the Cache</source>
         <translation type="unfinished" />
@@ -1955,7 +1955,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1076" />
+        <location filename="../../gui/tab_gwc.py" line="1099" />
         <location filename="../../gui/tab_gwc.py" line="124" />
         <source>Tasks</source>
         <translation type="unfinished" />
@@ -1986,19 +1986,19 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished">Nom</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="600" />
+        <location filename="../../gui/tab_gwc.py" line="612" />
         <location filename="../../gui/tab_gwc.py" line="156" />
         <source>Enabled</source>
         <translation type="unfinished">Activé</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="609" />
+        <location filename="../../gui/tab_gwc.py" line="621" />
         <location filename="../../gui/tab_gwc.py" line="157" />
         <source>Gridsets</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="639" />
+        <location filename="../../gui/tab_gwc.py" line="651" />
         <location filename="../../gui/tab_gwc.py" line="158" />
         <source>Formats</source>
         <translation type="unfinished" />
@@ -2034,376 +2034,376 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="522" />
+        <location filename="../../gui/tab_gwc.py" line="525" />
         <source>Pick a layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="526" />
+        <location filename="../../gui/tab_gwc.py" line="529" />
         <source>'{}' is cached already.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="981" />
-        <location filename="../../gui/tab_gwc.py" line="969" />
-        <location filename="../../gui/tab_gwc.py" line="576" />
+        <location filename="../../gui/tab_gwc.py" line="996" />
+        <location filename="../../gui/tab_gwc.py" line="984" />
+        <location filename="../../gui/tab_gwc.py" line="588" />
         <source>Advanced</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="587" />
-        <location filename="../../gui/tab_gwc.py" line="580" />
+        <location filename="../../gui/tab_gwc.py" line="599" />
+        <location filename="../../gui/tab_gwc.py" line="592" />
         <source>Layer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="591" />
+        <location filename="../../gui/tab_gwc.py" line="603" />
         <source>A published layer or layer group GeoWebCache does not cache yet.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="602" />
+        <location filename="../../gui/tab_gwc.py" line="614" />
         <source>Disabled, GeoWebCache neither serves nor stores tiles for it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="925" />
-        <location filename="../../gui/tab_gwc.py" line="615" />
+        <location filename="../../gui/tab_gwc.py" line="940" />
+        <location filename="../../gui/tab_gwc.py" line="627" />
         <source>Gridset</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="617" />
+        <location filename="../../gui/tab_gwc.py" line="629" />
         <source>From zoom</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="628" />
-        <location filename="../../gui/tab_gwc.py" line="621" />
+        <location filename="../../gui/tab_gwc.py" line="640" />
+        <location filename="../../gui/tab_gwc.py" line="633" />
         <source>all</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="624" />
+        <location filename="../../gui/tab_gwc.py" line="636" />
         <source>To zoom</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="631" />
+        <location filename="../../gui/tab_gwc.py" line="643" />
         <source>The tile grids the layer is cached in. Set the zoom levels to serve only those; "all" serves every level.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="931" />
-        <location filename="../../gui/tab_gwc.py" line="644" />
+        <location filename="../../gui/tab_gwc.py" line="946" />
+        <location filename="../../gui/tab_gwc.py" line="656" />
         <source>Format</source>
         <translation type="unfinished">Format</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="647" />
+        <location filename="../../gui/tab_gwc.py" line="659" />
         <source>The image or tile formats cached.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="651" />
+        <location filename="../../gui/tab_gwc.py" line="663" />
         <source>Meta-tile width</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="656" />
+        <location filename="../../gui/tab_gwc.py" line="668" />
         <source>Tiles rendered together in one request, so labels are not cut at tile edges.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="664" />
+        <location filename="../../gui/tab_gwc.py" line="676" />
         <source>Meta-tile height</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="672" />
+        <location filename="../../gui/tab_gwc.py" line="684" />
         <source>Gutter (px)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="677" />
+        <location filename="../../gui/tab_gwc.py" line="689" />
         <source>Extra pixels rendered around each meta-tile, for symbols that overflow.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="685" />
+        <location filename="../../gui/tab_gwc.py" line="697" />
         <source>Expire cached tiles after (s)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="690" />
+        <location filename="../../gui/tab_gwc.py" line="702" />
         <source>0 keeps a tile until it is truncated.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="696" />
+        <location filename="../../gui/tab_gwc.py" line="708" />
         <source>Client cache max-age (s)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="701" />
+        <location filename="../../gui/tab_gwc.py" line="713" />
         <source>Sent to browsers and QGIS as Cache-Control; 0 sends none.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="711" />
-        <location filename="../../gui/tab_gwc.py" line="708" />
+        <location filename="../../gui/tab_gwc.py" line="723" />
+        <location filename="../../gui/tab_gwc.py" line="720" />
         <source>Parameter filters</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="713" />
+        <location filename="../../gui/tab_gwc.py" line="725" />
         <source>Which request parameters get a cache of their own (STYLES, CQL_FILTER, TIME...), as GeoWebCache's XML. A value no filter allows is not cached.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1002" />
-        <location filename="../../gui/tab_gwc.py" line="727" />
+        <location filename="../../gui/tab_gwc.py" line="1025" />
+        <location filename="../../gui/tab_gwc.py" line="739" />
         <source>Failed to load the tile cache of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="736" />
+        <location filename="../../gui/tab_gwc.py" line="748" />
         <source>Tile cache of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="737" />
+        <location filename="../../gui/tab_gwc.py" line="749" />
         <source>How GeoWebCache caches this layer. Changes apply to the tiles rendered from now on; Truncate clears what is cached already.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="757" />
+        <location filename="../../gui/tab_gwc.py" line="769" />
         <source>Failed to save the tile cache of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="762" />
+        <location filename="../../gui/tab_gwc.py" line="774" />
         <source>Tile cache of '{}' saved.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="770" />
+        <location filename="../../gui/tab_gwc.py" line="782" />
         <source>Failed to list the layers that can be cached</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="777" />
+        <location filename="../../gui/tab_gwc.py" line="789" />
         <source>Every published layer is cached already. GeoServer caches new layers by itself.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="787" />
+        <location filename="../../gui/tab_gwc.py" line="799" />
         <source>GeoServer caches every new layer by itself, so this is for a layer whose cache was removed. Tiles are stored the first time they are requested.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="802" />
+        <location filename="../../gui/tab_gwc.py" line="814" />
         <source>Create</source>
         <translation type="unfinished">Créer</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="812" />
+        <location filename="../../gui/tab_gwc.py" line="827" />
         <source>Failed to cache '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="817" />
+        <location filename="../../gui/tab_gwc.py" line="832" />
         <source>'{}' is now cached.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="838" />
+        <location filename="../../gui/tab_gwc.py" line="853" />
         <source>The first zoom level is after the last.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="857" />
+        <location filename="../../gui/tab_gwc.py" line="872" />
         <source>The area is not a box: each minimum must be below its maximum.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="883" />
+        <location filename="../../gui/tab_gwc.py" line="898" />
         <source>No task running for this layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="885" />
+        <location filename="../../gui/tab_gwc.py" line="900" />
         <source>aborted</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="886" />
+        <location filename="../../gui/tab_gwc.py" line="901" />
         <source>pending</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="887" />
+        <location filename="../../gui/tab_gwc.py" line="902" />
         <source>running</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="888" />
+        <location filename="../../gui/tab_gwc.py" line="903" />
         <source>done</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="893" />
+        <location filename="../../gui/tab_gwc.py" line="908" />
         <source>{} of {} tiles</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="895" />
+        <location filename="../../gui/tab_gwc.py" line="910" />
         <source>counting the tiles</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="898" />
+        <location filename="../../gui/tab_gwc.py" line="913" />
         <source>, about {} s left</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="903" />
+        <location filename="../../gui/tab_gwc.py" line="918" />
         <source>Task {}: {}, {}{}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="914" />
+        <location filename="../../gui/tab_gwc.py" line="929" />
         <source>Task</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="917" />
+        <location filename="../../gui/tab_gwc.py" line="932" />
         <source>Seed renders the missing tiles, Reseed renders them all again, Truncate deletes them</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="937" />
+        <location filename="../../gui/tab_gwc.py" line="952" />
         <source>From zoom level</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="945" />
+        <location filename="../../gui/tab_gwc.py" line="960" />
         <source>To zoom level</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="950" />
+        <location filename="../../gui/tab_gwc.py" line="965" />
         <source>Each level has four times the tiles of the one before: the task list shows the total once GeoWebCache has counted it</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="958" />
+        <location filename="../../gui/tab_gwc.py" line="973" />
         <source>Threads</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="966" />
+        <location filename="../../gui/tab_gwc.py" line="981" />
         <source>Only this area</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="970" />
+        <location filename="../../gui/tab_gwc.py" line="985" />
         <source>Taken from the map view, a layer or a bookmark, or typed in QGIS's order: xmin, xmax, ymin, ymax. Sent in the gridset's CRS. Not set: the layer's whole extent.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="979" />
+        <location filename="../../gui/tab_gwc.py" line="994" />
         <source>Parameters</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="982" />
+        <location filename="../../gui/tab_gwc.py" line="997" />
         <source>A parameter and its value (STYLES, population) for the tiles of one parameter filter value. Empty: the default tiles.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1012" />
+        <location filename="../../gui/tab_gwc.py" line="1035" />
         <source>Seed or Truncate '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1013" />
+        <location filename="../../gui/tab_gwc.py" line="1036" />
         <source>GeoWebCache runs the task in the background; the task list opens next and shows its progress.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1020" />
+        <location filename="../../gui/tab_gwc.py" line="1043" />
         <source>Start</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1144" />
-        <location filename="../../gui/tab_gwc.py" line="1031" />
+        <location filename="../../gui/tab_gwc.py" line="1164" />
+        <location filename="../../gui/tab_gwc.py" line="1054" />
         <source>Are you sure you want to truncate the tiles of layer '{}'?</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1035" />
+        <location filename="../../gui/tab_gwc.py" line="1058" />
         <source>The tiles of this gridset, format and zoom range are deleted (within the area, if one is set). They are rendered again on request.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1050" />
+        <location filename="../../gui/tab_gwc.py" line="1073" />
         <source>Failed to start the task on '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1072" />
+        <location filename="../../gui/tab_gwc.py" line="1095" />
         <source>Tasks of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1082" />
+        <location filename="../../gui/tab_gwc.py" line="1105" />
         <source>Asking GeoWebCache…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1087" />
+        <location filename="../../gui/tab_gwc.py" line="1109" />
         <source>Stop all</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1090" />
+        <location filename="../../gui/tab_gwc.py" line="1110" />
         <source>Failed to read the tasks</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1121" />
+        <location filename="../../gui/tab_gwc.py" line="1141" />
         <source>Failed to stop the tasks on '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1127" />
+        <location filename="../../gui/tab_gwc.py" line="1147" />
         <source>Stopping the tasks…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1148" />
+        <location filename="../../gui/tab_gwc.py" line="1168" />
         <source>Every tile GeoWebCache stored for this layer is deleted, in every gridset and format. The layer and its cache configuration stay; tiles are rendered again on request.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1158" />
+        <location filename="../../gui/tab_gwc.py" line="1178" />
         <source>Failed to truncate the tile cache of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1163" />
+        <location filename="../../gui/tab_gwc.py" line="1183" />
         <source>Tile cache of '{}' truncated.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1179" />
+        <location filename="../../gui/tab_gwc.py" line="1199" />
         <source>Are you sure you want to stop caching layer '{}'?</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_gwc.py" line="1182" />
+        <location filename="../../gui/tab_gwc.py" line="1202" />
         <source>Are you sure you want to stop caching %n layer(s)?</source>
         <translation>
             <numerusform>Voulez-vous vraiment retirer %n couche du cache ?</numerusform>
@@ -2411,12 +2411,12 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1190" />
+        <location filename="../../gui/tab_gwc.py" line="1210" />
         <source>Layer '{}' removed from the cache.</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_gwc.py" line="1191" />
+        <location filename="../../gui/tab_gwc.py" line="1211" />
         <source>%n layer(s) removed from the cache.</source>
         <translation>
             <numerusform>%n couche retirée du cache.</numerusform>
@@ -2424,7 +2424,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_gwc.py" line="1195" />
+        <location filename="../../gui/tab_gwc.py" line="1215" />
         <source>The cached tiles and the cache configuration are removed; the layer itself stays published and can be added to the cache again.</source>
         <translation type="unfinished" />
     </message>
@@ -3800,27 +3800,27 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="899" />
+        <location filename="../../gui/dlg_resource_form.py" line="904" />
         <source>Close</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="942" />
+        <location filename="../../gui/dlg_resource_form.py" line="947" />
         <source>'{}' is picked in '{}' but not added: press Add, or clear it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="946" />
+        <location filename="../../gui/dlg_resource_form.py" line="951" />
         <source>'{}' must start with http:// or https://.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="948" />
+        <location filename="../../gui/dlg_resource_form.py" line="953" />
         <source>'{}' has nothing to choose from.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="950" />
+        <location filename="../../gui/dlg_resource_form.py" line="955" />
         <source>'{}' is required.</source>
         <translation type="unfinished" />
     </message>
@@ -3834,173 +3834,173 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
 </context><context>
     <name>ServerTabMixin</name>
     <message>
-        <location filename="../../gui/tab_server.py" line="117" />
+        <location filename="../../gui/tab_server.py" line="118" />
         <source>Contact</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="118" />
+        <location filename="../../gui/tab_server.py" line="119" />
         <source>Global settings</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="120" />
+        <location filename="../../gui/tab_server.py" line="121" />
         <source>Logging</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="588" />
-        <location filename="../../gui/tab_server.py" line="121" />
+        <location filename="../../gui/tab_server.py" line="602" />
+        <location filename="../../gui/tab_server.py" line="122" />
         <source>Catalog</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="143" />
+        <location filename="../../gui/tab_server.py" line="144" />
         <source>Open in the web interface</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="145" />
+        <location filename="../../gui/tab_server.py" line="146" />
         <source>GeoServer's own page for this, in a browser. It will ask to log in.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="154" />
+        <location filename="../../gui/tab_server.py" line="155" />
         <source>Name</source>
         <translation type="unfinished">Nom</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="155" />
+        <location filename="../../gui/tab_server.py" line="156" />
         <source>Summary</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="161" />
+        <location filename="../../gui/tab_server.py" line="162" />
         <source>Failed to load the server settings</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="173" />
+        <location filename="../../gui/tab_server.py" line="174" />
         <source>Reload the configuration, or reset the caches</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="216" />
+        <location filename="../../gui/tab_server.py" line="217" />
         <source>Proxy base URL: {}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="218" />
+        <location filename="../../gui/tab_server.py" line="219" />
         <source>No proxy base URL</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="223" />
+        <location filename="../../gui/tab_server.py" line="224" />
         <source>On</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="225" />
+        <location filename="../../gui/tab_server.py" line="226" />
         <source>Off</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="257" />
+        <location filename="../../gui/tab_server.py" line="258" />
         <source>Failed to load '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="278" />
+        <location filename="../../gui/tab_server.py" line="287" />
         <source>Failed to save '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="282" />
+        <location filename="../../gui/tab_server.py" line="292" />
         <source>'{}' saved.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="288" />
+        <location filename="../../gui/tab_server.py" line="298" />
         <source>The server-wide service. A workspace can override it with settings of its own.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="294" />
+        <location filename="../../gui/tab_server.py" line="304" />
         <source>How much GeoServer writes to its log, and where.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="498" />
+        <location filename="../../gui/tab_server.py" line="507" />
         <source>Show the log</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="511" />
+        <location filename="../../gui/tab_server.py" line="518" />
         <source>The log is written to {}, outside GeoServer's data directory, which the REST API cannot read. Open it on the server.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="524" />
+        <location filename="../../gui/tab_server.py" line="534" />
         <source>Failed to read the log</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="529" />
+        <location filename="../../gui/tab_server.py" line="540" />
         <source>GeoServer Log</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="530" />
+        <location filename="../../gui/tab_server.py" line="541" />
         <source>The last {} lines, newest at the bottom.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="536" />
+        <location filename="../../gui/tab_server.py" line="547" />
         <source>Log</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="585" />
+        <location filename="../../gui/tab_server.py" line="599" />
         <source>Reload</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="586" />
+        <location filename="../../gui/tab_server.py" line="600" />
         <source>Reset</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="589" />
+        <location filename="../../gui/tab_server.py" line="603" />
         <source>Reload reads the whole configuration from the data directory again, after it changed outside GeoServer; on a large catalog it takes a while. Reset drops the caches of stores, feature types and styles, so they are read afresh.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="599" />
+        <location filename="../../gui/tab_server.py" line="613" />
         <source>Do</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="605" />
+        <location filename="../../gui/tab_server.py" line="619" />
         <source>Run</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="624" />
+        <location filename="../../gui/tab_server.py" line="635" />
         <source>Failed to reload the catalog</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="626" />
+        <location filename="../../gui/tab_server.py" line="637" />
         <source>Failed to reset the caches</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="630" />
+        <location filename="../../gui/tab_server.py" line="641" />
         <source>Catalog reloaded.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_server.py" line="632" />
+        <location filename="../../gui/tab_server.py" line="643" />
         <source>Caches reset.</source>
         <translation type="unfinished" />
     </message>
