@@ -174,12 +174,14 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         # reads, so it becomes the active one: with its own auth config, never
         # the one of the profile that was active before.
         shown = self._profile(self._shown)
+        active = self.plg_settings.active_profile_name()
         if shown is not None:
             settings.geoserver_url = shown["url"]
             settings.geoserver_auth_cfg_id = shown["auth_cfg_id"]
-        elif self._profile(self.plg_settings.active_profile_name()) is None and (
-            self.plg_settings.active_profile_name()
-        ):
+            # Untouched, the checkbox is not read below: the previous
+            # profile's setting was kept, and then saved into this one.
+            settings.geoserver_verify_tls = bool(shown.get("verify_tls", True))
+        elif active and self._profile(active) is None:
             # The active profile was removed, and no other is shown: nothing is
             # left to connect with.
             settings.geoserver_url = ""
@@ -229,18 +231,12 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
         stand-in built for another edited one; both are updated in place.
         With more than one profile, every warning says which one it is about.
         """
-        log = self.log
-        if profile and len(self._profiles) > 1:
-            self.log = lambda message="", **kwargs: log(
-                message=self.tr("Profile '{}': {}").format(profile, message), **kwargs
-            )
-        try:
-            self._store_one_connection(settings, url, username, password, verify_tls)
-        finally:
-            self.log = log
 
-    def _store_one_connection(self, settings, url, username, password, verify_tls):
-        """The checks and the credential write of _store_connection."""
+        def warn(message, level=Qgis.MessageLevel.Warning):
+            if profile and len(self._profiles) > 1:
+                message = self.tr("Profile '{}': {}").format(profile, message)
+            self.log(message=message, log_level=level, push=True)
+
         settings.geoserver_verify_tls = verify_tls
 
         # geoserver URL (not sensitive, stored in QgsSettings)
@@ -250,18 +246,21 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
             # apply() cannot stop the options dialog from closing, so keep the
             # previous URL and warn: dropping out here would also discard the
             # credentials the user just typed.
-            self.log(
-                message=f"{problem} {self.tr('URL not saved.')}",
-                log_level=Qgis.MessageLevel.Warning,
-                push=True,
-            )
+            warn(f"{problem} {self.tr('URL not saved.')}")
         else:
             settings.geoserver_url = url
 
         # credentials (sensitive, stored encrypted in QgsAuthManager)
-        if not (username or password) and settings.geoserver_auth_cfg_id:
-            # Both blanked on purpose: forget the stored credentials rather
-            # than keep them behind empty fields.
+        loaded = self._loaded.get(profile) if profile else None
+        # Blank fields forget the stored credentials only when they showed
+        # some: with the master password declined they read blank, and an
+        # edit of the URL alone deleted the credentials.
+        showed_some = loaded is None or bool(loaded["username"] or loaded["password"])
+        if (
+            not (username or password)
+            and settings.geoserver_auth_cfg_id
+            and showed_some
+        ):
             settings.remove_credentials()
             settings.geoserver_auth_cfg_id = ""
         if username or password:
@@ -270,36 +269,24 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
                 settings.geoserver_auth_cfg_id = auth_cfg_id
             else:
                 # Typically the user dismissed the master password prompt
-                self.log(
-                    message=self.tr(
+                warn(
+                    self.tr(
                         "Could not store the credentials in the QGIS authentication "
                         "database. Check that the master password is set, then save again."
                     ),
-                    log_level=Qgis.MessageLevel.Critical,
-                    push=True,
+                    Qgis.MessageLevel.Critical,
                 )
 
-        self._warn_if_password_travels_in_clear(url, username, password)
-
-    def _warn_if_password_travels_in_clear(
-        self, url: str, username: str, password: str
-    ) -> None:
-        """Say once, while saving, that HTTP Basic over http:// is readable.
-
-        Informs rather than refuses: apply() cannot stop the options dialog
-        from closing, and a plain-HTTP server on a trusted network is a
-        legitimate setup: the settings are saved either way.
-        """
-        if not self._password_travels_in_clear(url, username, password):
-            return
-        self.log(
-            message=self.tr(
-                "{url} is plain HTTP, so the password is sent unencrypted with every "
-                "request. Use https:// where the server offers it."
-            ).format(url=url),
-            log_level=Qgis.MessageLevel.Warning,
-            push=True,
-        )
+        if self._password_travels_in_clear(url, username, password):
+            # Informs rather than refuses: apply() cannot stop the options
+            # dialog from closing, and a plain-HTTP server on a trusted
+            # network is a legitimate setup. The settings are saved either way.
+            warn(
+                self.tr(
+                    "{url} is plain HTTP, so the password is sent unencrypted with "
+                    "every request. Use https:// where the server offers it."
+                ).format(url=url)
+            )
 
     def _url_problem(self, url):
         """What is wrong with a GeoServer URL, or None. One check, two callers
