@@ -368,6 +368,27 @@ class TestDocument(unittest.TestCase):
         self.assertTrue(seen["open"])
         self.assertTrue(seen["said"])
 
+    def test_a_bad_add_stays_in_the_form(self):
+        # The Add form had no validate: the same refusal came as a banner
+        # after the form closed, with every other field lost.
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        seen = {}
+
+        class Adding(ResourceFormDialog):
+            def exec(inner):
+                table = inner.get_widget("gridsets")
+                table.set_rows([["EPSG:4326", 3, None]])
+                inner._on_accept()
+                seen["open"] = not inner.result()
+                seen["said"] = inner._validation_label.text()
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_gwc, "ResourceFormDialog", Adding):
+            dlg._add_gwc_layer()
+        self.assertTrue(seen["open"])
+        self.assertIn("zoom", seen["said"])
+
     def test_a_gridset_listed_twice_is_refused(self):
         # The second row was dropped without a word, with its zoom range.
         values = {
@@ -547,9 +568,10 @@ class TestActions(unittest.TestCase):
         self.dlg._truncate_gwc_layer(STATES_ROW)
         [(_verb, path, kwargs)] = [c for c in self.gs.calls if c[0] == "POST"]
         self.assertEqual(path, "/gwc/rest/masstruncate")
+        # Bytes, so no HTTP stack encodes the name as Latin-1 on the way out.
         self.assertEqual(
             kwargs["data"],
-            "<truncateLayer><layerName>topp:states</layerName></truncateLayer>",
+            b"<truncateLayer><layerName>topp:states</layerName></truncateLayer>",
         )
         # GWC's mass-truncate rejects application/xml with a 400
         self.assertEqual(kwargs["headers"], {"Content-Type": "text/xml"})
@@ -781,6 +803,25 @@ class TestSeed(unittest.TestCase):
         form.get_widget("gridset").setCurrentText("EPSG:900913")
         self.assertEqual(area.outputCrs().authid(), "EPSG:900913")
         self.assertEqual(form.get_values()["bounds"], "")  # not set: all of it
+
+    def test_the_gridsets_crs_are_read_in_parallel(self):
+        # One GET per gridset, one after another behind the waiting box.
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        with (
+            patch.object(tab_gwc, "ResourceFormDialog", Recording),
+            patch.object(dlg, "_fan_out", wraps=dlg._fan_out) as fanned,
+        ):
+            dlg._seed_gwc_layer(STATES_ROW)
+        fanned.assert_called_once()
+        self.assertEqual(fanned.call_args.args[1], ["EPSG:4326", "EPSG:900913"])
+        self.assertEqual(
+            [c[1] for c in dlg.gs.calls if "/gridsets/" in c[1]],
+            [
+                "/gwc/rest/gridsets/EPSG%3A4326.xml",
+                "/gwc/rest/gridsets/EPSG%3A900913.xml",
+            ],
+        )
 
     def test_a_failed_read_is_shown_in_the_monitor_not_raised(self):
         dlg = SyncDialog()

@@ -14,15 +14,16 @@ REPLACE the stored object (a PUT of the proxy URL alone wiped the contact),
 so those three are sent back whole, with the form's fields merged in.
 """
 
+import threading
 from collections import deque
 
 import requests
 from qgis.PyQt.QtCore import QCoreApplication
-from qgis.PyQt.QtWidgets import QDialog, QDialogButtonBox
+from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.toolbelt.payload import changed, keyword_list, words
-from geoserver_manager.toolbelt.rest import summarise_body
+from geoserver_manager.toolbelt.rest import Abandoned, summarise_body
 
 # Strings are looked up in this file's own context: self.tr() would resolve
 # against GeoServerMainDialog instead (see docs/development/architecture.md).
@@ -273,11 +274,20 @@ class ServerTabMixin:
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         after = dlg.get_values()
-        saved = self._fetch(
-            lambda: self._save_server_section(kind, before, after),
-            translate("ServerTabMixin", "Failed to save '{}'").format(row_data[0]),
-        )
-        if saved:
+        saved = []
+        # A write: a Cancel on the waiting box says the PUT may still land,
+        # and the tab reloads once it answers. _fetch is for reads.
+        if (
+            self._run_action(
+                lambda: saved.append(
+                    self._wait_for_save(
+                        lambda: self._save_server_section(kind, before, after)
+                    )
+                ),
+                translate("ServerTabMixin", "Failed to save '{}'").format(row_data[0]),
+            )
+            and saved[0]
+        ):
             self.show_success_message(
                 translate("ServerTabMixin", "'{}' saved.").format(row_data[0])
             )
@@ -494,10 +504,7 @@ class ServerTabMixin:
 
     def _add_log_button(self, dlg):
         """A Show the log button on the logging form."""
-        button = dlg._button_box.addButton(
-            translate("ServerTabMixin", "Show the log"),
-            QDialogButtonBox.ButtonRole.ActionRole,
-        )
+        button = dlg.add_button(translate("ServerTabMixin", "Show the log"))
         button.clicked.connect(
             lambda: self._show_server_log(dlg.get_values().get("location"))
         )
@@ -519,9 +526,13 @@ class ServerTabMixin:
         path = "{}/resource/{}".format(
             self.gs.rest_service.rest_endpoints.base_url, location
         )
+        # Cancel stops the download: the read went on to the end of a file
+        # of hundreds of MB after the box was gone.
+        stop = threading.Event()
         tail = self._fetch(
-            lambda: self._log_tail(client, path),
+            lambda: self._log_tail(client, path, stop=stop),
             translate("ServerTabMixin", "Failed to read the log"),
+            stop=stop,
         )
         if tail is None:
             return
@@ -551,12 +562,13 @@ class ServerTabMixin:
         dlg.exec()
 
     @staticmethod
-    def _log_tail(client, path, keep=_LOG_TAIL_BYTES, lines=_LOG_TAIL_LINES):
+    def _log_tail(client, path, keep=_LOG_TAIL_BYTES, lines=_LOG_TAIL_LINES, stop=None):
         """The last lines of a server file, streamed. Runs in a worker.
 
         TODO(#50): the library's client reads a body whole (row 60), and
         GeoServer offers no Range, so this streams the file itself and keeps
         only its end in memory: a production log can be hundreds of MB.
+        `stop`, a threading.Event, ends the download between two chunks.
         """
         with requests.get(
             f"{client.url}{path}",
@@ -571,6 +583,8 @@ class ServerTabMixin:
                 )
             chunks, size = deque(), 0
             for chunk in response.iter_content(64 * 1024):
+                if stop is not None and stop.is_set():
+                    raise Abandoned()  # leaving the block closes the connection
                 chunks.append(chunk)
                 size += len(chunk)
                 while size - len(chunks[0]) >= keep:
@@ -612,14 +626,11 @@ class ServerTabMixin:
             "reload" if reload else "reset",
         )
 
-        def run():
+        # A write in a worker: a reload of a large catalog takes a while, and
+        # a Cancel on the waiting box does not stop it, so _run_action says so.
+        if self._run_action(
             # TODO(#50): no reload or reset in the library (row 60).
-            self._raw_rest("post", path)
-            return True
-
-        # In a worker: a reload of a large catalog takes a while.
-        if self._fetch(
-            run,
+            lambda: self._wait_for_save(lambda: self._raw_rest("post", path)),
             (
                 translate("ServerTabMixin", "Failed to reload the catalog")
                 if reload

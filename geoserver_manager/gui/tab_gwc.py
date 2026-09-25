@@ -20,7 +20,7 @@ from xml.sax.saxutils import escape
 from qgis.core import Qgis
 from qgis.PyQt import sip
 from qgis.PyQt.QtCore import QCoreApplication, QTimer
-from qgis.PyQt.QtWidgets import QDialog, QDialogButtonBox
+from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.scope import GLOBAL, PENDING
@@ -515,8 +515,11 @@ class GwcTabMixin:
         # fails server-side ("Duplicate field mimeFormats"), so XML it is.
         self._put_gwc_xml(name, self._gwc_xml_with_values(xml_text, values))
 
-    def _create_gwc_layer_from_values(self, values):
-        """Start caching the layer the form names. Raises when it is cached already."""
+    def _check_new_gwc_layer(self, values):
+        """(name, document) of the cache the Add form would create, or a
+        ValueError: no layer, a name a URL eats, one cached already, a zoom
+        range with one end, filters that are not XML. Reads only: the form
+        runs it before it closes, so a refusal keeps what was typed."""
         name = (values.get("layer") or "").strip()
         if not name:
             raise ValueError(translate("GwcTabMixin", "Pick a layer."))
@@ -525,14 +528,18 @@ class GwcTabMixin:
             raise ValueError(
                 translate("GwcTabMixin", "'{}' is cached already.").format(name)
             )
+        return name, self._gwc_xml_with_values(
+            _NEW_LAYER_XML.format(name=escape(name)), values
+        )
+
+    def _create_gwc_layer_from_values(self, values):
+        """Start caching the layer the form names. Raises when it is cached already."""
+        name, document = self._check_new_gwc_layer(values)
         # TODO(#50): publish_gwc_layer() PUTs a JSON template GeoWebCache reads
         # as a degraded configuration: no formats, 0×0 meta-tiles, a single
         # gridset, no STYLES filter, after a needless configuration reload.
         # Workaround: PUT the XML document GeoServer itself would write.
-        self._put_gwc_xml(
-            name,
-            self._gwc_xml_with_values(_NEW_LAYER_XML.format(name=escape(name)), values),
-        )
+        self._put_gwc_xml(name, document)
 
     def _put_gwc_xml(self, name, document):
         """PUT one cached layer's XML document: the only write GWC takes whole."""
@@ -552,10 +559,15 @@ class GwcTabMixin:
         combination per request. It wants `text/xml`: `application/xml`, which
         the layer PUTs take, is a 400 "Format extension unknown" here.
         """
+        # Bytes: a str body is encoded by the HTTP stack, as Latin-1 on an
+        # older urllib3, which garbles or refuses a name outside it.
+        document = (
+            f"<truncateLayer><layerName>{escape(name)}</layerName></truncateLayer>"
+        )
         self._raw_rest(
             "post",
             f"{self._gwc_base()}/masstruncate",
-            data=f"<truncateLayer><layerName>{escape(name)}</layerName></truncateLayer>",
+            data=document.encode("utf-8"),
             headers={"Content-Type": "text/xml"},
         )
 
@@ -800,6 +812,9 @@ class GwcTabMixin:
             },
             parent=self,
             ok_label=translate("GwcTabMixin", "Create"),
+            # A refusal (a zoom range with one end, a layer cached meanwhile)
+            # stays in the form, with the rest of what was typed.
+            validate=self._form_check(self._check_new_gwc_layer),
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -994,7 +1009,15 @@ class GwcTabMixin:
         def load():
             current = self._gwc_form_values(self._gwc_layer_xml(name))
             # Each gridset's CRS: an area picked on the map is sent in it.
-            crs = {row[0]: self._gridset_crs(row[0]) for row in current["gridsets"]}
+            # One GET per gridset, in parallel; any failure fails the load.
+            names = [row[0] for row in current["gridsets"]]
+            crs = {}
+            for gridset, (result, error) in zip(
+                names, self._fan_out(self._gridset_crs, names)
+            ):
+                if error is not None:
+                    raise error
+                crs[gridset] = result
             return current, crs
 
         fetched = self._fetch(
@@ -1083,10 +1106,7 @@ class GwcTabMixin:
             parent=self,
         )
         dlg.hide_save_button()
-        stop = dlg._button_box.addButton(
-            translate("GwcTabMixin", "Stop all"),
-            QDialogButtonBox.ButtonRole.ActionRole,
-        )
+        stop = dlg.add_button(translate("GwcTabMixin", "Stop all"))
         failure = translate("GwcTabMixin", "Failed to read the tasks")
         closed = []
 

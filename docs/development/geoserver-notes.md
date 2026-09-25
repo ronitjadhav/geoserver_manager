@@ -30,8 +30,8 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
 - The client strips trailing `/` from the URL itself. It has no timeout parameter at all
   (`TIMEOUT = 120` is a module constant and `RestClient.get` takes no `timeout`), which is why
   `toolbelt/probe.py` uses `requests` directly: a dead host must cost 10 s, not two minutes (row 20 of
-  #50). The Server tab's log view does too (`_log_tail`, row 60): it streams the file and keeps only its end,
-  where the library's client reads a body whole. `verifytls` is the *Verify the server's TLS certificate* setting (default on);
+  #50). The Server tab's log view does too (`_log_tail`, row 60): it streams the file, keeps only its end
+  and stops between two chunks on Cancel, where the library's client reads a body whole. `verifytls` is the *Verify the server's TLS certificate* setting (default on);
   it catches `requests.exceptions.SSLError` before `OSError` so a private-CA server is reported as a
   certificate problem, not as "is the server running?".
 - **Layers of every type** (rows 39, 48 and 49 of #50): `GET /rest/layers.json` is the one list where vector, raster and cascaded layers

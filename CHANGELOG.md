@@ -392,6 +392,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **Server tab:** cancelling the wait on a save, a catalog reload or a reset
+  now says the change may still apply and reloads the tab; it was silent, and
+  the row kept its old summary.
+- **Tile cache:** a refused *Add a Layer to the Cache* form (a zoom range with
+  one end, filters that are not XML, a layer cached meanwhile) stays open with
+  what was typed, as the edit form does.
+- Cancelling *Show the log* stops the download; the whole file kept streaming
+  in the background.
+- The seed form reads its gridsets' definitions in parallel.
+- Tile cache truncation sends its request as UTF-8 bytes, so a layer name
+  outside Latin-1 cannot be garbled by the HTTP stack.
 - **A save abandoned at the waiting box holds off Refresh and the profile
   switch until it ends.** Its remaining requests read the connection, so a
   switch meanwhile sent the rest of the save to the other server.
