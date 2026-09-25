@@ -546,10 +546,6 @@ class TestDelete(unittest.TestCase):
         self.assertEqual(values["layers"], "-")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestNamesInPaths(unittest.TestCase):
     """Security: a name is refused before it reaches a request, and one that
     the server already holds is quoted on its way into a path."""
@@ -623,3 +619,7 @@ class TestLayersViewerIsAViewer(unittest.TestCase):
         self.assertEqual(
             [c for c in gs.calls if c[0] in ("DELETE", "delete_wms_layer")], []
         )
+
+
+if __name__ == "__main__":
+    unittest.main()

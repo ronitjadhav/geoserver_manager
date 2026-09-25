@@ -12,7 +12,7 @@ layer's other styles need. This widget does that, on a `QTableWidget`, with the
 plugin's own icons, recoloured with the theme like every other.
 """
 
-from qgis.PyQt.QtCore import QCoreApplication, QEvent, Qt, pyqtSignal
+from qgis.PyQt.QtCore import QCoreApplication, QEvent, Qt
 from qgis.PyQt.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -61,8 +61,6 @@ class ListTable(QWidget):
         A group may hold a layer twice (with two styles), a cache a gridset
         once: GeoWebCache kept the first and dropped the other silently.
     """
-
-    changed = pyqtSignal()
 
     def __init__(
         self,
@@ -186,7 +184,6 @@ class ListTable(QWidget):
                 if spec.get("placeholder"):  # what a blank cell means
                     cell.lineEdit().setPlaceholderText(spec["placeholder"])
                 cell.setEnabled(not self._read_only)
-                cell.currentTextChanged.connect(self.changed)
                 self.table.setCellWidget(index, column, cell)
             elif kind == "spin":
                 cell = QSpinBox()
@@ -196,13 +193,11 @@ class ListTable(QWidget):
                 cell.setSpecialValueText(spec.get("none_text", "-"))
                 cell.setValue(cell.minimum() if value is None else int(value))
                 cell.setReadOnly(self._read_only)
-                cell.valueChanged.connect(self.changed)
                 self.table.setCellWidget(index, column, cell)
             else:
                 self.table.setItem(
                     index, column, QTableWidgetItem("" if value is None else str(value))
                 )
-        self.changed.emit()
 
     def _cell(self, index, column):
         widget = self.table.cellWidget(index, column)
@@ -240,7 +235,6 @@ class ListTable(QWidget):
         index = self._selected()
         if index is not None:
             self.table.removeRow(index)
-            self.changed.emit()
 
     def _up(self):
         self._move(-1)

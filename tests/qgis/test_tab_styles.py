@@ -578,13 +578,6 @@ class TestSaveStyleToDisk(unittest.TestCase):
 
 
 # ############################################################################
-# ####### Stand-alone run ########
-# ################################
-if __name__ == "__main__":
-    unittest.main()
-
-
-# ############################################################################
 # ###### Legend preview ##########
 # ################################
 
@@ -977,3 +970,10 @@ class TestRenameCopyAndUsage(unittest.TestCase):
         self.assertIn("ne:broken (could not be read", users[2])
         self.assertEqual(users[3], "tasmania (layer group)")
         self.assertEqual(len(users), 4)
+
+
+# ############################################################################
+# ####### Stand-alone run ########
+# ################################
+if __name__ == "__main__":
+    unittest.main()

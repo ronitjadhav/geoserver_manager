@@ -625,10 +625,6 @@ class TestActions(unittest.TestCase):
         self.assertEqual(form._button_box.button(ok).text(), "Save")  # an edit
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestNamesInPaths(unittest.TestCase):
     def setUp(self):
         self.dlg = SyncDialog()
@@ -796,3 +792,7 @@ class TestSeed(unittest.TestCase):
         self.assertEqual(
             dlg._read_seed_tasks(Client(), "/gwc/rest/seed/x.json"), "HTTP 500: boom"
         )
+
+
+if __name__ == "__main__":
+    unittest.main()

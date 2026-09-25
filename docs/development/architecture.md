@@ -75,7 +75,7 @@ what the code cannot tell you. Python 3.12 (QGIS 3.40 and newer), PyQt5
   | `_form_check(check) -> validate` | a form's `validate`: `check(values)` behind the waiting box, on Save, before the form closes, so a refusal (a taken name) keeps what was typed. `check` only reads (`_check_new_datastore`, `_check_new_workspace`...); the save runs after the form closed and checks again. A pure check (group rows, a tile cache edit) is passed as `validate` directly |
   | `_wait_for_save(fn) -> value` | a save's requests under `_run_action`. A Cancel cannot stop a request already sent: the save still lands, so the banner says it may, and the tab reloads once it ends |
   | `_check((content, status))` | unwrap a geoservercloud tuple; raises on ≥ 400 |
-  | `_fetch_list(api_method, *args)` | a list endpoint; `[]` when the payload is not a list |
+  | `_fetch_list(api_method, *args)` | a list endpoint; raises when the payload is not a list (a sign-in page), which must not render as an empty table |
   | `_resource_exists(getter, *args)` | pre-check before *Add* (the library upserts) |
   | `_raw_rest(method, path, **kw)` | endpoints the library lacks; raises with GeoServer's response body |
   | `_name_of(item)` | the name of a list entry (dict or str) |

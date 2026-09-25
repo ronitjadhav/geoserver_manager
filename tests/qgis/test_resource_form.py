@@ -147,13 +147,6 @@ class TestReadOnlyAndWideFields(unittest.TestCase):
         self.assertEqual(dlg.get_values(), {"pw": "secret", "f": "/tmp/a.sld"})
 
 
-# ############################################################################
-# ####### Stand-alone run ########
-# ################################
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestResourceFormHeight(unittest.TestCase):
     """The form opens tall enough for its wrapped text."""
 
@@ -663,3 +656,10 @@ class TestLongTextOpensAtItsStart(unittest.TestCase):
         self.assertEqual(dlg.get_widget("url").cursorPosition(), 0)
         dlg.set_values({"url": "http://other.example.org/" + "y" * 300})
         self.assertEqual(dlg.get_widget("url").cursorPosition(), 0)
+
+
+# ############################################################################
+# ####### Stand-alone run ########
+# ################################
+if __name__ == "__main__":
+    unittest.main()

@@ -26,7 +26,8 @@ The Layers tab of a connected dialog.
 
 Working with a list:
 
-- **Search** filters every column. Press Ctrl+F to jump there and Esc to clear.
+- **Search** filters the list by any column loaded so far (see
+  [Good to know](#good-to-know)). Press Ctrl+F to jump there and Esc to clear.
   Enter goes from the search box to the results.
 - **Sort** by clicking a column header. Click again to reverse it.
 - **Open** a resource by clicking its name, or by selecting the row and

@@ -805,7 +805,7 @@ class TestPublish(unittest.TestCase):
                         "epsg": bad,
                         "title": "",
                         "abstract": "",
-                        "keywords": "",
+                        "keywords": [],
                     }
                 )
         self.dlg._publish_table(
@@ -816,7 +816,7 @@ class TestPublish(unittest.TestCase):
                 "epsg": "EPSG:3857",  # tolerated, the number is what counts
                 "title": "",
                 "abstract": "",
-                "keywords": "",
+                "keywords": [],
             }
         )
         self.assertEqual(self.dlg.gs.created[-1]["srs"], "EPSG:3857")
@@ -830,7 +830,7 @@ class TestPublish(unittest.TestCase):
                 "epsg": 2056,
                 "title": "Demo",
                 "abstract": "",
-                "keywords": "a, b,, c ",
+                "keywords": ["a", "b", "", "c "],
             }
         )
         sent = self.dlg.gs.created[0]
@@ -852,7 +852,7 @@ class TestPublish(unittest.TestCase):
                 "epsg": 25832,
                 "title": "",
                 "abstract": "",
-                "keywords": "",
+                "keywords": [],
             }
         )
         sent = self.dlg.gs.created[0]
@@ -1076,7 +1076,7 @@ class TestEditLayer(unittest.TestCase):
         "name": "roads",
         "title": "Roads",
         "abstract": "",
-        "keywords": "a, b",
+        "keywords": ["a", "b"],
         "srs": "EPSG:4326",
         "projection_policy": "FORCE_DECLARED",
         "enabled": True,
@@ -1092,7 +1092,7 @@ class TestEditLayer(unittest.TestCase):
     def test_an_untouched_form_sends_nothing(self):
         self.assertEqual(self.changes(), (None, False))
         # the same keywords written differently are the same keywords
-        self.assertEqual(self.changes(keywords="a,b "), (None, False))
+        self.assertEqual(self.changes(keywords=["a", "b "]), (None, False))
 
     def test_only_what_changed_goes_out_in_geoservers_spelling(self):
         body, recalc = self.changes(
@@ -1110,7 +1110,7 @@ class TestEditLayer(unittest.TestCase):
         self.assertFalse(recalc)
 
     def test_emptied_keywords_are_sent_empty_which_clears_them(self):
-        body, _ = self.changes(keywords="")
+        body, _ = self.changes(keywords=[])
         self.assertEqual(body, {"keywords": {"string": []}})
 
     def test_a_new_srs_is_normalised_and_recomputes_the_bounds(self):
@@ -1809,7 +1809,7 @@ class TestPublishQgisLayer(unittest.TestCase):
             "with_style": False,
             "title": "",
             "abstract": "",
-            "keywords": "",
+            "keywords": [],
         }
         base.update(overrides)
         return base
@@ -1860,7 +1860,9 @@ class TestPublishQgisLayer(unittest.TestCase):
     def test_metadata_is_merged_onto_what_geoserver_computed(self):
         self.add_layer()
         self.dlg._publish_qgis_layer(
-            self.values(title="Roads", abstract="Main roads", keywords="roads, 2024")
+            self.values(
+                title="Roads", abstract="Main roads", keywords=["roads", "2024"]
+            )
         )
         feature_type_puts = [
             call for call in self.sent("PUT") if "featuretypes" in call[1]
@@ -1996,7 +1998,7 @@ class TestVectorUploadRunsInATask(unittest.TestCase):
                 "with_style": False,
                 "title": "",
                 "abstract": "",
-                "keywords": "",
+                "keywords": [],
             }
         )
         self.assertIsNotNone(self.dlg._upload)  # the upload slot, not a load
@@ -2065,13 +2067,6 @@ class TestPublishForm(unittest.TestCase):
             form, form.get_widget("qgis_layer").currentLayer()
         )
         self.assertEqual(form.get_widget("name").text(), "my_choice")
-
-
-# ############################################################################
-# ####### Stand-alone run ########
-# ################################
-if __name__ == "__main__":
-    unittest.main()
 
 
 # ############################################################################
@@ -2217,3 +2212,10 @@ class TestPreviewInBrowser(unittest.TestCase):
         # the in-QGIS preview first, the browser one right after it
         self.assertEqual(labels[:3], ["Add to QGIS", "Preview", "Preview in a browser"])
         self.assertIn("log in", dlg._row_actions[2][3])
+
+
+# ############################################################################
+# ####### Stand-alone run ########
+# ################################
+if __name__ == "__main__":
+    unittest.main()

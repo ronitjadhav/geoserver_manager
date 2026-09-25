@@ -64,16 +64,18 @@ Field options:
                   the dialog open and says so, like a missing required field
     - crs (bool): a "text" field holding an SRS code, with a button that
                   looks one up in QGIS's CRS picker
-    - default: default value
+    - echo_password (bool): a "text" field for a password: QGIS's password
+                  box, hidden, with its eye to show what was typed
+    - default: default value (an "extent" always starts not set)
     - help (str): hint text shown below the widget
     - placeholder (str): placeholder text for text/textarea
-    - options (list[str]): choices for "combo"
+    - options (list): choices for "combo": strings, or (label, value)
     - min/max (int): range for "spinbox"
     - read_only (bool): disable editing
     - group (str): optional tab group name; fields with the same group
       appear under one tab; ungrouped fields go to the first tab
-    - on_change (callable): for "combo" fields, called with (new_value)
-      when the selection changes
+    - on_change (callable): called with the new value when a "combo" (its
+      value, not its label) or a "layer" (the layer) changes
     - visible (bool): initial visibility (default True)
     - max_height / min_height (int): a "textarea", "list", "keyvalue" or
       "table"'s height bounds. A textarea is at most 120 px by default, a
@@ -735,7 +737,8 @@ class ResourceFormDialog(QDialog):
         label.setToolTip(text)
 
     def set_values(self, values):
-        """Fill text fields after the form opened: a viewer's picked entry."""
+        """Fill fields after the form opened: text, code, a list, a table, a
+        key/value table, or a combo by its value (a viewer's picked entry)."""
         for key, value in values.items():
             widget = self._widgets[key]
             if isinstance(widget, QPlainTextEdit):

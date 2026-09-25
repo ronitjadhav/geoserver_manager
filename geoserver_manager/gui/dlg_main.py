@@ -674,9 +674,10 @@ class GeoServerMainDialog(
     ):
         """Park a _FetchTask in `slot` and start it.
 
-        The slots are "_task" (loads), "_upload", "_delete" and "_side".
+        The slots are "_task" (loads), "_upload", "_delete", "_side" (a
+        form's legend) and "_detail" (a page's detail cells).
 
-        The two slots never cancel each other. `finished` comes back on the
+        One slot's task never cancels another's. `finished` comes back on the
         GUI thread: a cancel (the user's, a superseding load's, or our own
         abort raised inside the worker) goes to on_cancel, an exception is
         reported, anything else is on_success(result). `on_done(outcome)`
@@ -1568,7 +1569,11 @@ class GeoServerMainDialog(
             for column in self._detail_columns:
                 item = self.resultsTable.item(index, column)
                 if item is not None and column < len(row):
-                    item.setText(self._cell_label(column, row[column]))
+                    text = self._cell_label(column, row[column])
+                    item.setText(text)
+                    # As _show_page does: a gridset list cut by its column
+                    # had no hover text when it landed here.
+                    item.setToolTip(text if len(text) > _ELIDED_AFTER else "")
 
     def _fill_details(self, rows):
         """Fetch the pending detail cells of these rows in the background.
@@ -1607,7 +1612,7 @@ class GeoServerMainDialog(
     def _complete_rows(self, rows):
         """Fetch the pending cells of these rows now, waiting. False on failure.
 
-        What a row action, a sort on a detail column or a search needs: the
+        What a row action or a sort on a detail column needs: the
         row's full values, not the marker.
         """
         todo = [row for row in rows if self._pending(row)]

@@ -44,14 +44,8 @@ def keyword_list(value):
 
 
 def words(value):
-    """A form's list field as clean strings: a list, or comma or line text.
-
-    The forms edit keywords and SRS lists in a list widget now; the text
-    form stays readable here because the publish paths are fed by several
-    forms and the layer tree.
-    """
-    if isinstance(value, str):
-        value = value.replace("\n", ",").split(",")
+    """A form's list field (keywords, an SRS list) as clean strings: each
+    trimmed, blanks dropped. None or "" is no word at all."""
     return [str(item).strip() for item in (value or ()) if str(item).strip()]
 
 

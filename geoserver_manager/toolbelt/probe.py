@@ -6,8 +6,9 @@ One bounded request that says whether a GeoServer REST API answers here.
 Used by the main dialog before its first table, and by the Settings page's
 *Test connection* button, with the fields as typed, saved or not.
 
-TODO(#50): the one request in the plugin that does not go through the
-library. `RestClient` hardcodes `timeout=TIMEOUT` (120 s) and takes no
+TODO(#50): one of the two requests in the plugin that do not go through the
+library (the other streams the server log, see tab_server._log_tail).
+`RestClient` hardcodes `timeout=TIMEOUT` (120 s) and takes no
 timeout argument, and this is the request the user waits for, so it uses
 `requests` directly with PROBE_TIMEOUT: a dead host must cost 10 s, not two
 minutes.

@@ -392,6 +392,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **Saving a layer group's layers is faster:** the plugin reads the members'
+  bounds in parallel, instead of two requests one after another per member.
+- Long cells (a layer's gridsets) keep their full text on hover once the page
+  fills them, and the search box is described as it works: it matches the
+  columns loaded so far.
 - **A refused form keeps what was typed.** A name that is taken, a layer or
   style not on the server, a zoom range with one end, filters that are not
   XML or an SRS that is not an EPSG code were refused after the form
@@ -451,8 +456,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   dialog made smaller, now scrolls. Before, the help text overlapped the
   next field, and a tall form could not shrink to fit a laptop screen. A
   bigger dialog now gives the extra height to its tables and lists, not to
-  a blank area below them. A datastore's Connection tab no longer opens on
-  a blank band left by the other types' hidden fields. A long layer or
+  a blank area below them. A datastore form no longer opens on a blank
+  band left by the other types' hidden fields. A long layer or
   style name no longer widens the whole form. At the window's minimum
   width, the tab list on the left no longer gets a horizontal scroll bar.
 - A save that did its first step and failed a later one (a workspace

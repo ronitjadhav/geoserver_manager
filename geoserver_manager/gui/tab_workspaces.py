@@ -261,14 +261,6 @@ class WorkspaceTabMixin:
         payload = self._raw_rest("get", self._wms_settings_path(workspace_name)).json()
         return payload.get("wms") or {}
 
-    @staticmethod
-    def _joined(value):
-        """A GeoServer string list ({"string": [...]}, or a bare value) as text."""
-        items = value.get("string") if isinstance(value, dict) else value
-        if isinstance(items, (str, int)):
-            items = [items]
-        return ", ".join(str(item) for item in (items or []))
-
     @classmethod
     def _wms_form_values(cls, settings, overall=None):
         """Prefill for the WMS group; settings is None for "no own settings".
@@ -295,10 +287,6 @@ class WorkspaceTabMixin:
         for field in self._wms_fields()[1:]:
             dlg.set_field_visible(field["key"], own)
 
-    @staticmethod
-    def _split(value):
-        return words(value)
-
     def _apply_wms_settings(self, workspace_name, values, existed):
         """Create, update or remove one workspace's own WMS settings.
 
@@ -322,8 +310,8 @@ class WorkspaceTabMixin:
             "enabled": values["wms_enabled"],
             "title": values["wms_title"],
             _ABSTRACT: values["wms_abstract"],
-            "keywords": {"string": self._split(values["wms_keywords"])},
-            "srs": {"string": self._split(values["wms_srs"])},
+            "keywords": {"string": words(values["wms_keywords"])},
+            "srs": {"string": words(values["wms_srs"])},
             "maxRenderingTime": values["wms_max_rendering_time"],
             "maxRenderingErrors": values["wms_max_rendering_errors"],
             # Empty, never null: GeoServer's LocaleConverter throws an NPE on
@@ -450,7 +438,7 @@ class WorkspaceTabMixin:
             "enabled": values[f"{service}_enabled"],
             "title": values[f"{service}_title"],
             _ABSTRACT: values[f"{service}_abstract"],
-            "keywords": {"string": self._split(values[f"{service}_keywords"])},
+            "keywords": {"string": words(values[f"{service}_keywords"])},
         }
         if service == "wfs":
             settings["maxFeatures"] = values["wfs_max_features"]
@@ -616,6 +604,8 @@ class WorkspaceTabMixin:
                     service: self._service_settings(service, old_name)
                     for service in OTHER_SERVICES
                 },
+                # TODO(#50): the global service settings are out of the
+                # library's reach, as on the Server tab (row 60).
                 self._raw_rest(
                     "get",
                     f"{self.gs.rest_service.rest_endpoints.base_url}"

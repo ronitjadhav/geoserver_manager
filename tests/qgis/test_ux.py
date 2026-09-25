@@ -256,10 +256,6 @@ class TestRememberedTab(unittest.TestCase):
         self.assertEqual(dlg.plg_settings.stored["last_tab"], 2)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 # ############################################################################
 # ##### Labels and empty states ##
 # ################################
@@ -645,3 +641,7 @@ class TestEnterInTheSearchBox(unittest.TestCase):
         QApplication.processEvents()
         self.assertEqual(opened, [])
         self.assertIs(dlg.focusWidget(), dlg.resultsTable)
+
+
+if __name__ == "__main__":
+    unittest.main()

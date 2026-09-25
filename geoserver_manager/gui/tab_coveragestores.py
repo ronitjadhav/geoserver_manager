@@ -797,14 +797,7 @@ class CoverageStoreTabMixin:
         for key in _TYPED_KEYS:
             dlg.set_field_visible(key, key in wanted)
         if store_type == QGIS_RASTER:
-            self._prefill_store_name(dlg, dlg.get_widget("qgis_layer").currentLayer())
-
-    @staticmethod
-    def _prefill_store_name(dlg, layer):
-        """Suggest the GeoServer-safe form of the picked layer's name."""
-        widget = dlg.get_widget("name")
-        if layer is not None and not widget.text().strip():
-            widget.setText(geoserver_name(layer.name()))
+            self._prefill_publish_name(dlg, dlg.get_widget("qgis_layer").currentLayer())
 
     def _add_coverage_store(self):
         """Create a coverage store."""
@@ -842,7 +835,7 @@ class CoverageStoreTabMixin:
             "type", lambda store_type: self._on_store_type_changed(dlg, store_type)
         )
         dlg.get_widget("qgis_layer").layerChanged.connect(
-            lambda layer: self._prefill_store_name(dlg, layer)
+            lambda layer: self._prefill_publish_name(dlg, layer)
         )
         self._on_store_type_changed(dlg, GEOTIFF)
         if dlg.exec() != QDialog.DialogCode.Accepted:

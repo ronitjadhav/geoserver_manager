@@ -202,8 +202,8 @@ class TestApplyWmsSettings(unittest.TestCase):
             "wms_enabled": True,
             "wms_title": "Topp WMS",
             "wms_abstract": "Per-workspace service",
-            "wms_keywords": "topp, wms",
-            "wms_srs": "4326, 3857",
+            "wms_keywords": ["topp", "wms"],
+            "wms_srs": ["4326", "3857"],
             "wms_max_rendering_time": 60,
             "wms_max_rendering_errors": 1000,
             "wms_default_locale": "en",
@@ -232,7 +232,7 @@ class TestApplyWmsSettings(unittest.TestCase):
 
     def test_an_empty_list_field_clears_it(self):
         self.dlg._apply_wms_settings(
-            "topp", self.base_values(wms_srs="", wms_keywords=" , "), existed=True
+            "topp", self.base_values(wms_srs=[], wms_keywords=[" ", ""]), existed=True
         )
         wms = self.sent("PUT")[0][2]["json"]["wms"]
         self.assertEqual(wms["srs"], {"string": []})
@@ -324,13 +324,6 @@ class TestWorkspaceDialog(unittest.TestCase):
         self.assertFalse(form.get_widget("set_default").isEnabled())
 
 
-# ############################################################################
-# ####### Stand-alone run ########
-# ################################
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestNamespaceAndOtherServices(unittest.TestCase):
     """Measured on 2.28.5: per-workspace WFS/WCS/WMTS settings behave like
     WMS (404 without, PUT creates or merges, DELETE falls back), and a PUT of
@@ -377,7 +370,7 @@ class TestNamespaceAndOtherServices(unittest.TestCase):
                     f"{service}_enabled": True,
                     f"{service}_title": "",
                     f"{service}_abstract": "",
-                    f"{service}_keywords": "",
+                    f"{service}_keywords": [],
                 }
             )
         values["wfs_max_features"] = 0
@@ -387,7 +380,9 @@ class TestNamespaceAndOtherServices(unittest.TestCase):
         )
 
     def test_ticking_own_puts_them_and_unticking_deletes_them(self):
-        self.save("topp", {}, wcs_own=True, wcs_title="Coverages", wcs_keywords="a, b")
+        self.save(
+            "topp", {}, wcs_own=True, wcs_title="Coverages", wcs_keywords=["a", "b"]
+        )
         (put,) = [c for c in self.calls("PUT") if "/services/" in c[1]]
         self.assertEqual(put[1], "/rest/services/wcs/workspaces/topp/settings.json")
         self.assertEqual(put[2]["json"]["wcs"]["title"], "Coverages")
@@ -407,3 +402,10 @@ class TestNamespaceAndOtherServices(unittest.TestCase):
         self.assertEqual(
             put[2]["json"], {"namespace": {"uri": "http://example.org/ne"}}
         )
+
+
+# ############################################################################
+# ####### Stand-alone run ########
+# ################################
+if __name__ == "__main__":
+    unittest.main()

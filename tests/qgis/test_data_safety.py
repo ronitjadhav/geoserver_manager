@@ -87,6 +87,20 @@ class FakeGS:
                 return path in existing
 
         self.rest_service = Rest()
+        self._documents, self._existing = documents, existing
+
+    def _store(self, collection, wrapper, workspace_name, name):
+        # As the library answers: the store's own fields, type included.
+        path = f"/rest/workspaces/{workspace_name}/{collection}/{name}.json"
+        if path not in self._existing:
+            return ("not found", 404)
+        return ((self._documents.get(path) or {}).get(wrapper, {}), 200)
+
+    def get_datastore(self, workspace_name, name):
+        return self._store("datastores", "dataStore", workspace_name, name)
+
+    def get_coverage_store(self, workspace_name, name):
+        return self._store("coveragestores", "coverageStore", workspace_name, name)
 
 
 class TestLayerStylesAsGeoServerWritesThem(unittest.TestCase):
@@ -206,10 +220,6 @@ class TestPublishLandsOnItsOwnLayer(unittest.TestCase):
             dlg._refuse_layer_clash("topp", "roads", True, "data", "GeoPackage")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestAnUntouchedSaveChangesNothing(unittest.TestCase):
     """Values a form cannot show exactly were rewritten by an unrelated Save."""
 
@@ -261,3 +271,7 @@ class TestAnUntouchedSaveChangesNothing(unittest.TestCase):
         self.assertEqual(values["wms_title"], "Global")
         self.assertEqual(values["wms_max_rendering_time"], 60)
         self.assertEqual(values["wms_max_rendering_errors"], 1000)
+
+
+if __name__ == "__main__":
+    unittest.main()

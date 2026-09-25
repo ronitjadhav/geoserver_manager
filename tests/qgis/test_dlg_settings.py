@@ -176,10 +176,6 @@ class TestApplyWarnsAndStillSaves(unittest.TestCase):
         )
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestProfiles(unittest.TestCase):
     """Several saved connections on the settings page (#47)."""
 
@@ -451,3 +447,7 @@ class TestTestConnection(unittest.TestCase):
             self.page.btn_test_connection.click()
         self.assertEqual(self.page.plg_settings.saved, [])
         self.assertEqual(self.page.plg_settings.settings.saved_credentials, [])
+
+
+if __name__ == "__main__":
+    unittest.main()
