@@ -392,6 +392,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **Editing a layer group waits for GeoServer instead of freezing QGIS:** the
+  form's checks (each style, the root layer) ran on the interface thread on
+  Save. A Cancel while saving now says the change may still land, and the
+  list reloads once it does.
+- A layer group's edit lists only its own workspace's groups, and a create
+  fetches each style and the workspace list once; the form's checks ran three
+  times per create.
+- Recomputing a group's bounds no longer reads the QGIS project from the
+  background thread.
 - **Server tab:** cancelling the wait on a save, a catalog reload or a reset
   now says the change may still apply and reloads the tab; it was silent, and
   the row kept its old summary.

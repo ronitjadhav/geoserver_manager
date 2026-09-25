@@ -12,6 +12,7 @@ from urllib.parse import quote
 from qgis.core import (
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
+    QgsCoordinateTransformContext,
     QgsProject,
     QgsRectangle,
 )
@@ -139,14 +140,30 @@ class LayerGroupTabMixin:
 
     def _fetch_layer_group_rows(self, task=None):
         """(rows, failures) for the Layer Groups table. Runs in a worker thread."""
+        groups, failures = self._group_names(self._get_workspace_names(), task)
+        # Mode and size are only in the group itself: one GET per group, for
+        # the page shown (#58). A group that cannot be read keeps its row.
+        rows = [[name, ws_label, PENDING, PENDING] for name, ws_label in groups]
+        return rows, failures
+
+    def _group_names(self, workspace_names, task=None):
+        """The global groups, then these workspaces', as (name, workspace label).
+
+        One listing per workspace, in parallel; a workspace that cannot be
+        listed is a failure beside the names, not the end of the listing.
+        Raises on an HTTP error of the global list. Runs in a worker thread.
+        """
         groups = [(name, GLOBAL) for name in self._global_group_names()]
         failures = []
-        ws_names = self._get_workspace_names()
         for ws_name, (names, error) in zip(
-            ws_names,
+            workspace_names,
             self._fan_out(
-                lambda ws: self._fetch_list(self.gs.get_layer_groups, ws),
-                ws_names,
+                # The library interpolates the name into the path as it is, so
+                # "a#b" would list "a": hand it the quoted segment.
+                lambda ws: self._fetch_list(
+                    self.gs.get_layer_groups, quote(ws, safe="")
+                ),
+                workspace_names,
                 task,
             ),
         ):
@@ -154,11 +171,7 @@ class LayerGroupTabMixin:
                 failures.append((ws_name, error))
                 continue
             groups.extend((self._name_of(group), ws_name) for group in names)
-
-        # Mode and size are only in the group itself: one GET per group, for
-        # the page shown (#58). A group that cannot be read keeps its row.
-        rows = [[name, ws_label, PENDING, PENDING] for name, ws_label in groups]
-        return rows, failures
+        return groups, failures
 
     def _global_group_names(self):
         """Names of the layer groups that live outside any workspace.
@@ -261,12 +274,17 @@ class LayerGroupTabMixin:
     def _show_layer_group_info(self, row_data):
         """Open a layer group to edit it."""
         name, workspace_label = row_data[0], row_data[1]
+        workspace_name = scope(workspace_label)
         fetched = self._fetch(
             lambda: (
-                self._group_detail(name, scope(workspace_label)),
+                self._group_detail(name, workspace_name),
                 self._all_layer_names(),
-                self._all_group_names(),
-                self._style_choices(scope(workspace_label)),
+                # A workspace group holds its own workspace's groups only, and
+                # the global ones: no need to list every other workspace.
+                self._all_group_names(
+                    [workspace_name] if workspace_name else self._get_workspace_names()
+                ),
+                self._style_choices(workspace_name),
             ),
             translate("LayerGroupTabMixin", "Failed to load layer group '{}'").format(
                 name
@@ -276,7 +294,7 @@ class LayerGroupTabMixin:
             return
         detail, layer_names, group_names, style_names = fetched
         before = self._group_form_values(detail, name, workspace_label)
-        own = f"{scope(workspace_label)}:{name}" if scope(workspace_label) else name
+        own = f"{workspace_name}:{name}" if workspace_name else name
 
         dlg = ResourceFormDialog(
             title=translate("LayerGroupTabMixin", "Layer Group '{}'").format(name),
@@ -288,18 +306,20 @@ class LayerGroupTabMixin:
             fields=self._group_fields(
                 [workspace_label],
                 self._same_workspace(
-                    scope(workspace_label),
+                    workspace_name,
                     layer_names + [group for group in group_names if group != own],
                 ),
-                self._same_workspace(scope(workspace_label), layer_names),
+                self._same_workspace(workspace_name, layer_names),
                 edit_mode=True,
                 styles=style_names,
             ),
             values=before,
             parent=self,
             ok_label=translate("LayerGroupTabMixin", "Save"),
-            validate=lambda after: self._check_group_rows(
-                after, scope(workspace_label), layer_names, group_names
+            validate=self._form_check(
+                lambda after: self._check_group_rows(
+                    after, workspace_name, layer_names, group_names
+                )
             ),
         )
         self._wire_group_form(dlg)
@@ -327,15 +347,30 @@ class LayerGroupTabMixin:
             return
 
         after = dlg.get_values()
-        saved = self._fetch(
-            lambda: self._save_layer_group(
-                name, scope(workspace_label), before, after, layer_names, group_names
-            ),
-            translate("LayerGroupTabMixin", "Failed to update layer group '{}'").format(
-                name
-            ),
-        )
-        if saved:
+        # Read here: the save runs in a worker, and the project is the GUI's.
+        context = QgsProject.instance().transformContext()
+        saved = []
+        if (
+            self._run_action(
+                lambda: saved.append(
+                    self._wait_for_save(
+                        lambda: self._save_layer_group(
+                            name,
+                            workspace_name,
+                            before,
+                            after,
+                            layer_names,
+                            group_names,
+                            context,
+                        )
+                    )
+                ),
+                translate(
+                    "LayerGroupTabMixin", "Failed to update layer group '{}'"
+                ).format(name),
+            )
+            and saved[0]
+        ):
             self.show_success_message(
                 translate("LayerGroupTabMixin", "Layer group '{}' saved.").format(name)
             )
@@ -364,9 +399,12 @@ class LayerGroupTabMixin:
         return body, before_layers != after_layers
 
     def _save_layer_group(
-        self, name, workspace_name, before, after, known_layers, known_groups
+        self, name, workspace_name, before, after, known_layers, known_groups, context
     ):
         """PUT what changed. False when nothing did. Runs in a worker thread.
+
+        :param context: the project's transform context, read on the GUI
+            thread, for the bounds.
 
         TODO(#50): no update_layer_group() in the library (row 57). GeoServer
         merges a partial PUT, but a new layer list needs a style per entry,
@@ -381,7 +419,7 @@ class LayerGroupTabMixin:
             body["publishables"] = {"published": published}
             # A new list with fewer styles than entries is refused.
             body["styles"] = {"style": [{"name": s} if s else "" for s in styles]}
-            body["bounds"] = self._group_bounds(published)
+            body["bounds"] = self._group_bounds(published, context)
         if mode == "EO" and (
             layers_changed
             or "mode" in body
@@ -478,12 +516,14 @@ class LayerGroupTabMixin:
             "rootLayerStyle": {"name": style},
         }
 
-    def _group_bounds(self, published):
+    def _group_bounds(self, published, context):
         """The union of the publishables' extents, in EPSG:4326.
 
         GeoServer computes it on a create but never on a PUT (a new layer list
         keeps the old box, and "bounds": null stores a zero one). Layers give
-        their lon/lat box; a nested group gives its own, in any CRS.
+        their lon/lat box; a nested group gives its own, in any CRS, which
+        `context`, the project's transform context, reprojects. Runs in a
+        worker thread, which is why the context comes from the caller.
         """
         wgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
 
@@ -499,7 +539,7 @@ class LayerGroupTabMixin:
         for box, error in self._fan_out(box_of, published):
             if error is not None:
                 raise error
-            rect = self._box_in(box or {}, wgs84)
+            rect = self._box_in(box or {}, wgs84, context)
             if rect is None:
                 continue
             if total is None:
@@ -543,8 +583,13 @@ class LayerGroupTabMixin:
         return body.get("latLonBoundingBox")
 
     @staticmethod
-    def _box_in(box, target):
-        """A GeoServer bbox as a QgsRectangle in the target CRS; None if empty."""
+    def _box_in(box, target, context=None):
+        """A GeoServer bbox as a QgsRectangle in the target CRS; None if empty.
+
+        Never reads the project itself: this runs in a worker for a save, and
+        the project belongs to the GUI thread. The caller passes its
+        transform context; without one, the transform has no overrides.
+        """
         try:
             rect = QgsRectangle(
                 float(box["minx"]),
@@ -562,7 +607,7 @@ class LayerGroupTabMixin:
         if not source.isValid() or source == target:
             return rect
         return QgsCoordinateTransform(
-            source, target, QgsProject.instance()
+            source, target, context or QgsCoordinateTransformContext()
         ).transformBoundingBox(rect)
 
     # -- Create ----------------------------------------------------------------
@@ -708,35 +753,30 @@ class LayerGroupTabMixin:
         dlg.on_value_changed("mode", show_root)
         show_root(dlg.get_values()["mode"])
 
-    def _all_group_names(self):
+    def _all_group_names(self, workspace_names=None):
         """Every group's name as a publishable spells it: bare when global,
-        "workspace:group" otherwise. Raises on HTTP errors."""
-        names = list(self._global_group_names())
-        workspaces = self._get_workspace_names()
-        # One workspace that cannot be listed (a name like "w#x") used to fail
-        # Create and Edit for every group; now it only loses its own groups.
-        for ws_name, (groups, error) in zip(
-            workspaces,
-            self._fan_out(
-                lambda ws: self._fetch_list(
-                    self.gs.get_layer_groups, quote(ws, safe="")
-                ),
-                workspaces,
-            ),
-        ):
-            if error is None:
-                names.extend(f"{ws_name}:{self._name_of(group)}" for group in groups)
-        return names
+        "workspace:group" in these workspaces (every workspace when None). A
+        workspace that cannot be listed only loses its own groups. Raises on
+        HTTP errors."""
+        if workspace_names is None:
+            workspace_names = self._get_workspace_names()
+        groups, _failures = self._group_names(workspace_names)
+        return [name if ws == GLOBAL else f"{ws}:{name}" for name, ws in groups]
 
     def _add_layer_group(self):
         """Create a layer group from picked or pasted layer names."""
-        fetched = self._fetch(
-            lambda: (
-                self._get_workspace_names(),
+
+        def load():
+            workspace_names = self._get_workspace_names()
+            return (
+                workspace_names,
                 self._all_layer_names(),
-                self._all_group_names(),
+                self._all_group_names(workspace_names),
                 self._style_choices(None),
-            ),
+            )
+
+        fetched = self._fetch(
+            load,
             translate("LayerGroupTabMixin", "Failed to load the workspaces and layers"),
         )
         if fetched is None:
@@ -824,25 +864,33 @@ class LayerGroupTabMixin:
                 )
 
     def _check_group_rows(self, values, workspace_name, known_layers, known_groups):
-        """Refuse layer rows GeoServer would drop or refuse. Pure: the form
-        runs it before it closes."""
+        """Refuse layer rows GeoServer would drop or refuse. Reads only (one
+        GET per style, and the root layer's): the form runs it behind the
+        waiting box before it closes."""
         self._group_publishables(
             values["layers"], workspace_name, known_layers, known_groups
         )
         if values["mode"] == "EO":
             self._eo_root(values, known_layers)
 
-    def _check_new_layer_group(self, values, known_layers, known_groups):
-        """The rows, a name a URL would eat, a name taken. Reads only."""
+    def _check_group_name(self, values):
+        """Refuse a name a URL would eat, or one that is taken. Reads only."""
         name, workspace_name = values["name"], scope(values["workspace"])
         self._require_safe_name(name)
-        self._check_group_rows(values, workspace_name, known_layers, known_groups)
         if self.gs.rest_service.resource_exists(self._group_path(name, workspace_name)):
             raise ValueError(
                 translate(
                     "LayerGroupTabMixin", "Layer group '{}' already exists in {}."
                 ).format(name, workspace_name or global_label())
             )
+
+    def _check_new_layer_group(self, values, known_layers, known_groups):
+        """What the Create form is refused for, before it closes: the name,
+        then the rows."""
+        self._check_group_name(values)
+        self._check_group_rows(
+            values, scope(values["workspace"]), known_layers, known_groups
+        )
 
     def _create_layer_group_from_values(
         self, values, known_layers=None, known_groups=()
@@ -863,7 +911,8 @@ class LayerGroupTabMixin:
         """
         name = values["name"]
         workspace_name = scope(values["workspace"])
-        self._check_new_layer_group(values, known_layers, known_groups)
+        self._check_group_name(values)
+        # The rows once: building the publishables is the check itself.
         published, styles = self._group_publishables(
             values["layers"], workspace_name, known_layers, known_groups
         )
@@ -932,7 +981,9 @@ class LayerGroupTabMixin:
         if detail is None:
             return
         rect = self._box_in(
-            detail.get("bounds") or {}, QgsCoordinateReferenceSystem("EPSG:4326")
+            detail.get("bounds") or {},
+            QgsCoordinateReferenceSystem("EPSG:4326"),
+            QgsProject.instance().transformContext(),
         )
         bbox = (
             (rect.xMinimum(), rect.yMinimum(), rect.xMaximum(), rect.yMaximum())

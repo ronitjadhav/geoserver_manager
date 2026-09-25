@@ -12,6 +12,7 @@ Usage from the repo root folder:
 import json
 from unittest.mock import patch
 
+from qgis.core import QgsCoordinateTransformContext
 from qgis.PyQt.QtWidgets import QDialog
 from qgis.testing import start_app, unittest
 
@@ -248,6 +249,16 @@ class TestLayerGroupsTab(unittest.TestCase):
         self.assertEqual(len(self.warnings), 1)
         self.assertIn("topp", self.warnings[0])
 
+    def test_a_workspace_name_is_quoted_for_the_library(self):
+        """The library interpolates the name into the path as it is, so the
+        listing of "w#x" asked for "w"; the pickers already quoted it."""
+        asked = []
+        self.dlg.gs.get_workspaces = lambda: ([{"name": "w#x"}], 200)
+        self.dlg.gs.get_layer_groups = lambda ws: (asked.append(ws), ([], 200))[1]
+        _rows, failures = self.dlg._fetch_layer_group_rows()
+        self.assertEqual(asked, ["w%23x"])
+        self.assertEqual(failures, [])
+
 
 class TestGroupDetail(unittest.TestCase):
     """The detail view reads what GeoServer actually stores."""
@@ -311,6 +322,31 @@ class TestGroupDetail(unittest.TestCase):
         self.assertFalse(form.get_widget("mode").isEnabled())
         self.assertIn("root_layer", form.get_values())
 
+    def test_a_workspace_group_lists_only_its_own_workspace(self):
+        """Every workspace's groups were listed, then all but one dropped."""
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        asked = []
+        real = dlg.gs.get_layer_groups
+        dlg.gs.get_layer_groups = lambda ws: (asked.append(ws), real(ws))[1]
+        with patch.object(tab_layergroups, "ResourceFormDialog", Recording):
+            dlg._show_layer_group_info(["roads_group", "topp"])
+        self.assertEqual(asked, ["topp"])
+
+    def test_the_edit_form_checks_its_rows_behind_the_waiting_box(self):
+        """The row check GETs each style. Run on the GUI thread on Save, a
+        hung server froze QGIS for the library's timeout."""
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        waited = []
+        dlg._wait_for = lambda fn, **kwargs: (waited.append(kwargs), fn())[1]
+        with patch.object(tab_layergroups, "ResourceFormDialog", Recording):
+            dlg._show_layer_group_info(["eo_group", GLOBAL])
+        form = Recording.opened[-1]
+        waited.clear()
+        form._validate(form.get_values())
+        self.assertEqual(len(waited), 1)
+
 
 class TestCreateLayerGroup(unittest.TestCase):
     def setUp(self):
@@ -319,6 +355,31 @@ class TestCreateLayerGroup(unittest.TestCase):
 
     def posted(self):
         return [call for call in self.dlg.gs.calls if call[0] == "POST"]
+
+    def test_a_create_checks_each_style_once(self):
+        """The form's check ran again inside the save, and the save then built
+        the publishables, which checks again: three GETs per style."""
+        self.dlg._create_layer_group_from_values(
+            {
+                "name": "g",
+                "workspace": GLOBAL,
+                "mode": "SINGLE",
+                "layers": rows("topp:tasmania_roads = simple_roads"),
+            },
+            ["topp:tasmania_roads"],
+            ["tasmania"],
+        )
+        checks = [c for c in self.dlg.gs.calls if c[0] == "get_style_definition"]
+        self.assertEqual(checks, [("get_style_definition", "simple_roads", None)])
+        self.assertEqual(len(self.posted()), 1)
+
+    def test_the_create_form_lists_the_workspaces_once(self):
+        asked = []
+        real = self.dlg.gs.get_workspaces
+        self.dlg.gs.get_workspaces = lambda: (asked.append(1), real())[1]
+        with patch.object(tab_layergroups, "ResourceFormDialog", Recording):
+            self.dlg._add_layer_group()
+        self.assertEqual(asked, [1])
 
     def test_global_group_payload(self):
         self.dlg._create_layer_group_from_values(
@@ -498,13 +559,21 @@ class TestEditLayerGroup(unittest.TestCase):
             TASMANIA, "tasmania", GLOBAL
         )
 
+    CONTEXT = QgsCoordinateTransformContext()
+
     def save(self, **changes):
         after = dict(self.before, **changes)
         with patch.object(
             LayerGroupTabMixin, "_group_bounds", return_value={"crs": "EPSG:4326"}
         ) as bounds:
             saved = self.dlg._save_layer_group(
-                "tasmania", None, self.before, after, self.LAYERS, self.GROUPS
+                "tasmania",
+                None,
+                self.before,
+                after,
+                self.LAYERS,
+                self.GROUPS,
+                self.CONTEXT,
             )
         puts = [call for call in self.dlg.gs.calls if call[0] == "PUT"]
         return saved, puts, bounds
@@ -537,6 +606,56 @@ class TestEditLayerGroup(unittest.TestCase):
         self.assertEqual(group["styles"], {"style": ["", ""]})
         self.assertEqual(group["bounds"], {"crs": "EPSG:4326"})
         bounds.assert_called_once()
+        # The project's transform context, read on the GUI thread, travels
+        # with the save: the worker must not read the project itself.
+        self.assertIs(bounds.call_args.args[1], self.CONTEXT)
+
+    def test_saving_from_the_form_is_a_write_that_reloads(self):
+        """The PUT ran under the read helper: a Cancel on the waiting box was
+        silent and nothing reloaded, while the request still landed."""
+        waited, banners, loads = [], [], []
+        self.dlg._wait_for = lambda fn, write=False, stop=None: (
+            waited.append(write),
+            fn(),
+        )[1]
+        self.dlg.show_success_message = banners.append
+        self.dlg._load_layer_groups = lambda: loads.append(1)
+
+        class Saving(ResourceFormDialog):
+            def exec(self):
+                self.get_widget("title").setText("Tassie")
+                return QDialog.DialogCode.Accepted
+
+        with patch.object(tab_layergroups, "ResourceFormDialog", Saving):
+            self.dlg._show_layer_group_info(["tasmania", GLOBAL])
+        puts = [call for call in self.dlg.gs.calls if call[0] == "PUT"]
+        self.assertEqual(puts[0][2]["json"], {"layerGroup": {"title": "Tassie"}})
+        self.assertTrue(waited[-1], "the save is a write: a Cancel says so")
+        self.assertEqual(banners, ["Layer group 'tasmania' saved."])
+        self.assertEqual(loads, [1])
+
+    def test_bounds_never_read_the_project_from_the_worker(self):
+        """QgsProject.instance() belongs to the GUI thread; the save that
+        recomputes the bounds runs in a worker, with the context it was given."""
+
+        class NoProject:
+            @staticmethod
+            def instance():
+                raise AssertionError("the project was read from the worker")
+
+        with patch.object(tab_layergroups, "QgsProject", NoProject):
+            rect = LayerGroupTabMixin._box_in(
+                {
+                    "minx": 589425.9,
+                    "maxx": 609518.7,
+                    "miny": 4913959.2,
+                    "maxy": 4928082.9,
+                    "crs": "EPSG:26713",
+                },
+                tab_layergroups.QgsCoordinateReferenceSystem("EPSG:4326"),
+                self.CONTEXT,
+            )
+        self.assertAlmostEqual(rect.xMinimum(), -103.87, places=1)
 
     def test_an_unknown_name_is_refused_since_geoserver_drops_it(self):
         with self.assertRaises(ValueError) as caught:
