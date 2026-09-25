@@ -1165,14 +1165,17 @@ class GeoServerMainDialog(
 
     def _on_header_clicked(self, column):
         """Sort the rows by this column; a second click reverses the order."""
-        is_actions = self._row_actions and column == self.resultsTable.columnCount() - 1
+        if self._row_actions and column == self.resultsTable.columnCount() - 1:
+            # Not sortable: put the indicator back where _sort says, after Qt
+            # moved it to the section clicked, and stay on this page.
+            self._show_sort_indicator()
+            return
         if column in self._detail_columns and not self._complete_rows(
             self._filtered_rows
         ):
             return  # sorting on a column needs every row's value
-        if not is_actions:
-            same = self._sort is not None and self._sort[0] == column
-            self._sort = (column, same and not self._sort[1])
+        same = self._sort is not None and self._sort[0] == column
+        self._sort = (column, same and not self._sort[1])
         # Re-rendering also puts the indicator back where _sort says, after Qt
         # moved it to the section that was clicked.
         self._apply_filter()

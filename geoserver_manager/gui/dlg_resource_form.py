@@ -208,13 +208,6 @@ class ResourceFormDialog(QDialog):
             is taken): after the form closed, the input was lost.
         """
         super().__init__(parent)
-        # Freed once closed: a child of the main dialog, every form opened
-        # stayed alive for the whole QGIS session, its layer combos still
-        # listening to the project. Safe because no caller touches its form
-        # after a nested event loop (a wait, a question), which is where Qt
-        # runs the deletion; the late landings (a legend, a task list) check
-        # sip.isdeleted first.
-        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.setWindowTitle(title)
 
         self._fields = fields
@@ -648,7 +641,9 @@ class ResourceFormDialog(QDialog):
             if ftype == "image":
                 continue  # a picture, not a value
             if ftype == "text":
-                result[key] = widget.text().strip()
+                # A password goes as typed: a space at its edge is part of it.
+                text = widget.text()
+                result[key] = text if field.get("echo_password") else text.strip()
             elif ftype == "checkbox":
                 result[key] = widget.isChecked()
             elif ftype == "combo":
@@ -850,6 +845,22 @@ class ResourceFormDialog(QDialog):
             wraps = max(max(form.heightForWidth(width), 0) for form in forms)
             needed += max(wraps - hinted, 0)
         return needed
+
+    def exec(self):
+        """Run the form modally, then free it once its caller is done.
+
+        Not WA_DeleteOnClose: QDialog.exec() deletes such a dialog before it
+        returns, and the get_values() every caller runs next read a dead
+        widget. deleteLater() runs once control is back in the event loop,
+        after the caller's waits and questions. Without either, every form
+        opened stayed alive for the whole QGIS session, its layer combos
+        still following the project. The late landings (a legend, a task
+        list) check sip.isdeleted first.
+        """
+        try:
+            return super().exec()
+        finally:
+            self.deleteLater()
 
     def keyPressEvent(self, event):  # noqa: N802 (Qt's own spelling)
         if event.key() == Qt.Key.Key_Escape:

@@ -66,6 +66,17 @@ class TestTableState(unittest.TestCase):
         self.assertEqual(self.dlg._current_page, 0)
         self.assertEqual(self.dlg._total_pages, 1)
 
+    def test_a_click_on_the_actions_header_keeps_the_page(self):
+        """The Actions column is not sortable: a click there re-rendered the
+        page anyway, which went back to the first one."""
+        self.dlg._row_actions = [("delete", "Delete", lambda row: None)]
+        self.dlg._page_next()
+
+        self.dlg._on_header_clicked(1)
+
+        self.assertEqual(self.dlg._current_page, 1)
+        self.assertIsNone(self.dlg._sort)
+
     def test_failed_load_cannot_repaint_previous_rows(self):
         """A loader arms the new tab's callbacks and headers, then fetches. If
         that fetch raises, the previous resource type's rows must be gone -
