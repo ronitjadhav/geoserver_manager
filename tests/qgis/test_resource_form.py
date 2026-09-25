@@ -584,28 +584,6 @@ class TestEscapeAsksFirst(unittest.TestCase):
         self.assertEqual(asked, [])
 
 
-class TestClosedFormsAreFreed(unittest.TestCase):
-    def test_a_closed_form_is_deleted_with_its_widgets(self):
-        # A child of the main dialog, every form stayed alive for the whole
-        # QGIS session, its layer combos listening to the project.
-        from qgis.PyQt import sip
-        from qgis.PyQt.QtCore import QCoreApplication, QEvent
-        from qgis.PyQt.QtWidgets import QWidget
-
-        parent = QWidget()
-        self.addCleanup(parent.deleteLater)
-        dlg = ResourceFormDialog(
-            title="t",
-            fields=[{"key": "layer", "label": "L", "type": "layer"}],
-            parent=parent,
-        )
-        dlg.show()
-        dlg.done(0)
-        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
-        self.assertTrue(sip.isdeleted(dlg))
-        self.assertEqual(parent.findChildren(ResourceFormDialog), [])
-
-
 class TestCrsPicker(unittest.TestCase):
     def test_the_button_fills_the_code_from_qgis_crs_picker(self):
         from unittest.mock import patch
@@ -678,6 +656,79 @@ class TestLongTextOpensAtItsStart(unittest.TestCase):
         self.assertEqual(dlg.get_widget("url").cursorPosition(), 0)
         dlg.set_values({"url": "http://other.example.org/" + "y" * 300})
         self.assertEqual(dlg.get_widget("url").cursorPosition(), 0)
+
+
+class TestFormLifetime(unittest.TestCase):
+    """A form is freed once its caller is done with it, and not before.
+
+    QDialog.exec() deletes a WA_DeleteOnClose dialog before it returns, so
+    the get_values() that every caller runs next read a dead widget. The
+    form frees itself with deleteLater() instead, which runs once control
+    is back in the event loop: after the caller's waits and questions.
+    """
+
+    def test_values_are_readable_after_exec_and_the_form_is_freed_later(self):
+        from qgis.PyQt import sip
+        from qgis.PyQt.QtCore import QEventLoop, QTimer
+        from qgis.PyQt.QtWidgets import QApplication, QWidget
+
+        # A child of the main dialog, with a layer combo that follows the
+        # project: what stayed alive for the whole QGIS session.
+        parent = QWidget()
+        self.addCleanup(parent.deleteLater)
+        dlg = ResourceFormDialog(
+            title="t",
+            fields=[
+                {"key": "name", "label": "Name", "type": "text"},
+                {"key": "layer", "label": "L", "type": "layer", "allow_empty": True},
+            ],
+            values={"name": "typed"},
+            parent=parent,
+        )
+        seen = []
+        loop = QEventLoop()
+
+        def read():
+            try:
+                return dlg.get_values()["name"]
+            except RuntimeError as error:  # a dead widget: the test fails
+                return str(error)
+
+        def caller():  # as a button's handler: inside event delivery
+            try:
+                QTimer.singleShot(0, dlg.accept)
+                dlg.exec()
+                seen.append(read())
+                QApplication.processEvents()  # what a wait for GeoServer does
+                seen.append(read())
+                seen.append(sip.isdeleted(dlg))
+            finally:
+                loop.quit()
+
+        QTimer.singleShot(0, caller)
+        loop.exec()
+        QApplication.processEvents()
+
+        self.assertEqual(seen, ["typed", "typed", False])
+        self.assertTrue(sip.isdeleted(dlg))
+        self.assertEqual(parent.findChildren(ResourceFormDialog), [])
+
+    def test_a_password_keeps_its_edge_spaces(self):
+        dlg = ResourceFormDialog(
+            title="t",
+            fields=[
+                {"key": "user", "label": "User", "type": "text"},
+                {
+                    "key": "password",
+                    "label": "Password",
+                    "type": "text",
+                    "echo_password": True,
+                },
+            ],
+        )
+        dlg.get_widget("user").setText(" admin ")
+        dlg.get_widget("password").setText(" s3cret ")
+        self.assertEqual(dlg.get_values(), {"user": "admin", "password": " s3cret "})
 
 
 # ############################################################################

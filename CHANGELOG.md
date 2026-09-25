@@ -392,6 +392,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- Clicking the Actions header keeps the page shown; it went back to the
+  first one.
+- A password keeps the spaces at its edges; every text field's were
+  trimmed, a password's included.
 - **A PostGIS, JNDI or PMTiles store gets its workspace's namespace.** In a
   workspace with its own namespace URI, the store was created serving
   `http://{workspace}` instead.
