@@ -208,6 +208,13 @@ class ResourceFormDialog(QDialog):
             is taken): after the form closed, the input was lost.
         """
         super().__init__(parent)
+        # Freed once closed: a child of the main dialog, every form opened
+        # stayed alive for the whole QGIS session, its layer combos still
+        # listening to the project. Safe because no caller touches its form
+        # after a nested event loop (a wait, a question), which is where Qt
+        # runs the deletion; the late landings (a legend, a task list) check
+        # sip.isdeleted first.
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.setWindowTitle(title)
 
         self._fields = fields

@@ -98,6 +98,59 @@ class TestAddFormChecksFirst(unittest.TestCase):
         self.assertEqual(dlg.gs.created, [])
 
 
+class TestNamespaceFollowsTheWorkspace(unittest.TestCase):
+    """The library's PostGIS, JNDI and PMTiles creates send
+    namespace=http://{ws}: a workspace with its own URI got a store serving
+    another namespace (measured on 2.28.5, review 2026-09-24)."""
+
+    def setUp(self):
+        created, saved = [], []
+
+        class GS:
+            def get_datastore(inner, ws, name):
+                if not created:
+                    return ("not found", 404)
+                return (
+                    {
+                        "type": "PostGIS",
+                        "enabled": True,
+                        "description": "d",
+                        "connectionParameters": {
+                            "entry": {"passwd": "crypt1:x", "namespace": f"http://{ws}"}
+                        },
+                    },
+                    200,
+                )
+
+            def create_pg_datastore(inner, **kwargs):
+                created.append(kwargs)
+                return ("", 201)
+
+            def create_datastore(inner, **kwargs):
+                saved.append(kwargs)
+                return ("", 200)
+
+        self.dlg = SyncDialog()
+        self.dlg.gs = GS()
+        self.saved = saved
+        self.values = dict(PG_VALUES, name="pg_new", workspace="topp")
+
+    def test_a_workspace_with_its_own_uri_gets_it_on_the_store(self):
+        self.dlg._namespace_uri = lambda ws: "http://example.org/topp"
+        self.dlg._create_datastore_from_values(self.values)
+        (save,) = self.saved
+        self.assertEqual(
+            save["connection_parameters"]["namespace"], "http://example.org/topp"
+        )
+        self.assertEqual(save["connection_parameters"]["passwd"], "crypt1:x")
+        self.assertEqual(save["description"], "d")
+
+    def test_nothing_more_is_sent_when_the_uri_already_matches(self):
+        self.dlg._namespace_uri = lambda ws: f"http://{ws}"
+        self.dlg._create_datastore_from_values(self.values)
+        self.assertEqual(self.saved, [])
+
+
 class TestDatastoreEdit(unittest.TestCase):
     def setUp(self):
         self.dlg = SyncDialog()
