@@ -686,7 +686,9 @@ class GeoServerMainDialog(
         abort raised inside the worker) goes to on_cancel, an exception is
         reported, anything else is on_success(result). `on_done(outcome)`
         then runs once, with "done", "failed" or "cancelled", which is how a
-        batch of uploads knows when to start the next one.
+        batch of uploads knows when to start the next one; a task landing
+        after the dialog closed gets "cancelled", so the batch stops there
+        and says what it did not start.
         """
 
         def finished(task, ok, result, error):
@@ -723,6 +725,8 @@ class GeoServerMainDialog(
                         ),
                         log_level=Qgis.MessageLevel.Warning,
                     )
+                if on_done is not None:
+                    on_done("cancelled")  # a batch stops, and says so
                 return
             if not quiet:
                 self._set_loading(self._loading())

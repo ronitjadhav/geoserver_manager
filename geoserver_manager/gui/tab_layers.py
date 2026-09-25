@@ -34,6 +34,7 @@ from geoserver_manager.toolbelt.qgis_export import (
     reprojection_target,
     require_crs,
 )
+from geoserver_manager.toolbelt.rest import Abandoned
 from geoserver_manager.toolbelt.sld import (
     layer_to_sld,
     styleable_project_layers,
@@ -236,28 +237,21 @@ class LayerTabMixin:
         )
 
     def _refuse_vector_clash(self, ws_name, name, values):
-        """Refuse a vector upload onto a store or layer it would not own."""
-        if not values.get("replace"):
-            for exists, message in (
-                (
-                    self._resource_exists(self.gs.get_datastore, ws_name, name),
-                    translate(
-                        "LayerTabMixin", "Datastore '{}' already exists in '{}'."
-                    ),
-                ),
-                (
-                    self._resource_exists(
-                        self.gs.get_feature_type, ws_name, name, name
-                    ),
-                    translate("LayerTabMixin", "Layer '{}' already exists in '{}'."),
-                ),
-            ):
-                if exists:
-                    raise ValueError(
-                        message.format(name, ws_name)
-                        + " "
-                        + translate("LayerTabMixin", "Tick Replace to overwrite it.")
-                    )
+        """Refuse a vector upload onto a store or layer it would not own.
+
+        The store first, then the layer: a layer of the name in another
+        store is what _refuse_layer_clash catches.
+        """
+        if not values.get("replace") and self._resource_exists(
+            self.gs.get_datastore, ws_name, name
+        ):
+            raise ValueError(
+                translate(
+                    "LayerTabMixin", "Datastore '{}' already exists in '{}'."
+                ).format(name, ws_name)
+                + " "
+                + translate("LayerTabMixin", "Tick Replace to overwrite it.")
+            )
         self._refuse_layer_clash(
             ws_name, name, values.get("replace"), "data", "GeoPackage"
         )
@@ -343,12 +337,21 @@ class LayerTabMixin:
         return unquote(match.group(1)) if match else None
 
     def _wmts_store_of(self, workspace_name, layer_name):
-        """The WMTS store holding this cascaded layer, or None (helpers of the
-        Cascaded Stores tab, reached through the shared dialog class)."""
-        for store, kind in self._cascaded_store_names(workspace_name):
-            if kind == WMTS and layer_name in self._cascaded_layer_names(
-                workspace_name, store, kind
-            ):
+        """The WMTS store holding this cascaded layer, or None.
+
+        The workspace's WMTS stores only: the Cascaded Stores tab's listing
+        GETs the WMS stores too, which this never reads. Their layers come
+        from that tab's helper, reached through the shared dialog class.
+        TODO(#50): upstream as get_wmts_stores(ws); the library lists no
+        cascaded store.
+        """
+        endpoints = self.gs.rest_service.rest_endpoints
+        payload = self._raw_rest(
+            "get", endpoints.wmtsstores(quote(workspace_name, safe=""))
+        ).json()
+        for store in self._unwrap(payload, "wmtsStores", "wmtsStore"):
+            store = self._name_of(store)
+            if layer_name in self._cascaded_layer_names(workspace_name, store, WMTS):
                 return store
         return None
 
@@ -536,6 +539,15 @@ class LayerTabMixin:
             )
         return fields
 
+    @staticmethod
+    def _unreadable(name):
+        """What a row action says of a row whose details could not be read
+        when the page filled: its type is unknown, not unsupported."""
+        return translate(
+            "LayerTabMixin",
+            "The details of '{}' could not be read. Refresh the list, then try again.",
+        ).format(name)
+
     def _layer_resource(self, row_data):
         """The resource behind a layer row, as GeoServer stores it: a feature
         type, a coverage or a cascaded layer, by the row's type and store."""
@@ -547,15 +559,7 @@ class LayerTabMixin:
         if kind in (WMS, WMTS):
             return self._cascaded_layer_detail(ws_name, store, kind, name)
         if kind == "-":
-            # Its details could not be read when the page filled: the type
-            # is unknown, not unsupported.
-            raise ValueError(
-                translate(
-                    "LayerTabMixin",
-                    "The details of '{}' could not be read. Refresh the list, "
-                    "then try again.",
-                ).format(name)
-            )
+            raise ValueError(self._unreadable(name))
         raise ValueError(
             translate("LayerTabMixin", "Unsupported layer type '{}'").format(kind)
         )
@@ -698,14 +702,8 @@ class LayerTabMixin:
         runs it before it closes, the save again."""
         if "name" in body:
             self._require_safe_name(body["name"])
-            base = self.gs.rest_service.rest_endpoints.base_url
             qualified = "{}:{}".format(ws_name, body["name"])
-            taken = f"{base}/layers/{quote(qualified, safe=':')}.json"
-            try:
-                self._raw_rest("get", taken)
-            except RuntimeError:
-                pass  # free (404)
-            else:
+            if self.gs.rest_service.resource_exists(self._layers_url(qualified)):
                 raise ValueError(
                     translate(
                         "LayerTabMixin", "Layer '{}' already exists in '{}'."
@@ -749,6 +747,9 @@ class LayerTabMixin:
         ?recalculate=nativebbox,latlonbbox (both measured on 2.28.5).
         """
         name, ws_name, kind, store = row_data[0], row_data[1], row_data[2], row_data[3]
+        if kind == "-":
+            self.show_warning_message(self._unreadable(name))
+            return
         if kind not in (VECTOR, RASTER):
             self.show_warning_message(
                 translate(
@@ -948,6 +949,8 @@ class LayerTabMixin:
             self._on_publish_layer_picked(
                 dlg, dlg.get_widget("qgis_layer").currentLayer()
             )
+        else:
+            self._refill_publish_combos(dlg)
 
     def _on_publish_layer_picked(self, dlg, layer):
         """Suggest the name, and hide what a raster ignores (its symbology)."""
@@ -969,8 +972,12 @@ class LayerTabMixin:
         """Cascade: workspace -> its datastores -> the store's unpublished tables.
 
         A fetch that fails leaves its combo empty (and logs why); the required
-        check then stops Save with the empty combo highlighted.
+        check then stops Save with the empty combo highlighted. The QGIS
+        source never reads these combos, so a workspace change there costs
+        nothing; switching back to the table source fills them.
         """
+        if dlg.get_values().get("source") == _SOURCE_QGIS:
+            return
         ws_combo = dlg.get_widget("workspace")
         ds_combo = dlg.get_widget("datastore")
         table_combo = dlg.get_widget("table")
@@ -997,18 +1004,15 @@ class LayerTabMixin:
             except Exception as e:
                 self.log(f"Could not list tables of {workspace}/{datastore}: {e}")
 
-    def _publish_layer(self, layer=None):
-        """Open the publish form: pick workspace, datastore and table.
-
-        :param layer: a project layer to preselect as the source, which is how
-            the layer tree's *Publish to GeoServer* entry opens this form.
-        """
+    def _publish_workspaces(self):
+        """The workspaces a publish form offers, or None once a failure or an
+        empty server is reported."""
         workspace_names = self._fetch(
             self._get_workspace_names,
             translate("LayerTabMixin", "Failed to load the workspaces"),
         )
         if workspace_names is None:
-            return
+            return None
         if not workspace_names:
             self.show_warning_message(
                 translate(
@@ -1016,6 +1020,24 @@ class LayerTabMixin:
                     "No workspaces available. Create a workspace first.",
                 )
             )
+            return None
+        return workspace_names
+
+    def _check_publish_form(self, values):
+        """What publishing a table would be refused for, before the form
+        closes: a bad EPSG code, a layer that exists. Reads only; the QGIS
+        source is checked by its own publish, after the export."""
+        if values.get("source") == _SOURCE_TABLE:
+            self._check_publish_table(values)
+
+    def _publish_layer(self, layer=None):
+        """Open the publish form: pick workspace, datastore and table.
+
+        :param layer: a project layer to preselect as the source, which is how
+            the layer tree's *Publish to GeoServer* entry opens this form.
+        """
+        workspace_names = self._publish_workspaces()
+        if workspace_names is None:
             return
 
         dlg = ResourceFormDialog(
@@ -1029,6 +1051,7 @@ class LayerTabMixin:
             fields=self._publish_fields(workspace_names),
             parent=self,
             ok_label=translate("LayerTabMixin", "Publish"),
+            validate=self._form_check(self._check_publish_form),
         )
         dlg.get_widget("workspace").currentTextChanged.connect(
             lambda ws: self._refill_publish_combos(dlg, workspace=ws)
@@ -1042,13 +1065,14 @@ class LayerTabMixin:
         dlg.get_widget("qgis_layer").layerChanged.connect(
             lambda layer: self._on_publish_layer_picked(dlg, layer)
         )
-        self._refill_publish_combos(dlg)
-        self._on_publish_source_changed(dlg, _SOURCE_TABLE)
         if layer is not None:
             # The layer first: switching the source prefills the name from
-            # whichever layer the combo shows at that moment.
+            # whichever layer the combo shows at that moment. The table
+            # source's combos are not filled: that source is not shown.
             dlg.get_widget("qgis_layer").setLayer(layer)
             dlg.set_values({"source": _SOURCE_QGIS})
+        else:
+            self._on_publish_source_changed(dlg, _SOURCE_TABLE)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
@@ -1098,19 +1122,8 @@ class LayerTabMixin:
             return
         if not self._upload_slot_free():
             return
-        workspace_names = self._fetch(
-            self._get_workspace_names,
-            translate("LayerTabMixin", "Failed to load the workspaces"),
-        )
+        workspace_names = self._publish_workspaces()
         if workspace_names is None:
-            return
-        if not workspace_names:
-            self.show_warning_message(
-                translate(
-                    "LayerTabMixin",
-                    "No workspaces available. Create a workspace first.",
-                )
-            )
             return
         fields = [
             dict(field, visible=True)
@@ -1168,7 +1181,11 @@ class LayerTabMixin:
                         ", ".join(left)
                     )
                 )
-            self.show_warning_message(" ".join(parts))
+            text = " ".join(parts)
+            self.show_warning_message(text)
+            if stopped:
+                # The dialog may be closed by now: the log is what is seen.
+                self.log(text, log_level=Qgis.MessageLevel.Warning)
 
         def next_layer():
             if not queue:
@@ -1184,23 +1201,35 @@ class LayerTabMixin:
                 (published if outcome == "done" else failed).append(name)
                 next_layer()
 
-            started = []
-            self._run_action(
-                lambda: started.append(
-                    self._publish_qgis_layer(
-                        {
-                            "workspace": values["workspace"],
-                            "name": layer.name(),
-                            "replace": values.get("replace"),
-                            "with_style": values.get("with_style"),
-                        },
-                        layer=layer,
-                        on_done=done,
+            started, stopped = [], []
+
+            def start():
+                try:
+                    started.append(
+                        self._publish_qgis_layer(
+                            {
+                                "workspace": values["workspace"],
+                                "name": layer.name(),
+                                "replace": values.get("replace"),
+                                "with_style": values.get("with_style"),
+                            },
+                            layer=layer,
+                            on_done=done,
+                        )
                     )
-                ),
-                translate("LayerTabMixin", "Failed to publish '{}'").format(name),
+                except Abandoned:
+                    # Cancel on the waiting box, during the layer's checks:
+                    # the same word as Cancel on the upload, the same end.
+                    stopped.append(name)
+                    raise
+
+            self._run_action(
+                start, translate("LayerTabMixin", "Failed to publish '{}'").format(name)
             )
-            if started != [True]:
+            if stopped:
+                queue.insert(0, (layer, name))
+                summary(stopped=True)
+            elif started != [True]:
                 failed.append(name)
                 next_layer()
 
@@ -1276,15 +1305,9 @@ class LayerTabMixin:
         failure = translate("LayerTabMixin", "Failed to publish '{}'").format(name)
 
         def published(_result):
-            if self.gs is None:  # a Refresh dropped the client meanwhile
-                self.show_warning_message(
-                    translate(
-                        "LayerTabMixin",
-                        "Layer '{}' uploaded. Reconnect to finish its metadata "
-                        "and style.",
-                    ).format(name)
-                )
-                return
+            # self.gs is still the client the upload used: a Refresh and a
+            # profile switch are refused while an upload runs.
+            kept = []
 
             def server_side():
                 # Best effort: the data is published at this point, so a
@@ -1301,8 +1324,10 @@ class LayerTabMixin:
 
             def finish():
                 self._wait_for_save(server_side)  # requests, off the GUI thread
-                if sld is not None:
-                    self._push_qgis_style(name, ws_name, sld, name, True)
+                if sld is not None and not self._push_qgis_style(
+                    name, ws_name, sld, name, True
+                ):
+                    kept.append(name)  # a style of the name exists, kept as it is
 
             done = translate(
                 "LayerTabMixin",
@@ -1310,9 +1335,19 @@ class LayerTabMixin:
                 "could not be set",
             ).format(name)
             if self._run_action(lambda: self._partly_saved(finish, done), failure):
-                self.show_success_message(
-                    translate("LayerTabMixin", "Layer '{}' published.").format(name)
-                )
+                if kept:
+                    # Not assigned either: it may not be this layer's style.
+                    self.show_warning_message(
+                        translate(
+                            "LayerTabMixin",
+                            "Layer '{}' published. Style '{}' already existed and "
+                            "was left as it is, not assigned to the layer.",
+                        ).format(name, name)
+                    )
+                else:
+                    self.show_success_message(
+                        translate("LayerTabMixin", "Layer '{}' published.").format(name)
+                    )
             # The user may have moved to another tab while it uploaded.
             self._reload_current_tab()
 
@@ -1382,8 +1417,10 @@ class LayerTabMixin:
         )
         self._raw_rest("put", path, json={"featureType": metadata})
 
-    def _publish_table(self, values):
-        """Publish one table as a feature type through the library."""
+    def _check_publish_table(self, values):
+        """Refuse, before any write, a table publish GeoServer would take badly;
+        returns the EPSG code as a number. Reads only: the form runs it before
+        it closes, the publish again."""
         ws_name, ds_name, table = (
             values["workspace"],
             values["datastore"],
@@ -1404,6 +1441,16 @@ class LayerTabMixin:
                     "The SRS must be an EPSG code number, such as 3857 or 4326.",
                 )
             )
+        return int(epsg)
+
+    def _publish_table(self, values):
+        """Publish one table as a feature type through the library."""
+        ws_name, ds_name, table = (
+            values["workspace"],
+            values["datastore"],
+            values["table"],
+        )
+        epsg = self._check_publish_table(values)
         keywords = words(values.get("keywords"))
         # TODO(#50): the facade's create_feature_type(epsg=...) fills both
         # bounding boxes from utils.EPSG_BBOX, which knows 2056, 4326 and 3857
@@ -1420,7 +1467,7 @@ class LayerTabMixin:
                     native_name=table,
                     workspace_name=ws_name,
                     store_name=ds_name,
-                    srs=f"EPSG:{int(epsg)}",
+                    srs=f"EPSG:{epsg}",
                     projection_policy="FORCE_DECLARED",
                     title=values.get("title") or None,
                     abstract=values.get("abstract") or None,
@@ -1469,10 +1516,9 @@ class LayerTabMixin:
         """Pick the default style of one layer, and the other styles it offers.
 
         The other styles are what a client may ask for with STYLES=; GeoServer
-        lists them in the capabilities. Both go out only when they changed:
-        the default through set_default_layer_style(), the others through
-        rest_service.update_layer(), whose layer PUT replaces the list
-        (measured on 2.28.5; an empty list clears it).
+        lists them in the capabilities. One layer PUT through the library's
+        Layer model carries whichever of the two changed: the PUT replaces
+        the list (measured on 2.28.5; an empty list clears it).
         """
         name, ws_name = row_data[0], row_data[1]
         fetched = self._fetch(
@@ -1534,16 +1580,18 @@ class LayerTabMixin:
             return
 
         def save():
-            if style != current:
-                self._check(self.gs.set_default_layer_style(name, ws_name, style))
-            if sorted(wanted) != sorted(others):
-                from geoservercloud.models.layer import Layer
+            from geoservercloud.models.layer import Layer
 
-                self._check(
-                    self.gs.rest_service.update_layer(
-                        Layer(name=name, styles=[{"name": s} for s in wanted]), ws_name
-                    )
-                )
+            layer = Layer(
+                name=name,
+                default_style_name=style if style != current else None,
+                styles=(
+                    [{"name": s} for s in wanted]
+                    if sorted(wanted) != sorted(others)
+                    else None
+                ),
+            )
+            self._check(self.gs.rest_service.update_layer(layer, ws_name))
 
         if self._run_action(
             lambda: self._wait_for_save(save),
@@ -2018,6 +2066,8 @@ class LayerTabMixin:
             self._raw_rest("delete", path, params={"recurse": "true"})
         elif kind in (WMS, WMTS):
             self._delete_cascaded_layer(workspace_name, store, kind, name)
+        elif kind == "-":
+            raise ValueError(self._unreadable(name))
         else:
             raise ValueError(
                 translate("LayerTabMixin", "Unsupported layer type '{}'").format(kind)

@@ -963,6 +963,78 @@ class TestPublish(unittest.TestCase):
         self.assertIs(form.get_widget("qgis_layer").currentLayer(), clicked)
         self.assertEqual(form.get_widget("name").text(), "Rivieres")
 
+    def test_the_qgis_source_asks_for_no_datastores_or_tables(self):
+        """Opened on a project layer, the form still listed the first
+        workspace's datastores and the first store's tables, and again on
+        every workspace change; the QGIS source never reads them."""
+        from unittest.mock import patch
+
+        from qgis.core import QgsProject, QgsVectorLayer
+        from qgis.PyQt.QtWidgets import QDialog
+
+        from geoserver_manager.gui import tab_layers
+        from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+
+        layer = QgsVectorLayer("Point?crs=epsg:4326", "cities", "memory")
+        QgsProject.instance().addMapLayers([layer])
+        self.addCleanup(QgsProject.instance().removeAllMapLayers)
+        asked = []
+        self.dlg._datastore_names = lambda ws: asked.append(("stores", ws)) or []
+        self.dlg._available_tables = (
+            lambda ws, ds: asked.append(("tables", ws, ds)) or []
+        )
+        opened = []
+
+        class Recording(ResourceFormDialog):
+            def exec(self):
+                opened.append(self)
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_layers, "ResourceFormDialog", Recording):
+            self.dlg._publish_layer(layer=layer)
+        form = opened[0]
+        self.assertEqual(asked, [])
+        form.get_widget("workspace").setCurrentText("empty")
+        self.assertEqual(asked, [])
+        # back to the table source: its combos are filled then
+        form.set_values({"source": tab_layers._SOURCE_TABLE})
+        self.assertEqual(asked, [("stores", "empty")])
+
+    def test_the_form_refuses_a_bad_table_publish_before_it_closes(self):
+        """Refused after the form closed, the title, abstract and keywords
+        typed were lost."""
+        from unittest.mock import patch
+
+        from qgis.PyQt.QtWidgets import QDialog
+
+        from geoserver_manager.gui import tab_layers
+        from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+
+        opened = []
+
+        class Recording(ResourceFormDialog):
+            def exec(self):
+                opened.append(self)
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_layers, "ResourceFormDialog", Recording):
+            self.dlg._publish_layer()
+        form = opened[0]
+        values = {
+            "source": tab_layers._SOURCE_TABLE,
+            "workspace": "topp",
+            "datastore": "pg",
+            "table": "tasmania_roads",
+            "epsg": "4326",
+        }
+        with self.assertRaises(ValueError) as ctx:
+            form._validate(values)
+        self.assertIn("already exists", str(ctx.exception))
+        with self.assertRaises(ValueError):
+            form._validate(dict(values, table="plugin_demo", epsg="abc"))
+        form._validate(dict(values, table="plugin_demo"))
+        self.assertEqual(self.dlg.gs.created, [])
+
 
 class TestBatchPublish(unittest.TestCase):
     """Several project layers, one form, one upload after another (#40)."""
@@ -1058,6 +1130,25 @@ class TestBatchPublish(unittest.TestCase):
         self.assertIn("Published: a.", self.warnings[-1])
         self.assertIn("Not started: c.", self.warnings[-1])
 
+    def test_a_cancel_while_a_layer_is_checked_stops_the_batch_too(self):
+        """Cancel on the waiting box during a layer's checks counted that
+        layer as failed and started the next one."""
+        from geoserver_manager.toolbelt.rest import Abandoned
+
+        def stop_at_b(values, layer=None, on_done=None):
+            if layer.name() == "b":
+                raise Abandoned()
+            self.calls.append((values, layer, on_done))
+            return True
+
+        self.dlg._publish_qgis_layer = stop_at_b
+        self.dlg._publish_layers(self.layers)
+        self.finish("done")
+        self.assertEqual([layer.name() for _v, layer, _d in self.calls], ["a"])
+        self.assertIn("Published: a.", self.warnings[-1])
+        self.assertIn("Not started: b, c.", self.warnings[-1])
+        self.assertEqual(self.errors, [])
+
     def test_two_layers_with_one_geoserver_name_are_refused_up_front(self):
         from qgis.core import QgsProject, QgsVectorLayer
 
@@ -1125,15 +1216,11 @@ class TestEditLayer(unittest.TestCase):
 
     def dialog(self, taken=()):
         dlg = SyncDialog()
-        dlg.gs = _EditFakeGS()
+        dlg.gs = _EditFakeGS(taken)
         sent = []
 
         def raw_rest(method, path, **kwargs):
             sent.append((method, path, kwargs))
-            if method == "get":
-                if any(path.endswith(f":{name}.json") for name in taken):
-                    return None
-                raise RuntimeError("HTTP 404")
             return None
 
         dlg._raw_rest = raw_rest
@@ -1177,7 +1264,23 @@ class TestEditLayer(unittest.TestCase):
                 dict(self.BEFORE, name="streets"),
             )
         self.assertIn("already exists", str(ctx.exception))
-        self.assertEqual([m for m, _p, _k in sent], ["get"])
+        # The check is the library's own existence GET, on the layer list.
+        self.assertEqual(dlg.gs.rest_service.asked, ["/rest/layers/topp:streets.json"])
+        self.assertEqual(sent, [])
+
+    def test_a_row_whose_details_failed_is_refused_as_unreadable(self):
+        """Delete said "Unsupported layer type '-'" and Update from the data
+        called the row a cascaded layer; both now say its details could not
+        be read, as opening it does."""
+        dlg, sent = self.dialog()
+        with self.assertRaises(ValueError) as ctx:
+            dlg._delete_layer_resource("topp", "-", "-", "roads")
+        self.assertIn("could not be read", str(ctx.exception))
+        warnings = []
+        dlg.show_warning_message = warnings.append
+        dlg._update_layer_from_source(["roads", "topp", "-", "-", "-"])
+        self.assertEqual(sent, [])
+        self.assertIn("could not be read", warnings[0])
 
     def test_a_bad_srs_is_refused_before_the_put(self):
         dlg, sent = self.dialog()
@@ -1217,19 +1320,33 @@ class TestEditLayer(unittest.TestCase):
 
 
 class _EditFakeGS:
-    class rest_service:
-        class rest_endpoints:
-            base_url = "/rest"
+    def __init__(self, taken=()):
+        class Rest:
+            asked = []
+
+            class rest_endpoints:
+                base_url = "/rest"
+
+                @staticmethod
+                def featuretype(ws, ds, name):
+                    return (
+                        f"/rest/workspaces/{ws}/datastores/{ds}/featuretypes/"
+                        f"{name}.json"
+                    )
+
+                @staticmethod
+                def coverage(ws, cs, name):
+                    return (
+                        f"/rest/workspaces/{ws}/coveragestores/{cs}/coverages/"
+                        f"{name}.json"
+                    )
 
             @staticmethod
-            def featuretype(ws, ds, name):
-                return f"/rest/workspaces/{ws}/datastores/{ds}/featuretypes/{name}.json"
+            def resource_exists(path):
+                Rest.asked.append(path)
+                return any(path.endswith(f":{name}.json") for name in taken)
 
-            @staticmethod
-            def coverage(ws, cs, name):
-                return (
-                    f"/rest/workspaces/{ws}/coveragestores/{cs}/coverages/{name}.json"
-                )
+        self.rest_service = Rest
 
 
 class TestSetLayerStyle(unittest.TestCase):
@@ -1417,7 +1534,39 @@ class TestSetLayerStyle(unittest.TestCase):
             self.dlg._set_layer_style(
                 ["tasmania_roads", "topp", "VECTOR", "taz_shapes", "simple_roads"]
             )
-        self.assertEqual(self.set_calls, [("tasmania_roads", "topp", "population")])
+        # One PUT: the new default, and the others without it (it was one).
+        self.assertEqual(
+            self.update_calls,
+            [
+                (
+                    "topp",
+                    {
+                        "name": "tasmania_roads",
+                        "defaultStyle": {"name": "population"},
+                        "styles": {"style": []},
+                    },
+                )
+            ],
+        )
+
+    def test_both_changed_is_one_put(self):
+        """The default went through set_default_layer_style() and the others
+        through update_layer(): two PUTs on the same layer document."""
+        self.run_form(style="population", others=["topp:roads_ws"])
+        self.assertEqual(self.set_calls, [])
+        self.assertEqual(
+            self.update_calls,
+            [
+                (
+                    "topp",
+                    {
+                        "name": "tasmania_roads",
+                        "defaultStyle": {"name": "population"},
+                        "styles": {"style": [{"name": "topp:roads_ws"}]},
+                    },
+                )
+            ],
+        )
 
     def test_style_action_sits_between_add_and_delete(self):
         self.dlg.show_warning_message = lambda t: None
@@ -1741,12 +1890,15 @@ class GpkgPublishFakeGS(StyleFakeGS):
             rest_endpoints = Endpoints()
 
             def resource_exists(inner, path):
-                # No other store's layer of the name; the store as the fake has it.
+                # The layer list as GeoServer has it; the store as the fake has it.
+                if "/layers/" in path:
+                    return outer.layer_exists
                 if "/datastores/" in path:
                     return outer.datastore_exists
                 return False
 
         self.rest_service = Rest()
+        self.feature_type_asked = 0
 
     def get_datastore(self, workspace_name, name):
         if not self.datastore_exists:
@@ -1764,6 +1916,7 @@ class GpkgPublishFakeGS(StyleFakeGS):
         )
 
     def get_feature_type(self, workspace_name, datastore_name, name):
+        self.feature_type_asked += 1
         return ({"name": name}, 200 if self.layer_exists else 404)
 
     def get_coverage_store(self, workspace_name, name):
@@ -1912,6 +2065,28 @@ class TestPublishQgisLayer(unittest.TestCase):
         self.dlg.gs = GpkgPublishFakeGS(layer_exists=True)
         with self.assertRaises(ValueError):
             self.dlg._publish_qgis_layer(self.values())
+
+    def test_the_clash_check_asks_the_store_and_the_layer_list_only(self):
+        """A feature-type GET went out as well, before the store's answer was
+        read, and could only say what the layer list says."""
+        self.add_layer()
+        self.dlg.gs = GpkgPublishFakeGS(datastore_exists=True)
+        with self.assertRaises(ValueError):
+            self.dlg._publish_qgis_layer(self.values())
+        self.assertEqual(self.dlg.gs.feature_type_asked, 0)
+
+    def test_a_kept_style_is_said_and_not_claimed(self):
+        """The user answered No to replacing a style of the layer's name: the
+        banner claimed a plain publish while the layer had GeoServer's
+        generic default style."""
+        self.add_layer()
+        warnings = []
+        self.dlg.show_warning_message = warnings.append
+        self.dlg.show_success_message = lambda text: self.fail(f"claimed: {text}")
+        self.dlg._push_qgis_style = lambda *args, **kwargs: False
+        self.dlg._publish_qgis_layer(self.values(with_style=True))
+        self.assertIn("Roads_2024", warnings[0])
+        self.assertIn("left as it is", warnings[0])
 
     def test_nothing_is_left_in_the_temporary_folder(self):
         import glob

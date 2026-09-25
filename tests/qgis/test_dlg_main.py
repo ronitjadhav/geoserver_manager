@@ -1181,6 +1181,23 @@ class TestUploadTask(unittest.TestCase):
         self.assertIn("boom", self.errors[0])
         self.assertEqual((self.done, self.cancelled), ([], []))
 
+    def test_closing_the_dialog_still_ends_what_waits_on_the_upload(self):
+        """A batch starts its next layer from on_done: closed before the
+        upload landed, the rest of the batch was dropped without a word."""
+        outcomes = []
+        self.dlg._run_upload(
+            "Upload failed",
+            self.blocked,
+            self.done.append,
+            self.cancelled.append,
+            on_done=outcomes.append,
+        )
+        self.dlg._closing = True
+        self.release.set()
+        spin_until(lambda: outcomes, timeout_ms=5000)
+        self.assertEqual(outcomes, ["cancelled"])
+        self.assertEqual(self.done, [])  # its GUI side needs the dialog
+
     def test_a_second_upload_is_refused_while_one_runs(self):
         self.assertTrue(self.upload(self.blocked))
         self.assertFalse(self.upload(lambda task: "never"))

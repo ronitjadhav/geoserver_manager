@@ -109,12 +109,15 @@ def export_to_geopackage(layer, path, table_name, target_crs=None):
     )
     # (error code, message, …); the tuple grew across QGIS versions.
     if result[0] != QgsVectorFileWriter.WriterError.NoError:
+        from qgis.PyQt.QtCore import QCoreApplication
+
         detail = next(
             (item for item in result[1:] if isinstance(item, str) and item), ""
         )
         raise RuntimeError(
-            f"QGIS could not write '{layer.name()}' as a GeoPackage: "
-            f"{detail or result[0]}"
+            QCoreApplication.translate(
+                "QgisExport", "QGIS could not write '{}' as a GeoPackage: {}"
+            ).format(layer.name(), detail or result[0])
         )
     return path
 
@@ -158,11 +161,16 @@ def export_to_geotiff(layer, path):
         QgsRasterFileWriter,
         QgsRasterPipe,
     )
+    from qgis.PyQt.QtCore import QCoreApplication
 
     provider = layer.dataProvider()
     pipe = QgsRasterPipe()
     if not pipe.set(provider.clone()):
-        raise RuntimeError(f"QGIS could not read '{layer.name()}' for export.")
+        raise RuntimeError(
+            QCoreApplication.translate(
+                "QgisExport", "QGIS could not read '{}' for export."
+            ).format(layer.name())
+        )
     writer = QgsRasterFileWriter(str(path))
     writer.setOutputFormat("GTiff")
     # setCreateOptions is deprecated in favour of setCreationOptions, which
@@ -179,6 +187,8 @@ def export_to_geotiff(layer, path):
     )
     if result != Qgis.RasterFileWriterResult.Success:
         raise RuntimeError(
-            f"QGIS could not write '{layer.name()}' as a GeoTIFF ({result})."
+            QCoreApplication.translate(
+                "QgisExport", "QGIS could not write '{}' as a GeoTIFF ({})."
+            ).format(layer.name(), result)
         )
     return path
