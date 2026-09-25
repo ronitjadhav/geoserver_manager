@@ -87,7 +87,10 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   it, the ciphertext is accepted back, and removing authentication needs JSON `null` for `user` and
   `password`: an empty string is stored as an encrypted empty password, and the store then fails to load.
   `POST …/{datastores|coveragestores}/{s}/reset` makes GeoServer re-read a store; cascaded stores have no
-  reset (404). **An empty connection parameter** is written `{"@key": "Session startup SQL"}`, with no
+  reset (404). **A disabled store still answers its reads**: with `enabled` false, a coverage store's
+  `coverages.json?list=all` and a WMS store's `wmslayers.json?list=available` both answer 200 with the
+  same lists as before (measured), so the reachability check after a save that disables a store is a
+  real check, not a false alarm. **An empty connection parameter** is written `{"@key": "Session startup SQL"}`, with no
   `$`, and the library reads it as `None`. Sent back as the text "None", GeoServer ran it as the startup
   SQL of every connection and the store stopped loading. The form shows it blank, and a row left as it
   was prefilled goes back as stored, number or `None` alike. **A store's namespace** is the workspace's URI when

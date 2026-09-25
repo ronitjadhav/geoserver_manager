@@ -392,6 +392,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- The raster upload form refuses a taken name as the name it will upload,
+  not as typed; "My DEM" used to pass the form and be refused as "My_DEM"
+  after it had closed.
+- Publishing a cascaded layer no longer reloads the Cascaded Stores tab;
+  nothing in it changed, and the reload cost every workspace's store
+  listings.
+- A cancelled mosaic ZIP upload no longer advises "Replace", which that form
+  has no box for.
+- Every coverage store request quotes the workspace and store names, so a
+  workspace named in the web interface with a `#` or `%` reaches the right
+  path.
 - Opening a workspace's edit form reads each settings path once, and the
   global service settings only where the workspace has none of its own; it
   used to read every path twice and all four global documents.

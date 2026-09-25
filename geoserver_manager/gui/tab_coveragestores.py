@@ -18,13 +18,16 @@ a layer.
 import shutil
 import tempfile
 from pathlib import Path
-from urllib.parse import quote
 
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.scope import PENDING
+
+# Every path this tab builds quotes its segments, as the cascaded tab does;
+# _q's docstring says why, and when it goes.
+from geoserver_manager.gui.tab_cascaded import _q
 from geoserver_manager.toolbelt.payload import bbox_text, changed, keyword_list, words
 from geoserver_manager.toolbelt.qgis_export import (
     export_to_geotiff,
@@ -213,7 +216,7 @@ class CoverageStoreTabMixin:
         get_coverage_store() for one store but no call that lists them, so the
         whole tab would have nothing to show. Workaround: GET the collection.
         """
-        path = self.gs.rest_service.rest_endpoints.coveragestores(workspace_name)
+        path = self.gs.rest_service.rest_endpoints.coveragestores(_q(workspace_name))
         payload = self._raw_rest("get", path).json()
         return sorted(
             self._name_of(store)
@@ -241,7 +244,9 @@ class CoverageStoreTabMixin:
         NotImplementedError, so there is no way to edit a store either.
         Workaround: GET the store path.
         """
-        path = self.gs.rest_service.rest_endpoints.coveragestore(workspace_name, name)
+        path = self.gs.rest_service.rest_endpoints.coveragestore(
+            _q(workspace_name), _q(name)
+        )
         payload = self._raw_rest("get", path).json()
         return payload.get("coverageStore") or {}
 
@@ -253,7 +258,9 @@ class CoverageStoreTabMixin:
         store can expose, published or not. Both are needed: "all" to offer
         publish candidates, "configured" to say what is live.
         """
-        path = self.gs.rest_service.rest_endpoints.coverages(workspace_name, store_name)
+        path = self.gs.rest_service.rest_endpoints.coverages(
+            _q(workspace_name), _q(store_name)
+        )
         payload = self._raw_rest("get", path, params={"list": "configured"}).json()
         return sorted(
             self._name_of(coverage)
@@ -392,11 +399,7 @@ class CoverageStoreTabMixin:
         if "name" in body:
             self._require_safe_name(body["name"])
             self._refuse_existing_store(ws_name, body["name"])
-        if "url" in body and not str(body["url"]).strip():
-            raise ValueError(translate("CoverageStoreTabMixin", "A URL is required."))
-        path = self.gs.rest_service.rest_endpoints.coveragestore(
-            quote(ws_name, safe=""), quote(name, safe="")
-        )
+        path = self.gs.rest_service.rest_endpoints.coveragestore(_q(ws_name), _q(name))
         self._raw_rest("put", path, json={"coverageStore": body})
 
     def _reset_coverage_store(self, row_data):
@@ -405,9 +408,7 @@ class CoverageStoreTabMixin:
         TODO(#50): no reset in the library (row 54): POST .../reset (measured).
         """
         name, ws_name = row_data[0], row_data[1]
-        path = self.gs.rest_service.rest_endpoints.coveragestore(
-            quote(ws_name, safe=""), quote(name, safe="")
-        )
+        path = self.gs.rest_service.rest_endpoints.coveragestore(_q(ws_name), _q(name))
         if self._run_action(
             lambda: self._wait_for_save(
                 lambda: self._raw_rest("post", path.removesuffix(".json") + "/reset")
@@ -430,7 +431,7 @@ class CoverageStoreTabMixin:
         of what a detail view is for. Workaround: GET the coverage path.
         """
         path = self.gs.rest_service.rest_endpoints.coverage(
-            workspace_name, store_name, name
+            _q(workspace_name), _q(store_name), _q(name)
         )
         payload = self._raw_rest("get", path).json()
         return payload.get("coverage") or {}
@@ -959,15 +960,27 @@ class CoverageStoreTabMixin:
             )
             self._reload_current_tab()
 
+        def cancelled(_task):
+            # Never a Replace (a taken name is refused), so the GeoTIFF's
+            # "store without its file" report does not apply. What an aborted
+            # archive leaves is not measured: say where to look.
+            self.show_warning_message(
+                translate(
+                    "CoverageStoreTabMixin",
+                    "Upload of '{}' cancelled. Check the Coverage Stores tab for "
+                    "what was left.",
+                ).format(name)
+            )
+
         self._upload_file(
             failure,
             self.gs.rest_service.rest_client,
-            endpoints.coveragestore(ws_name, name, "file", "imagemosaic"),
+            endpoints.coveragestore(_q(ws_name), _q(name), "file", "imagemosaic"),
             source,
             {"configure": "none"},
             {"Content-Type": "application/zip", "Accept": "application/json"},
             created,
-            self._store_upload_cancelled(ws_name, name),
+            cancelled,
         )
 
     def _publish_qgis_raster(self, values, layer=None, on_done=None):
@@ -1012,8 +1025,8 @@ class CoverageStoreTabMixin:
         client = self.gs.rest_service.rest_client
         endpoints = self.gs.rest_service.rest_endpoints
         upload_path = (
-            f"{endpoints.base_url}/workspaces/{quote(ws_name, safe='')}"
-            f"/coveragestores/{quote(name, safe='')}/file.geotiff"
+            f"{endpoints.base_url}/workspaces/{_q(ws_name)}"
+            f"/coveragestores/{_q(name)}/file.geotiff"
         )
         metadata = {
             key: values[key] for key in ("title", "abstract") if values.get(key)
@@ -1022,7 +1035,7 @@ class CoverageStoreTabMixin:
         if keywords:
             # The feature type's shape; a partial coverage PUT merges it too.
             metadata["keywords"] = {"string": keywords}
-        metadata_path = endpoints.coverage(ws_name, name, name)
+        metadata_path = endpoints.coverage(_q(ws_name), _q(name), _q(name))
         partly = translate(
             "CoverageStoreTabMixin",
             "Raster '{}' is published, but its title, abstract and keywords "
@@ -1074,15 +1087,23 @@ class CoverageStoreTabMixin:
         if values["type"] != QGIS_RASTER:
             self._refuse_existing_store(ws_name, name)
             return
-        if not values.get("replace"):
+        # The upload's name, the one a layer can carry, not the typed one:
+        # checked as typed, "My DEM" passed while "My_DEM" was refused after
+        # the form had closed, with everything typed into it.
+        self._check_raster_target(ws_name, geoserver_name(name), values.get("replace"))
+
+    def _check_raster_target(self, ws_name, name, replace):
+        """Refuse the store, and the layer, a raster upload would land on.
+
+        Reads only: the form runs it before it closes, the upload again.
+        """
+        if not replace:
             self._refuse_existing_store(
                 ws_name,
                 name,
                 translate("CoverageStoreTabMixin", "Tick Replace to overwrite it."),
             )
-        self._refuse_layer_clash(
-            ws_name, name, values.get("replace"), "coverage", "GeoTIFF"
-        )
+        self._refuse_layer_clash(ws_name, name, replace, "coverage", "GeoTIFF")
 
     def _refuse_existing_store(self, ws_name, name, hint=""):
         """Raise when the store exists: its creators upsert, or PUT over it."""
@@ -1131,18 +1152,10 @@ class CoverageStoreTabMixin:
                 ).format(layer.name())
             )
 
-        def refuse():  # reads: off the GUI thread
-            if not values.get("replace"):
-                self._refuse_existing_store(
-                    ws_name,
-                    name,
-                    translate("CoverageStoreTabMixin", "Tick Replace to overwrite it."),
-                )
-            self._refuse_layer_clash(
-                ws_name, name, values.get("replace"), "coverage", "GeoTIFF"
-            )
-
-        self._wait_for(refuse)
+        # Reads, so off the GUI thread; the form ran it once, before it closed.
+        self._wait_for(
+            lambda: self._check_raster_target(ws_name, name, values.get("replace"))
+        )
         source = local_geotiff_path(layer)
         if source is not None:
             return source, None

@@ -535,6 +535,31 @@ class TestCreateCoverageStore(unittest.TestCase):
         self.assertTrue(Path(path).exists())  # the user's own file is not removed
         Path(path).unlink()
 
+    def test_a_cancelled_zip_upload_does_not_offer_replace(self):
+        """The GeoTIFF's report says "upload it again with Replace ticked",
+        which the ZIP form has no box for."""
+        import tempfile
+
+        warnings = []
+        self.dlg.show_warning_message = warnings.append
+        captured = {}
+        self.dlg._upload_file = lambda *args, **kwargs: captured.update(
+            on_cancel=args[7]
+        )
+        with tempfile.NamedTemporaryFile(suffix=".zip") as handle:
+            self.dlg._upload_mosaic_zip(
+                {
+                    "name": "mos",
+                    "workspace": "nurc",
+                    "type": MOSAIC_ZIP,
+                    "zip": handle.name,
+                }
+            )
+        self.dlg.gs = FakeGS(exists=True)  # what a cancel could leave behind
+        captured["on_cancel"](None)
+        self.assertIn("'mos'", warnings[-1])
+        self.assertNotIn("Replace", warnings[-1])
+
     def test_a_server_that_drops_the_cog_settings_is_reported(self):
         """GeoServer silently ignores store metadata it does not understand."""
         warnings = []
@@ -871,6 +896,31 @@ class TestPublishQgisRaster(RasterFixture):
 
         self.dlg._publish_qgis_raster(self.values(replace=True))
         self.assertEqual(len(self.puts()), 1)
+
+    def test_the_form_check_asks_for_the_name_the_upload_will_use(self):
+        """ "My DEM" is uploaded as My_DEM: checked as typed, the form let it
+        through and the refusal came after it had closed."""
+        self.add_layer("dem")
+        self.dlg.gs = FakeGS(exists=True)
+        with self.assertRaises(ValueError) as refused:
+            self.dlg._check_new_coverage_store(self.values())
+        self.assertIn("'My_DEM'", str(refused.exception))
+        self.assertIn(("get_coverage_store", "sf", "My_DEM"), self.dlg.gs.calls)
+
+    def test_the_paths_carry_quoted_names(self):
+        self.add_layer("dem")
+        self.dlg._coverage_store_detail("my ws", "my store")
+        self.dlg._coverage_detail("my ws", "my store", "a b")
+        self.dlg._publish_qgis_raster(self.values(workspace="my ws"))
+        paths = [call[1] for call in self.dlg.gs.calls if call[0] in ("GET", "PUT")]
+        self.assertIn("/rest/workspaces/my%20ws/coveragestores/my%20store.json", paths)
+        self.assertIn(
+            "/rest/workspaces/my%20ws/coveragestores/my%20store/coverages/a%20b.json",
+            paths,
+        )
+        self.assertIn(
+            "/rest/workspaces/my%20ws/coveragestores/My_DEM/file.geotiff", paths
+        )
 
     def test_title_and_abstract_go_in_a_partial_coverage_put(self):
         self.add_layer("dem")
