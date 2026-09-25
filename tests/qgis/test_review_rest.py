@@ -251,5 +251,23 @@ class TestForms(unittest.TestCase):
         self.assertFalse(_is_secret("Expose primary keys"))
 
 
+class TestUploadBodyRedirect(unittest.TestCase):
+    def test_requests_notes_where_to_rewind_the_body_to(self):
+        # `requests` records a body position, and rewinds to it on a redirect,
+        # only for a body it can iterate; with read() alone the redirected PUT
+        # announced its length and sent nothing, until the server's timeout.
+        import io
+
+        import requests
+
+        from geoserver_manager.toolbelt.rest import ProgressReader
+
+        body = ProgressReader(io.BytesIO(b"0123456789"), 10)
+        request = requests.Request("PUT", "http://gs.example.org/x", data=body)
+        prepared = request.prepare()
+        self.assertEqual(prepared._body_position, 0)
+        self.assertEqual(prepared.headers["Content-Length"], "10")
+
+
 if __name__ == "__main__":
     unittest.main()

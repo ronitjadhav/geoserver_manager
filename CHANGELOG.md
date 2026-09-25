@@ -392,6 +392,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **A save abandoned at the waiting box holds off Refresh and the profile
+  switch until it ends.** Its remaining requests read the connection, so a
+  switch meanwhile sent the rest of the save to the other server.
+- **An upload the server redirects is sent again in full.** The redirected
+  request announced its length and sent nothing, until the server gave up.
+- A warning or an error is logged without reading the settings first; every
+  log line read the whole block to learn whether debug mode was on.
 - **Switching to another saved profile applies its TLS setting.** Saved
   untouched, the profile connected with the previous profile's setting,
   which was then written into it.

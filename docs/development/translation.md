@@ -52,7 +52,8 @@ self.tr("%n item(s) could not be listed: {names}.", None, n)
 `pylupdate6` marks such a message `numerus="yes"`, and each locale fills in
 its own forms (English and French have two). Never build the plural from a
 noun and "(s)" or `+ "s"`: that is right in no language. For the deletes, a
-tab hands `_delete_many` its own counted noun as `counted`.
+tab hands `_delete_many` its own sentences through `_one_or_many`, the plural
+one counted this way.
 
 **The English `.ts` needs the English forms too.** With no translation, Qt
 only puts the number in, so "%n layer(s)" would reach an English user as

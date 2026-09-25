@@ -103,6 +103,11 @@ class ProgressReader:
     def __len__(self):
         return self._total
 
+    def __iter__(self):
+        # What makes `requests` note the body's start and rewind to it on a
+        # redirect: a body with read() alone was resent as nothing.
+        return iter(lambda: self.read(8192), b"")
+
     def tell(self):
         return self.sent
 
