@@ -303,6 +303,40 @@ class TestProfiles(unittest.TestCase):
             self.settings.geoserver_url, "https://a2.example.org/geoserver"
         )
 
+    def test_switching_to_an_untouched_profile_takes_its_tls_setting(self):
+        # The checkbox of an untouched profile is not read on Save: the
+        # previous profile's setting was kept, and written into this one.
+        self.store["idB"] = ("ub", "pb")
+        self.manager.profiles.append(
+            {
+                "name": "B",
+                "url": "https://b.example.org/geoserver",
+                "auth_cfg_id": "idB",
+                "verify_tls": False,
+            }
+        )
+        self.page.load_settings()
+        self.page.cmb_profile.setCurrentText("B")
+        self.page.apply()
+        self.assertEqual(self.manager.values["active_profile"], "B")
+        self.assertFalse(self.settings.geoserver_verify_tls)
+        saved = [p for p in self.manager.profiles if p["name"] == "B"][0]
+        self.assertFalse(saved["verify_tls"])
+
+    def test_editing_the_url_of_an_undecryptable_profile_keeps_its_credentials(self):
+        # With the master password declined the fields read blank; a change
+        # of the URL alone then read as "both blanked on purpose".
+        self.declined = True
+        self.page.load_settings()
+        self.assertEqual(self.page.txt_gs_username.text(), "")
+        self.page.txt_gs_url.setText("https://a2.example.org/geoserver")
+        self.page.apply()
+        self.assertEqual(self.store["idA"], ("ua", "pa"))
+        self.assertEqual(self.manager.profiles[0]["auth_cfg_id"], "idA")
+        self.assertEqual(
+            self.manager.profiles[0]["url"], "https://a2.example.org/geoserver"
+        )
+
     def test_saving_another_profile_makes_it_active_with_its_own_auth(self):
         self.add("B")
         self.page.txt_gs_url.setText("https://b.example.org/geoserver")

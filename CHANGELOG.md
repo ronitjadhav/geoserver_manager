@@ -392,6 +392,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **Switching to another saved profile applies its TLS setting.** Saved
+  untouched, the profile connected with the previous profile's setting,
+  which was then written into it.
+- Editing the URL of a profile whose password could not be decrypted
+  (master password declined) no longer forgets its credentials.
 - **The plugin loads on a PyQt6 QGIS.** It watched a palette signal that
   PyQt6 no longer has, and failed while setting up its menu.
 - A click on the toolbar button brings an open, connected dialog forward;

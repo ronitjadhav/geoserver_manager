@@ -358,52 +358,52 @@
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="235" />
+        <location filename="../../gui/dlg_settings.py" line="237" />
         <source>Profile '{}': {}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="254" />
+        <location filename="../../gui/dlg_settings.py" line="249" />
         <source>URL not saved.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="274" />
+        <location filename="../../gui/dlg_settings.py" line="269" />
         <source>Could not store the credentials in the QGIS authentication database. Check that the master password is set, then save again.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="296" />
+        <location filename="../../gui/dlg_settings.py" line="281" />
         <source>{url} is plain HTTP, so the password is sent unencrypted with every request. Use https:// where the server offers it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="308" />
+        <location filename="../../gui/dlg_settings.py" line="291" />
         <source>The GeoServer URL must start with http:// or https://.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="313" />
+        <location filename="../../gui/dlg_settings.py" line="296" />
         <source>Take the user name and password out of the URL: the fields below carry them.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="327" />
+        <location filename="../../gui/dlg_settings.py" line="310" />
         <source>Testing…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="338" />
+        <location filename="../../gui/dlg_settings.py" line="321" />
         <source>Connected. GeoServer answered.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="389" />
+        <location filename="../../gui/dlg_settings.py" line="372" />
         <source>Reset settings</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/dlg_settings.py" line="390" />
+        <location filename="../../gui/dlg_settings.py" line="373" />
         <source>Remove %n saved profile(s) and their stored passwords? This cannot be undone.</source>
         <translation>
             <numerusform>Supprimer %n profil enregistré et son mot de passe ? Cette action est définitive.</numerusform>
@@ -411,63 +411,63 @@
         </translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="410" />
+        <location filename="../../gui/dlg_settings.py" line="393" />
         <source>The server connection shown below. Saving makes it the active one.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="414" />
+        <location filename="../../gui/dlg_settings.py" line="397" />
         <source>Add…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="415" />
+        <location filename="../../gui/dlg_settings.py" line="398" />
         <source>Remove</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="420" />
+        <location filename="../../gui/dlg_settings.py" line="403" />
         <source>Removes the shown profile when you save. Cancel keeps it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="422" />
+        <location filename="../../gui/dlg_settings.py" line="405" />
         <source>Profile</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="486" />
+        <location filename="../../gui/dlg_settings.py" line="469" />
         <source>None yet. Saving creates one.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="525" />
+        <location filename="../../gui/dlg_settings.py" line="508" />
         <source>The active profile: the dialog connects to it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="527" />
+        <location filename="../../gui/dlg_settings.py" line="510" />
         <source>Active: {}. Saving makes '{}' active instead.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="530" />
+        <location filename="../../gui/dlg_settings.py" line="513" />
         <source>Saving makes '{}' the active profile.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="546" />
-        <location filename="../../gui/dlg_settings.py" line="538" />
+        <location filename="../../gui/dlg_settings.py" line="529" />
+        <location filename="../../gui/dlg_settings.py" line="521" />
         <source>Add a Profile</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="538" />
+        <location filename="../../gui/dlg_settings.py" line="521" />
         <source>Name of the new profile:</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_settings.py" line="547" />
+        <location filename="../../gui/dlg_settings.py" line="530" />
         <source>A profile named '{}' already exists.</source>
         <translation type="unfinished" />
     </message>
