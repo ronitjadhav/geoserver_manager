@@ -182,7 +182,12 @@ class TestWfsForm(unittest.TestCase):
 
     def test_the_type_is_offered_and_shows_only_its_fields(self):
         fields = self.dlg._datastore_fields(["topp"])
-        options = [field for field in fields if field["key"] == "type"][0]["options"]
+        options = [
+            value
+            for field in fields
+            if field["key"] == "type"
+            for _label, value in field["options"]
+        ]
         self.assertIn(WFS, options)
         form = ResourceFormDialog(title="t", fields=fields)
         self.dlg._on_type_changed(form, WFS)

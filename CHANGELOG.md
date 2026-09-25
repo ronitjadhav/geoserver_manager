@@ -257,6 +257,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- **The rest of the interface can be translated.** The tab names, a
+  datastore's "Other..." type, "(global)" in the style and group forms, the
+  coverage store and style formats, the catalog's Reload and Reset, file
+  filters and the map preview's messages were fixed English. Delete
+  confirmations and their banners are whole sentences now, so a translation
+  can agree them ("supprimée" for a layer), instead of "delete" + "layer" +
+  the name glued in English order. A locale the plugin has no translation
+  for falls back to English's plural forms, not "layer(s)".
+- **One way to say things:** edit forms are titled by what they show
+  ("Datastore 'x'", no "Edit"), a store or a style is named "ws:name" in a
+  confirmation, as layers are, a style's name field is "Name", formats read
+  SLD, CSS, YSLD and MBStyle, a locked field has no asterisk, and a batch
+  offers to "Replace those that already exist". Titles and help text follow
+  QGIS's font size. A row whose details could not be read says so instead of
+  "Unsupported layer type '-'".
 - **Every label can be translated, and the tables read in words.** A form's
   choices ("A layer from this QGIS project", "From file", "(global)",
   "(pick a layer)", the seed task and the coverage store types) were also

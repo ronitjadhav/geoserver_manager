@@ -254,7 +254,7 @@ class Recording(ResourceFormDialog):
         return QDialog.DialogCode.Rejected
 
 
-def confirm_yes(kind, labels, cascade="", **kwargs):
+def confirm_yes(question, labels=(), cascade=""):
     return True
 
 
@@ -539,7 +539,7 @@ class TestActions(unittest.TestCase):
         self.assertEqual(self.puts(), [])
 
     def test_truncate_asks_first_then_mass_truncates(self):
-        self.dlg._confirm_delete = lambda kind, labels, cascade="", **kwargs: False
+        self.dlg._confirm_delete = lambda question, labels=(), cascade="": False
         self.dlg._truncate_gwc_layer(STATES_ROW)
         self.assertEqual([c for c in self.gs.calls if c[0] == "POST"], [])
 
@@ -557,15 +557,16 @@ class TestActions(unittest.TestCase):
     def test_remove_uses_the_library_for_a_workspace_layer_and_raw_for_a_group(self):
         cascades = []
 
-        def confirm(kind, labels, cascade="", **kwargs):
-            cascades.append((kind, labels, cascade))
+        def confirm(question, labels=(), cascade=""):
+            cascades.append((question, labels, cascade))
             return True
 
         self.dlg._confirm_delete = confirm
         self.dlg._remove_selected_gwc_layers([STATES_ROW, TASMANIA_ROW])
         self.assertIn(("delete_gwc_layer", "topp", "states"), self.gs.calls)
         self.assertIn(("DELETE", "/gwc/rest/layers/tasmania.json", {}), self.gs.calls)
-        [(kind, labels, cascade)] = cascades
+        [(question, labels, cascade)] = cascades
+        self.assertIn("stop caching 2 layer", question)
         self.assertEqual(labels, ["topp:states", "tasmania"])
         self.assertIn("layer itself stays", cascade)
 

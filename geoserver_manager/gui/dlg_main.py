@@ -873,6 +873,24 @@ class GeoServerMainDialog(
         ("Server", "server", "_load_server"),
     )
 
+    def _tab_titles(self):
+        """Each tab's name as the navigation list shows it, translated.
+
+        TABS keeps the English key (invariant 11): the list showed that key,
+        so a French interface listed its tabs in English.
+        """
+        return {
+            "Workspaces": self.tr("Workspaces"),
+            "Datastores": self.tr("Datastores"),
+            "Coverage Stores": self.tr("Coverage Stores"),
+            "Cascaded Stores": self.tr("Cascaded Stores"),
+            "Layers": self.tr("Layers"),
+            "Layer Groups": self.tr("Layer Groups"),
+            "Styles": self.tr("Styles"),
+            "Tile Cache": self.tr("Tile Cache"),
+            "Server": self.tr("Server"),
+        }
+
     def _tab_help(self):
         """One line per tab for its tooltip: GeoServer's words, not REST's.
 
@@ -912,7 +930,8 @@ class GeoServerMainDialog(
         """Build the navigation list on the left from TABS."""
         self.navList.clear()
         for label, icon_name, _loader in self.TABS:
-            item = QListWidgetItem(icon(icon_name, self.navList.palette()), label)
+            title = self._tab_titles().get(label, label)
+            item = QListWidgetItem(icon(icon_name, self.navList.palette()), title)
             item.setToolTip(self._tab_help().get(label, ""))
             self.navList.addItem(item)
         # Never narrower than its longest entry: at the window's minimum
@@ -2003,32 +2022,28 @@ class GeoServerMainDialog(
             ).format(names=shown)
         )
 
-    def _confirm_delete(self, kind, labels, cascade="", verb=None, counted=None):
-        """Ask before acting on one or more resources of one kind.
+    @staticmethod
+    def _one_or_many(one, many):
+        """labels -> a whole sentence: one.format(the label), or many(count).
 
-        :param kind: human-readable type (e.g. "workspace"), or "" for none.
-        :param labels: names of the resources about to be acted on.
-        :param counted: n -> "%n workspace(s)" in the tab's own context, with
-            the count passed to translate(); required for more than one label.
+        The tab translates both with the name or the count in place ("Delete
+        workspace '{}'?", "%n workspace(s) deleted."). Glued here from "delete",
+        "workspace" and the name, a French sentence could not agree its words.
+        """
+        return lambda labels: (
+            one.format(labels[0]) if len(labels) == 1 else many(len(labels))
+        )
+
+    def _confirm_delete(self, question, labels=(), cascade=""):
+        """Ask before acting on resources; True when the user said yes.
+
+        :param question: the whole sentence, translated by the tab.
+        :param labels: the resources; for more than one, listed after it.
         :param cascade: what else the action takes with it. Both delete
             paths send recurse=true, so the user has to be told.
-        :param verb: the action, "delete" by default; the Tile Cache tab
-            passes "stop caching" and "truncate".
         """
-        verb = verb or self.tr("delete")
-        if len(labels) == 1:
-            subject = f"{kind} '{labels[0]}'" if kind else f"'{labels[0]}'"
-            question = self.tr("Are you sure you want to {verb} {subject}?").format(
-                verb=verb, subject=subject
-            )
-        else:
-            question = self.tr(
-                "Are you sure you want to {verb} {things}?\n\n{items}"
-            ).format(
-                verb=verb,
-                things=counted(len(labels)),
-                items="\n".join(f"  • {label}" for label in labels),
-            )
+        if len(labels) > 1:
+            question += "\n\n" + "\n".join(f"  • {label}" for label in labels)
         # The separator lives here, so a translation cannot glue the sentences.
         parts = [question, cascade.strip(), self.tr("This action cannot be undone.")]
         reply = QMessageBox.warning(
@@ -2040,27 +2055,14 @@ class GeoServerMainDialog(
         )
         return reply == QMessageBox.StandardButton.Yes
 
-    def _delete_many(
-        self,
-        kind,
-        labeled_deletes,
-        reload_fn,
-        counted,
-        cascade="",
-        verb=None,
-        done=None,
-    ):
+    def _delete_many(self, labeled_deletes, reload_fn, ask, done, cascade=""):
         """Confirm and run one or more deletions in a task, then reload the table.
 
-        :param kind: human-readable resource type (e.g. "workspace").
-        :param counted: n -> "%n workspace(s)", translated with the count in the
-            tab's own context, so each locale gets its own plural forms (#60).
-            Built from a noun and "(s)" here, French would read "3 couche(s)".
         :param labeled_deletes: list of (label, zero-arg callable) pairs.
         :param reload_fn: called afterwards to refresh the table.
+        :param ask: labels -> the confirmation's question, and `done`: labels
+            -> the success banner, both whole sentences from _one_or_many().
         :param cascade: sentence naming what else goes, for the confirmation.
-        :param verb: the action for the confirmation ("delete" by default).
-        :param done: the past participle for the banner ("deleted" by default).
 
         The requests run off the GUI thread with progress and Cancel: fifty
         workspaces with recurse=true are minutes, not a wait cursor.
@@ -2073,10 +2075,8 @@ class GeoServerMainDialog(
             )
             return
         labels = [label for label, _ in labeled_deletes]
-        if not self._confirm_delete(kind, labels, cascade, verb=verb, counted=counted):
+        if not self._confirm_delete(ask(labels), labels, cascade):
             return
-        verb = verb or self.tr("delete")
-        done = done or self.tr("deleted")
 
         # Shared with cancelled(): a Cancel after a failure used to drop it.
         errors = []
@@ -2093,48 +2093,27 @@ class GeoServerMainDialog(
                     task.setProgress(100 * (index + 1) / len(labeled_deletes))
             return errors
 
-        def report(errors):
+        def listed(errors):
             for label, detail in errors:
-                self.log(
-                    f"{verb} {kind} error ({label}): {detail}",
-                    log_level=Qgis.MessageLevel.Critical,
-                )
+                self.log(f"{label}: {detail}", log_level=Qgis.MessageLevel.Critical)
+            return "\n".join(f"{label}: {detail}" for label, detail in errors)
+
+        def report(errors):
             if errors:
                 self.show_error_message(
-                    self.tr("Could not {verb}:\n{errors}").format(
-                        verb=verb,
-                        errors="\n".join(f"{label}: {d}" for label, d in errors),
-                    )
-                )
-            elif len(labels) == 1:
-                self.show_success_message(
-                    self.tr("{kind} '{name}' {done}.").format(
-                        kind=kind.capitalize(), name=labels[0], done=done
-                    )
+                    self.tr("These failed:\n{errors}").format(errors=listed(errors))
                 )
             else:
-                self.show_success_message(
-                    self.tr("{things} {done}.").format(
-                        things=counted(len(labels)), done=done
-                    )
-                )
+                self.show_success_message(done(labels))
             reload_same_tab()
 
         def cancelled(_task):
-            for label, detail in errors:
-                self.log(
-                    f"{verb} {kind} error ({label}): {detail}",
-                    log_level=Qgis.MessageLevel.Critical,
-                )
             if errors:
                 self.show_error_message(
                     self.tr(
-                        "Cancelled. What was already done stays done. Could not "
-                        "{verb}:\n{errors}"
-                    ).format(
-                        verb=verb,
-                        errors="\n".join(f"{label}: {d}" for label, d in errors),
-                    )
+                        "Cancelled. What was already done stays done. These "
+                        "failed:\n{errors}"
+                    ).format(errors=listed(errors))
                 )
             else:
                 self.show_warning_message(
@@ -2154,7 +2133,7 @@ class GeoServerMainDialog(
 
         self._launch_task(
             "_delete",
-            self.tr("{verb} failed").format(verb=verb.capitalize()),
+            self.tr("The batch stopped"),
             delete_all,
             report,
             cancelled,

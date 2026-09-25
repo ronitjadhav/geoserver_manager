@@ -221,6 +221,31 @@ class TestPluralForms(unittest.TestCase):
     English forms, and every locale carries all of its own.
     """
 
+    def test_a_locale_without_a_translation_gets_englishs_plurals(self):
+        # "%n layer(s)" read "(s)" in, say, a German QGIS: no .qm was loaded.
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import MagicMock, patch
+
+        from geoserver_manager import plugin_main
+
+        folder = Path(tempfile.mkdtemp()) / "geoserver_manager"
+        (folder / "resources" / "i18n").mkdir(parents=True)
+        english = folder / "resources" / "i18n" / "geoserver_manager_en.qm"
+        english.write_bytes(b"")
+        logged = []
+        with (
+            patch.object(plugin_main, "DIR_PLUGIN_ROOT", folder),
+            patch.object(plugin_main.QgsSettings, "value", lambda *a: "de_DE"),
+            patch.object(plugin_main.QCoreApplication, "installTranslator"),
+            patch.object(
+                plugin_main.PlgLogger, "log", lambda *a, **k: logged.append(k)
+            ),
+        ):
+            plugin = plugin_main.GeoServerManagerPlugin(MagicMock())
+        self.assertIsNotNone(plugin.translator)
+        self.assertTrue(any(str(english) in str(k.get("message")) for k in logged))
+
     def test_every_plural_is_finished_in_every_shipped_locale(self):
         for path in sorted(I18N.glob("*.ts")):
             plurals = [

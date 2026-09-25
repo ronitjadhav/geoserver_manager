@@ -63,14 +63,6 @@ def _mode_label(mode):
     return labels.get(mode, mode)
 
 
-def _mode_from_label(label):
-    """The enum behind a label, or the value itself when it already is one."""
-    for mode in MODES:
-        if label in (mode, _mode_label(mode)):
-            return mode
-    return label
-
-
 class LayerGroupTabMixin:
     """Mixin that adds layer-group methods to the main dialog."""
 
@@ -141,6 +133,9 @@ class LayerGroupTabMixin:
             str(cell) for cell in self._group_summary(row[0], row[1])
         )
         self._detail_columns = (2, 3)
+        # The row keeps GeoServer's enum (SINGLE, EO), the cell says it in
+        # words: the translated label was stored and read back (#91).
+        self._cell_display = {2: _mode_label}
         self._start_load(
             translate("LayerGroupTabMixin", "Failed to load layer groups"),
             self._fetch_layer_group_rows,
@@ -185,7 +180,7 @@ class LayerGroupTabMixin:
     def _group_summary(self, name, workspace_label):
         """(mode, number of layers) for the list view. Raises on HTTP errors."""
         detail = self._group_detail(name, scope(workspace_label))
-        return _mode_label(detail.get("mode", "")), len(self._group_layers(detail))
+        return detail.get("mode", ""), len(self._group_layers(detail))
 
     # -- One group -------------------------------------------------------------
 
@@ -248,8 +243,11 @@ class LayerGroupTabMixin:
 
         return {
             "name": name,
-            "workspace": workspace_label,
-            "mode": _mode_label(detail.get("mode", "")),
+            # Shown, never read back: the save keeps the row's own scope.
+            "workspace": (
+                global_label() if workspace_label == GLOBAL else workspace_label
+            ),
+            "mode": detail.get("mode", ""),
             "title": text_of(detail.get("internationalTitle") or detail.get("title")),
             # GeoServer stores the abstract under "abstractTxt".
             "abstract": text_of(
@@ -363,8 +361,8 @@ class LayerGroupTabMixin:
         ):
             if after.get(key) != before.get(key):
                 body[target] = after.get(key)
-        if _mode_from_label(after["mode"]) != _mode_from_label(before["mode"]):
-            body["mode"] = _mode_from_label(after["mode"])
+        if after["mode"] != before["mode"]:
+            body["mode"] = after["mode"]
         before_layers = LayerGroupTabMixin._parse_group_layers(before["layers"], None)
         after_layers = LayerGroupTabMixin._parse_group_layers(after["layers"], None)
         return body, before_layers != after_layers
@@ -379,7 +377,7 @@ class LayerGroupTabMixin:
         and it keeps the old bounds, so they are recomputed here.
         """
         body, layers_changed = self._group_changes(before, after)
-        mode = _mode_from_label(after["mode"])
+        mode = after["mode"]
         if layers_changed:
             published, styles = self._group_publishables(
                 after["layers"], workspace_name, known_layers, known_groups
@@ -595,8 +593,8 @@ class LayerGroupTabMixin:
                 "key": "mode",
                 "label": translate("LayerGroupTabMixin", "Mode"),
                 "type": "combo",
-                "options": [_mode_label(mode) for mode in MODES],
-                "default": _mode_label("SINGLE"),
+                "options": [(_mode_label(mode), mode) for mode in MODES],
+                "default": "SINGLE",
                 "help": translate(
                     "LayerGroupTabMixin",
                     "Single publishes the group as one layer; Opaque Container is "
@@ -697,13 +695,12 @@ class LayerGroupTabMixin:
     def _wire_group_form(self, dlg):
         """Show the root fields for an Earth Observation group only."""
 
-        def show_root(label):
+        def show_root(mode):
             for key in ("root_layer", "root_style"):
-                dlg.set_field_visible(key, _mode_from_label(label) == "EO")
+                dlg.set_field_visible(key, mode == "EO")
 
-        mode = dlg.get_widget("mode")
-        mode.currentTextChanged.connect(show_root)
-        show_root(mode.currentText())
+        dlg.on_value_changed("mode", show_root)
+        show_root(dlg.get_values()["mode"])
 
     def _all_group_names(self):
         """Every group's name as a publishable spells it: bare when global,
@@ -826,7 +823,7 @@ class LayerGroupTabMixin:
         self._group_publishables(
             values["layers"], workspace_name, known_layers, known_groups
         )
-        if _mode_from_label(values["mode"]) == "EO":
+        if values["mode"] == "EO":
             self._eo_root(values, known_layers)
 
     def _check_new_layer_group(self, values, known_layers, known_groups):
@@ -838,7 +835,7 @@ class LayerGroupTabMixin:
             raise ValueError(
                 translate(
                     "LayerGroupTabMixin", "Layer group '{}' already exists in {}."
-                ).format(name, values["workspace"] or GLOBAL)
+                ).format(name, workspace_name or global_label())
             )
 
     def _create_layer_group_from_values(
@@ -864,7 +861,7 @@ class LayerGroupTabMixin:
         published, styles = self._group_publishables(
             values["layers"], workspace_name, known_layers, known_groups
         )
-        mode = _mode_from_label(values["mode"])
+        mode = values["mode"]
         root = self._eo_root(values, known_layers) if mode == "EO" else {}
 
         group = {"name": name, "mode": mode, "publishables": {"published": published}}
@@ -1005,7 +1002,6 @@ class LayerGroupTabMixin:
     def _delete_selected_layer_groups(self, selected_rows):
         """Delete one or more layer groups after confirmation."""
         self._delete_many(
-            translate("LayerGroupTabMixin", "layer group"),
             [
                 (
                     # As the Layers tab names them; a global group has no prefix.
@@ -1017,7 +1013,24 @@ class LayerGroupTabMixin:
                 for row in selected_rows
             ],
             self._load_layer_groups,
-            lambda n: translate("LayerGroupTabMixin", "%n layer group(s)", None, n),
+            ask=self._one_or_many(
+                translate(
+                    "LayerGroupTabMixin",
+                    "Are you sure you want to delete layer group '{}'?",
+                ),
+                lambda n: translate(
+                    "LayerGroupTabMixin",
+                    "Are you sure you want to delete %n layer group(s)?",
+                    None,
+                    n,
+                ),
+            ),
+            done=self._one_or_many(
+                translate("LayerGroupTabMixin", "Layer group '{}' deleted."),
+                lambda n: translate(
+                    "LayerGroupTabMixin", "%n layer group(s) deleted.", None, n
+                ),
+            ),
             cascade=translate(
                 "LayerGroupTabMixin",
                 "Only the group goes away. The layers it published stay. "

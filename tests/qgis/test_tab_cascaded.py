@@ -513,17 +513,17 @@ class TestDelete(unittest.TestCase):
         self.dlg.show_success_message = lambda text: None
         self.asked = []
 
-        def confirm(kind, labels, cascade="", **kwargs):
-            self.asked.append((kind, labels, cascade))
+        def confirm(question, labels=(), cascade=""):
+            self.asked.append((question, labels, cascade))
             return True
 
         self.dlg._confirm_delete = confirm
 
     def test_store_delete_names_the_cascade_and_uses_the_typed_library_call(self):
         self.dlg._delete_selected_cascaded_stores([REMOTE_ROW, TILES_ROW])
-        kind, labels, cascade = self.asked[0]
-        self.assertEqual(kind, "cascaded store")
-        self.assertEqual(labels, ["topp/remote", "sf/tiles"])
+        question, labels, cascade = self.asked[0]
+        self.assertIn("delete 2 cascaded store", question)
+        self.assertEqual(labels, ["topp:remote", "sf:tiles"])
         self.assertIn("cascaded layer", cascade)
         self.assertIn(("delete_wms_store", "topp", "remote"), self.gs.calls)
         self.assertIn(("delete_wmts_store", "sf", "tiles"), self.gs.calls)

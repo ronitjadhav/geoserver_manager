@@ -40,6 +40,8 @@ _CONTENT_TYPES = {
     "mbstyle": "application/vnd.geoserver.mbstyle+json",
 }
 _EDITABLE_FORMATS = tuple(_CONTENT_TYPES)
+# Each format as its authors spell it (the combo showed "MBSTYLE").
+_FORMAT_NAMES = {"sld": "SLD", "css": "CSS", "ysld": "YSLD", "mbstyle": "MBStyle"}
 # How the form's code editor highlights each format; YSLD stays plain.
 _CODE_LANGUAGES = {"sld": "xml", "css": "css", "mbstyle": "json"}
 # A file's format, from its extension; .zip stays the library's job.
@@ -75,7 +77,8 @@ class StyleTabMixin:
             translate("StyleTabMixin", "Upload a Style"),
             translate(
                 "StyleTabMixin",
-                "Upload a style from an SLD file, pasted SLD, or a QGIS layer's symbology",
+                "Upload a style: a pasted document or a file (SLD, CSS, YSLD, "
+                "MBStyle), or a QGIS layer's symbology",
             ),
             self._add_style,
         )
@@ -361,7 +364,7 @@ class StyleTabMixin:
             {
                 "key": "name",
                 "group": translate("StyleTabMixin", "Details"),
-                "label": translate("StyleTabMixin", "Style Name"),
+                "label": translate("StyleTabMixin", "Name"),
                 "type": "text",
                 "required": True,
                 "help": translate(
@@ -451,7 +454,7 @@ class StyleTabMixin:
             fields=self._style_fields(editable, language_version, style_format),
             values={
                 "name": name,
-                "workspace": row_data[1],
+                "workspace": global_label() if row_data[1] == GLOBAL else row_data[1],
                 "format": style_format,
                 "version": language_version or "-",
                 "filename": definition.get("filename", ""),
@@ -511,7 +514,7 @@ class StyleTabMixin:
         if self._resource_exists(self.gs.get_style_definition, name, workspace_name):
             raise ValueError(
                 translate("StyleTabMixin", "Style '{}' already exists in {}.").format(
-                    name, workspace_name or GLOBAL
+                    name, workspace_name or global_label()
                 )
             )
 
@@ -617,7 +620,7 @@ class StyleTabMixin:
         return [
             {
                 "key": "name",
-                "label": translate("StyleTabMixin", "Style Name"),
+                "label": translate("StyleTabMixin", "Name"),
                 "type": "text",
                 "required": True,
             },
@@ -645,7 +648,11 @@ class StyleTabMixin:
                 "key": "format",
                 "label": translate("StyleTabMixin", "Format"),
                 "type": "combo",
-                "options": [style_format.upper() for style_format in _CONTENT_TYPES],
+                # Their own names; the value is GeoServer's format key.
+                "options": [
+                    (_FORMAT_NAMES[style_format], style_format)
+                    for style_format in _CONTENT_TYPES
+                ],
                 "help": translate(
                     "StyleTabMixin",
                     "CSS, YSLD and MBStyle need their GeoServer extension",
@@ -667,9 +674,10 @@ class StyleTabMixin:
                 "type": "file",
                 "required": True,
                 "visible": False,
-                "filter": (
+                "filter": translate(
+                    "StyleTabMixin",
                     "Styles (*.sld *.zip *.css *.ysld *.yaml *.mbstyle *.json);;"
-                    "All files (*)"
+                    "All files (*)",
                 ),
                 "help": translate(
                     "StyleTabMixin",
@@ -900,7 +908,9 @@ class StyleTabMixin:
             self,
             translate("StyleTabMixin", "Save style '{}'").format(name),
             suggested,
-            f"{style_format.upper()} (*.{style_format});;All files (*)",
+            translate("StyleTabMixin", "{} (*.{});;All files (*)").format(
+                style_format.upper(), style_format
+            ),
         )
         if not path:
             return
@@ -1093,10 +1103,10 @@ class StyleTabMixin:
     def _delete_selected_styles(self, selected_rows):
         """Delete one or more styles after confirmation."""
         self._delete_many(
-            translate("StyleTabMixin", "style"),
             [
                 (
-                    f"{row[1]}/{row[0]}",
+                    # "ws:name" as layers and groups are named; a global one bare
+                    f"{scope(row[1])}:{row[0]}" if scope(row[1]) else row[0],
                     lambda name=row[0], ws=scope(row[1]): self._do_delete_style(
                         name, ws
                     ),
@@ -1104,7 +1114,21 @@ class StyleTabMixin:
                 for row in selected_rows
             ],
             self._load_styles,
-            lambda n: translate("StyleTabMixin", "%n style(s)", None, n),
+            ask=self._one_or_many(
+                translate(
+                    "StyleTabMixin", "Are you sure you want to delete style '{}'?"
+                ),
+                lambda n: translate(
+                    "StyleTabMixin",
+                    "Are you sure you want to delete %n style(s)?",
+                    None,
+                    n,
+                ),
+            ),
+            done=self._one_or_many(
+                translate("StyleTabMixin", "Style '{}' deleted."),
+                lambda n: translate("StyleTabMixin", "%n style(s) deleted.", None, n),
+            ),
             cascade=translate(
                 "StyleTabMixin",
                 "The style file is removed from the server too, and layers that used "

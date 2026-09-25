@@ -784,7 +784,7 @@ class TestErrorText(unittest.TestCase):
         dlg = SyncDialog()
         errors = []
         dlg.show_error_message = errors.append
-        dlg._confirm_delete = lambda kind, labels, cascade="", **kwargs: True
+        dlg._confirm_delete = lambda question, labels=(), cascade="": True
 
         def boom():
             raise self._http_error(
@@ -792,7 +792,10 @@ class TestErrorText(unittest.TestCase):
             )
 
         dlg._delete_many(
-            "layer", [("ws/ds/l", boom)], lambda: None, lambda n: f"{n} layers"
+            [("ws/ds/l", boom)],
+            lambda: None,
+            ask=dlg._one_or_many("Delete '{}'?", lambda n: ""),
+            done=dlg._one_or_many("'{}' deleted.", lambda n: ""),
         )
         self.assertEqual(len(errors), 1)
         self.assertIn("layer group 'x'", errors[0])
@@ -1426,10 +1429,11 @@ class TestFileStoreFormBehaviour(unittest.TestCase):
 
     def test_the_new_types_are_offered_in_the_type_combo(self):
         options = [
-            field["options"]
+            value
             for field in self.dlg._datastore_fields(["topp"])
             if field["key"] == "type"
-        ][0]
+            for _label, value in field["options"]
+        ]
         for store_type in (
             "Shapefile",
             "Directory of spatial files (shapefiles)",
@@ -1523,7 +1527,7 @@ class TestConnectionGuard(unittest.TestCase):
         self.dlg.show_success_message = lambda text: None
         # If the guard ever breaks, a row action would reach the modal delete
         # confirmation and hang the suite instead of failing it.
-        self.dlg._confirm_delete = lambda kind, labels, cascade="", **kwargs: False
+        self.dlg._confirm_delete = lambda question, labels=(), cascade="": False
         self.dlg._load_layers()  # arms the buttons, as a loaded tab does
         self.dlg.gs = None  # what refresh_ui() does while it re-probes
 

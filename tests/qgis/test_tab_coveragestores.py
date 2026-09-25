@@ -614,7 +614,7 @@ class TestPublishAndDelete(unittest.TestCase):
         Recording.opened.clear()  # class-level: order must not matter
         self.dlg = SyncDialog()
         self.dlg.gs = FakeGS()
-        self.dlg._confirm_delete = lambda kind, labels, cascade="", **kwargs: True
+        self.dlg._confirm_delete = lambda question, labels=(), cascade="": True
         self.dlg._load_coverage_stores = lambda: None
         self.dlg.show_success_message = lambda text: None
         self.dlg.show_warning_message = lambda text: None
@@ -669,13 +669,13 @@ class TestPublishAndDelete(unittest.TestCase):
     def test_the_delete_confirmation_names_the_cascade(self):
         seen = {}
 
-        def confirm(kind, labels, cascade="", **kwargs):
-            seen.update(kind=kind, cascade=cascade)
+        def confirm(question, labels=(), cascade=""):
+            seen.update(question=question, cascade=cascade)
             return False
 
         self.dlg._confirm_delete = confirm
         self.dlg._delete_selected_coverage_stores([["sfdem", "sf", "GeoTIFF", "1"]])
-        self.assertEqual(seen["kind"], "coverage store")
+        self.assertIn("delete coverage store 'sf:sfdem'?", seen["question"])
         self.assertIn("layers published from them", seen["cascade"])
 
 

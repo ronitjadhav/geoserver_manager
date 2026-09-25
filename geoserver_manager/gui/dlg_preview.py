@@ -12,7 +12,7 @@ already knows how to send it, so the plugin does not hand-roll the URL.
 
 from qgis.core import Qgis, QgsCoordinateReferenceSystem, QgsRectangle
 from qgis.gui import QgsMapCanvas, QgsMapTool
-from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtCore import QCoreApplication, Qt
 from qgis.PyQt.QtGui import QCursor
 from qgis.PyQt.QtWidgets import (
     QApplication,
@@ -193,13 +193,19 @@ class LayerPreviewDialog(QDialog):
     def result_text(point, result):
         """The panel's text for one identify result."""
         if not result.isValid():
-            return result.error().message() or "GetFeatureInfo failed."
+            return result.error().message() or QCoreApplication.translate(
+                "LayerPreviewDialog", "GetFeatureInfo failed."
+            )
         lines = [f"{point.x():.6f}, {point.y():.6f}"]
         values = result.results()
         for key in sorted(values):
             value = values[key]
             lines.append(
-                str(value) if isinstance(value, str) else f"Band {key}: {value}"
+                str(value)
+                if isinstance(value, str)
+                else QCoreApplication.translate(
+                    "LayerPreviewDialog", "Band {}: {}"
+                ).format(key, value)
             )
         return "\n".join(lines) if len(lines) > 1 else lines[0] + "\n-"
 

@@ -75,10 +75,14 @@ class TestTasks(unittest.TestCase):
 
         with patch.object(self.dlg, "_confirm_delete", return_value=True):
             self.dlg._delete_many(
-                "layer",
                 [("a", refused), ("b", cancel_the_rest), ("c", lambda: None)],
                 lambda: None,
-                lambda n: f"{n} layers",
+                ask=dlg_main.GeoServerMainDialog._one_or_many(
+                    "Delete '{}'?", lambda n: ""
+                ),
+                done=dlg_main.GeoServerMainDialog._one_or_many(
+                    "'{}' deleted.", lambda n: ""
+                ),
             )
         settle(lambda: self.dlg._delete is None and self.messages)
         kinds = [kind for kind, _text in self.messages]
@@ -271,10 +275,14 @@ class TestConnection(unittest.TestCase):
         reloaded = []
         with patch.object(dlg, "_confirm_delete", return_value=True):
             dlg._delete_many(
-                "layer",
                 [("a", lambda: None)],
                 lambda: reloaded.append(1),
-                lambda n: f"{n} layers",
+                ask=dlg_main.GeoServerMainDialog._one_or_many(
+                    "Delete '{}'?", lambda n: ""
+                ),
+                done=dlg_main.GeoServerMainDialog._one_or_many(
+                    "'{}' deleted.", lambda n: ""
+                ),
             )
         self.assertEqual(reloaded, [])
 

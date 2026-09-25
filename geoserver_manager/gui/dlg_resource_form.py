@@ -21,7 +21,7 @@ Usage:
 
 For edit mode, pass existing values:
     dlg = ResourceFormDialog(
-        title="Edit Workspace 'my_ws'",
+        title="Workspace 'my_ws'",
         fields=fields,
         values={"name": "my_ws", "isolated": False},
         parent=self,
@@ -133,6 +133,15 @@ _CODE_EDITORS = {
 }
 
 
+def _scaled(font, factor):
+    """The font, `factor` times its size, never below a readable 7 pt."""
+    if font.pointSizeF() > 0:
+        font.setPointSizeF(max(font.pointSizeF() * factor, 7.0))
+    else:  # a font set in pixels
+        font.setPixelSize(max(round(font.pixelSize() * factor), 9))
+    return font
+
+
 class _FormPage(QgsScrollArea):
     """A form that scrolls when the dialog is too small, rather than squeeze.
 
@@ -219,7 +228,11 @@ class ResourceFormDialog(QDialog):
 
         # Header
         title_label = QLabel(title)
-        title_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+        # Sizes from the dialog's own font: fixed pixels ignored QGIS's font
+        # size setting, and the title came out smaller than the description.
+        font = _scaled(title_label.font(), 1.15)
+        font.setBold(True)
+        title_label.setFont(font)
         layout.addWidget(title_label)
 
         if description:
@@ -299,7 +312,8 @@ class ResourceFormDialog(QDialog):
 
             # Label
             label_text = field["label"]
-            if field.get("required"):
+            # Not on a locked field: an asterisk asks for input it cannot take.
+            if field.get("required") and not field.get("read_only"):
                 label_text += " *"
             label = QLabel(label_text)
             label.setContentsMargins(0, 4, 0, 4)
@@ -315,9 +329,8 @@ class ResourceFormDialog(QDialog):
             if help_text:
                 help_label = QLabel(help_text)
                 help_label.setWordWrap(True)
-                help_label.setStyleSheet(
-                    f"color: {hint_colour(self.palette())}; font-size: 11px;"
-                )
+                help_label.setStyleSheet(f"color: {hint_colour(self.palette())};")
+                help_label.setFont(_scaled(help_label.font(), 0.85))
                 help_label.setSizePolicy(
                     QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
                 )
@@ -452,6 +465,9 @@ class ResourceFormDialog(QDialog):
         if ftype == "list":
             w = QgsListWidget(QMetaType.Type.QString)
             w.setList([str(item) for item in (value or [])])
+            view = w.findChild(QTableView)
+            if view is not None:  # a lone "Value" header over a list of words
+                view.horizontalHeader().hide()
             w.setReadOnly(read_only)
             self._grows(w, field, max_height=160)
             # QGIS's own .ui sets 300 px, wider than the form's field column:

@@ -217,11 +217,10 @@ class DatastoreTabMixin:
             return ("-", "-")
         return (detail.get("type", "-"), self._yes_no(detail.get("enabled", True)))
 
-    def _datastore_fields(self, workspace_names, on_type_changed=None, edit_mode=False):
+    def _datastore_fields(self, workspace_names, edit_mode=False):
         """Return datastore form field definitions with type-specific params.
 
         :param workspace_names: list of workspace names for the combo box.
-        :param on_type_changed: callback(new_type) when the type combo changes.
         :param edit_mode: editing an existing datastore. The workspace is
             fixed and the password has to be re-entered.
         """
@@ -259,9 +258,20 @@ class DatastoreTabMixin:
                 "key": "type",
                 "label": translate("DatastoreTabMixin", "Type"),
                 "type": "combo",
-                "options": _SUPPORTED_TYPES,
+                # GeoServer's own type names, and "Other..." in the user's
+                # language: it was both the label and the key (#91).
+                "options": [
+                    (
+                        (
+                            translate("DatastoreTabMixin", "Other...")
+                            if kind == _OTHER
+                            else kind
+                        ),
+                        kind,
+                    )
+                    for kind in _SUPPORTED_TYPES
+                ],
                 "required": True,
-                "on_change": on_type_changed,
             },
             {
                 "key": "description",
@@ -349,11 +359,19 @@ class DatastoreTabMixin:
                 "type": "keyvalue",
                 "visible": False,
                 "max_height": 320,
-                "help": translate(
-                    "DatastoreTabMixin",
-                    "Exactly as GeoServer stores them. A parameter you remove is "
-                    "removed on the server; a masked password (••••) is kept as "
-                    "it is unless you replace it.",
+                "help": (
+                    translate(
+                        "DatastoreTabMixin",
+                        "Exactly as GeoServer stores them. A parameter you remove "
+                        "is removed on the server; a masked password (••••) is "
+                        "kept as it is unless you replace it.",
+                    )
+                    if edit_mode
+                    else translate(
+                        "DatastoreTabMixin",
+                        "The type's connection parameters, named as GeoServer's "
+                        "documentation of that type names them.",
+                    )
                 ),
             },
             # --- PMTiles fields ---
@@ -706,8 +724,8 @@ class DatastoreTabMixin:
         type_combo = dlg.get_widget("type")
         if type_combo is None:
             return
-        type_combo.currentTextChanged.connect(lambda t: self._on_type_changed(dlg, t))
-        self._on_type_changed(dlg, initial_type or type_combo.currentText())
+        dlg.on_value_changed("type", lambda kind: self._on_type_changed(dlg, kind))
+        self._on_type_changed(dlg, initial_type or dlg.get_values()["type"])
         if locked:
             type_combo.setEnabled(False)
 
@@ -1081,7 +1099,7 @@ class DatastoreTabMixin:
         editable = ds_type in _OWNED_PARAMS
 
         dlg = ResourceFormDialog(
-            title=translate("DatastoreTabMixin", "Edit Datastore '{}'").format(ds_name),
+            title=translate("DatastoreTabMixin", "Datastore '{}'").format(ds_name),
             description=(
                 translate(
                     "DatastoreTabMixin",
@@ -1159,16 +1177,32 @@ class DatastoreTabMixin:
     def _delete_selected_datastores(self, selected_rows):
         """Delete one or more datastores after confirmation."""
         self._delete_many(
-            translate("DatastoreTabMixin", "datastore"),
             [
                 (
-                    f"{row[1]}/{row[0]}",
+                    f"{row[1]}:{row[0]}",
                     lambda ws=row[1], ds=row[0]: self._do_delete_datastore(ws, ds),
                 )
                 for row in selected_rows
             ],
             self._load_datastores,
-            lambda n: translate("DatastoreTabMixin", "%n datastore(s)", None, n),
+            ask=self._one_or_many(
+                translate(
+                    "DatastoreTabMixin",
+                    "Are you sure you want to delete datastore '{}'?",
+                ),
+                lambda n: translate(
+                    "DatastoreTabMixin",
+                    "Are you sure you want to delete %n datastore(s)?",
+                    None,
+                    n,
+                ),
+            ),
+            done=self._one_or_many(
+                translate("DatastoreTabMixin", "Datastore '{}' deleted."),
+                lambda n: translate(
+                    "DatastoreTabMixin", "%n datastore(s) deleted.", None, n
+                ),
+            ),
             # _do_delete_datastore sends recurse=true
             cascade=translate(
                 "DatastoreTabMixin", "Every layer published from it is deleted too."

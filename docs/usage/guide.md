@@ -64,7 +64,7 @@ A workspace groups stores, layers and styles, like a folder.
   the *WMS*, *WFS*, *WCS* and *WMTS* tabs.
 
 ```{figure} ../static/screenshots/workspace-edit.png
-:alt: The Edit Workspace form, with the name, namespace URI, isolation and default checkboxes, and WMS, WFS, WCS and WMTS tabs
+:alt: The workspace form, with the name, namespace URI, isolation and default checkboxes, and WMS, WFS, WCS and WMTS tabs
 :width: 420px
 
 Editing a workspace.
