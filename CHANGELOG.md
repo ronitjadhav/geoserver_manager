@@ -392,6 +392,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **The plugin loads on a PyQt6 QGIS.** It watched a palette signal that
+  PyQt6 no longer has, and failed while setting up its menu.
+- A click on the toolbar button brings an open, connected dialog forward;
+  it used to reconnect and reload the tab every time.
+- The help menu's documentation entry and the missing-library message's
+  title translate.
 - Clicking the Actions header keeps the page shown; it went back to the
   first one.
 - A password keeps the spaces at its edges; every text field's were

@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 from qgis.core import Qgis, QgsLayerTreeModel, QgsProject, QgsVectorLayer
 from qgis.gui import QgsLayerTreeView
-from qgis.PyQt.QtCore import QSize
+from qgis.PyQt.QtCore import QCoreApplication, QEvent, QSize
 from qgis.PyQt.QtGui import QColor, QIcon, QPalette
 from qgis.PyQt.QtWidgets import QApplication, QDialog, QMainWindow, QMenu
 from qgis.testing import start_app, unittest
@@ -46,6 +46,7 @@ class FakeIface:
         self.view.setModel(self.model)
         self.bar = FakeBar()
         self.help_menu = QMenu()
+        self.window = QMainWindow()
 
     def layerTreeView(self):  # noqa: N802
         return self.view
@@ -54,7 +55,7 @@ class FakeIface:
         return self.bar
 
     def mainWindow(self):  # noqa: N802
-        return None
+        return self.window
 
     def pluginHelpMenu(self):  # noqa: N802
         return self.help_menu
@@ -572,18 +573,16 @@ class TestPluginWiring(unittest.TestCase):
         self.assertEqual(tried, [1])
         self.assertIsNone(plugin.main_dialog)
 
-    def test_menu_icons_follow_the_palette_and_disconnect_on_unload(self):
-        app = QApplication.instance()
-        original = QPalette(app.palette())
+    def test_menu_icons_follow_the_palette_and_stop_watching_on_unload(self):
+        from geoserver_manager.plugin_main import _PaletteWatch
+
+        original = QPalette(QApplication.palette())
         self.addCleanup(QApplication.setPalette, original)
-        receivers = app.receivers(app.paletteChanged)
-        window = QMainWindow()
-        self.addCleanup(window.deleteLater)
-        self.iface.mainWindow = lambda: window
+        window = self.iface.window
         plugin = GeoServerManagerPlugin(self.iface)
         plugin.initGui()
         try:
-            self.assertEqual(app.receivers(app.paletteChanged), receivers + 1)
+            self.assertEqual(len(window.findChildren(_PaletteWatch)), 1)
             before = plugin.action_help.icon().pixmap(QSize(20, 20)).toImage()
             changed = QPalette(original)
             changed.setColor(QPalette.ColorRole.Text, QColor("#526fa8"))
@@ -593,7 +592,56 @@ class TestPluginWiring(unittest.TestCase):
             self.assertNotEqual(before, after)
         finally:
             plugin.unload()
-        self.assertEqual(app.receivers(app.paletteChanged), receivers)
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        self.assertEqual(window.findChildren(_PaletteWatch), [])
+
+    def test_no_pyqt5_only_palette_signal_is_used(self):
+        """QApplication.paletteChanged is deprecated in Qt 6 and PyQt6 does
+        not bind it: connecting it stopped the plugin from loading there."""
+        from pathlib import Path
+
+        import geoserver_manager
+
+        root = Path(geoserver_manager.__file__).parent
+        offenders = [
+            str(path.relative_to(root))
+            for path in root.rglob("*.py")
+            if "paletteChanged" in path.read_text(encoding="utf-8")
+        ]
+        self.assertEqual(offenders, [])
+
+    def test_a_click_on_an_open_connected_dialog_brings_it_forward(self):
+        """It used to reconnect and reload the open tab on every click."""
+        from types import SimpleNamespace
+
+        calls = []
+
+        class Dialog:
+            gs = object()
+
+            def isVisible(self):  # noqa: N802
+                return True
+
+            def show(self):
+                calls.append("show")
+
+            def raise_(self):
+                calls.append("raise")
+
+            def activateWindow(self):  # noqa: N802
+                calls.append("activate")
+
+            def refresh_ui(self):
+                calls.append("refresh")
+
+        plugin = GeoServerManagerPlugin(self.iface)
+        plugin.dependencies_available = True
+        plugin.plg_settings = SimpleNamespace(
+            get_plg_settings=lambda: SimpleNamespace(has_credentials=lambda: True)
+        )
+        plugin.main_dialog = Dialog()
+        plugin.run()
+        self.assertEqual(calls, ["raise", "activate"])
 
     def test_highlighted_menu_icons_keep_their_strokes_visible(self):
         plugin = GeoServerManagerPlugin(self.iface)

@@ -1355,10 +1355,15 @@
         <source>&lt;b&gt;GeoServer Manager could not start.&lt;/b&gt;&lt;br&gt;&lt;br&gt;The bundled &lt;code&gt;geoservercloud&lt;/code&gt; library did not import. Reinstalling the plugin usually fixes it; otherwise install it into QGIS's Python by running in a terminal:&lt;br&gt;&lt;code&gt;pip install geoservercloud&lt;/code&gt;&lt;br&gt;&lt;br&gt;Details are in the QGIS log panel, GeoServer Manager tab.</source>
         <translation type="unfinished" />
     </message>
+    <message>
+        <location filename="../../toolbelt/dependencies.py" line="158" />
+        <source>GeoServer Manager: missing library</source>
+        <translation type="unfinished" />
+    </message>
 </context><context>
     <name>GeoServerMainDialog</name>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1698" />
+        <location filename="../../gui/dlg_main.py" line="1701" />
         <source>GeoServer answered with something that is not its REST API (a sign-in page?)</source>
         <translation type="unfinished" />
     </message>
@@ -1505,7 +1510,7 @@
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1841" />
+        <location filename="../../gui/dlg_main.py" line="1844" />
         <location filename="../../gui/dlg_main.py" line="827" />
         <source>Cancel</source>
         <translation>Annuler</translation>
@@ -1536,7 +1541,7 @@
         <translation>Chargement…</translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="2145" />
+        <location filename="../../gui/dlg_main.py" line="2148" />
         <location filename="../../gui/dlg_main.py" line="846" />
         <source>Working…</source>
         <translation type="unfinished" />
@@ -1637,104 +1642,104 @@
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1388" />
+        <location filename="../../gui/dlg_main.py" line="1391" />
         <location filename="../../gui/dlg_main.py" line="1097" />
         <source>Actions</source>
         <translation>Actions</translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1240" />
+        <location filename="../../gui/dlg_main.py" line="1243" />
         <source>Click to open (or select and press Enter)</source>
         <translation>Cliquer pour ouvrir (ou sélectionner et appuyer sur Entrée)</translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1242" />
+        <location filename="../../gui/dlg_main.py" line="1245" />
         <source>Click to open</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1294" />
+        <location filename="../../gui/dlg_main.py" line="1297" />
         <source>Results {} to {} (out of {} items)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1301" />
+        <location filename="../../gui/dlg_main.py" line="1304" />
         <source>Not connected. Press Refresh (F5), or open Settings.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1304" />
+        <location filename="../../gui/dlg_main.py" line="1307" />
         <source>Nothing matches '{}'. Esc clears the filter.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1310" />
+        <location filename="../../gui/dlg_main.py" line="1313" />
         <source>Nothing here yet. Start with '{}' above.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1313" />
+        <location filename="../../gui/dlg_main.py" line="1316" />
         <source>No results</source>
         <translation>Aucun résultat</translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1388" />
+        <location filename="../../gui/dlg_main.py" line="1391" />
         <source>More</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1393" />
+        <location filename="../../gui/dlg_main.py" line="1396" />
         <source>Actions for {}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1532" />
+        <location filename="../../gui/dlg_main.py" line="1535" />
         <source>Yes</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1532" />
+        <location filename="../../gui/dlg_main.py" line="1535" />
         <source>No</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1628" />
-        <location filename="../../gui/dlg_main.py" line="1605" />
+        <location filename="../../gui/dlg_main.py" line="1631" />
+        <location filename="../../gui/dlg_main.py" line="1608" />
         <source>Failed to load the details</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1658" />
+        <location filename="../../gui/dlg_main.py" line="1661" />
         <source>'{}' has a '/', '?', '#' or '%' in its name, which changes the address the plugin would use. Rename it in GeoServer's web interface to manage it here.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1676" />
+        <location filename="../../gui/dlg_main.py" line="1679" />
         <source>'{}' cannot be used as a name: no slash, '?', '#', '%' or leading and trailing spaces.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1732" />
+        <location filename="../../gui/dlg_main.py" line="1735" />
         <source>Not connected to GeoServer. Press Refresh (F5) to connect.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1770" />
+        <location filename="../../gui/dlg_main.py" line="1773" />
         <source>Stopped waiting. GeoServer may still apply the change: the tab reloads once it answers.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="1840" />
+        <location filename="../../gui/dlg_main.py" line="1843" />
         <source>Waiting for GeoServer…</source>
         <translation>En attente de GeoServer…</translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="2002" />
+        <location filename="../../gui/dlg_main.py" line="2005" />
         <source>'{}' was saved, but GeoServer cannot read it: {}</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/dlg_main.py" line="2022" />
+        <location filename="../../gui/dlg_main.py" line="2025" />
         <source>%n item(s) could not be listed: {names}. Details in the QGIS log (GeoServer Manager tab).</source>
         <translation>
             <numerusform>%n élément n'a pas pu être listé : {names}. Détails dans le journal QGIS (onglet GeoServer Manager).</numerusform>
@@ -1742,59 +1747,59 @@
         </translation>
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="2053" />
+        <location filename="../../gui/dlg_main.py" line="2056" />
         <source>This action cannot be undone.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="2056" />
+        <location filename="../../gui/dlg_main.py" line="2059" />
         <source>Please confirm</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="2079" />
+        <location filename="../../gui/dlg_main.py" line="2082" />
         <source>A delete is already running. Wait for it or cancel it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="2109" />
+        <location filename="../../gui/dlg_main.py" line="2112" />
         <source>These failed:
 {errors}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="2118" />
+        <location filename="../../gui/dlg_main.py" line="2121" />
         <source>Cancelled. What was already done stays done. These failed:
 {errors}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="2125" />
+        <location filename="../../gui/dlg_main.py" line="2128" />
         <source>Cancelled. What was already done stays done.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="2141" />
+        <location filename="../../gui/dlg_main.py" line="2144" />
         <source>The batch stopped</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="2169" />
+        <location filename="../../gui/dlg_main.py" line="2172" />
         <source>An upload is already running. Wait for it or cancel it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="2252" />
+        <location filename="../../gui/dlg_main.py" line="2255" />
         <source>Upload of '{name}' cancelled. GeoServer kept the {kind} and its layer but had already removed their data file. Upload it again with Replace ticked, or delete the {kind}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="2258" />
+        <location filename="../../gui/dlg_main.py" line="2261" />
         <source>Upload of '{name}' cancelled. Check the {tab} tab for what was left.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_main.py" line="2262" />
+        <location filename="../../gui/dlg_main.py" line="2265" />
         <source>Upload of '{name}' cancelled. Nothing was left on the server.</source>
         <translation type="unfinished" />
     </message>
@@ -1873,22 +1878,27 @@
 </context><context>
     <name>GeoServerManagerPlugin</name>
     <message>
-        <location filename="../../plugin_main.py" line="87" />
+        <location filename="../../plugin_main.py" line="113" />
         <source>Help</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../plugin_main.py" line="96" />
+        <location filename="../../plugin_main.py" line="122" />
         <source>Settings</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../plugin_main.py" line="233" />
+        <location filename="../../plugin_main.py" line="152" />
+        <source>{} documentation</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../plugin_main.py" line="262" />
         <source>GeoServer Manager: first connection</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../plugin_main.py" line="234" />
+        <location filename="../../plugin_main.py" line="263" />
         <source>Welcome to GeoServer Manager.
 
 Enter your GeoServer's URL, user name and password on the settings page that opens next; Test connection tells you whether they work before you save.</source>
@@ -3765,52 +3775,52 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
 </context><context>
     <name>ResourceFormDialog</name>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="300" />
+        <location filename="../../gui/dlg_resource_form.py" line="293" />
         <source>General</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="280" />
+        <location filename="../../gui/dlg_resource_form.py" line="273" />
         <source>Save</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="545" />
+        <location filename="../../gui/dlg_resource_form.py" line="538" />
         <source>Not set</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="576" />
+        <location filename="../../gui/dlg_resource_form.py" line="569" />
         <source>Pick a CRS</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="875" />
+        <location filename="../../gui/dlg_resource_form.py" line="886" />
         <source>Discard your changes?</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="888" />
+        <location filename="../../gui/dlg_resource_form.py" line="899" />
         <source>Close</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="931" />
+        <location filename="../../gui/dlg_resource_form.py" line="942" />
         <source>'{}' is picked in '{}' but not added: press Add, or clear it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="935" />
+        <location filename="../../gui/dlg_resource_form.py" line="946" />
         <source>'{}' must start with http:// or https://.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="937" />
+        <location filename="../../gui/dlg_resource_form.py" line="948" />
         <source>'{}' has nothing to choose from.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="939" />
+        <location filename="../../gui/dlg_resource_form.py" line="950" />
         <source>'{}' is required.</source>
         <translation type="unfinished" />
     </message>

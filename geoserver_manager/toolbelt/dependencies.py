@@ -153,5 +153,11 @@ def ensure_dependencies() -> bool:
         "<code>pip install geoservercloud</code><br><br>"
         "Details are in the QGIS log panel, GeoServer Manager tab.",
     )
-    QMessageBox.critical(None, "GeoServer Manager - Missing Dependency", error_msg)
+    QMessageBox.critical(
+        None,
+        QCoreApplication.translate(
+            "Dependencies", "GeoServer Manager: missing library"
+        ),
+        error_msg,
+    )
     return False
