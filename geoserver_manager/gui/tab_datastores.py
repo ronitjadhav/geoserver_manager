@@ -217,12 +217,14 @@ class DatastoreTabMixin:
             return ("-", "-")
         return (detail.get("type", "-"), self._yes_no(detail.get("enabled", True)))
 
-    def _datastore_fields(self, workspace_names, edit_mode=False):
+    def _datastore_fields(self, workspace_names, edit_mode=False, typed=True):
         """Return datastore form field definitions with type-specific params.
 
         :param workspace_names: list of workspace names for the combo box.
         :param edit_mode: editing an existing datastore. The workspace is
             fixed, and a password left blank keeps the stored one.
+        :param typed: the store's type has a form of its own. The generic
+            editor shows every parameter already, so it gets no Advanced tab.
         """
         # One page: the fields of the picked type show right under Type. On a
         # tab of their own, picking PostGIS meant going to look for them (#91).
@@ -550,8 +552,9 @@ class DatastoreTabMixin:
                     ),
                 },
             )
-            # Every parameter the typed fields do not own. Not in Add: it
-            # would show an empty Advanced tab there.
+        if edit_mode and typed:
+            # Every parameter the typed fields do not own. Not in Add, nor
+            # for the generic editor: an empty Advanced tab either way.
             fields.append(
                 {
                     "key": "other_params",
@@ -702,8 +705,6 @@ class DatastoreTabMixin:
         for key in _TYPE_SPECIFIC_FIELDS:
             dlg.set_field_visible(key, False)
         dlg.set_field_visible("raw_params", True)
-        # raw_params already holds every parameter.
-        dlg.set_field_visible("other_params", False)
 
     @staticmethod
     def _parse_params(pairs):
@@ -740,9 +741,11 @@ class DatastoreTabMixin:
         Merged onto the stored parameters, as every other store save is.
         """
         uri = self._namespace_uri(ws)
+        if not uri or uri == f"http://{ws}":
+            return  # what the library sent already
         detail = self._check(self.gs.get_datastore(ws, name))
         params = dict(self._connection_params(detail))
-        if not uri or params.get("namespace") == uri:
+        if params.get("namespace") == uri:
             return
         params["namespace"] = uri
         self._check(
@@ -854,8 +857,6 @@ class DatastoreTabMixin:
                     description=description,
                 )
             )
-        else:
-            raise ValueError(f"Unsupported datastore type: {ds_type}")
 
     def _update_datastore_from_values(self, values, detail, conn_params, old_name=None):
         """Save an edit without discarding server-side configuration.
@@ -878,8 +879,11 @@ class DatastoreTabMixin:
         ds_type = detail.get("type") if isinstance(detail, dict) else None
         if not ds_type:
             raise RuntimeError(
-                "GeoServer did not report this datastore's type, so it cannot "
-                "be updated safely."
+                translate(
+                    "DatastoreTabMixin",
+                    "GeoServer did not report this datastore's type, so it cannot "
+                    "be updated safely.",
+                )
             )
 
         merged = dict(conn_params)
@@ -1024,13 +1028,18 @@ class DatastoreTabMixin:
             result[key] = self._kept(conn_params, key, value)
         return result
 
-    def _rename_datastore(self, workspace_name, old_name, new_name):
-        """Rename a datastore: one PUT with the new name on the old path.
+    def _datastore_path(self, workspace_name, datastore_name):
+        """The store's REST path, its segments quoted (see _addressable)."""
+        return self.gs.rest_service.rest_endpoints.datastore(
+            quote(workspace_name, safe=""), quote(datastore_name, safe="")
+        )
 
-        TODO(#50): no rename in the library (row 56). Refused before any
-        request when the name is unsafe or taken, since a taken name would
-        leave two stores fighting over one path.
-        """
+    def _check_datastore_rename(self, workspace_name, old_name, new_name):
+        """Refuse, before any request, a new name a URL would eat or one
+        taken: a taken name would leave two stores fighting over one path.
+        Reads only: the edit form runs it before it closes, the rename again."""
+        if new_name == old_name:
+            return
         self._require_safe_name(new_name)
         if self._resource_exists(self.gs.get_datastore, workspace_name, new_name):
             raise ValueError(
@@ -1039,11 +1048,16 @@ class DatastoreTabMixin:
                     "Datastore '{}' already exists in workspace '{}'.",
                 ).format(new_name, workspace_name)
             )
+
+    def _rename_datastore(self, workspace_name, old_name, new_name):
+        """Rename a datastore: one PUT with the new name on the old path.
+
+        TODO(#50): no rename in the library (row 56).
+        """
+        self._check_datastore_rename(workspace_name, old_name, new_name)
         self._raw_rest(
             "put",
-            self.gs.rest_service.rest_endpoints.datastore(
-                quote(workspace_name, safe=""), quote(old_name, safe="")
-            ),
+            self._datastore_path(workspace_name, old_name),
             json={"dataStore": {"name": new_name}},
         )
 
@@ -1153,9 +1167,14 @@ class DatastoreTabMixin:
                 ).format(ds_type)
             ),
             # Edit mode locks the workspace, so its own name is all the combo needs.
-            fields=self._datastore_fields([ws_name], edit_mode=True),
+            fields=self._datastore_fields([ws_name], edit_mode=True, typed=editable),
             values=values,
             parent=self,
+            validate=self._form_check(
+                lambda after: self._check_datastore_rename(
+                    ws_name, ds_name, after["name"]
+                )
+            ),
         )
         if editable:
             self._wire_type_combo(dlg, initial_type=values["type"], locked=True)
@@ -1194,9 +1213,7 @@ class DatastoreTabMixin:
         rotated password on the database side. TODO(#50): no reset in the
         library (row 54): POST .../reset (measured on 2.28.5)."""
         name, ws_name = row_data[0], row_data[1]
-        path = self.gs.rest_service.rest_endpoints.datastore(
-            quote(ws_name, safe=""), quote(name, safe="")
-        )
+        path = self._datastore_path(ws_name, name)
         if self._run_action(
             lambda: self._wait_for_save(
                 lambda: self._raw_rest("post", path.removesuffix(".json") + "/reset")
@@ -1252,7 +1269,5 @@ class DatastoreTabMixin:
         """Execute the REST DELETE for a datastore (recurse=true removes feature types too)."""
         # TODO(#50): upstream as delete_datastore(ws, ds, recurse=True); the library
         # has none. Workaround: DELETE /workspaces/{ws}/datastores/{ds}.json?recurse=true
-        path = self.gs.rest_service.rest_endpoints.datastore(
-            workspace_name, datastore_name
-        )
+        path = self._datastore_path(workspace_name, datastore_name)
         self._raw_rest("delete", path, params={"recurse": "true"})

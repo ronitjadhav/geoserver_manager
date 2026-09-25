@@ -392,6 +392,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- Opening a workspace's edit form reads each settings path once, and the
+  global service settings only where the workspace has none of its own; it
+  used to read every path twice and all four global documents.
+- Renaming a workspace or a datastore onto a taken or unsafe name is refused
+  inside the edit form, keeping what was typed; a workspace rename onto a
+  taken name was not checked at all.
+- The editor for a datastore type without its own form (Properties, Oracle,
+  CSV...) no longer opens with an empty Advanced tab.
+- When GeoServer's default workspace cannot be read, the Default column shows
+  "-" and a warning says so; every row used to say "No".
+- Saving the default workspace no longer re-sets it as the default on every
+  save; creating a PostGIS, JNDI or PMTiles store no longer fetches it back
+  when the workspace uses the default namespace URI.
 - **Editing a CSS or YSLD style saves.** The body was sent to a path without
   its extension, which GeoServer refused.
 - Saving a style's body updates its SLD version in the list; the old one

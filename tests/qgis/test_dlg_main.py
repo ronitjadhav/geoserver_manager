@@ -491,10 +491,23 @@ class TestDefaultWorkspaceHandling(unittest.TestCase):
         self.assertEqual(self.warnings, [])
         self.assertIn("could not be made the default", warning[0])
 
-    def test_default_workspace_name_is_none_when_unreadable(self):
-        self.assertIsNone(
-            self.dlg._default_workspace_name()
-        )  # FakeGS has no REST client
+    def test_default_workspace_name_raises_when_unreadable(self):
+        # Swallowed here, every row of the list read "No" without a word; the
+        # list reports it, the edit form's prefill treats it as unknown.
+        with self.assertRaises(Exception):
+            self.dlg._default_workspace_name()  # FakeGS has no REST client
+
+    def test_a_create_checks_the_name_once(self):
+        counted = []
+        with patch.object(
+            type(self.dlg),
+            "_require_safe_name",
+            lambda inner, name: counted.append(name),
+        ):
+            self.dlg._save_workspace(
+                {"name": "fresh", "isolated": False, "set_default": False, "uri": ""}
+            )
+        self.assertEqual(counted, ["fresh"])
 
     def test_default_flag_locks_the_checkbox_field(self):
         field = [
@@ -823,6 +836,28 @@ class SlowGS:
     def __init__(self, latency=0.2, workspaces=50):
         self.latency = latency
         self.names = [f"ws{index:02d}" for index in range(workspaces)]
+        outer = self
+
+        class Response:
+            status_code = 200
+            text = ""
+
+            def json(inner):  # the default workspace, read raw
+                return {"workspace": {"name": outer.names[0]}}
+
+        class Client:
+            def get(inner, path, **kwargs):
+                time.sleep(outer.latency)
+                return Response()
+
+        class Endpoints:
+            base_url = "/rest"
+
+        class Rest:
+            rest_client = Client()
+            rest_endpoints = Endpoints()
+
+        self.rest_service = Rest()
 
     def get_workspaces(self):
         time.sleep(self.latency)
