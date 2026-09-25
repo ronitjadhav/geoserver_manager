@@ -90,7 +90,9 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   reset (404). **An empty connection parameter** is written `{"@key": "Session startup SQL"}`, with no
   `$`, and the library reads it as `None`. Sent back as the text "None", GeoServer ran it as the startup
   SQL of every connection and the store stopped loading. The form shows it blank, and a row left as it
-  was prefilled goes back as stored, number or `None` alike.
+  was prefilled goes back as stored, number or `None` alike. **A store's namespace** is the workspace's URI when
+  it is created without the parameter; the library's PostGIS, JNDI and PMTiles creates send
+  `http://{workspace}` instead, so the plugin merges the workspace's URI on after them (row 64).
 - **Editing a layer is one partial resource PUT** (row 53 of #50). Measured on 2.28.5: a
   `PUT …/featuretypes/{ft}.json` or `…/coverages/{c}.json` with only some of title, abstract, keywords,
   srs, projectionPolicy, enabled, advertised, cqlFilter and name merges and keeps the rest (bounds,

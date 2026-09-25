@@ -392,6 +392,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **A PostGIS, JNDI or PMTiles store gets its workspace's namespace.** In a
+  workspace with its own namespace URI, the store was created serving
+  `http://{workspace}` instead.
+- Forms are freed once closed; each one opened used to stay in memory for
+  the whole QGIS session, its layer lists still following the project.
 - **Saving a layer group's layers is faster:** the plugin reads the members'
   bounds in parallel, instead of two requests one after another per member.
 - Long cells (a layer's gridsets) keep their full text on hover once the page

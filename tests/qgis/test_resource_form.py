@@ -584,6 +584,28 @@ class TestEscapeAsksFirst(unittest.TestCase):
         self.assertEqual(asked, [])
 
 
+class TestClosedFormsAreFreed(unittest.TestCase):
+    def test_a_closed_form_is_deleted_with_its_widgets(self):
+        # A child of the main dialog, every form stayed alive for the whole
+        # QGIS session, its layer combos listening to the project.
+        from qgis.PyQt import sip
+        from qgis.PyQt.QtCore import QCoreApplication, QEvent
+        from qgis.PyQt.QtWidgets import QWidget
+
+        parent = QWidget()
+        self.addCleanup(parent.deleteLater)
+        dlg = ResourceFormDialog(
+            title="t",
+            fields=[{"key": "layer", "label": "L", "type": "layer"}],
+            parent=parent,
+        )
+        dlg.show()
+        dlg.done(0)
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        self.assertTrue(sip.isdeleted(dlg))
+        self.assertEqual(parent.findChildren(ResourceFormDialog), [])
+
+
 class TestCrsPicker(unittest.TestCase):
     def test_the_button_fills_the_code_from_qgis_crs_picker(self):
         from unittest.mock import patch

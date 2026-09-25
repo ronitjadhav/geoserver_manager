@@ -729,6 +729,33 @@ class DatastoreTabMixin:
         if locked:
             type_combo.setEnabled(False)
 
+    def _set_workspace_namespace(self, ws, name):
+        """Give a store its workspace's namespace URI, when it has another.
+
+        TODO(#50): create_pg_datastore(), create_jndi_datastore() and
+        create_pmtiles_datastore() send namespace=http://{ws}, whatever the
+        workspace's own URI (row 64); a store created without one gets the
+        workspace's (measured on 2.28.5), as the web interface does. So a
+        workspace with its own URI got a store serving another namespace.
+        Merged onto the stored parameters, as every other store save is.
+        """
+        uri = self._namespace_uri(ws)
+        detail = self._check(self.gs.get_datastore(ws, name))
+        params = dict(self._connection_params(detail))
+        if not uri or params.get("namespace") == uri:
+            return
+        params["namespace"] = uri
+        self._check(
+            self.gs.create_datastore(
+                workspace_name=ws,
+                datastore_name=name,
+                datastore_type=detail.get("type"),
+                connection_parameters=params,
+                description=detail.get("description"),
+                enabled=bool(detail.get("enabled", True)),
+            )
+        )
+
     def _check_new_datastore(self, values):
         """Refuse, before anything is sent, a datastore the Add form cannot
         create. Reads only: the form runs it before it closes."""
@@ -789,7 +816,19 @@ class DatastoreTabMixin:
                     description=description,
                 )
             )
-        elif ds_type in (_SHAPEFILE, _SHAPEFILE_DIRECTORY, _GEOPACKAGE, _WFS):
+        if ds_type in ("PostGIS", "PostGIS (JNDI)", "PMTiles"):
+            try:
+                self._set_workspace_namespace(ws, name)
+            except Exception as error:  # the store itself is created
+                raise PartlySaved(
+                    translate(
+                        "DatastoreTabMixin",
+                        "Datastore '{}' is created, but its namespace could not be "
+                        "set to the workspace's: {}",
+                    ).format(name, self._error_text(error))
+                ) from error
+            return
+        if ds_type in (_SHAPEFILE, _SHAPEFILE_DIRECTORY, _GEOPACKAGE, _WFS):
             params = (
                 self._wfs_params(values)
                 if ds_type == _WFS
