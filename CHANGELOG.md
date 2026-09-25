@@ -392,6 +392,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **Closing the dialog during a batch publish no longer drops the remaining
+  layers silently:** the batch stops and its summary names what was not
+  started, in the message bar and the QGIS log.
+- **Publishing a layer whose style you chose to keep says so:** the banner
+  used to claim a plain publish while the layer sat on GeoServer's default
+  style.
+- A table publish that GeoServer would refuse (a taken table, a bad EPSG
+  code) is refused before the form closes, so the typed metadata is kept.
+- A Cancel while a layer of a batch is being checked stops the batch, as a
+  Cancel on its upload does; it used to count the layer as failed and go on.
+- Delete and *Update from the data* on a row whose details could not be read
+  say so, instead of "Unsupported layer type" or "is a cascaded layer".
+- Fewer requests: the publish form no longer lists datastores and tables for
+  the QGIS source, the vector clash check sends one GET instead of two, *Set
+  styles* sends one layer PUT instead of two, and a cascaded WMTS layer's
+  store lookup no longer lists the WMS stores.
+- The GeoPackage and GeoTIFF export error messages translate.
 - The raster upload form refuses a taken name as the name it will upload,
   not as typed; "My DEM" used to pass the form and be refused as "My_DEM"
   after it had closed.
