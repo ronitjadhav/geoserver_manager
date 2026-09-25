@@ -320,8 +320,22 @@ class TestListing(unittest.TestCase):
         self.assertEqual(self.dlg.resultsTable.columnCount(), 6)
         self.assertEqual(self.dlg.btn_add.text(), "Add a Cascaded Store")
 
-    def test_a_store_whose_get_fails_shows_dashes(self):
-        self.assertEqual(self.dlg._cascaded_store_summary(None), ("-", "-"))
+    def test_a_store_whose_get_fails_shows_dashes_and_is_named(self):
+        warnings = []
+        self.dlg.show_warning_message = warnings.append
+        detail = self.dlg._cascaded_store_detail
+
+        def broken(ws_name, name, kind):
+            if name == "tiles":
+                raise RuntimeError("HTTP 500: boom")
+            return detail(ws_name, name, kind)
+
+        self.dlg._cascaded_store_detail = broken
+        self.dlg._load_cascaded_stores()
+        self.assertIn(["tiles", "sf", WMTS, "-", "-"], self.dlg._all_rows)
+        # Beside the listing's own warning about the `broken` workspace.
+        self.assertEqual(len(warnings), 2)
+        self.assertTrue(any("sf:tiles" in warning for warning in warnings), warnings)
 
     def test_layer_names_configured_and_advertised(self):
         self.assertEqual(
@@ -410,12 +424,15 @@ class TestCreate(unittest.TestCase):
             )
         self.assertEqual(self.creates(), [])
 
-    def test_add_refuses_a_url_without_a_scheme(self):
-        with self.assertRaises(ValueError):
-            self.dlg._create_cascaded_store_from_values(
-                self.values(capabilities_url="remote.example.org/wms")
-            )
-        self.assertEqual(self.creates(), [])
+    def test_both_forms_refuse_a_url_without_a_scheme_before_they_close(self):
+        # The form's own check (dlg_resource_form: "url"), not a check after
+        # Save: GeoServer accepts any string and fails when layers are listed.
+        for fields in (
+            self.dlg._cascaded_store_fields(["topp"]),
+            self.dlg._cascaded_store_info_fields(),
+        ):
+            (field,) = [f for f in fields if f["key"] == "capabilities_url"]
+            self.assertTrue(field["url"])
 
 
 class TestCascadedLayers(unittest.TestCase):
@@ -468,10 +485,12 @@ class TestCascadedLayers(unittest.TestCase):
             ),
         ):
             self.dlg._publish_cascaded_layer(REMOTE_ROW)
-        self.assertIn(
-            ("create_wms_layer", "topp", "remote", "topp:roads", "roads"), self.gs.calls
-        )
+        create = ("create_wms_layer", "topp", "remote", "topp:roads", "roads")
+        self.assertIn(create, self.gs.calls)
         self.assertIn("'topp:roads' published as layer 'roads'.", self.messages)
+        # No reload: no cell of the table depends on the store's layers, and
+        # one cost two collection GETs per workspace.
+        self.assertEqual(self.gs.calls[self.gs.calls.index(create) + 1 :], [])
 
     def test_delete_sends_recurse_because_the_layer_references_the_resource(self):
         self.dlg._delete_cascaded_layer("topp", "remote", WMS, "states")
@@ -583,9 +602,19 @@ class TestNamesInPaths(unittest.TestCase):
             self.dlg._cascaded_store_detail("my ws", "my store", WMTS)
         with contextlib.suppress(RuntimeError):
             self.dlg._cascaded_layer_detail("my ws", "my store", WMTS, "a b")
+        with contextlib.suppress(RuntimeError):
+            self.dlg._cascaded_layer_names("my ws", "my store", WMS)
+        self.dlg._cascaded_store_exists("my ws", "my store", WMTS)
         self.dlg._delete_cascaded_layer("my ws", "my store", WMTS, "a#b")
-        paths = [call[1] for call in self.gs.calls if call[0] in ("GET", "DELETE")]
-        self.assertIn("/rest/workspaces/my%20ws/wmtsstores/my%20store.json", paths)
+        paths = [
+            call[1] for call in self.gs.calls if call[0] in ("GET", "DELETE", "EXISTS")
+        ]
+        self.assertEqual(
+            paths.count("/rest/workspaces/my%20ws/wmtsstores/my%20store.json"), 2
+        )
+        self.assertIn(
+            "/rest/workspaces/my%20ws/wmsstores/my%20store/wmslayers.json", paths
+        )
         self.assertIn(
             "/rest/workspaces/my%20ws/wmtsstores/my%20store/layers/a%20b.json", paths
         )
