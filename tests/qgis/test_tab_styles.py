@@ -75,7 +75,11 @@ class FakeGS:
                     if workspace_name
                     else f"/rest/styles/{name}"
                 )
-                return f"{base}.{format}"
+                # As the library: an extension for these three formats only
+                # (test_library_contract pins it).
+                if format in ("json", "sld", "mbstyle"):
+                    return f"{base}.{format}"
+                return base
 
         class Rest:
             rest_client = Client()
@@ -214,12 +218,49 @@ class TestStylesTab(unittest.TestCase):
         )
 
     def test_a_css_body_is_put_with_its_own_content_type(self):
-        # The library's create_style() has no CSS content type at all.
+        # The library's create_style() has no CSS content type at all, and
+        # its path builder no .css: the bare path is a 500 "No such style
+        # handler".
         self.dlg._save_style_body("generic", None, "css", "* { stroke: red; }")
         verb, path, kwargs = self.dlg.gs.calls[-1]
         self.assertEqual((verb, path), ("PUT", "/rest/styles/generic.css"))
         self.assertEqual(
             kwargs["headers"], {"Content-Type": "application/vnd.geoserver.geocss+css"}
+        )
+
+    def test_a_ysld_body_is_put_to_its_own_extension_in_a_workspace(self):
+        self.dlg._save_style_body("roads_style", "topp", "ysld", "feature-styles: []")
+        verb, path, _kwargs = self.dlg.gs.calls[-1]
+        self.assertEqual(
+            (verb, path), ("PUT", "/rest/workspaces/topp/styles/roads_style.ysld")
+        )
+
+    def test_saving_only_the_body_reloads_the_list(self):
+        # The Version cell follows the body: a 1.0 body replaced by a 1.1
+        # one is recorded as 1.1, and the row kept 1.0.0 until F5.
+        class Editing(ResourceFormDialog):
+            def exec(self):
+                self.get_widget("body").setText("<sld version='1.1.0'/>")
+                return QDialog.DialogCode.Accepted
+
+        reloads = []
+        self.dlg._load_styles = lambda: reloads.append(1)
+        with patch.object(tab_styles, "ResourceFormDialog", Editing):
+            self.dlg._show_style_info(["population", GLOBAL])
+        self.assertEqual(reloads, [1])
+        self.assertEqual(self.dlg.gs.calls[-1][:2], ("PUT-body", "population"))
+
+    def test_the_no_image_fallback_translates(self):
+        from tests.qgis.test_i18n import Spy
+
+        spy = Spy(["StyleTabMixin"])
+        from qgis.PyQt.QtCore import QCoreApplication
+
+        QCoreApplication.installTranslator(spy)
+        self.addCleanup(QCoreApplication.removeTranslator, spy)
+        self.assertEqual(
+            StyleTabMixin._ogc_exception_text(""),
+            "[StyleTabMixin] GeoServer returned no image",
         )
 
     def test_upload_from_a_string_sends_the_body_with_its_own_content_type(self):
@@ -447,17 +488,26 @@ class TestStyleFromQgisLayer(unittest.TestCase):
         QgsProject.instance().removeAllMapLayers()
 
     def test_the_project_layer_becomes_a_style_with_the_1_1_content_type(self):
-        self.dlg._create_style_from_values(
-            {
-                "name": "new_towns",
-                "workspace": "topp",
-                "source": "From a QGIS layer",
-                "qgis_layer": self.layer,
-            }
-        )
+        """Through the Upload form, the one path there is: the export runs on
+        the GUI thread, then the SLD is uploaded as a pasted one."""
+        layer = self.layer
+
+        class Uploading(ResourceFormDialog):
+            def exec(self):
+                self.set_values(
+                    {"name": "new_towns", "workspace": "topp", "source": "Paste"}
+                )
+                self.set_values({"source": tab_styles._SOURCE_QGIS})
+                self.get_widget("qgis_layer").setLayer(layer)
+                return QDialog.DialogCode.Accepted
+
+        self.dlg.show_error_message = lambda text: self.fail(text)
+        with patch.object(tab_styles, "ResourceFormDialog", Uploading):
+            self.dlg._add_style()
+        posts = [call for call in self.dlg.gs.calls if call[0] == "POST"]
         self.assertFalse(any(c[0] == "definition" for c in self.dlg.gs.calls))
-        verb, _path, kwargs = self.dlg.gs.calls[-1]
-        self.assertEqual(verb, "POST")
+        ((_verb, path, kwargs),) = posts
+        self.assertEqual(path, "/rest/workspaces/topp/styles.json")
         self.assertEqual(kwargs["params"], {"name": "new_towns"})
         self.assertEqual(kwargs["headers"]["Content-Type"], SLD_1_1)
         self.assertIn(b"ff0000", kwargs["data"].lower())  # the symbology travelled
@@ -566,6 +616,33 @@ class TestSaveStyleToDisk(unittest.TestCase):
         self.assertEqual(target.read_text(), SLD)
         self.assertIn("population.sld", saved[0])
         self.assertIn("1.0.0", saved[0])  # the version it wrote, for the record
+
+    def test_the_bytes_are_written_as_stored_whatever_their_encoding(self):
+        # Decoded with replacement characters and written back as UTF-8, an
+        # ISO-8859-1 style lost its accents under its own declaration.
+        import tempfile
+        from pathlib import Path
+
+        stored = (
+            '<?xml version="1.0" encoding="ISO-8859-1"?>'
+            '<StyledLayerDescriptor version="1.0.0"><Title>caf\xe9</Title>'
+            "</StyledLayerDescriptor>"
+        ).encode("latin-1")
+
+        class Response:
+            status_code = 200
+            content = stored
+
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        dlg.gs.rest_service.rest_client.get = lambda path, **kwargs: Response()
+        dlg.show_error_message = lambda text: self.fail(f"unexpected: {text}")
+        target = Path(tempfile.mkdtemp()) / "population.sld"
+        with patch.object(
+            tab_styles.QFileDialog, "getSaveFileName", lambda *a, **k: (str(target), "")
+        ):
+            dlg._save_style_to_disk(["population", GLOBAL])
+        self.assertEqual(target.read_bytes(), stored)
 
     def test_cancelling_the_file_dialog_writes_nothing(self):
         dlg = SyncDialog()
@@ -873,16 +950,33 @@ class TestRenameCopyAndUsage(unittest.TestCase):
     def calls(self, verb):
         return [call for call in self.dlg.gs.calls if call[0] == verb]
 
-    def test_a_rename_is_a_put_of_the_name(self):
+    def test_a_rename_is_a_put_of_the_name_and_nothing_else(self):
+        # Its caller checked the name before the body PUT; a second
+        # get_style_definition here was one GET per rename for nothing.
+        reads = []
+        definition = self.dlg.gs.get_style_definition
+        self.dlg.gs.get_style_definition = lambda *args: reads.append(args) or (
+            definition(*args)
+        )
         self.dlg._rename_style("population", None, "new_population")
         ((_verb, path, kwargs),) = self.calls("PUT")
         self.assertEqual(path, "/rest/styles/population.json")
         self.assertEqual(kwargs["json"], {"style": {"name": "new_population"}})
+        self.assertEqual(reads, [])
 
     def test_a_rename_onto_a_taken_name_sends_nothing(self):
-        with self.assertRaises(ValueError):
-            self.dlg._rename_style("population", None, "generic")
+        class Renaming(ResourceFormDialog):
+            def exec(self):
+                self.get_widget("name").setText("generic")
+                return QDialog.DialogCode.Accepted
+
+        errors = []
+        self.dlg.show_error_message = errors.append
+        with patch.object(tab_styles, "ResourceFormDialog", Renaming):
+            self.dlg._show_style_info(["population", GLOBAL])
         self.assertEqual(self.calls("PUT"), [])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("already exists", errors[0])
 
     def test_a_pasted_css_style_is_posted_with_its_content_type(self):
         self.dlg._create_style_from_values(
@@ -970,6 +1064,29 @@ class TestRenameCopyAndUsage(unittest.TestCase):
         self.assertIn("ne:broken (could not be read", users[2])
         self.assertEqual(users[3], "tasmania (layer group)")
         self.assertEqual(len(users), 4)
+
+        # Cancelled, each fan-out stops after the round in flight: the
+        # waiting box's Cancel used to leave every remaining GET to run.
+        from types import SimpleNamespace
+
+        cancelled = SimpleNamespace(isCanceled=lambda: True, setProgress=lambda v: None)
+        self.assertEqual(
+            self.dlg._style_users("roads_style", "topp", cancelled),
+            ["topp:roads (default style)", "tasmania (layer group)"],
+        )
+
+    def test_used_by_hands_the_waiting_box_a_stop_event(self):
+        import threading
+
+        captured = {}
+
+        def fetch(action, failure, **kwargs):
+            captured.update(kwargs)
+            return None
+
+        self.dlg._fetch = fetch
+        self.dlg._show_style_users(["roads_style", "topp"])
+        self.assertIsInstance(captured.get("stop"), threading.Event)
 
 
 # ############################################################################

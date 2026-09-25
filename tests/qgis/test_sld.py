@@ -59,6 +59,26 @@ class TestLayerToSld(unittest.TestCase):
         self.assertEqual(sld_version(sld), "1.1.0")
         self.assertIn("StyledLayerDescriptor", sld)
 
+    def test_a_layer_that_exports_nothing_is_refused_in_the_users_language(self):
+        from qgis.PyQt.QtCore import QCoreApplication
+
+        from tests.qgis.test_i18n import Spy
+
+        class Mute:  # a renderer QGIS cannot write as SLD
+            def saveSldStyle(self, path):  # noqa: N802
+                return None
+
+            def name(self):
+                return "towns"
+
+        spy = Spy(["Sld"])
+        QCoreApplication.installTranslator(spy)
+        self.addCleanup(QCoreApplication.removeTranslator, spy)
+        with self.assertRaises(RuntimeError) as raised:
+            layer_to_sld(Mute())
+        self.assertTrue(str(raised.exception).startswith("[Sld] "), raised.exception)
+        self.assertIn("'towns'", str(raised.exception))
+
     def test_the_symbology_is_actually_in_there(self):
         layer = point_layer("towns", colour="#ff0000")
         sld = layer_to_sld(layer)

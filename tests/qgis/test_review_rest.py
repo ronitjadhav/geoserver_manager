@@ -151,11 +151,6 @@ class TestStyles(unittest.TestCase):
     def test_an_sld_1_1_style_is_copied_as_its_stored_file(self):
         # {style}.sld serves the 1.0 rendition; the copy was stored as 1.0.
         dlg = self.dlg
-        dlg._style_with_body = lambda name, ws: (
-            {"filename": "towns.sld", "languageVersion": {"version": "1.1.0"}},
-            "sld",
-            "<rendition 1.0/>",
-        )
         paths = []
 
         class Reply:
@@ -172,9 +167,16 @@ class TestStyles(unittest.TestCase):
                 class rest_endpoints:
                     base_url = "/rest"
 
+            def get_style_definition(self, name, workspace_name=None):
+                return (
+                    {"filename": "towns.sld", "languageVersion": {"version": "1.1.0"}},
+                    200,
+                )
+
         dlg.gs = GS()
         _definition, _format, body = dlg._style_as_stored("towns", "topp")
-        self.assertEqual(body, "<stored 1.1/>")
+        # The bytes as stored: the one GET is the resource, not the rendition.
+        self.assertEqual(body, b"<stored 1.1/>")
         self.assertEqual(paths, ["/rest/resource/workspaces/topp/styles/towns.sld"])
 
     def test_a_taken_name_is_refused_before_the_body_is_saved(self):

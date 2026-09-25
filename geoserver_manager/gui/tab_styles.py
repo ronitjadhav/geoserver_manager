@@ -7,7 +7,9 @@ Used as a mixin for GeoServerMainDialog.
 """
 
 import re
+import threading
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import quote
 
 from qgis.PyQt import sip
@@ -209,14 +211,18 @@ class StyleTabMixin:
         )
 
     def _style_as_stored(self, name, workspace_name):
-        """(definition, format, body), the body as the file GeoServer keeps.
+        """(definition, format, body), the body as the bytes GeoServer keeps.
 
         `{style}.sld` serves an SLD 1.1 style as its 1.0 rendition, so Copy
         stored a 1.0 conversion and Save to disk wrote one. The stored file is
-        the resource under styles/ (measured on 2.28.5). Runs in a worker.
+        the resource under styles/ (measured on 2.28.5). Bytes, not text: an
+        ISO-8859-1 body decoded with replacement characters and written back
+        as UTF-8 is another file. Runs in a worker.
         TODO(#50): no call for a style's stored file in the library (row 58).
         """
-        definition, style_format, body = self._style_with_body(name, workspace_name)
+        definition = self._check(self.gs.get_style_definition(name, workspace_name))
+        definition = definition if isinstance(definition, dict) else {}
+        style_format = self._style_format(definition)
         filename = definition.get("filename")
         if (
             style_format == "sld"
@@ -229,11 +235,10 @@ class StyleTabMixin:
                 else "styles"
             )
             base = self.gs.rest_service.rest_endpoints.base_url
-            response = self._raw_rest(
-                "get", f"{base}/resource/{folder}/{quote(filename, safe='')}"
-            )
-            body = response.content.decode("utf-8", errors="replace")
-        return definition, style_format, body
+            path = f"{base}/resource/{folder}/{quote(filename, safe='')}"
+        else:
+            path = self._style_path(name, workspace_name, style_format)
+        return definition, style_format, self._raw_rest("get", path).content
 
     def _sld_of(self, name, workspace_name):
         """A style's SLD, what QGIS reads. Runs in a worker.
@@ -252,8 +257,7 @@ class StyleTabMixin:
         mbstyle, so a CSS style comes back as its JSON definition instead of its
         body. Workaround: GET the style path with the definition's own format.
         """
-        path = self._style_path(name, workspace_name, "json")
-        path = path[: -len(".json")] + f".{style_format}"
+        path = self._style_path(name, workspace_name, style_format)
         content = self._raw_rest("get", path).content
         return content.decode("utf-8", errors="replace")
 
@@ -307,18 +311,22 @@ class StyleTabMixin:
         )
 
     def _style_path(self, name, workspace_name, style_format):
-        """The style's REST path with its segments URL-quoted.
+        """The style's REST path in any format, its segments URL-quoted.
 
         TODO(#50): `RestEndpoints.style()` interpolates the names raw, and
         `requests` sends `styles/a#b.json` as `styles/a`, a different style.
         Pre-quoting the segments the builder receives is the smallest fix; it
-        has to go when the library quotes them itself, or `%` doubles.
+        has to go when the library quotes them itself, or `%` doubles. The
+        builder also appends an extension for json, sld and mbstyle only: a
+        CSS or YSLD body PUT to the bare path is a 500 "No such style
+        handler" (row 58), so the .json path gets its suffix swapped.
         """
-        return self.gs.rest_service.rest_endpoints.style(
+        path = self.gs.rest_service.rest_endpoints.style(
             quote(name, safe=""),
             quote(workspace_name, safe="") if workspace_name else None,
-            format=style_format,
+            format="json",
         )
+        return path[: -len(".json")] + f".{style_format}"
 
     # -- View / edit -----------------------------------------------------------
 
@@ -491,18 +499,18 @@ class StyleTabMixin:
             self.show_success_message(
                 translate("StyleTabMixin", "Style '{}' saved.").format(new_name)
             )
-            if new_name != name:
-                self._load_styles()
+            # After a body save too: a 1.0 body replaced by a 1.1 one is
+            # recorded as 1.1, and the Version cell kept the old one.
+            self._load_styles()
 
     def _rename_style(self, name, workspace_name, new_name):
         """Rename a style in place. Layers and groups keep using it.
 
         Measured on 2.28.5: a PUT of the new name on the definition renames the
         style and its references follow, since GeoServer links them by id.
+        The caller has refused an unsafe or taken name before the body PUT.
         TODO(#50): no rename in the library (row 58).
         """
-        self._require_safe_name(new_name)
-        self._refuse_taken_style(new_name, workspace_name)
         self._raw_rest(
             "put",
             self._style_path(name, workspace_name, "json"),
@@ -568,7 +576,9 @@ class StyleTabMixin:
         if match:
             return match.group(1)
         lines = (text or "").strip().splitlines()
-        return lines[0][:200] if lines else "GeoServer returned no image"
+        if lines:
+            return lines[0][:200]
+        return translate("StyleTabMixin", "GeoServer returned no image")
 
     def _load_legend(self, dlg, name, workspace_name):
         """Fetch the legend into the dialog's image field, off the GUI thread.
@@ -780,11 +790,9 @@ class StyleTabMixin:
             # Bytes, as the file is: an ISO-8859-1 SLD failed to decode, and one
             # that did was re-encoded under its own encoding declaration.
             self._create_style(name, workspace_name, style_format, path.read_bytes())
-        elif source == _SOURCE_QGIS:
-            self._create_sld_style(
-                name, workspace_name, layer_to_sld(values["qgis_layer"])
-            )
         else:
+            # A QGIS layer arrives here as a pasted SLD: _add_style exports it
+            # on the GUI thread first (invariant 9).
             style_format = (values.get("format") or "sld").lower()
             self._create_style(name, workspace_name, style_format, values["sld"])
 
@@ -813,10 +821,6 @@ class StyleTabMixin:
             data=data,
             headers={"Content-Type": content_type},
         )
-
-    def _create_sld_style(self, name, workspace_name, sld):
-        """Create an SLD style from its body; see _create_style."""
-        self._create_style(name, workspace_name, "sld", sld)
 
     # -- QGIS <-> GeoServer ----------------------------------------------------
 
@@ -915,12 +919,14 @@ class StyleTabMixin:
         if not path:
             return
         if self._run_action(
-            lambda: Path(path).write_text(body, encoding="utf-8"),
+            lambda: Path(path).write_bytes(body),
             translate("StyleTabMixin", "Failed to save '{}'").format(name),
         ):
             self.show_success_message(
                 translate("StyleTabMixin", "Style '{}' saved as {} ({}).").format(
-                    name, Path(path).name, sld_version(body)
+                    name,
+                    Path(path).name,
+                    sld_version(body.decode("utf-8", errors="replace")),
                 )
                 if style_format == "sld"
                 else translate("StyleTabMixin", "Style '{}' saved as {}.").format(
@@ -997,9 +1003,14 @@ class StyleTabMixin:
     def _show_style_users(self, row_data):
         """List the layers and layer groups that use a style."""
         name, workspace_name = row_data[0], scope(row_data[1])
+        # The waiting box's Cancel stops the fan-outs between rounds, as
+        # _complete_rows does: they kept GETting every layer and group.
+        stop = threading.Event()
+        halt = SimpleNamespace(isCanceled=stop.is_set, setProgress=lambda _value: None)
         users = self._fetch(
-            lambda: self._style_users(name, workspace_name),
+            lambda: self._style_users(name, workspace_name, halt),
             translate("StyleTabMixin", "Failed to find what uses '{}'").format(name),
+            stop=stop,
         )
         if users is None:
             return
@@ -1028,11 +1039,12 @@ class StyleTabMixin:
         dlg.hide_save_button()
         dlg.exec()
 
-    def _style_users(self, name, workspace_name):
+    def _style_users(self, name, workspace_name, task=None):
         """Every layer and group using the style, with how. Runs in a worker.
 
         GeoServer has no endpoint for this, so every layer and group is read:
-        one GET each, fanned out. A layer names a workspace style "ws:name".
+        one GET each, fanned out; `task` (or a stand-in) stops the fan-outs
+        when cancelled. A layer names a workspace style "ws:name".
         TODO(#50): no get_layers() nor a layer's styles in the library (row 58).
         """
         reference = f"{workspace_name}:{name}" if workspace_name else name
@@ -1045,7 +1057,7 @@ class StyleTabMixin:
                 .json()
                 .get("layer", {}),
                 layers,
-                None,
+                task,
             ),
         ):
             if error:
@@ -1077,7 +1089,7 @@ class StyleTabMixin:
                     qualified.rpartition(":")[2], qualified.rpartition(":")[0] or None
                 ),
                 groups,
-                None,
+                task,
             ),
         ):
             if error:

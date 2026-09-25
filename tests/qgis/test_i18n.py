@@ -309,6 +309,7 @@ class TestShippedFrenchLocale(unittest.TestCase):
             "GeoServerManagerPlugin",
             "LayerTreeMenu",
             "QgisExport",
+            "Sld",
             "LayerPreviewDialog",
             "ListTable",
             "ResourceFormDialog",
