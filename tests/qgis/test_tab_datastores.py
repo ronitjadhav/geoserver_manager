@@ -104,10 +104,11 @@ class TestNamespaceFollowsTheWorkspace(unittest.TestCase):
     another namespace (measured on 2.28.5, review 2026-09-24)."""
 
     def setUp(self):
-        created, saved = [], []
+        created, saved, gets = [], [], []
 
         class GS:
             def get_datastore(inner, ws, name):
+                gets.append(name)
                 if not created:
                     return ("not found", 404)
                 return (
@@ -132,7 +133,7 @@ class TestNamespaceFollowsTheWorkspace(unittest.TestCase):
 
         self.dlg = SyncDialog()
         self.dlg.gs = GS()
-        self.saved = saved
+        self.saved, self.gets = saved, gets
         self.values = dict(PG_VALUES, name="pg_new", workspace="topp")
 
     def test_a_workspace_with_its_own_uri_gets_it_on_the_store(self):
@@ -149,6 +150,8 @@ class TestNamespaceFollowsTheWorkspace(unittest.TestCase):
         self.dlg._namespace_uri = lambda ws: f"http://{ws}"
         self.dlg._create_datastore_from_values(self.values)
         self.assertEqual(self.saved, [])
+        # The store was read before the URI was compared: one GET for nothing.
+        self.assertEqual(self.gets, ["pg_new"])  # the Add check only
 
 
 class TestDatastoreEdit(unittest.TestCase):
@@ -183,6 +186,16 @@ class TestDatastoreEdit(unittest.TestCase):
     def test_an_unchanged_name_is_no_rename(self):
         self.update(old_name="pg")
         self.dlg._raw_rest.assert_not_called()
+
+    def test_every_store_path_is_quoted(self):
+        # The delete built its path from the raw names while the rename and
+        # the reset quoted theirs.
+        self.dlg._do_delete_datastore("a b", "c#d")
+        self.dlg._raw_rest.assert_called_once_with(
+            "delete",
+            "/rest/workspaces/a%20b/datastores/c%23d.json",
+            params={"recurse": "true"},
+        )
 
     def test_other_parameters_list_what_the_form_does_not_own(self):
         self.assertEqual(
@@ -286,12 +299,74 @@ class TestDatastoreForm(unittest.TestCase):
         self.assertIn("other_params", edit)
 
     def test_the_generic_editor_does_not_list_the_parameters_twice(self):
-        form = ResourceFormDialog(
-            title="t", fields=self.dlg._datastore_fields(["topp"], edit_mode=True)
-        )
-        self.dlg._show_generic_editor(form, "Properties")
+        keys = {
+            f["key"]
+            for f in self.dlg._datastore_fields(["topp"], edit_mode=True, typed=False)
+        }
+        self.assertIn("raw_params", keys)
+        self.assertNotIn("other_params", keys)
+
+    def test_a_type_without_a_form_opens_on_one_page(self):
+        # The Advanced tab held one hidden field: an empty page to click on.
+        from qgis.PyQt.QtWidgets import QDialog
+
+        from geoserver_manager.gui import tab_datastores
+
+        class GS:
+            def get_datastore(inner, ws, name):
+                detail = {
+                    "type": "Properties",
+                    "enabled": True,
+                    "connectionParameters": {"entry": {"directory": "file:data/p"}},
+                }
+                return (detail, 200)
+
+        self.dlg.gs = GS()
+        opened = []
+
+        class Recording(ResourceFormDialog):
+            def exec(inner):
+                opened.append(inner)
+                return QDialog.DialogCode.Rejected
+
+        with mock.patch.object(tab_datastores, "ResourceFormDialog", Recording):
+            self.dlg._show_datastore_info(["props", "topp", "Properties"])
+        (form,) = opened
+        self.assertIsNone(form._tabs)
+        self.assertIsNone(form.get_widget("other_params"))
         self.assertNotIn("raw_params", form._hidden_keys)
-        self.assertIn("other_params", form._hidden_keys)
+
+
+class TestEditFormChecksFirst(unittest.TestCase):
+    def test_a_rename_onto_a_taken_name_keeps_the_edit_form_open(self):
+        # Refused after the form closed, the whole edit was lost.
+        from qgis.PyQt.QtWidgets import QDialog
+
+        from geoserver_manager.gui import tab_datastores
+
+        dlg = SyncDialog()
+        dlg.gs = RecordingGS(taken={"pg", "other"})
+        seen = {}
+
+        class Filling(ResourceFormDialog):
+            def exec(inner):
+                for key, text in (
+                    ("name", "other"),
+                    ("pg_host", "db"),
+                    ("pg_db", "d"),
+                    ("pg_user", "u"),
+                ):
+                    inner.get_widget(key).setText(text)
+                inner._on_accept()
+                seen["open"] = not inner.result()
+                seen["said"] = inner._validation_label.text()
+                return QDialog.DialogCode.Rejected
+
+        with mock.patch.object(tab_datastores, "ResourceFormDialog", Filling):
+            dlg._show_datastore_info(["pg", "topp", "PostGIS"])
+        self.assertTrue(seen["open"])
+        self.assertIn("already exists", seen["said"])
+        self.assertEqual(dlg.gs.created, [])
 
 
 if __name__ == "__main__":

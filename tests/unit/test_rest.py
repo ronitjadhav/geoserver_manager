@@ -78,6 +78,14 @@ class TestRawRest(unittest.TestCase):
             raw_rest(FakeClient(500, "Unable to delete layer"), "put", "/x")
         self.assertEqual(str(caught.exception), "HTTP 500: Unable to delete layer")
 
+    def test_an_accepted_status_is_an_answer_not_a_failure(self):
+        # A 404 on a workspace's settings path means "none of its own".
+        client = FakeClient(404, "No such settings")
+        self.assertIs(raw_rest(client, "put", "/x", accept=(404,)), client)
+        self.assertEqual(client.calls, [("/x", {})])  # accept is not sent on
+        with self.assertRaises(RuntimeError):
+            raw_rest(FakeClient(500), "put", "/x", accept=(404,))
+
 
 if __name__ == "__main__":
     unittest.main()

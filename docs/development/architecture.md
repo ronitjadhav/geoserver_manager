@@ -77,7 +77,7 @@ what the code cannot tell you. Python 3.12 (QGIS 3.40 and newer), PyQt5
   | `_check((content, status))` | unwrap a geoservercloud tuple; raises on ≥ 400 |
   | `_fetch_list(api_method, *args)` | a list endpoint; raises when the payload is not a list (a sign-in page), which must not render as an empty table |
   | `_resource_exists(getter, *args)` | pre-check before *Add* (the library upserts) |
-  | `_raw_rest(method, path, **kw)` | endpoints the library lacks; raises with GeoServer's response body |
+  | `_raw_rest(method, path, **kw)` | endpoints the library lacks; raises with GeoServer's response body, except for a status in `accept=(404,)`, which comes back as the answer it is (a settings path with none of its own) |
   | `_name_of(item)` | the name of a list entry (dict or str) |
   | `_get_workspace_names()` | workspace names for combos: a fresh GET every call, deliberately uncached |
   | `_start_load(failure_message, fetch)` | a tab load: runs `fetch(task)` in a `QgsTask`, renders `(rows, failures)` when it lands |

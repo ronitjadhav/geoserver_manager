@@ -89,6 +89,8 @@ class FakeGS:
                 if path.startswith("/rest/namespaces/"):
                     name = path.rsplit("/", 1)[1][: -len(".json")]
                     return Response({"namespace": {"uri": f"http://{name}.org"}})
+                if path == "/rest/services/wms/workspaces/topp/settings.json":
+                    return Response("No such settings", 404)
                 return Response({"wms": NE_WMS})
 
             def put(inner, path, **kwargs):
@@ -121,6 +123,8 @@ class FakeGS:
         return ([{"name": "ne"}, {"name": "topp"}], 200)
 
     def get_workspace(self, name):
+        if name not in ("ne", "topp"):
+            return ("No such workspace", 404)
         return ({"name": name, "isolated": False}, 200)
 
     def get_workspace_wms_settings(self, workspace_name):
@@ -262,10 +266,18 @@ class TestApplyWmsSettings(unittest.TestCase):
         self.assertEqual(self.sent("PUT"), [])
         self.assertEqual(self.sent("DELETE"), [])
 
-    def test_existence_is_asked_of_the_library(self):
+    def test_one_get_answers_whether_a_workspace_has_its_own_settings(self):
+        # The facade was asked first, then the same URL was read raw.
         self.assertIsNone(self.dlg._wms_settings("topp"))  # 404 -> no settings
-        self.assertIn(("get_workspace_wms_settings", "topp"), self.dlg.gs.calls)
         self.assertEqual(self.dlg._wms_settings("ne"), NE_WMS)
+        self.assertEqual(
+            [call[1] for call in self.dlg.gs.calls if call[0] == "GET"],
+            [
+                "/rest/services/wms/workspaces/topp/settings.json",
+                "/rest/services/wms/workspaces/ne/settings.json",
+            ],
+        )
+        self.assertEqual(len(self.dlg.gs.calls), 2)
 
     def test_a_rename_moves_the_settings_to_the_new_name(self):
         values = self.base_values(name="ne_renamed", isolated=False, set_default=False)
@@ -323,6 +335,54 @@ class TestWorkspaceDialog(unittest.TestCase):
         self.assertTrue(form.get_widget("set_default").isChecked())
         self.assertFalse(form.get_widget("set_default").isEnabled())
 
+    def test_saving_the_default_workspace_does_not_set_it_again(self):
+        # Its box is locked and ticked, so every save re-PUT default.json.
+        class Accepting(ResourceFormDialog):
+            def exec(inner):
+                return QDialog.DialogCode.Accepted
+
+        with patch.object(tab_workspaces, "ResourceFormDialog", Accepting):
+            self.dlg._show_workspace_info(["topp"])  # the fake's default
+        puts = [call[1] for call in self.dlg.gs.calls if call[0] == "PUT"]
+        self.assertEqual(puts, ["/rest/workspaces/topp.json"])
+
+    def test_a_rename_onto_a_taken_name_keeps_the_edit_form_open(self):
+        # Refused after the form closed, every setting had to be typed again.
+        seen = {}
+
+        class Filling(ResourceFormDialog):
+            def exec(inner):
+                inner.get_widget("name").setText("topp")  # the fake: it exists
+                inner._on_accept()
+                seen["open"] = not inner.result()
+                seen["said"] = inner._validation_label.text()
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_workspaces, "ResourceFormDialog", Filling):
+            self.dlg._show_workspace_info(["ne"])
+        self.assertTrue(seen["open"])
+        self.assertIn("already exists", seen["said"])
+        self.assertEqual([c for c in self.dlg.gs.calls if c[0] == "PUT"], [])
+
+
+class TestDefaultColumn(unittest.TestCase):
+    def test_an_unreadable_default_is_reported_not_shown_as_no(self):
+        # Every row read "No" and no banner said the default was unknown.
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        original = dlg._raw_rest
+
+        def raw(method, path, **kwargs):
+            if path.endswith("/workspaces/default.json"):
+                raise RuntimeError("HTTP 403: forbidden")
+            return original(method, path, **kwargs)
+
+        dlg._raw_rest = raw
+        rows, failures = dlg._fetch_workspace_rows()
+        self.assertEqual([row[1] for row in rows], [None, None])
+        self.assertEqual(len(failures), 1)
+        self.assertIn("default", failures[0][0])
+
 
 class TestNamespaceAndOtherServices(unittest.TestCase):
     """Measured on 2.28.5: per-workspace WFS/WCS/WMTS settings behave like
@@ -359,6 +419,17 @@ class TestNamespaceAndOtherServices(unittest.TestCase):
         self.assertFalse(form.get_widget("wfs_own").isChecked())
         self.assertEqual(form.get_widget("wfs_title").text(), "Global WFS")
         self.assertEqual(form.get_widget("wfs_max_features").value(), 1000000)
+
+    def test_opening_a_workspace_reads_each_settings_path_once(self):
+        # Each path was read twice (exists, then the payload) and the four
+        # global documents came whatever the workspace had of its own: 13
+        # requests for 'ne', which has its own WMS and WFS settings.
+        self.open_for("ne")
+        gets = [call[1] for call in self.dlg.gs.calls if call[0] == "GET"]
+        self.assertEqual(len(gets), len(set(gets)))  # no path twice
+        self.assertNotIn("/rest/services/wms/settings.json", gets)
+        self.assertNotIn("/rest/services/wfs/settings.json", gets)
+        self.assertEqual(len(gets), 8)
 
     def save(self, workspace_name, had, **changes):
         values = {"name": workspace_name, "isolated": False, "set_default": False}

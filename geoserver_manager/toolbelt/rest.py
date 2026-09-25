@@ -37,17 +37,19 @@ def summarise_body(text, limit=300):
     return text.splitlines()[0][:limit] if text else ""
 
 
-def raw_rest(client, method, path, **kwargs):
+def raw_rest(client, method, path, accept=(), **kwargs):
     """Call the library's REST client directly, for what it has no method for.
 
     Raises RuntimeError carrying GeoServer's response body on any HTTP error,
-    so the message the user sees has the same shape as `_check`'s. Every
-    caller is a library gap: list it in issue #50 and mark it TODO(#50).
-    Module-level so a worker thread can hold the client it was given instead
-    of reading `dialog.gs`, which a Refresh clears mid-flight.
+    so the message the user sees has the same shape as `_check`'s. `accept`
+    lists the error statuses to return instead: a 404 that means "none of
+    its own" (a workspace's service settings) is an answer, not a failure.
+    Every caller is a library gap: list it in issue #50 and mark it
+    TODO(#50). Module-level so a worker thread can hold the client it was
+    given instead of reading `dialog.gs`, which a Refresh clears mid-flight.
     """
     response = getattr(client, method)(path, **kwargs)
-    if response.status_code >= 400:
+    if response.status_code >= 400 and response.status_code not in accept:
         raise RuntimeError(
             f"HTTP {response.status_code}: {summarise_body(response.text)}"
         )

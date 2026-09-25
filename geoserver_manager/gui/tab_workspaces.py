@@ -78,13 +78,21 @@ class WorkspaceTabMixin:
         workspaces = self._fetch_list(self.gs.get_workspaces)
         # Shown in the list so the server's truth is visible at a glance:
         # GeoServer always has exactly one default and it cannot be unset.
-        default = self._default_workspace_name()
+        failures = []
+        try:
+            default = self._default_workspace_name()
+        except Exception as error:
+            # Unknown, and said so: every row read "No" without a word.
+            default = None
+            failures.append(
+                (translate("WorkspaceTabMixin", "the default workspace"), error)
+            )
         rows = [
             # A boolean cell, like every other: Yes / No, translated.
-            [name, self._yes_no(name == default)]
+            [name, None if default is None else self._yes_no(name == default)]
             for name in (self._name_of(ws) for ws in workspaces)
         ]
-        return rows, []
+        return rows, failures
 
     def _workspace_fields(self, is_default=False, with_wms=False):
         """Return workspace form field definitions.
@@ -250,16 +258,15 @@ class WorkspaceTabMixin:
 
         TODO(#50): upstream: WmsSettings models neither the title, the
         abstract, the keywords nor the SRS list, so
-        get_workspace_wms_settings() cannot show what this form is for. The
-        facade call is still what answers "does this workspace have its own
-        settings" (404 when it does not); the payload comes from a raw GET.
+        get_workspace_wms_settings() cannot show what this form is for. One
+        raw GET answers both questions: a 404 means "none of its own".
         """
-        if not self._resource_exists(
-            self.gs.get_workspace_wms_settings, workspace_name
-        ):
+        response = self._raw_rest(
+            "get", self._wms_settings_path(workspace_name), accept=(404,)
+        )
+        if response.status_code == 404:
             return None
-        payload = self._raw_rest("get", self._wms_settings_path(workspace_name)).json()
-        return payload.get("wms") or {}
+        return response.json().get("wms") or {}
 
     @classmethod
     def _wms_form_values(cls, settings, overall=None):
@@ -386,20 +393,25 @@ class WorkspaceTabMixin:
         return f"{base}/services/{service}/workspaces/{workspace_name}/settings.json"
 
     def _service_settings(self, service, workspace_name):
-        """(own settings or None, the global ones). Runs in a worker."""
-        base = self.gs.rest_service.rest_endpoints.base_url
-        path = self._service_settings_path(service, workspace_name)
-        # 404 means "no own settings": asked first, so any other failure of
-        # the read below carries GeoServer's reason.
-        own = (
-            self._raw_rest("get", path).json().get(service)
-            if self.gs.rest_service.resource_exists(path)
-            else None
+        """(own settings or None, the global ones or {}). Runs in a worker.
+
+        The global ones are what the form starts from when the workspace has
+        none of its own, so they are read only then.
+        """
+        response = self._raw_rest(
+            "get", self._service_settings_path(service, workspace_name), accept=(404,)
         )
-        overall = self._raw_rest(
-            "get", f"{base}/services/{service}/settings.json"
-        ).json()
-        return own, overall.get(service) or {}
+        own = None if response.status_code == 404 else response.json().get(service)
+        if own is not None:
+            return own, {}
+        return None, self._global_service_settings(service)
+
+    def _global_service_settings(self, service):
+        """One service's global settings. TODO(#50): out of the library's
+        reach, as on the Server tab (row 60)."""
+        base = self.gs.rest_service.rest_endpoints.base_url
+        payload = self._raw_rest("get", f"{base}/services/{service}/settings.json")
+        return payload.json().get(service) or {}
 
     @classmethod
     def _service_form_values(cls, service, own, overall):
@@ -465,16 +477,13 @@ class WorkspaceTabMixin:
         )
 
     def _default_workspace_name(self):
-        """Name of GeoServer's default workspace, or None if it cannot be read.
+        """Name of GeoServer's default workspace. Raises when it cannot be read.
 
         TODO(#50): upstream as get_default_workspace(); no getter exists.
         """
-        try:
-            base = self.gs.rest_service.rest_endpoints.base_url
-            payload = self._raw_rest("get", f"{base}/workspaces/default.json").json()
-            return payload.get("workspace", {}).get("name")
-        except Exception:  # best-effort prefill: unreadable means "unknown"
-            return None
+        base = self.gs.rest_service.rest_endpoints.base_url
+        payload = self._raw_rest("get", f"{base}/workspaces/default.json").json()
+        return payload.get("workspace", {}).get("name")
 
     def _set_default_workspace(self, name):
         """Set the GeoServer default workspace.
@@ -514,6 +523,13 @@ class WorkspaceTabMixin:
                 )
             )
 
+    def _check_workspace_rename(self, old_name, values):
+        """A new name is checked as a new workspace's is: GeoServer refuses a
+        rename onto a taken name with a 500 and changes nothing. Reads only:
+        the edit form runs it before it closes, the save again."""
+        if values["name"] != old_name:
+            self._check_new_workspace(values)
+
     def _save_workspace(self, values, old_name=None):
         """Create (old_name None) or update a workspace from form values.
 
@@ -521,9 +537,6 @@ class WorkspaceTabMixin:
         warning to show once it is back, or None.
         """
         name = values["name"]
-        if old_name is None or name != old_name:
-            # A new name goes into a REST path: refuse what a URL would eat.
-            self._require_safe_name(name)
         if old_name is None:
             self._check_new_workspace(values)
             self._check(self.gs.create_workspace(name, isolated=values["isolated"]))
@@ -541,6 +554,7 @@ class WorkspaceTabMixin:
         else:
             # One PUT, rename or not (create_workspace would POST, get a 409,
             # then PUT).
+            self._check_workspace_rename(old_name, values)
             self._put_workspace(old_name, name, values["isolated"])
         if values["set_default"]:
             # Separate from the save: a 403 here must not report the (already
@@ -591,29 +605,32 @@ class WorkspaceTabMixin:
                 self.show_warning_message(warning[0])
             self._load_workspaces()
 
+    def _workspace_details(self, name):
+        """What the edit form shows, read in one worker call: the workspace,
+        its settings per service (the global ones only where it has none of
+        its own), whether it is the default, and its namespace URI."""
+        wms = self._wms_settings(name)
+        try:
+            default = self._default_workspace_name()
+        except Exception:  # best-effort prefill: unknown reads as unticked
+            default = None
+        return (
+            self._check(self.gs.get_workspace(name)),
+            wms,
+            default,
+            self._namespace_uri(name),
+            {
+                service: self._service_settings(service, name)
+                for service in OTHER_SERVICES
+            },
+            None if wms is not None else self._global_service_settings("wms"),
+        )
+
     def _show_workspace_info(self, row_data):
         """Open a form dialog to view/edit an existing workspace and its WMS."""
         old_name = row_data[0]
         fetched = self._fetch(
-            lambda: (
-                self._check(self.gs.get_workspace(old_name)),
-                self._wms_settings(old_name),
-                self._default_workspace_name(),
-                self._namespace_uri(old_name),
-                {
-                    service: self._service_settings(service, old_name)
-                    for service in OTHER_SERVICES
-                },
-                # TODO(#50): the global service settings are out of the
-                # library's reach, as on the Server tab (row 60).
-                self._raw_rest(
-                    "get",
-                    f"{self.gs.rest_service.rest_endpoints.base_url}"
-                    "/services/wms/settings.json",
-                )
-                .json()
-                .get("wms"),
-            ),
+            lambda: self._workspace_details(old_name),
             translate("WorkspaceTabMixin", "Failed to load workspace details"),
         )
         if fetched is None:
@@ -645,6 +662,9 @@ class WorkspaceTabMixin:
             fields=self._workspace_fields(is_default=is_default, with_wms=True),
             values=values,
             parent=self,
+            validate=self._form_check(
+                lambda after: self._check_workspace_rename(old_name, after)
+            ),
         )
         own = dlg.get_widget("wms_own")
         own.toggled.connect(lambda checked: self._on_wms_own_changed(dlg, checked))
@@ -661,6 +681,8 @@ class WorkspaceTabMixin:
             return
 
         values = dlg.get_values()
+        # The default's own box is locked and ticked: not a request to set it.
+        values["set_default"] = values["set_default"] and not is_default
         had_wms = wms_settings is not None
         had = {service: own is not None for service, (own, _) in services.items()}
         warning = []
