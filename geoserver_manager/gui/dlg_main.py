@@ -741,11 +741,7 @@ class GeoServerMainDialog(
                 self._reload_current_tab()
                 outcome = "done"
             elif error is not None:
-                detail = self._error_text(error)
-                self.show_error_message(f"{failure_message}: {detail}")
-                self.log(
-                    f"{failure_message}: {detail}", log_level=Qgis.MessageLevel.Critical
-                )
+                self._report_failure(failure_message, error)
                 outcome = "failed"
             elif ok or completed:
                 on_success(result)
@@ -1725,6 +1721,12 @@ class GeoServerMainDialog(
             return f"{error}: {summary}"
         return str(error)
 
+    def _report_failure(self, failure_message, error):
+        """A failed action: the same line in the banner and in the QGIS log."""
+        detail = self._error_text(error)
+        self.show_error_message(f"{failure_message}: {detail}")
+        self.log(f"{failure_message}: {detail}", log_level=Qgis.MessageLevel.Critical)
+
     def _require_connection(self):
         """True when there is a client to talk to; otherwise say so and refuse.
 
@@ -1785,11 +1787,7 @@ class GeoServerMainDialog(
                 )
             return False
         except Exception as e:
-            detail = self._error_text(e)
-            self.show_error_message(f"{failure_message}: {detail}")
-            self.log(
-                f"{failure_message}: {detail}", log_level=Qgis.MessageLevel.Critical
-            )
+            self._report_failure(failure_message, e)
             return False
         finally:
             self.unsetCursor()
@@ -1945,6 +1943,22 @@ class GeoServerMainDialog(
         cheaper than a stale picker.
         """
         return [self._name_of(ws) for ws in self._fetch_list(self.gs.get_workspaces)]
+
+    def _scoped_names(self, global_names, list_in, workspace_names, task=None):
+        """(name, workspace label) pairs of a resource that lives globally or
+        in a workspace: the global names first, then each workspace's, listed
+        in parallel by `list_in(ws)`. A workspace that cannot be listed is a
+        failure beside the names, not the end of the listing. In a worker."""
+        pairs = [(name, GLOBAL) for name in global_names]
+        failures = []
+        for ws_name, (items, error) in zip(
+            workspace_names, self._fan_out(list_in, workspace_names, task)
+        ):
+            if error is not None:
+                failures.append((ws_name, error))
+                continue
+            pairs.extend((self._name_of(item), ws_name) for item in items)
+        return pairs, failures
 
     @staticmethod
     def _fan_out(fn, items, task=None):

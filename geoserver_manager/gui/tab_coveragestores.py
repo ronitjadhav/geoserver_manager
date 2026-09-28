@@ -1024,10 +1024,7 @@ class CoverageStoreTabMixin:
         source, folder = prepared
         client = self.gs.rest_service.rest_client
         endpoints = self.gs.rest_service.rest_endpoints
-        upload_path = (
-            f"{endpoints.base_url}/workspaces/{_q(ws_name)}"
-            f"/coveragestores/{_q(name)}/file.geotiff"
-        )
+        upload_path = endpoints.coveragestore(_q(ws_name), _q(name), "file", "geotiff")
         metadata = {
             key: values[key] for key in ("title", "abstract") if values.get(key)
         }

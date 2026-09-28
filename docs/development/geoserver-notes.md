@@ -121,6 +121,11 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   GeoServer adds `namespace` itself. A PUT without a key drops it (the map is replaced, invariant 3), and
   `featuretypes.json?list=available` lists the remote's feature types, so *Publish a Layer → a table in a
   datastore* cascades them. The typed creators stop before it; the form goes through the generic `create_datastore`.
+- **Add to QGIS as WFS**: no `srsname`. Without it QGIS takes the type's own CRS from the
+  capabilities and the features arrive native (`sf:archsites`, EPSG:26713, easting first; measured
+  on 2.28.5 / QGIS 3.40); with `srsname=EPSG:4326` GeoServer reprojected every feature and QGIS
+  reprojected them again to the canvas. The embedded preview's WMS layer likewise reads its extent
+  from the capabilities, in the URI's EPSG:4326, so no resource GET is needed for its bounds.
 - **Add to QGIS as WMTS**: the URI names the tile matrix set (`EPSG:900913`) and *no* `crs=`. With
   `crs=EPSG:4326` beside it QGIS accepted the layer, reported it as 4326 and reprojected every tile on the
   fly (measured against the sandbox); without it the layer takes the tile matrix's own CRS.
@@ -142,8 +147,10 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   `create_feature_type()` template would replace the computed values); the store is marked `read_only` by
   merging onto its own parameters (the recommended setting for a file store nobody writes to), best-effort,
   because the data is already published by then and a flag must not fail the publish; and deleting the store later **leaves the
-  uploaded file** in the data directory. A QGIS layer name must pass `toolbelt/qgis_export.geoserver_name()`
-  first: it becomes a WFS type name, so it has to be an XML NCName.
+  uploaded file** in the data directory. A *Replace* (the same PUT onto the existing store) makes
+  GeoServer re-read the table: a column added to the GeoPackage is served at once, by REST and by
+  DescribeFeatureType (measured on 2.28.5), so no reset has to follow it. A QGIS layer name must pass
+  `toolbelt/qgis_export.geoserver_name()` first: it becomes a WFS type name, so it has to be an XML NCName.
 - **Publishing a QGIS raster** (rows 31–32 of #50) uploads a GeoTIFF: `PUT
   .../coveragestores/{name}/file.geotiff?configure=first&coverageName={name}` with `Content-Type: image/tiff`.
   Measured on 2.28.5: GeoServer saves the body as `data/{ws}/{store}/{store}.geotiff`, creates a GeoTIFF store

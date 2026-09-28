@@ -161,22 +161,12 @@ class StyleTabMixin:
         GET per style, fanned out, because whether a style is SLD decides what
         *Apply to a QGIS layer* can do with it.
         """
-        pairs = [
-            (self._name_of(style), GLOBAL)
-            for style in self._fetch_list(self.gs.get_styles)
-        ]
-        ws_names = self._get_workspace_names()
-        failures = []
-        for ws_name, (styles, error) in zip(
-            ws_names,
-            self._fan_out(
-                lambda ws: self._fetch_list(self.gs.get_styles, ws), ws_names, task
-            ),
-        ):
-            if error:
-                failures.append((ws_name, error))
-                continue
-            pairs.extend((self._name_of(style), ws_name) for style in styles)
+        pairs, failures = self._scoped_names(
+            [self._name_of(style) for style in self._fetch_list(self.gs.get_styles)],
+            lambda ws: self._fetch_list(self.gs.get_styles, ws),
+            self._get_workspace_names(),
+            task,
+        )
         # Format and version follow for the page shown (#58).
         rows = [[name, ws_label, PENDING, PENDING] for name, ws_label in pairs]
         return rows, failures

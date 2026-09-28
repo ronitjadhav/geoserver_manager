@@ -1863,7 +1863,10 @@ class LayerTabMixin:
             uri.setParam("url", f"{base}/ows")
             uri.setParam("typename", qualified_name)
             uri.setParam("version", "auto")
-            uri.setParam("srsname", "EPSG:4326")
+            # No srsname: QGIS takes the type's own CRS from the capabilities
+            # and the features arrive native. srsname=EPSG:4326 made GeoServer
+            # reproject every feature, and QGIS again to the canvas (measured
+            # on 2.28.5 with sf:archsites, EPSG:26713).
             uri.setParam("pagingEnabled", "true")
             if authcfg:
                 uri.setAuthConfigId(authcfg)
@@ -1968,15 +1971,6 @@ class LayerTabMixin:
         reaches the project.
         """
         name, ws_name = row_data[0], row_data[1]
-        detail = self._fetch(
-            lambda: self._layer_resource(row_data),
-            translate("LayerTabMixin", "Failed to load layer details"),
-        )
-        if detail is None:
-            return
-        detail = detail if isinstance(detail, dict) else {}
-        # latLonBoundingBox is EPSG:4326 by definition, which is the map's CRS.
-        bbox, _srs = self._bbox_from(detail.get("latLonBoundingBox"))
         qualified = f"{ws_name}:{name}" if ws_name else name
 
         # An invalid layer is not an error here: the window explains it in
@@ -1989,6 +1983,20 @@ class LayerTabMixin:
         )
         if layer is None:
             return
+        # The WMS layer reads its extent from the capabilities, in the URI's
+        # EPSG:4326, the map's CRS (measured on 2.28.5): the resource GET
+        # that fetched latLonBoundingBox for it was a second read of the same.
+        extent = layer.extent() if layer.isValid() else None
+        bbox = (
+            None
+            if extent is None or extent.isEmpty()
+            else (
+                extent.xMinimum(),
+                extent.yMinimum(),
+                extent.xMaximum(),
+                extent.yMaximum(),
+            )
+        )
         LayerPreviewDialog(qualified, layer, bbox, parent=self).show()
 
     def _add_layer_to_qgis(self, row_data):

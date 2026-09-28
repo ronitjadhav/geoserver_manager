@@ -168,6 +168,8 @@ class ServerTabMixin:
         sections = self._server_sections()
         reads = [kind for kind, _label in sections if kind != "catalog"]
         results = dict(zip(reads, self._fan_out(self._server_read, reads, task)))
+        if len(results) < len(reads):
+            return [], []  # cancelled between two rounds: nothing is rendered
         rows, failures = [], []
         for kind, label in sections:
             if kind == "catalog":

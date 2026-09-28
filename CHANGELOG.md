@@ -392,6 +392,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **A layer added to QGIS as WFS keeps its own CRS.** It asked GeoServer for
+  EPSG:4326, so every feature of a projected layer was reprojected there,
+  then again by QGIS to the map.
+- The map preview opens with one request fewer: the WMS layer already knows
+  its extent.
+- Cancelling the Server tab's load between two reads no longer raises in the
+  background.
 - **Closing the dialog during a batch publish no longer drops the remaining
   layers silently:** the batch stops and its summary names what was not
   started, in the message bar and the QGIS log.
