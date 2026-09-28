@@ -159,6 +159,14 @@ class TestServerTab(unittest.TestCase):
         self.assertEqual(len(self.warnings), 1)
         self.assertIn("WMTS", self.warnings[0])
 
+    def test_a_cancel_between_two_reads_returns_nothing_rather_than_raising(self):
+        # The fan-out stops between rounds and returns fewer results: the
+        # rows then read a section it never fetched, a KeyError in the worker.
+        with patch.object(
+            self.dlg, "_fan_out", lambda fn, items, task=None: [({}, None)]
+        ):
+            self.assertEqual(self.dlg._fetch_server_rows(), ([], []))
+
 
 class TestServerSaves(unittest.TestCase):
     def setUp(self):

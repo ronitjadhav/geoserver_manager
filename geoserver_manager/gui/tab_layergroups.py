@@ -153,25 +153,14 @@ class LayerGroupTabMixin:
         listed is a failure beside the names, not the end of the listing.
         Raises on an HTTP error of the global list. Runs in a worker thread.
         """
-        groups = [(name, GLOBAL) for name in self._global_group_names()]
-        failures = []
-        for ws_name, (names, error) in zip(
+        return self._scoped_names(
+            self._global_group_names(),
+            # The library interpolates the name into the path as it is, so
+            # "a#b" would list "a": hand it the quoted segment.
+            lambda ws: self._fetch_list(self.gs.get_layer_groups, quote(ws, safe="")),
             workspace_names,
-            self._fan_out(
-                # The library interpolates the name into the path as it is, so
-                # "a#b" would list "a": hand it the quoted segment.
-                lambda ws: self._fetch_list(
-                    self.gs.get_layer_groups, quote(ws, safe="")
-                ),
-                workspace_names,
-                task,
-            ),
-        ):
-            if error:
-                failures.append((ws_name, error))
-                continue
-            groups.extend((self._name_of(group), ws_name) for group in names)
-        return groups, failures
+            task,
+        )
 
     def _global_group_names(self):
         """Names of the layer groups that live outside any workspace.

@@ -163,6 +163,10 @@ class FakeGS:
             def coverage(inner, ws, store, name):
                 return f"{BASE}/workspaces/{ws}/coveragestores/{store}/coverages/{name}.json"
 
+            def coveragestore(inner, ws, name, method=None, store_type=None):
+                base = f"{BASE}/workspaces/{ws}/coveragestores/{name}"
+                return f"{base}/{method}.{store_type}" if method else f"{base}.json"
+
             def featuretype(inner, ws, store, name):
                 return f"{BASE}/workspaces/{ws}/datastores/{store}/featuretypes/{name}.json"
 
@@ -530,8 +534,11 @@ class TestEveryLayerType(unittest.TestCase):
             self.assertIn(f"layers={layer}", url)
             self.assertIn("bbox=-103.87,44.37,-103.62,44.5", url)
 
-    def test_the_map_preview_opens_a_window_on_the_layers_extent(self):
-        windows = []
+    def test_the_map_preview_opens_a_window_without_reading_the_resource(self):
+        # The WMS layer reads its extent from the capabilities (measured on
+        # 2.28.5): the resource GET for latLonBoundingBox was a second read.
+        # Against this fake the layer is invalid, so the window gets no box.
+        windows, reads = [], []
 
         class Window:
             def __init__(inner, title, layer, bbox=None, parent=None):
@@ -540,12 +547,18 @@ class TestEveryLayerType(unittest.TestCase):
             def show(inner):
                 pass
 
-        with patch.object(tab_layers, "LayerPreviewDialog", Window):
+        with (
+            patch.object(tab_layers, "LayerPreviewDialog", Window),
+            patch.object(
+                self.dlg, "_layer_resource", lambda row: reads.append(row) or {}
+            ),
+        ):
             self.dlg._preview_layer(self.rows["sfdem"])
 
         title, layer, bbox, parent = windows[0]
         self.assertEqual(title, "sf:sfdem")
-        self.assertEqual(bbox, (-103.87, 44.37, -103.62, 44.5))
+        self.assertEqual(reads, [])
+        self.assertIsNone(bbox)
         self.assertIs(parent, self.dlg)
         # built like Add to QGIS builds it, never added to the project
         self.assertIn("layers=sf:sfdem", layer.source())
@@ -677,6 +690,8 @@ class TestAddToQgis(unittest.TestCase):
         self.assertIn("authcfg=abc123", uri)
         self.assertIn("pagingEnabled='true'", uri)
         self.assertNotIn("password", uri.lower())
+        # No srsname: the features arrive in the type's own CRS (measured).
+        self.assertNotIn("srsname", uri)
 
     def test_no_auth_config_means_anonymous(self):
         uri, _ = GeoServerMainDialog._layer_uri("WMS", self.BASE, "topp:roads", "")
@@ -1341,6 +1356,11 @@ class _EditFakeGS:
                         f"{name}.json"
                     )
 
+                @staticmethod
+                def coveragestore(ws, name, method=None, store_type=None):
+                    base = f"/rest/workspaces/{ws}/coveragestores/{name}"
+                    return f"{base}/{method}.{store_type}" if method else f"{base}.json"
+
             @staticmethod
             def resource_exists(path):
                 Rest.asked.append(path)
@@ -1884,6 +1904,10 @@ class GpkgPublishFakeGS(StyleFakeGS):
                     f"/rest/workspaces/{workspace_name}/coveragestores/"
                     f"{store_name}/coverages/{name}.json"
                 )
+
+            def coveragestore(inner, ws, name, method=None, store_type=None):
+                base = f"/rest/workspaces/{ws}/coveragestores/{name}"
+                return f"{base}/{method}.{store_type}" if method else f"{base}.json"
 
         class Rest:
             rest_client = Client()
