@@ -312,6 +312,21 @@ class TestGroupDetail(unittest.TestCase):
         self.assertIn("solo", offered)
         self.assertNotIn("tasmania", offered)
 
+    def test_a_workspace_group_is_offered_the_global_groups(self):
+        # Measured on 2.28.5: a group in "sf" may hold a global group (201,
+        # stored). The picker offered this workspace's names only, although
+        # the same name typed was accepted.
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        with patch.object(tab_layergroups, "ResourceFormDialog", Recording):
+            dlg._show_layer_group_info(["roads_group", "topp"])
+        pick = Recording.opened[-1].get_widget("layers").picker
+        offered = [pick.itemText(i) for i in range(pick.count())]
+        self.assertIn("tasmania", offered)
+        self.assertIn("topp:tasmania_roads", offered)
+        self.assertNotIn("nurc:mosaic", offered)
+        self.assertNotIn("topp:roads_group", offered)
+
     def test_an_earth_observation_group_keeps_its_mode(self):
         # Every way of clearing the root layer is refused by GeoServer.
         dlg = SyncDialog()

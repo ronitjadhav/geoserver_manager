@@ -116,6 +116,18 @@ class FakeGS:
         },
         "/rest/workspaces/sf/wmtsstores/tiles/layers.json": {"wmtsLayers": ""},
         "/rest/workspaces/sf/wmtsstores/tiles/layers/states.json": RAW_TILES_DETAIL,
+        # As GeoServer answers a layer with an international title: that one
+        # alone, no plain title, which the library's model reads (measured).
+        "/rest/workspaces/topp/wmsstores/remote/wmslayers/states.json": {
+            "wmsLayer": {
+                "name": "states",
+                "nativeName": "topp:states",
+                "internationalTitle": {"fr": "États", "en": "States"},
+                "srs": "EPSG:4326",
+                "enabled": True,
+                "keywords": {"string": ["census", "states"]},
+            }
+        },
     }
     AVAILABLE = {
         "/rest/workspaces/topp/wmsstores/remote/wmslayers.json": {
@@ -283,6 +295,14 @@ class TestViewerRead(unittest.TestCase):
         dlg = SyncDialog()
         dlg._fetch = lambda action, failure, **kwargs: None
         self.assertIsNone(dlg._cascaded_layer_values("topp", "store", "WMS", "x"))
+
+    def test_an_international_title_reaches_the_viewer(self):
+        # get_wms_layer()'s model reads the plain title only: it showed blank.
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        values = dlg._cascaded_layer_values("topp", "remote", "WMS", "states")
+        self.assertEqual(values["title"], "en: States; fr: États")
+        self.assertEqual(values["keywords"], "census, states")
 
 
 class TestWmsStoreDetail(unittest.TestCase):

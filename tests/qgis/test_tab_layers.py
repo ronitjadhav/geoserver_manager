@@ -179,6 +179,9 @@ class FakeGS:
             def wmslayers(inner, ws, store):
                 return f"{BASE}/workspaces/{ws}/wmsstores/{store}/wmslayers.json"
 
+            def wmslayer(inner, ws, store, name):
+                return f"{BASE}/workspaces/{ws}/wmsstores/{store}/wmslayers/{name}.json"
+
             def wmtslayers(inner, ws, store):
                 return f"{BASE}/workspaces/{ws}/wmtsstores/{store}/layers.json"
 
@@ -226,6 +229,10 @@ class FakeGS:
         if path == f"{BASE}/workspaces/sf/wmtsstores/remote_wmts/layers/tiles.json":
             detail = dict(CASCADED, name="tiles", nativeName="topp:states")
             return ({"wmtsLayer": detail}, 200)
+        if "/wmsstores/" in path and "/wmslayers/" in path:
+            # A cascaded WMS layer is read raw, as GeoServer writes it (row 65).
+            name = path.rsplit("/", 1)[1][: -len(".json")]
+            return ({"wmsLayer": dict(CASCADED, name=name)}, 200)
         if path.endswith("/coveragestores/sfdem/coverages/sfdem.json"):
             return ({"coverage": COVERAGE}, 200)
         if "/featuretypes/" in path:
