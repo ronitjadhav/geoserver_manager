@@ -392,6 +392,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- A layer group in a workspace is offered the global groups too; GeoServer
+  accepts them, and the same name typed already worked.
+- The cascaded layer viewer shows an international title and abstract; a
+  layer that had one showed a blank title.
 - **A layer added to QGIS as WFS keeps its own CRS.** It asked GeoServer for
   EPSG:4326, so every feature of a projected layer was reprojected there,
   then again by QGIS to the map.

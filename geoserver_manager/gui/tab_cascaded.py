@@ -14,7 +14,7 @@ from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.scope import PENDING
-from geoserver_manager.toolbelt.payload import bbox_text, changed, keyword_list
+from geoserver_manager.toolbelt.payload import bbox_text, changed, keyword_list, text_of
 from geoserver_manager.toolbelt.rest import PartlySaved
 
 # GeoServer's own `type` values. The Type column carries them, and every
@@ -238,14 +238,14 @@ class CascadedStoreTabMixin:
         )
 
     def _cascaded_layer_detail(self, workspace_name, store_name, kind, layer_name):
-        """One cascaded layer: remote name, title, SRS, bounds, keywords, …"""
-        if kind == WMS:
-            return self._check(
-                self.gs.get_wms_layer(workspace_name, store_name, layer_name)
-            )
-        # TODO(#50): no get_wmts_layer() in the library. Workaround: GET the path.
-        path = self._layers_path(workspace_name, store_name, WMTS, layer_name)
-        return self._raw_rest("get", path).json().get(_LAYER_KEYS[WMTS][1]) or {}
+        """One cascaded layer: remote name, title, SRS, bounds, keywords, …
+
+        TODO(#50): read raw for both kinds. No get_wmts_layer() in the library
+        (row 36), and get_wms_layer()'s model drops an international title,
+        which GeoServer sends without a plain one (row 65).
+        """
+        path = self._layers_path(workspace_name, store_name, kind, layer_name)
+        return self._raw_rest("get", path).json().get(_LAYER_KEYS[kind][1]) or {}
 
     def _cascaded_layer_exists(self, workspace_name, store_name, kind, layer_name):
         """True when a cascaded layer of that name is already published."""
@@ -308,12 +308,14 @@ class CascadedStoreTabMixin:
         keywords = keyword_list(detail.get("keywords"))
         return {
             "native_name": detail.get("nativeName", ""),
-            "title": str(detail.get("title") or ""),
+            "title": text_of(detail.get("internationalTitle") or detail.get("title")),
             "srs": detail.get("srs", ""),
             "enabled": self._yes_no(detail.get("enabled", True)),
             "bounds": bbox_text(detail.get("latLonBoundingBox")) or "-",
             "keywords": ", ".join(keywords) or "-",
-            "abstract": str(detail.get("abstract") or ""),
+            "abstract": text_of(
+                detail.get("internationalAbstract") or detail.get("abstract")
+            ),
         }
 
     def _cascaded_layer_fields(self, names):

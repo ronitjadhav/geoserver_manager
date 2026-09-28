@@ -197,7 +197,9 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
 - **Library models that lose data** (row 62, measured on 2.28.5): `rest_service.get_layer()` keeps a single
   other style as the bare `{"name", "href"}` object GeoServer writes, and `Layer.asdict()` reads its keys as two
   styles named "name" and "href" (11 demo layers); `get_wms_store()`'s model drops `user`, `password`,
-  `maxConnections`, `readTimeout` and `connectTimeout`. Both are read raw. A style is created in **one** `POST`
+  `maxConnections`, `readTimeout` and `connectTimeout`. Both are read raw. So is a cascaded WMS layer (row 65):
+  GeoServer sends one with an international title as `internationalTitle` alone, no `title`, and
+  `WmsLayer` reads the plain title only, so `get_wms_layer()` returned none. A style is created in **one** `POST`
   to the collection with `?name=` and the body's content type: creating the definition first left an empty style
   behind when the body was refused (a retry then "already exists"). A GeoPackage upload whose name matches a
   layer in another store is published as `name1`, and a Replace upload onto a store of another type makes
@@ -285,7 +287,8 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   union of the members' lon/lat boxes (`_group_bounds`). A name GeoServer does not know is **dropped with a
   200**, so every line is checked first. A rename is forbidden (403). An EO group needs `rootLayer` and
   `rootLayerStyle`, and cannot leave EO mode: JSON null, `""`, `{}` and an empty XML element are all refused.
-  A workspace group can only hold that workspace's layers. A group may share a layer's qualified name.
+  A workspace group can hold that workspace's layers and groups, and the global groups (a group in `sf`
+  holding a global group is created, 201, and stored as it is); a layer of another workspace is a bare 500. A group may share a layer's qualified name.
 - The bundled wheel is the upstream 0.8.5 with `geoserver_acceptance_tests/` removed (15 MB of fixtures):
   16 MB → 49 KB. On a version bump, strip the new wheel the same way. The procedure is in
   `toolbelt/dependencies.py`; see [packaging and release](packaging.md). `GSC_REQUIRED` pins the version;

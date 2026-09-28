@@ -4,7 +4,7 @@
 <context>
     <name>CascadedStoreTabMixin</name>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="595" />
+        <location filename="../../gui/tab_cascaded.py" line="597" />
         <location filename="../../gui/tab_cascaded.py" line="74" />
         <source>Add a Cascaded Store</source>
         <translation type="unfinished" />
@@ -15,15 +15,15 @@
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="677" />
-        <location filename="../../gui/tab_cascaded.py" line="548" />
+        <location filename="../../gui/tab_cascaded.py" line="679" />
+        <location filename="../../gui/tab_cascaded.py" line="550" />
         <location filename="../../gui/tab_cascaded.py" line="122" />
         <location filename="../../gui/tab_cascaded.py" line="84" />
         <source>Workspace</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="703" />
+        <location filename="../../gui/tab_cascaded.py" line="705" />
         <location filename="../../gui/tab_cascaded.py" line="91" />
         <source>Cascaded layers</source>
         <translation type="unfinished" />
@@ -54,29 +54,29 @@
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="676" />
-        <location filename="../../gui/tab_cascaded.py" line="542" />
+        <location filename="../../gui/tab_cascaded.py" line="678" />
+        <location filename="../../gui/tab_cascaded.py" line="544" />
         <location filename="../../gui/tab_cascaded.py" line="121" />
         <source>Name</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="678" />
-        <location filename="../../gui/tab_cascaded.py" line="555" />
+        <location filename="../../gui/tab_cascaded.py" line="680" />
+        <location filename="../../gui/tab_cascaded.py" line="557" />
         <location filename="../../gui/tab_cascaded.py" line="123" />
         <source>Type</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="695" />
-        <location filename="../../gui/tab_cascaded.py" line="335" />
+        <location filename="../../gui/tab_cascaded.py" line="697" />
+        <location filename="../../gui/tab_cascaded.py" line="337" />
         <location filename="../../gui/tab_cascaded.py" line="124" />
         <source>Enabled</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="684" />
-        <location filename="../../gui/tab_cascaded.py" line="562" />
+        <location filename="../../gui/tab_cascaded.py" line="686" />
+        <location filename="../../gui/tab_cascaded.py" line="564" />
         <location filename="../../gui/tab_cascaded.py" line="125" />
         <source>GetCapabilities URL</source>
         <translation type="unfinished" />
@@ -92,234 +92,234 @@
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="324" />
+        <location filename="../../gui/tab_cascaded.py" line="326" />
         <source>Layer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="437" />
-        <location filename="../../gui/tab_cascaded.py" line="332" />
+        <location filename="../../gui/tab_cascaded.py" line="439" />
+        <location filename="../../gui/tab_cascaded.py" line="334" />
         <source>Remote layer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="333" />
+        <location filename="../../gui/tab_cascaded.py" line="335" />
         <source>Title</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="334" />
+        <location filename="../../gui/tab_cascaded.py" line="336" />
         <source>SRS</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="336" />
+        <location filename="../../gui/tab_cascaded.py" line="338" />
         <source>Bounds</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="337" />
+        <location filename="../../gui/tab_cascaded.py" line="339" />
         <source>Keywords</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="343" />
+        <location filename="../../gui/tab_cascaded.py" line="345" />
         <source>Abstract</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="354" />
+        <location filename="../../gui/tab_cascaded.py" line="356" />
         <source>Failed to load layer '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="365" />
+        <location filename="../../gui/tab_cascaded.py" line="367" />
         <source>Failed to load the layers of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="373" />
+        <location filename="../../gui/tab_cascaded.py" line="375" />
         <source>'{}' publishes no layer yet. Use Publish a layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="381" />
+        <location filename="../../gui/tab_cascaded.py" line="383" />
         <source>Cascaded layers of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="384" />
+        <location filename="../../gui/tab_cascaded.py" line="386" />
         <source>What this store publishes from the remote server. To remove one, delete it from the Layers tab.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="408" />
+        <location filename="../../gui/tab_cascaded.py" line="410" />
         <source>Failed to list the remote layers of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="416" />
+        <location filename="../../gui/tab_cascaded.py" line="418" />
         <source>The remote server behind '{}' advertises no layer. Check its capabilities URL.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="425" />
+        <location filename="../../gui/tab_cascaded.py" line="427" />
         <source>Publish a layer of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="428" />
+        <location filename="../../gui/tab_cascaded.py" line="430" />
         <source>The remote layer becomes a layer of this GeoServer, fetched from the remote server on every request. Leave the name empty to reuse the remote name without its prefix.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="444" />
+        <location filename="../../gui/tab_cascaded.py" line="446" />
         <source>Layer name</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="446" />
+        <location filename="../../gui/tab_cascaded.py" line="448" />
         <source>As published here, in workspace '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="452" />
+        <location filename="../../gui/tab_cascaded.py" line="454" />
         <source>Publish</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="466" />
+        <location filename="../../gui/tab_cascaded.py" line="468" />
         <source>Failed to publish '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="471" />
+        <location filename="../../gui/tab_cascaded.py" line="473" />
         <source>'{}' published as layer '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="481" />
+        <location filename="../../gui/tab_cascaded.py" line="483" />
         <source>Connection</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="485" />
+        <location filename="../../gui/tab_cascaded.py" line="487" />
         <source>User name</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="488" />
+        <location filename="../../gui/tab_cascaded.py" line="490" />
         <source>Only if the remote server asks</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="494" />
+        <location filename="../../gui/tab_cascaded.py" line="496" />
         <source>Password</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="499" />
+        <location filename="../../gui/tab_cascaded.py" line="501" />
         <source>Blank keeps the stored password. Clear the user name and the password to stop authenticating.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="510" />
+        <location filename="../../gui/tab_cascaded.py" line="512" />
         <source>Max connections</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="519" />
+        <location filename="../../gui/tab_cascaded.py" line="521" />
         <source>Read timeout (s)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="528" />
+        <location filename="../../gui/tab_cascaded.py" line="530" />
         <source>Connect timeout (s)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="688" />
-        <location filename="../../gui/tab_cascaded.py" line="570" />
+        <location filename="../../gui/tab_cascaded.py" line="690" />
+        <location filename="../../gui/tab_cascaded.py" line="572" />
         <source>As GeoServer reaches it, from its own machine, not from yours.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="581" />
+        <location filename="../../gui/tab_cascaded.py" line="583" />
         <source>Failed to load the workspaces</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="587" />
+        <location filename="../../gui/tab_cascaded.py" line="589" />
         <source>No workspaces available. Create a workspace first.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="596" />
+        <location filename="../../gui/tab_cascaded.py" line="598" />
         <source>A cascaded store proxies another server's WMS or WMTS: its layers can then be published here, and are fetched from the remote server on every request.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="604" />
+        <location filename="../../gui/tab_cascaded.py" line="606" />
         <source>Create</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="615" />
+        <location filename="../../gui/tab_cascaded.py" line="617" />
         <source>Failed to create cascaded store '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="620" />
+        <location filename="../../gui/tab_cascaded.py" line="622" />
         <source>Cascaded store '{}' created.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="634" />
+        <location filename="../../gui/tab_cascaded.py" line="636" />
         <source>Cascaded store '{}' already exists in workspace '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="661" />
+        <location filename="../../gui/tab_cascaded.py" line="663" />
         <source>Cascaded store '{}' created, but its credentials and limits could not be set: {}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="706" />
+        <location filename="../../gui/tab_cascaded.py" line="708" />
         <source>Layers</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="707" />
+        <location filename="../../gui/tab_cascaded.py" line="709" />
         <source>Open the Cascaded layers action for one layer's details.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="765" />
+        <location filename="../../gui/tab_cascaded.py" line="767" />
         <source>Failed to load cascaded store '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="774" />
+        <location filename="../../gui/tab_cascaded.py" line="776" />
         <source>Cascaded Store '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="791" />
+        <location filename="../../gui/tab_cascaded.py" line="793" />
         <source>Failed to save cascaded store '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="796" />
+        <location filename="../../gui/tab_cascaded.py" line="798" />
         <source>Cascaded store '{}' saved.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="831" />
+        <location filename="../../gui/tab_cascaded.py" line="833" />
         <source>Are you sure you want to delete cascaded store '{}'?</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_cascaded.py" line="835" />
+        <location filename="../../gui/tab_cascaded.py" line="837" />
         <source>Are you sure you want to delete %n cascaded store(s)?</source>
         <translation>
             <numerusform>Are you sure you want to delete %n cascaded store?</numerusform>
@@ -327,12 +327,12 @@
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="843" />
+        <location filename="../../gui/tab_cascaded.py" line="845" />
         <source>Cascaded store '{}' deleted.</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_cascaded.py" line="844" />
+        <location filename="../../gui/tab_cascaded.py" line="846" />
         <source>%n cascaded store(s) deleted.</source>
         <translation>
             <numerusform>%n cascaded store deleted.</numerusform>
@@ -340,7 +340,7 @@
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="849" />
+        <location filename="../../gui/tab_cascaded.py" line="851" />
         <source>Every cascaded layer published from it is deleted too; the remote server is not touched.</source>
         <translation type="unfinished" />
     </message>
@@ -2454,7 +2454,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="776" />
+        <location filename="../../gui/tab_layergroups.py" line="784" />
         <location filename="../../gui/tab_layergroups.py" line="71" />
         <source>Create a Layer Group</source>
         <translation type="unfinished" />
@@ -2465,7 +2465,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="623" />
+        <location filename="../../gui/tab_layergroups.py" line="631" />
         <location filename="../../gui/tab_layergroups.py" line="123" />
         <location filename="../../gui/tab_layergroups.py" line="78" />
         <source>Workspace</source>
@@ -2512,22 +2512,22 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="616" />
+        <location filename="../../gui/tab_layergroups.py" line="624" />
         <location filename="../../gui/tab_layergroups.py" line="122" />
         <source>Name</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="634" />
+        <location filename="../../gui/tab_layergroups.py" line="642" />
         <location filename="../../gui/tab_layergroups.py" line="124" />
         <source>Mode</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="701" />
-        <location filename="../../gui/tab_layergroups.py" line="689" />
-        <location filename="../../gui/tab_layergroups.py" line="663" />
-        <location filename="../../gui/tab_layergroups.py" line="658" />
+        <location filename="../../gui/tab_layergroups.py" line="709" />
+        <location filename="../../gui/tab_layergroups.py" line="697" />
+        <location filename="../../gui/tab_layergroups.py" line="671" />
+        <location filename="../../gui/tab_layergroups.py" line="666" />
         <location filename="../../gui/tab_layergroups.py" line="125" />
         <source>Layers</source>
         <translation type="unfinished" />
@@ -2538,8 +2538,8 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="1003" />
-        <location filename="../../gui/tab_layergroups.py" line="966" />
+        <location filename="../../gui/tab_layergroups.py" line="1011" />
+        <location filename="../../gui/tab_layergroups.py" line="974" />
         <location filename="../../gui/tab_layergroups.py" line="278" />
         <source>Failed to load layer group '{}'</source>
         <translation type="unfinished" />
@@ -2575,182 +2575,182 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="444" />
+        <location filename="../../gui/tab_layergroups.py" line="452" />
         <source>List at least one layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="451" />
-        <source>'{}' is in another workspace. A group in '{}' can only hold that workspace's layers and groups.</source>
+        <location filename="../../gui/tab_layergroups.py" line="459" />
+        <source>'{}' is in another workspace. A group in '{}' holds that workspace's layers and groups, and the global groups.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="466" />
+        <location filename="../../gui/tab_layergroups.py" line="474" />
         <source>No layer or group named '{}' on the server. Pick it from the list, or qualify it as workspace:layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="483" />
+        <location filename="../../gui/tab_layergroups.py" line="491" />
         <source>An Earth Observation group needs a root layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="490" />
+        <location filename="../../gui/tab_layergroups.py" line="498" />
         <source>No layer named '{}' on the server.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="497" />
+        <location filename="../../gui/tab_layergroups.py" line="505" />
         <source>Root layer '{}' has no default style: type one.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="540" />
+        <location filename="../../gui/tab_layergroups.py" line="548" />
         <source>None of the layers has bounds, so the group would have none.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="627" />
+        <location filename="../../gui/tab_layergroups.py" line="635" />
         <source>A global group can mix layers from several workspaces</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="638" />
+        <location filename="../../gui/tab_layergroups.py" line="646" />
         <source>Single publishes the group as one layer; Opaque Container is the same but hides its layers from the capabilities; Named Tree also keeps the layers addressable on their own; Container Tree and Earth Observation Tree only group them</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="648" />
+        <location filename="../../gui/tab_layergroups.py" line="656" />
         <source>Title</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="653" />
+        <location filename="../../gui/tab_layergroups.py" line="661" />
         <source>Abstract</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="666" />
+        <location filename="../../gui/tab_layergroups.py" line="674" />
         <source>Layer or group</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="668" />
+        <location filename="../../gui/tab_layergroups.py" line="676" />
         <source>Style</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="672" />
+        <location filename="../../gui/tab_layergroups.py" line="680" />
         <source>(default)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="675" />
+        <location filename="../../gui/tab_layergroups.py" line="683" />
         <source>In drawing order: the first row is drawn first, at the bottom. A blank style is the layer's own default.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="683" />
+        <location filename="../../gui/tab_layergroups.py" line="691" />
         <source>Root layer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="686" />
+        <location filename="../../gui/tab_layergroups.py" line="694" />
         <source>(pick a layer)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="690" />
+        <location filename="../../gui/tab_layergroups.py" line="698" />
         <source>What an Earth Observation group draws when it is requested as a whole</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="698" />
+        <location filename="../../gui/tab_layergroups.py" line="706" />
         <source>Root layer style</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="702" />
+        <location filename="../../gui/tab_layergroups.py" line="710" />
         <source>Its default style</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="709" />
+        <location filename="../../gui/tab_layergroups.py" line="717" />
         <source>Enabled</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="715" />
+        <location filename="../../gui/tab_layergroups.py" line="723" />
         <source>Advertised</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="718" />
+        <location filename="../../gui/tab_layergroups.py" line="726" />
         <source>Listed in the capabilities. Off, the group is still served to whoever names it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="728" />
+        <location filename="../../gui/tab_layergroups.py" line="736" />
         <source>Bounds</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="769" />
+        <location filename="../../gui/tab_layergroups.py" line="777" />
         <source>Failed to load the workspaces and layers</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="777" />
+        <location filename="../../gui/tab_layergroups.py" line="785" />
         <source>Publish several layers as one. GeoServer computes the group's bounds from the layers it contains.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="789" />
+        <location filename="../../gui/tab_layergroups.py" line="797" />
         <source>Create</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="807" />
+        <location filename="../../gui/tab_layergroups.py" line="815" />
         <source>Failed to create layer group '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="812" />
+        <location filename="../../gui/tab_layergroups.py" line="820" />
         <source>Layer group '{}' created.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="850" />
+        <location filename="../../gui/tab_layergroups.py" line="858" />
         <source>No style '{}' on the server.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="871" />
+        <location filename="../../gui/tab_layergroups.py" line="879" />
         <source>Layer group '{}' already exists in {}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="946" />
+        <location filename="../../gui/tab_layergroups.py" line="954" />
         <source>Could not add '{}' to QGIS</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="951" />
+        <location filename="../../gui/tab_layergroups.py" line="959" />
         <source>'{}' added to the project as WMS.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="986" />
+        <location filename="../../gui/tab_layergroups.py" line="994" />
         <source>Could not build the preview of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="1042" />
+        <location filename="../../gui/tab_layergroups.py" line="1050" />
         <source>Are you sure you want to delete layer group '{}'?</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_layergroups.py" line="1046" />
+        <location filename="../../gui/tab_layergroups.py" line="1054" />
         <source>Are you sure you want to delete %n layer group(s)?</source>
         <translation>
             <numerusform>Are you sure you want to delete %n layer group?</numerusform>
@@ -2758,12 +2758,12 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="1054" />
+        <location filename="../../gui/tab_layergroups.py" line="1062" />
         <source>Layer group '{}' deleted.</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_layergroups.py" line="1055" />
+        <location filename="../../gui/tab_layergroups.py" line="1063" />
         <source>%n layer group(s) deleted.</source>
         <translation>
             <numerusform>%n layer group deleted.</numerusform>
@@ -2771,7 +2771,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_layergroups.py" line="1059" />
+        <location filename="../../gui/tab_layergroups.py" line="1067" />
         <source>Only the group goes away. The layers it published stay. GeoServer refuses if another layer group contains this one.</source>
         <translation type="unfinished" />
     </message>

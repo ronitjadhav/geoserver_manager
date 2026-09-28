@@ -425,10 +425,18 @@ class LayerGroupTabMixin:
 
     @staticmethod
     def _same_workspace(workspace_name, names):
-        """The names a group in this workspace may hold: all, for a global one."""
+        """The names a group in this workspace may hold: all, for a global one.
+
+        A workspace group holds its own workspace's layers and groups, and the
+        global groups, which are the bare names (measured on 2.28.5).
+        """
         if not workspace_name:
             return list(names)
-        return [name for name in names if name.startswith(f"{workspace_name}:")]
+        return [
+            name
+            for name in names
+            if ":" not in name or name.startswith(f"{workspace_name}:")
+        ]
 
     def _group_publishables(self, rows, workspace_name, known_layers, known_groups):
         """The layer list as GeoServer publishables, and the styles beside it.
@@ -450,8 +458,8 @@ class LayerGroupTabMixin:
                 raise ValueError(
                     translate(
                         "LayerGroupTabMixin",
-                        "'{}' is in another workspace. A group in '{}' can only "
-                        "hold that workspace's layers and groups.",
+                        "'{}' is in another workspace. A group in '{}' holds that "
+                        "workspace's layers and groups, and the global groups.",
                     ).format(layer, workspace_name)
                 )
             if known_layers is None or layer in known_layers:
