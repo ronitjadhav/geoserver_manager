@@ -42,6 +42,12 @@ class TestLogGate(unittest.TestCase):
             )
             self.assertEqual(reads, [1])
 
+    def test_a_level_passed_by_position_is_refused(self):
+        # It landed in the application slot and the message stayed at Info:
+        # dropped without debug mode, a TypeError from QGIS with it.
+        with self.assertRaises(TypeError):
+            PlgLogger.log("lost", Qgis.MessageLevel.Critical)
+
 
 if __name__ == "__main__":
     unittest.main()

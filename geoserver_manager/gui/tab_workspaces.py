@@ -562,7 +562,10 @@ class WorkspaceTabMixin:
             try:
                 self._set_default_workspace(name)
             except Exception as e:
-                self.log(f"Set default workspace error: {e}", Qgis.MessageLevel.Warning)
+                self.log(
+                    f"Set default workspace error: {e}",
+                    log_level=Qgis.MessageLevel.Warning,
+                )
                 return translate(
                     "WorkspaceTabMixin",
                     "Workspace '{}' saved, but it could not be made the default: {}",
