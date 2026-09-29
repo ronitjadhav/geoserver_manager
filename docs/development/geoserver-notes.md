@@ -184,8 +184,10 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   `/rest/services/{wfs|wcs|wmts}/workspaces/{ws}/settings.json` answers 404 without own settings; a `PUT`
   creates them or merges into them; `DELETE` falls back to the global ones, as for WMS. A freshly created WFS
   override has `maxFeatures` 0, not the global value, so the form prefills from the global settings. A `PUT` of
-  `{"namespace": {"uri": …}}` alone merges; a workspace rename keeps the URI; a URI another non-isolated
-  workspace uses is a 500 "Namespace with URI … already exists".
+  `{"namespace": {"uri": …}}` alone does **not** keep `isolated`: it stores false, on the namespace and the
+  workspace, so the plugin sends `{"uri": …, "isolated": …}` from the form. A workspace rename keeps the URI.
+  A URI another workspace uses is a 500 "Namespace with URI … already exists", unless the PUT carries
+  `"isolated": true` (200, the URI shared).
 - **Server-wide settings** (row 60, measured on 2.28.5): `…/services/{wms|wfs|wcs|wmts}/settings.json`
   merges a partial `PUT`, like the resources. But `/settings.json` (global), `/settings/contact.json` and
   `/logging.json` **replace** the stored object: a `PUT` of `proxyBaseUrl` alone wiped the contact and the

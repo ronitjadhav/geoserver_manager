@@ -136,10 +136,14 @@ class TestBlankFieldsClear(unittest.TestCase):
         dlg = SyncDialog()
         put = []
         dlg._save_workspace = lambda values, old_name=None: None
-        dlg._put_namespace_uri = lambda name, uri: put.append(uri)
+        dlg._put_namespace_uri = lambda name, uri, isolated: put.append(uri)
         dlg._apply_wms_settings = lambda *args: None
         dlg._save_workspace_and_wms(
-            {"name": "w", "uri": "", "wms_own": False}, "w", False, {}, "http://old"
+            {"name": "w", "uri": "", "isolated": False, "wms_own": False},
+            "w",
+            False,
+            {},
+            "http://old",
         )
         self.assertEqual(put, ["http://w"])
 

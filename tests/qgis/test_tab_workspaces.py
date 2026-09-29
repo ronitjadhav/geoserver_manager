@@ -18,8 +18,10 @@ from qgis.testing import start_app, unittest
 # project
 from geoserver_manager.gui import tab_workspaces
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.gui.scope import GLOBAL
 from geoserver_manager.gui.tab_workspaces import WorkspaceTabMixin
 from geoserver_manager.toolbelt.dependencies import BUNDLED_WHLS
+from geoserver_manager.toolbelt.rest import PartlySaved
 from tests.qgis.sync_dialog import SyncDialog
 
 for _whl in BUNDLED_WHLS:  # conftest does this under pytest; unittest needs it too
@@ -364,6 +366,59 @@ class TestWorkspaceDialog(unittest.TestCase):
         self.assertIn("already exists", seen["said"])
         self.assertEqual([c for c in self.dlg.gs.calls if c[0] == "PUT"], [])
 
+    def test_a_name_with_a_space_keeps_the_add_form_open(self):
+        # GeoServer kept it after a 500, and the plugin said "Failed to create".
+        seen = {}
+
+        class Filling(ResourceFormDialog):
+            def exec(inner):
+                inner.get_widget("name").setText("rv2_sp ace")
+                inner._on_accept()
+                seen["open"] = not inner.result()
+                seen["said"] = inner._validation_label.text()
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_workspaces, "ResourceFormDialog", Filling):
+            self.dlg._add_workspace()
+        self.assertTrue(seen["open"])
+        self.assertIn("cannot be a workspace name", seen["said"])
+        self.assertNotIn("create_workspace", [c[0] for c in self.dlg.gs.calls])
+
+    def test_a_name_geoservers_own_form_refuses_is_refused(self):
+        for name in ("a<b", "a|b", "1ws", "a:b", "tab\there"):
+            with self.assertRaises(ValueError, msg=name):
+                self.dlg._check_new_workspace({"name": name})
+        for name in ("ne_2", "géo", "_x", "a-b.c"):
+            self.dlg._check_new_workspace({"name": name})
+
+    def test_the_global_scope_label_is_no_workspace_name(self):
+        # Its styles and groups would be edited and deleted as the global ones.
+        with self.assertRaises(ValueError):
+            self.dlg._check_new_workspace({"name": GLOBAL})
+        with self.assertRaises(ValueError):
+            self.dlg._check_workspace_rename("ne", {"name": "(global)"})
+        self.assertEqual([c for c in self.dlg.gs.calls if c[0] != "GET"], [])
+
+    def test_an_existing_workspace_named_like_the_global_scope_gives_no_rows(self):
+        # Made elsewhere, its "generic" row was the global one: Delete took that.
+        listed = []
+
+        class GS:
+            def get_workspaces(inner):
+                return ([{"name": GLOBAL}, {"name": "topp"}], 200)
+
+            def get_styles(inner, workspace_name=None):
+                listed.append(workspace_name)
+                return ([{"name": "generic"}], 200)
+
+        self.dlg.gs = GS()
+        rows, failures = self.dlg._fetch_style_rows()
+        self.assertEqual(
+            [row[:2] for row in rows], [["generic", GLOBAL], ["generic", "topp"]]
+        )
+        self.assertEqual([label for label, _ in failures], [GLOBAL])
+        self.assertNotIn(GLOBAL, listed)
+
 
 class TestDefaultColumn(unittest.TestCase):
     def test_an_unreadable_default_is_reported_not_shown_as_no(self):
@@ -383,11 +438,26 @@ class TestDefaultColumn(unittest.TestCase):
         self.assertEqual(len(failures), 1)
         self.assertIn("default", failures[0][0])
 
+    def test_an_empty_server_has_no_default_to_report(self):
+        # Without workspaces default.json is a 404, shown as "could not be listed".
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        dlg.gs.get_workspaces = lambda: ([], 200)
+        original = dlg._raw_rest
+
+        def raw(method, path, **kwargs):
+            if path.endswith("/workspaces/default.json"):
+                raise RuntimeError("HTTP 404: No such workspace: 'default' found")
+            return original(method, path, **kwargs)
+
+        dlg._raw_rest = raw
+        self.assertEqual(dlg._fetch_workspace_rows(), ([], []))
+
 
 class TestNamespaceAndOtherServices(unittest.TestCase):
     """Measured on 2.28.5: per-workspace WFS/WCS/WMTS settings behave like
     WMS (404 without, PUT creates or merges, DELETE falls back), and a PUT of
-    the namespace URI alone merges."""
+    the namespace URI without `isolated` stores it false."""
 
     def setUp(self):
         Recording.opened.clear()
@@ -471,8 +541,39 @@ class TestNamespaceAndOtherServices(unittest.TestCase):
         self.save("ne", {}, uri="http://example.org/ne")
         (put,) = [c for c in self.calls("PUT") if "/namespaces/" in c[1]]
         self.assertEqual(
-            put[2]["json"], {"namespace": {"uri": "http://example.org/ne"}}
+            put[2]["json"],
+            {"namespace": {"uri": "http://example.org/ne", "isolated": False}},
         )
+
+    def test_an_isolated_workspace_stays_isolated_when_its_uri_changes(self):
+        # A URI PUT without `isolated` un-isolated it, and refused a shared URI.
+        self.save("ne", {}, isolated=True, uri="http://shared.example.org")
+        (put,) = [c for c in self.calls("PUT") if "/namespaces/" in c[1]]
+        self.assertIs(put[2]["json"]["namespace"]["isolated"], True)
+        self.dlg.gs.calls.clear()
+        self.dlg._save_workspace(
+            {
+                "name": "fresh",
+                "isolated": True,
+                "set_default": False,
+                "uri": "http://shared.example.org",
+            }
+        )
+        (put,) = [c for c in self.calls("PUT") if "/namespaces/" in c[1]]
+        self.assertEqual(put[1], "/rest/namespaces/fresh.json")
+        self.assertIs(put[2]["json"]["namespace"]["isolated"], True)
+
+    def test_a_failed_default_is_still_reported_when_a_setting_fails(self):
+        # The warning named the setting only; the default's failure was lost.
+        def refuse(*args, **kwargs):
+            raise RuntimeError("HTTP 403: forbidden")
+
+        self.dlg._set_default_workspace = refuse
+        self.dlg._apply_wms_settings = refuse
+        with self.assertRaises(PartlySaved) as caught:
+            self.save("ne", {}, set_default=True)
+        self.assertIn("could not be made the default", str(caught.exception))
+        self.assertIn("service settings were not", str(caught.exception))
 
 
 # ############################################################################

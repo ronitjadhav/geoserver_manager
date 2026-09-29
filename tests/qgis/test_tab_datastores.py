@@ -240,6 +240,35 @@ class TestDatastoreEdit(unittest.TestCase):
         merged = self.dlg._merge_other_params(dict(stored), stored, "PostGIS", shown)
         self.assertEqual(merged["proxy password"], "crypt1:X")
 
+    def test_a_secret_typed_in_the_table_keeps_its_edge_spaces(self):
+        # The typed password fields kept them; the key/value tables did not.
+        stored = dict(STORED, **{"proxy password": "crypt1:X"})
+        pairs = {" proxy password ": " new pass ", " fetch size ": " 500 "}
+        merged = self.dlg._merge_other_params(dict(stored), stored, "PostGIS", pairs)
+        self.assertEqual(merged["proxy password"], " new pass ")
+        self.assertEqual(merged["fetch size"], "500")
+        self.assertEqual(
+            self.dlg._parse_params({"s3.secret-access-key": " k "}),
+            {"s3.secret-access-key": " k "},
+        )
+
+    def test_an_on_off_flag_is_shown_even_when_its_key_reads_as_a_secret(self):
+        # PMTiles stores carry these two, always "true" or "false".
+        flags = {
+            "io.tileverse.rangereader.s3.use-default-credentials-provider": "false",
+            "io.tileverse.rangereader.gcs.default-credentials-chain": "true",
+            "io.tileverse.rangereader.s3.aws-secret-access-key": "crypt1:S",
+        }
+        shown = self.dlg._other_params("PMTiles", dict(flags, pmtiles="s3://b/x"))
+        self.assertEqual(
+            shown,
+            {
+                "io.tileverse.rangereader.s3.use-default-credentials-provider": "false",
+                "io.tileverse.rangereader.gcs.default-credentials-chain": "true",
+                "io.tileverse.rangereader.s3.aws-secret-access-key": _MASKED,
+            },
+        )
+
 
 class TestOtherType(unittest.TestCase):
     def setUp(self):

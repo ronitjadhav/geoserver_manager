@@ -6,11 +6,14 @@ Workspace tab: load, create, edit, delete workspaces.
 Used as a mixin for GeoServerMainDialog.
 """
 
+import re
+
 from qgis.core import Qgis
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
+from geoserver_manager.gui.scope import GLOBAL
 from geoserver_manager.toolbelt.payload import keyword_list, words
 from geoserver_manager.toolbelt.rest import PartlySaved
 
@@ -22,6 +25,9 @@ _ABSTRACT = "abstrct"
 # group of its own. Measured on 2.28.5: GET is a 404 without own settings, a
 # PUT creates or merges them, DELETE falls back to the global ones.
 OTHER_SERVICES = ("wfs", "wcs", "wmts")
+
+# An XML NCName, as GeoServer's own workspace pages require (XMLNameValidator).
+_XML_NAME = re.compile(r"[^\W\d][\w.\-]*")
 
 
 # Every user-visible string in this file goes through translate() with this
@@ -79,14 +85,16 @@ class WorkspaceTabMixin:
         # Shown in the list so the server's truth is visible at a glance:
         # GeoServer always has exactly one default and it cannot be unset.
         failures = []
-        try:
-            default = self._default_workspace_name()
-        except Exception as error:
-            # Unknown, and said so: every row read "No" without a word.
-            default = None
-            failures.append(
-                (translate("WorkspaceTabMixin", "the default workspace"), error)
-            )
+        default = None
+        # No workspace, no default: GeoServer answers default.json with a 404.
+        if workspaces:
+            try:
+                default = self._default_workspace_name()
+            except Exception as error:
+                # Unknown, and said so: every row read "No" without a word.
+                failures.append(
+                    (translate("WorkspaceTabMixin", "the default workspace"), error)
+                )
         rows = [
             # A boolean cell, like every other: Yes / No, translated.
             [name, None if default is None else self._yes_no(name == default)]
@@ -468,12 +476,13 @@ class WorkspaceTabMixin:
         payload = self._raw_rest("get", self._namespace_path(workspace_name)).json()
         return (payload.get("namespace") or {}).get("uri") or ""
 
-    def _put_namespace_uri(self, workspace_name, uri):
-        """Set the URI; a PUT of it alone merges (measured on 2.28.5)."""
+    def _put_namespace_uri(self, workspace_name, uri, isolated):
+        """Set the URI. `isolated` goes with it: without it GeoServer stores
+        false, and the workspace is no longer isolated (measured on 2.28.5)."""
         self._raw_rest(
             "put",
             self._namespace_path(workspace_name),
-            json={"namespace": {"uri": uri}},
+            json={"namespace": {"uri": uri, "isolated": isolated}},
         )
 
     def _default_workspace_name(self):
@@ -510,10 +519,21 @@ class WorkspaceTabMixin:
         self._raw_rest("put", path, json=Workspace(new_name, isolated).put_payload())
 
     def _check_new_workspace(self, values):
-        """Refuse a name a URL would eat, or one taken. Reads only: the Add
-        form runs it before it closes, the save again."""
+        """Refuse a name a URL would eat, one GeoServer's own form refuses,
+        or one taken. Reads only: the Add form runs it before it closes, the
+        save again."""
         name = values["name"]
         self._require_safe_name(name)
+        # A space half-created one (500), and rows carry GLOBAL as the global scope.
+        if name == GLOBAL or not _XML_NAME.fullmatch(name):
+            raise ValueError(
+                translate(
+                    "WorkspaceTabMixin",
+                    "'{}' cannot be a workspace name: it must start with a letter "
+                    "or '_', then hold only letters, digits, '_', '-' and '.', as "
+                    "GeoServer's own form requires.",
+                ).format(name)
+            )
         # create_workspace upserts, so an existing name would silently
         # reconfigure the live workspace and report it as created
         if self._resource_exists(self.gs.get_workspace, name):
@@ -542,7 +562,9 @@ class WorkspaceTabMixin:
             self._check(self.gs.create_workspace(name, isolated=values["isolated"]))
             if (values.get("uri") or "").strip():
                 try:
-                    self._put_namespace_uri(name, values["uri"].strip())
+                    self._put_namespace_uri(
+                        name, values["uri"].strip(), values["isolated"]
+                    )
                 except Exception as error:
                     raise PartlySaved(
                         translate(
@@ -726,7 +748,9 @@ class WorkspaceTabMixin:
         try:
             if old_uri is not None and uri != old_uri:
                 # Emptied: back to GeoServer's own default, not left as it was.
-                self._put_namespace_uri(name, uri or f"http://{name}")
+                self._put_namespace_uri(
+                    name, uri or f"http://{name}", values["isolated"]
+                )
             self._apply_wms_settings(name, values, had_wms)
             for service in OTHER_SERVICES:
                 if f"{service}_own" in values:
@@ -734,13 +758,13 @@ class WorkspaceTabMixin:
                         service, name, values, (had_services or {}).get(service, False)
                     )
         except Exception as error:
-            raise PartlySaved(
-                translate(
-                    "WorkspaceTabMixin",
-                    "Workspace '{}' saved, but its namespace or service settings "
-                    "were not: {}",
-                ).format(name, self._error_text(error))
-            ) from error
+            message = translate(
+                "WorkspaceTabMixin",
+                "Workspace '{}' saved, but its namespace or service settings "
+                "were not: {}",
+            ).format(name, self._error_text(error))
+            # A failed "make default" is only a warning, and would be lost here.
+            raise PartlySaved(f"{message} {warning}" if warning else message) from error
         return warning
 
     def _delete_workspace(self, row_data):

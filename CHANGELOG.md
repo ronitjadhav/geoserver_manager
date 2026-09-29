@@ -392,6 +392,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **Saving a workspace's namespace URI keeps it isolated.** The URI went to
+  GeoServer without the isolation, so an isolated workspace lost it, and a
+  URI it shared with another workspace was refused.
+- A workspace name that GeoServer cannot use is refused before the form
+  closes. A name with a space used to be half-created and reported as a
+  failure. A new or renamed workspace starts with a letter or `_` and holds
+  only letters, digits, `_`, `-` and `.`, as in GeoServer's own form.
+- A workspace named "(global)" can no longer be created. One made elsewhere
+  is no longer listed on the Styles and Layer Groups tabs, where its styles
+  and groups stood in for the global ones of the same name, so an edit or a
+  delete reached those. It is reported instead, so you can rename it.
+- When making a workspace the default failed and one of its settings failed
+  too, the message now names both; it named the settings only.
+- The Workspaces tab of a GeoServer with no workspace no longer warns that
+  the default workspace could not be listed.
+- A secret typed in a key/value table (a store's Other parameters, the
+  generic editor, an Other store) keeps its leading and trailing spaces, as
+  the password fields already do.
+- The two PMTiles on/off credential options show their true or false value;
+  they were masked as secrets.
 - **A URL that redirects is refused.** The connection check read a URL
   behind a redirect (the usual http:// to https:// rule) as Connected. Every
   save then reached GeoServer without its body, or as a read, and GeoServer

@@ -59,7 +59,9 @@ A workspace groups stores, layers and styles, like a folder.
 
 - **Add a Workspace:** give it a name, and optionally its namespace URI (the
   one WFS and GML qualify its features with; `http://name` otherwise). Make
-  it isolated or the default if needed.
+  it isolated or the default if needed. The name starts with a letter or `_`
+  and holds only letters, digits, `_`, `-` and `.`, as in GeoServer's own form;
+  any other is refused before the form closes, and so is a rename to one.
 - **Click a name** to edit it: rename it, change its namespace URI or its
   isolation, make it the default, or give it service settings of its own on
   the *WMS*, *WFS*, *WCS* and *WMTS* tabs.
