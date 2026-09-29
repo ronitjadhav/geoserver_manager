@@ -392,6 +392,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **Add to QGIS reaches the layers of an isolated workspace:** the layer,
+  the map preview and a layer group now load through their workspace's own
+  service, where GeoServer lists them. Before, they were invalid.
+- **A layer added to QGIS behind a proxy draws:** QGIS kept sending its map,
+  tile and feature info requests to the address GeoServer advertised, so the
+  layer was added and stayed blank. A WFS layer that cannot load now points
+  to the Proxy base URL setting.
+- Publishing a table whose layer name another store of the workspace already
+  uses is refused before the form closes, and the refusal names that store.
+  Before, the table's own store was checked, and the publish failed after
+  the form had closed, losing the metadata typed into it.
+- Publishing a layer of the QGIS project refuses a taken store or layer name
+  before the form closes, with the title, abstract and keywords still there.
+- The batch publish summary names the layer whose upload ended the batch:
+  cancelled, or still uploading when the dialog closed. A stopped batch
+  always warns and logs, never ends on a success banner.
+- A Cancel while a batch-published layer's title, keywords or style was
+  being set stops the batch, and the summary says the layer is published
+  without them. Before, the batch went on and ended on success.
+- **Set style and Push style from QGIS no longer claim a default style on a
+  cascaded WMS layer:** GeoServer accepts one and keeps none. Such a layer
+  is offered its other styles only, and a pushed style is uploaded without
+  being assigned.
+- A kept style that already is the layer's default (a Replace) is no longer
+  said to be 'not assigned to the layer'.
 - Renaming a coverage store onto a taken name, or onto one a URL cannot
   carry, is refused before the edit form closes, so the rest of the edit is
   kept.

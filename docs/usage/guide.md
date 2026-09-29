@@ -271,7 +271,9 @@ a raster's size and bands).
 ```
 
 A cascaded layer stays read-only: GeoServer's REST API cannot change one, so
-its web interface is the place for that.
+its web interface is the place for that. A cascaded WMS layer also keeps the
+remote server's default style: *Set style* offers its other styles only, and
+*Push style from QGIS* uploads the style without assigning it.
 
 ## Layer groups
 
