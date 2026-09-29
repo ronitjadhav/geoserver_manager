@@ -399,6 +399,34 @@ class TestWhichServerLayer(unittest.TestCase):
             LayerTreeMenu.server_layer_from_source(Source(uri, provider), BASE)
         )
 
+    def test_another_geoserver_on_the_same_host_is_not_a_target(self):
+        # Review F47: only the host was compared, so /gs2 passed as /geoserver.
+        for other in (
+            "http://gs.example.org/gs2",
+            "http://gs.example.org/geoserver2",
+            "https://gs.example.org/geoserver",
+        ):
+            for protocol in ("WFS", "WMS", "WMTS"):
+                uri, provider = SyncDialog._layer_uri(protocol, other, "topp:states")
+                self.assertIsNone(
+                    LayerTreeMenu.server_layer_from_source(Source(uri, provider), BASE),
+                    (other, protocol),
+                )
+
+    def test_a_path_below_this_server_still_names_its_layer(self):
+        for base, url in (
+            (BASE, f"{BASE}/gwc/service/wmts?REQUEST=GetCapabilities"),
+            (BASE, f"{BASE}/topp/wms"),
+            (f"{BASE}/", f"{BASE}/ows"),
+            ("http://gs.example.org", "http://gs.example.org/ows"),
+        ):
+            source = f"crs=EPSG:4326&layers=topp:states&styles=&url={url}"
+            self.assertEqual(
+                LayerTreeMenu.server_layer_from_source(Source(source, "wms"), base),
+                "topp:states",
+                (base, url),
+            )
+
     def test_a_local_layer_names_nothing(self):
         for source, provider in (
             ("Point?crs=epsg:4326&field=id:integer", "memory"),
@@ -494,6 +522,39 @@ class TestPush(MenuCase):
         self.assertIn("boom", text)
         self.assertEqual(level, Qgis.MessageLevel.Critical)
 
+    def test_a_cancelled_upload_says_the_style_may_still_change(self):
+        # Review F30: a Cancel on the save's waiting box said nothing.
+        from geoserver_manager.toolbelt.rest import Abandoned
+
+        del self.dlg._push_qgis_style  # the dialog's own, from here on
+
+        def cancel(_work):
+            raise Abandoned(write=True)
+
+        self.dlg._wait_for_save = cancel
+        self.dlg._confirm_replace_style = lambda *args: True
+        self.push()
+        self.assertEqual(
+            self.iface.bar.messages,
+            [
+                (
+                    "Stopped waiting. GeoServer may still apply the change.",
+                    Qgis.MessageLevel.Warning,
+                )
+            ],
+        )
+
+    def test_a_name_that_changes_the_address_is_refused(self):
+        # Review F57: layers/topp:a#b.json went out as layers/topp:a.
+        self.dlg.gs.layers = ["topp:a#b"]
+        self.layer.setName("a#b")
+        self.push()
+        self.assertEqual(self.dlg.pushed, [])
+        self.assertEqual(FakeForm.opened, [])
+        text, level = self.iface.bar.messages[-1]
+        self.assertIn("'topp:a#b' has a '/', '?', '#' or '%'", text)
+        self.assertEqual(level, Qgis.MessageLevel.Warning)
+
 
 class TestApply(MenuCase):
     def setUp(self):
@@ -547,6 +608,15 @@ class TestApply(MenuCase):
         self.apply()
         self.assertEqual(self.applied, [(self.layer, "<StyledLayerDescriptor/>")])
         self.assertTrue(self.dlg.requests[-1][1].endswith("/styles/population.sld"))
+
+    def test_a_name_that_changes_the_address_is_refused(self):
+        # Review F57: the layer tree is a dispatch point too (invariant 10).
+        uri, provider = SyncDialog._layer_uri("WMS", BASE, "topp:a#b", "cfg1")
+        self.layer = Source(uri, provider, name="a#b")
+        self.apply()
+        self.assertEqual(self.dlg.requests, [])
+        self.assertEqual(self.applied, [])
+        self.assertIn("Rename it in GeoServer's web interface", self.texts()[-1])
 
     def test_a_layer_without_styles_is_said(self):
         self.styles_by_layer = {"topp:states": (None, [])}

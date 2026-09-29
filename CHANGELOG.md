@@ -392,6 +392,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- The layer tree's *Push style* and *Apply style* refuse a GeoServer layer
+  whose name holds '/', '?', '#' or '%', as the dialog does; a push to "a#b"
+  set the style of layer "a".
+- A layer from another GeoServer on the same host (another path, or https
+  instead of http) is no longer taken for a layer of the connected one when
+  a style is pushed or applied from the layer tree.
+- A Cancel while the layer tree pushes a style warns that GeoServer may
+  still apply the change; it said nothing.
+- Warnings and errors the plugin puts in QGIS's message bar (the settings
+  page's save problems, the library version warning) stay until closed; they
+  faded after 6 and 9 seconds.
 - In a workspace layer group, a global group picked from the list is that
   global group, even when the workspace has a layer or group of the same
   name. It went out as the workspace's namesake, and in an edit of `ws:g`

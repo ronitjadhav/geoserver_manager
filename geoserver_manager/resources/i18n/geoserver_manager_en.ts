@@ -3708,22 +3708,22 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
 </context><context>
     <name>LayerTreeMenu</name>
     <message>
-        <location filename="../../gui/layer_tree.py" line="81" />
+        <location filename="../../gui/layer_tree.py" line="82" />
         <source>Push style to GeoServer…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="85" />
+        <location filename="../../gui/layer_tree.py" line="86" />
         <source>Apply style from GeoServer…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="98" />
+        <location filename="../../gui/layer_tree.py" line="99" />
         <source>Publish to GeoServer…</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/layer_tree.py" line="100" />
+        <location filename="../../gui/layer_tree.py" line="101" />
         <source>Publish %n layer(s) to GeoServer…</source>
         <translation>
             <numerusform>Publish %n layer to GeoServer…</numerusform>
@@ -3731,147 +3731,157 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         </translation>
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="109" />
+        <location filename="../../gui/layer_tree.py" line="110" />
         <source>Not connected. Open GeoServer Manager first</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="118" />
+        <location filename="../../gui/layer_tree.py" line="119" />
         <source>Open GeoServer Manager to connect…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="196" />
+        <location filename="../../gui/layer_tree.py" line="205" />
         <source>Could not list the layers of the server</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="210" />
+        <location filename="../../gui/layer_tree.py" line="219" />
         <source>No layer on the server is named like '{}'. Publish it first, from the Layers tab.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="222" />
+        <location filename="../../gui/layer_tree.py" line="231" />
         <source>Several layers on the server are named like '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="228" />
+        <location filename="../../gui/layer_tree.py" line="237" />
         <source>GeoServer layer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="236" />
+        <location filename="../../gui/layer_tree.py" line="245" />
         <source>Continue</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="249" />
+        <location filename="../../gui/layer_tree.py" line="261" />
+        <source>'{}' has a '/', '?', '#' or '%' in its name, which changes the address the plugin would use. Rename it in GeoServer's web interface to manage it here.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/layer_tree.py" line="278" />
         <source>Push the style of '{}' to GeoServer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="258" />
+        <location filename="../../gui/layer_tree.py" line="287" />
         <source>The symbology of '{}' is exported as SLD and uploaded to workspace '{}' as the style of layer '{}'. A style of that name there is replaced, which is how you push a change you just made in QGIS.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="267" />
+        <location filename="../../gui/layer_tree.py" line="296" />
         <source>Style name</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="274" />
+        <location filename="../../gui/layer_tree.py" line="303" />
         <source>Make it the layer's default style</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="282" />
+        <location filename="../../gui/layer_tree.py" line="311" />
         <source>Upload</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="292" />
+        <location filename="../../gui/layer_tree.py" line="321" />
         <source>Could not export the symbology of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="304" />
+        <location filename="../../gui/layer_tree.py" line="333" />
         <source>Failed to upload the style of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="311" />
+        <location filename="../../gui/layer_tree.py" line="340" />
         <source>Style '{}' left as it is.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="319" />
+        <location filename="../../gui/layer_tree.py" line="348" />
         <source>'{}' on GeoServer now uses the style of '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="323" />
+        <location filename="../../gui/layer_tree.py" line="352" />
         <source>Style '{}' uploaded to workspace '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="350" />
+        <location filename="../../gui/layer_tree.py" line="379" />
         <source>Apply a GeoServer style to '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="360" />
+        <location filename="../../gui/layer_tree.py" line="389" />
         <source>Failed to load the styles of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="368" />
+        <location filename="../../gui/layer_tree.py" line="397" />
         <source>'{}' has no style on the server.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="378" />
+        <location filename="../../gui/layer_tree.py" line="407" />
         <source>'{}' has several styles on the server; the default comes first. The style is applied to this project only.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="386" />
+        <location filename="../../gui/layer_tree.py" line="415" />
         <source>Style</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="394" />
+        <location filename="../../gui/layer_tree.py" line="423" />
         <source>Apply</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="403" />
+        <location filename="../../gui/layer_tree.py" line="432" />
         <source>Failed to load style '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="410" />
+        <location filename="../../gui/layer_tree.py" line="439" />
         <source>Failed to apply '{}' to '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="420" />
+        <location filename="../../gui/layer_tree.py" line="449" />
         <source>'{}' now uses the GeoServer style '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="428" />
+        <location filename="../../gui/layer_tree.py" line="457" />
         <source>QGIS could not read all of '{}': {}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="431" />
+        <location filename="../../gui/layer_tree.py" line="460" />
         <source>no detail given</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/layer_tree.py" line="498" />
+        <location filename="../../gui/layer_tree.py" line="511" />
+        <source>Stopped waiting. GeoServer may still apply the change.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/layer_tree.py" line="536" />
         <source>Not connected to GeoServer. Open GeoServer Manager and connect first.</source>
         <translation type="unfinished" />
     </message>
