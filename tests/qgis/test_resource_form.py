@@ -180,6 +180,18 @@ class TestResourceFormHeight(unittest.TestCase):
         self.assertGreaterEqual(dlg.height(), needed)
         dlg.close()
 
+    def test_a_form_without_a_description_opens_unscrolled(self):
+        # Its layout has no height-for-width, and the height needed was -1.
+        from qgis.PyQt.QtWidgets import QApplication
+
+        fields = [{"key": f"f{i}", "label": "Field", "type": "text"} for i in range(8)]
+        dlg = ResourceFormDialog(title="t", fields=fields)
+        dlg.resize(dlg.minimumSizeHint())
+        dlg.show()
+        self.addCleanup(dlg.close)
+        QApplication.processEvents()
+        self.assertEqual(dlg._field_page["f0"].verticalScrollBar().maximum(), 0)
+
 
 class TestResourceFormResize(unittest.TestCase):
     """A resized form scrolls or grows; it never squeezes or overlaps."""
@@ -368,6 +380,22 @@ class TestListValues(unittest.TestCase):
         table.picker.setCurrentText("EPSG:4326")
         table._add_picked()
         self.assertEqual(table.rows(), ["EPSG:4326"])
+
+    def test_a_stored_zoom_outside_the_range_comes_back_as_it_was(self):
+        # Clamped to the column's range, an untouched Save rewrote 45 as 40.
+        spin = {"label": "Z", "type": "spin", "min": 0, "max": 40}
+        dlg = self.form(
+            [
+                {
+                    "key": "t",
+                    "label": "T",
+                    "type": "table",
+                    "columns": [{"label": "Gridset"}, spin, spin],
+                }
+            ],
+            {"t": [["big", 3, 45], ["low", -3, None]]},
+        )
+        self.assertEqual(dlg.get_values()["t"], [["big", 3, 45], ["low", -3, None]])
 
 
 class TestKeysAndWheel(unittest.TestCase):
@@ -568,6 +596,46 @@ class TestEscapeAsksFirst(unittest.TestCase):
         dlg.set_values({"body": "<changed/>"})
         dlg._on_cancel()
         self.assertFalse(dlg.isVisible())
+
+    def test_the_window_close_button_asks_too(self):
+        from qgis.PyQt.QtWidgets import QMessageBox
+
+        asked = self.answer(QMessageBox.StandardButton.Cancel)
+        dlg = self.form()
+        dlg.set_values({"body": "<changed/>"})
+        dlg.windowHandle().close()  # a spontaneous close, as the title bar's X
+        self.assertEqual(len(asked), 1)
+        self.assertTrue(dlg.isVisible())
+
+    def test_discard_on_the_close_button_closes_and_close_stays_quiet(self):
+        from qgis.PyQt.QtWidgets import QMessageBox
+
+        asked = self.answer(QMessageBox.StandardButton.Discard)
+        dlg = self.form()
+        dlg.set_values({"body": "<changed/>"})
+        dlg.windowHandle().close()
+        self.assertFalse(dlg.isVisible())
+        quiet = self.form()
+        quiet.set_values({"body": "<changed/>"})
+        quiet.close()
+        self.assertFalse(quiet.isVisible())
+        self.assertEqual(len(asked), 1)
+
+    def test_a_viewer_with_a_button_of_its_own_stays_a_viewer(self):
+        # The seed tasks viewer's Stop all showed Save again, and its polled
+        # text then made Close ask to discard changes.
+        from qgis.PyQt.QtWidgets import QDialogButtonBox, QMessageBox
+
+        asked = self.answer(QMessageBox.StandardButton.Cancel)
+        viewer = self.form()
+        viewer.hide_save_button()
+        viewer.add_button("Stop all")
+        save = viewer._button_box.button(QDialogButtonBox.StandardButton.Ok)
+        self.assertFalse(save.isVisible())
+        viewer.set_values({"body": "<polled/>"})
+        viewer.windowHandle().close()
+        self.assertFalse(viewer.isVisible())
+        self.assertEqual(asked, [])
 
     def test_an_untouched_form_or_a_viewer_closes_without_asking(self):
         from qgis.PyQt.QtWidgets import QMessageBox

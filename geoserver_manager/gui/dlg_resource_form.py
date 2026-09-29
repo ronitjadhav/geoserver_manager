@@ -831,7 +831,12 @@ class ResourceFormDialog(QDialog):
 
     def needed_height(self):
         """The height that shows the whole form, at the current width."""
-        needed = self.layout().totalHeightForWidth(self.width())
+        layout = self.layout()
+        # Without a wrapped description, totalHeightForWidth() is -1.
+        if layout.hasHeightForWidth():
+            needed = layout.totalHeightForWidth(self.width())
+        else:
+            needed = layout.totalSizeHint().height()
         # A page's hint is its form at the form's own width. At the page's,
         # wrapped help can need more, and the form would open scrolled.
         # (Not height-for-width on the page: the dialog's layout would take
@@ -868,34 +873,51 @@ class ResourceFormDialog(QDialog):
             return
         super().keyPressEvent(event)
 
+    def closeEvent(self, event):  # noqa: N802 (Qt's own spelling)
+        """The title bar's close button asks like Esc; close() stays quiet."""
+        if event.spontaneous() and not self._may_discard():
+            event.ignore()
+            return
+        super().closeEvent(event)
+
     def _on_cancel(self):
         """Esc or Cancel: ask before an edit is thrown away.
 
         Esc closed a style's editor with its changes gone, without a word.
         A form with nothing to save (a viewer) or nothing changed just closes.
-        Only the user's own Esc and Cancel ask: close() goes through reject().
+        Only the user's own Esc, Cancel and window close button ask: close()
+        from the code goes through reject().
         """
+        if self._may_discard():
+            self.reject()
+
+    def _may_discard(self):
+        """True when closing loses nothing, or the user said Discard."""
         saves = self._button_box.button(QDialogButtonBox.StandardButton.Ok).isVisible()
-        if (
-            saves
-            and self._opened_with is not None
-            and self.get_values() != self._opened_with
-            and QMessageBox.question(
+        return (
+            not saves
+            or self._opened_with is None
+            or self.get_values() == self._opened_with
+            or QMessageBox.question(
                 self,
                 self.windowTitle(),
                 self.tr("Discard your changes?"),
                 QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Cancel,
             )
-            != QMessageBox.StandardButton.Discard
-        ):
-            return
-        self.reject()
+            == QMessageBox.StandardButton.Discard
+        )
 
     def add_button(self, text):
         """A button beside Save and Cancel for an action of the form's own
         (Show the log, Stop all); the caller connects its clicked signal."""
-        return self._button_box.addButton(text, QDialogButtonBox.ButtonRole.ActionRole)
+        save = self._button_box.button(QDialogButtonBox.StandardButton.Ok)
+        hidden = save.isHidden()
+        button = self._button_box.addButton(
+            text, QDialogButtonBox.ButtonRole.ActionRole
+        )
+        save.setHidden(hidden)  # addButton() shows every button again
+        return button
 
     def hide_save_button(self):
         """Hide the Save button, leaving only Cancel (for view-only dialogs)."""

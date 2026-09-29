@@ -42,8 +42,8 @@ the tab reloads once GeoServer answers.
 
 In a form, a name that is taken, a layer that is not on the server or a
 zoom range with one end is refused before the form closes, with what you
-typed still there. Enter in a list's picker adds the name. Esc or *Cancel*
-asks before throwing an edit away.
+typed still there. Enter in a list's picker adds the name. Esc, *Cancel*
+or the window's close button asks before throwing an edit away.
 
 Every delete asks first and says what else goes with it. GeoServer deletes
 recursively: a workspace takes its stores, layers and styles along.

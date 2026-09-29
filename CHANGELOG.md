@@ -392,6 +392,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- A tile cache's gridset stored with a zoom level outside the form's range
+  (such as 45) keeps it: the edit form no longer clamps it to 40, and saving
+  without touching it no longer rewrites it.
+- The window's close button asks before throwing a form's edit away, as Esc
+  and Cancel already did. The seed task list no longer shows Save again next
+  to *Stop all*, and closing it no longer asks to discard changes.
+- Form descriptions, field help and image placeholders are grey again, like
+  the placeholders next to them, instead of being drawn in the full text
+  colour.
+- A form without a description (a coverage store's or a cascaded store's
+  edit, the seed task list) opens tall enough to show its fields without
+  scrolling.
 - The layer tree's *Push style* and *Apply style* refuse a GeoServer layer
   whose name holds '/', '?', '#' or '%', as the dialog does; a push to "a#b"
   set the style of layer "a".
