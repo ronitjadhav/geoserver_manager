@@ -8,7 +8,7 @@ from pathlib import Path
 
 # PyQGIS
 from qgis.core import Qgis, QgsSettings
-from qgis.gui import QgisInterface
+from qgis.gui import QgisInterface, QgsGui
 from qgis.PyQt.QtCore import (
     QCoreApplication,
     QEvent,
@@ -175,6 +175,27 @@ class GeoServerManagerPlugin:
             self.iface, dialog=lambda: self.main_dialog, open_dialog=self.run
         )
 
+        # -- Settings saved in QGIS's Options reach a dialog that is already open.
+        QgsGui.instance().optionsChanged.connect(self._on_options_changed)
+
+    def _on_options_changed(self):
+        # Queued: the dialog's own Settings button reconnects once Options closes.
+        QTimer.singleShot(0, self._reconnect_if_settings_changed)
+
+    def _reconnect_if_settings_changed(self):
+        """Reconnect a dialog whose client the saved settings no longer
+        describe: its table and its links would name two servers."""
+        dialog = self.main_dialog
+        if dialog is None or dialog.gs is None:
+            return  # nothing held: the next click connects with what is saved
+        if not self._connected_as_saved(dialog, self.plg_settings.get_plg_settings()):
+            dialog.refresh_ui(show_message=True)
+
+    @staticmethod
+    def _connected_as_saved(dialog, settings) -> bool:
+        """True when the dialog holds a client built from `settings`."""
+        return dialog.gs is not None and dialog.gs_connection == settings.connection()
+
     def _queue_menu_icon_refresh(self):
         # Once, after the window's children have the new palette too.
         self._icon_refresh_timer.start(0)
@@ -202,6 +223,10 @@ class GeoServerManagerPlugin:
 
     def unload(self) -> None:
         """Cleans up when plugin is disabled/uninstalled."""
+        try:
+            QgsGui.instance().optionsChanged.disconnect(self._on_options_changed)
+        except TypeError:
+            pass  # already disconnected
         self.iface.mainWindow().removeEventFilter(self._palette_watch)
         self._palette_watch.deleteLater()
         self._icon_refresh_timer.stop()
@@ -279,9 +304,9 @@ class GeoServerManagerPlugin:
             dialog = self.main_dialog = GeoServerMainDialog(
                 self.iface.mainWindow(), self.iface
             )
-        if dialog.isVisible() and dialog.gs is not None:
-            # Open and connected: the click brings it forward. It used to
-            # reconnect and reload the tab, or refuse while an upload ran.
+        if dialog.isVisible() and self._connected_as_saved(dialog, settings):
+            # Open and connected as saved: the click brings it forward. It used
+            # to reconnect and reload the tab, or refuse while an upload ran.
             dialog.raise_()
             dialog.activateWindow()
             return

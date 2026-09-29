@@ -610,14 +610,19 @@ class TestPluginWiring(unittest.TestCase):
         ]
         self.assertEqual(offenders, [])
 
-    def test_a_click_on_an_open_connected_dialog_brings_it_forward(self):
-        """It used to reconnect and reload the open tab on every click."""
+    SAVED = ("https://a.example.org/geoserver", True, "admin", "geoserver")
+
+    def open_dialog(self, saved):
+        """The plugin with an open dialog connected as SAVED, while the
+        settings now say `saved`; returns (plugin, calls made on the dialog)."""
         from types import SimpleNamespace
 
         calls = []
+        connection = self.SAVED
 
         class Dialog:
             gs = object()
+            gs_connection = connection
 
             def isVisible(self):  # noqa: N802
                 return True
@@ -631,17 +636,70 @@ class TestPluginWiring(unittest.TestCase):
             def activateWindow(self):  # noqa: N802
                 calls.append("activate")
 
-            def refresh_ui(self):
+            def refresh_ui(self, show_message=False):
                 calls.append("refresh")
+
+            def close(self):
+                pass
+
+            def deleteLater(self):  # noqa: N802
+                pass
 
         plugin = GeoServerManagerPlugin(self.iface)
         plugin.dependencies_available = True
         plugin.plg_settings = SimpleNamespace(
-            get_plg_settings=lambda: SimpleNamespace(has_credentials=lambda: True)
+            get_plg_settings=lambda: SimpleNamespace(
+                has_credentials=lambda: True, connection=lambda: saved
+            )
         )
         plugin.main_dialog = Dialog()
+        return plugin, calls
+
+    def options_saved(self):
+        """What QGIS emits once its Options dialog is accepted."""
+        from qgis.gui import QgsGui
+
+        QgsGui.instance().optionsChanged.emit()
+        for _ in range(3):  # the reconnect is queued
+            QApplication.processEvents()
+
+    def test_a_click_on_an_open_connected_dialog_brings_it_forward(self):
+        """It used to reconnect and reload the open tab on every click."""
+        plugin, calls = self.open_dialog(self.SAVED)
         plugin.run()
         self.assertEqual(calls, ["raise", "activate"])
+
+    def test_a_click_after_the_settings_changed_reconnects(self):
+        # Only raised, the dialog kept the old server while Add to QGIS, the
+        # previews and the Server tab's links read the new one.
+        for saved in (
+            ("https://b.example.org/geoserver", True, "admin", "geoserver"),
+            ("https://a.example.org/geoserver", False, "admin", "geoserver"),
+            ("https://a.example.org/geoserver", True, "admin", "changed"),
+        ):
+            with self.subTest(saved=saved):
+                plugin, calls = self.open_dialog(saved)
+                plugin.run()
+                self.assertEqual(calls, ["show", "raise", "activate", "refresh"])
+
+    def test_settings_saved_in_qgis_options_reach_the_open_dialog(self):
+        plugin, calls = self.open_dialog(self.SAVED)
+        plugin.initGui()
+        self.addCleanup(lambda: plugin.main_dialog and plugin.unload())
+        self.options_saved()
+        self.assertEqual(calls, [])  # nothing changed: no reconnect
+        plugin.main_dialog.gs_connection = ("https://old.example.org", True, "a", "b")
+        self.options_saved()
+        self.assertEqual(calls, ["refresh"])
+
+    def test_unload_stops_listening_to_qgis_options(self):
+        plugin, calls = self.open_dialog(("https://b.example.org", True, "a", "b"))
+        dialog = plugin.main_dialog
+        plugin.initGui()
+        plugin.unload()
+        plugin.main_dialog = dialog  # a reload keeps the old plugin object alive
+        self.options_saved()
+        self.assertEqual(calls, [])
 
     def test_highlighted_menu_icons_keep_their_strokes_visible(self):
         plugin = GeoServerManagerPlugin(self.iface)

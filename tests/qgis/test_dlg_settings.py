@@ -106,6 +106,9 @@ class FakeSettingsManager:
     def set_value_from_key(self, key, value):
         self.values = {**(self.values or {}), key: value}
 
+    def get_value_from_key(self, key, default=None, exp_type=None):
+        return (self.values or {}).get(key, default)
+
 
 class TestApplyWarnsAndStillSaves(unittest.TestCase):
     """The real apply(), driven against stubs: it must warn *and* save."""
@@ -174,6 +177,40 @@ class TestApplyWarnsAndStillSaves(unittest.TestCase):
         self.assertTrue(
             any("must start with http" in message for message, _l, _p in self.pushed)
         )
+
+    def test_a_url_refused_for_its_password_is_not_repeated_with_it(self):
+        # The plain-HTTP warning quoted the typed URL, password included, into
+        # the message bar and the QGIS log.
+        self.fill("http://admin:secret@gs.example.org/geoserver")
+        self.page.apply()
+        self.assertTrue(any("out of the URL" in m for m, _l, _p in self.pushed))
+        self.assertFalse(any("secret" in m for m, _l, _p in self.pushed), self.pushed)
+
+    def test_an_upper_case_scheme_is_a_url_like_any_other(self):
+        for url in ("HTTPS://gs.example.org/geoserver", "Http://gs.example.org"):
+            with self.subTest(url=url):
+                self.fill(url)
+                self.page.apply()
+                self.assertEqual(self.settings.geoserver_url, url)
+
+    def test_a_scheme_without_a_host_is_refused(self):
+        for url in ("http:/gs.example.org", "https://"):
+            with self.subTest(url=url):
+                self.fill(url)
+                self.page.apply()
+                self.assertEqual(
+                    self.settings.geoserver_url, "http://old.example.org/geoserver"
+                )
+
+    def test_debug_mode_from_the_environment_is_not_saved(self):
+        # get_plg_settings() reads QGIS_GEOSERVER_MANAGER_DEBUG_MODE=true; an
+        # OK stored it, and debug mode stayed on once the variable was gone.
+        self.settings.debug_mode = True
+        self.page.load_settings()
+        self.assertFalse(self.page.opt_debug.isChecked())
+        self.fill("https://gs.example.org/geoserver")
+        self.page.apply()
+        self.assertIs(self.manager.saved[-1].debug_mode, False)
 
 
 class TestProfiles(unittest.TestCase):
@@ -468,6 +505,13 @@ class TestTestConnection(unittest.TestCase):
             self.page.btn_test_connection.click()
         self.assertEqual(self.calls, [])
         self.assertIn("http://", self.page.lbl_test_result.text())
+
+    def test_an_upper_case_scheme_is_tried(self):
+        self.page.txt_gs_url.setText("HTTP://gs.example.org/geoserver")
+        with self.probe(None):
+            self.page.btn_test_connection.click()
+        self.assertEqual(len(self.calls), 1)
+        self.assertIn("Connected", self.page.lbl_test_result.text())
 
     def test_editing_a_field_retires_the_result(self):
         with self.probe(None):

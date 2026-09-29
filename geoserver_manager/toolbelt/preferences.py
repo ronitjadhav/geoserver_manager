@@ -21,9 +21,10 @@ from geoserver_manager.toolbelt.env_var_parser import EnvVarParser
 # ########## Classes ###############
 # ##################################
 
-# Every setting can be overridden by an environment variable of this prefix
-# and its upper-cased name: QGIS_GEOSERVER_MANAGER_DEBUG_MODE=true.
+# QGIS_GEOSERVER_MANAGER_DEBUG_MODE=true overrides debug mode, and nothing else.
 PREFIX_ENV_VARIABLE = "QGIS_GEOSERVER_MANAGER_"
+# The name of every auth config the plugin creates, and the only kind it removes.
+AUTH_CFG_NAME = "GeoServer Manager"
 
 
 @dataclass
@@ -64,10 +65,29 @@ class PlgSettingsStructure:
             )
         return ("", "")
 
+    def auth_method(self) -> str:
+        """The auth config's method ("Basic"), or "" when it is gone.
+
+        Needs no master password, so it tells a declined one from the rest.
+        """
+        return QgsApplication.authManager().configAuthMethodKey(
+            self.geoserver_auth_cfg_id
+        )
+
+    def connection(self) -> tuple:
+        """What a client is built from: URL, TLS setting and credentials."""
+        return (
+            self.geoserver_url,
+            bool(self.geoserver_verify_tls),
+            *self.get_credentials(),
+        )
+
     def save_credentials(self, username: str, password: str) -> str:
         """Store username/password in QgsAuthManager (encrypted).
 
-        Creates a new auth config or updates the existing one.
+        Updates the auth config when the plugin made it. One that is gone,
+        of another method or another program's is left as it is, and a new
+        one created.
 
         :param username: GeoServer username.
         :param password: GeoServer password.
@@ -77,32 +97,53 @@ class PlgSettingsStructure:
         auth_mgr = QgsApplication.authManager()
         auth_cfg = QgsAuthMethodConfig()
 
-        if self.geoserver_auth_cfg_id:
-            # Try to load and update existing config
-            if auth_mgr.loadAuthenticationConfig(
+        if self._is_own_config():
+            # PyQGIS returns (ok, config): the tuple alone is always true.
+            auth_mgr.loadAuthenticationConfig(
                 self.geoserver_auth_cfg_id, auth_cfg, True
-            ):
-                auth_cfg.setConfig("username", username)
-                auth_cfg.setConfig("password", password)
-                if not auth_mgr.updateAuthenticationConfig(auth_cfg):
-                    return ""
-                return self.geoserver_auth_cfg_id
+            )
+            if not auth_cfg.isValid():  # the master password was declined
+                return ""
+            auth_cfg.setConfig("username", username)
+            auth_cfg.setConfig("password", password)
+            if not auth_mgr.updateAuthenticationConfig(auth_cfg):
+                return ""
+            return self.geoserver_auth_cfg_id
 
         # Create a new auth config
-        auth_cfg.setName("GeoServer Manager")
+        auth_cfg.setName(AUTH_CFG_NAME)
         auth_cfg.setMethod("Basic")
         auth_cfg.setConfig("username", username)
         auth_cfg.setConfig("password", password)
-        if not auth_mgr.storeAuthenticationConfig(auth_cfg):
+        stored, _ = auth_mgr.storeAuthenticationConfig(auth_cfg)
+        if not stored:
             return ""
         return auth_cfg.id()
 
     def remove_credentials(self) -> None:
-        """Remove the auth config from QgsAuthManager."""
+        """Remove the auth config from QgsAuthManager, if the plugin made it.
+
+        Another config may be what other QGIS connections log in with.
+        """
         if self.geoserver_auth_cfg_id:
-            auth_mgr = QgsApplication.authManager()
-            auth_mgr.removeAuthenticationConfig(self.geoserver_auth_cfg_id)
+            if self._is_own_config():
+                QgsApplication.authManager().removeAuthenticationConfig(
+                    self.geoserver_auth_cfg_id
+                )
             self.geoserver_auth_cfg_id = ""
+
+    def _is_own_config(self) -> bool:
+        """Whether the auth config is one the plugin made: Basic, under its name.
+
+        Read without the secrets, so no master password is asked for.
+        """
+        if self.auth_method() != "Basic":
+            return False  # gone, or another method
+        auth_cfg = QgsAuthMethodConfig()
+        QgsApplication.authManager().loadAuthenticationConfig(
+            self.geoserver_auth_cfg_id, auth_cfg, False
+        )
+        return auth_cfg.name() == AUTH_CFG_NAME
 
 
 class PlgOptionsManager:
@@ -118,17 +159,17 @@ class PlgOptionsManager:
         settings = QgsSettings()
         settings.beginGroup(__title__)
 
-        # map settings values to preferences object, the environment winning
+        # map settings values to preferences object
         li_settings_values = [
-            EnvVarParser.get_env_var(
-                f"{PREFIX_ENV_VARIABLE}{i.name}".upper(),
-                settings.value(key=i.name, defaultValue=i.default, type=i.type),
-            )
+            settings.value(key=i.name, defaultValue=i.default, type=i.type)
             for i in fields(PlgSettingsStructure)
         ]
 
         # instanciate new settings object
         options = PlgSettingsStructure(*li_settings_values)
+        options.debug_mode = EnvVarParser.get_env_var(
+            f"{PREFIX_ENV_VARIABLE}DEBUG_MODE", options.debug_mode
+        )
 
         settings.endGroup()
 
@@ -251,11 +292,13 @@ class PlgOptionsManager:
     def activate_profile(cls, profile) -> None:
         """Make `profile` the connection everything reads; None clears it,
         which the dialog shows as "Not configured"."""
-        settings = cls.get_plg_settings()
-        settings.geoserver_url = profile["url"] if profile else ""
-        settings.geoserver_auth_cfg_id = profile["auth_cfg_id"] if profile else ""
-        settings.geoserver_verify_tls = (
-            bool(profile.get("verify_tls", True)) if profile else True
+        # Not save_from_object(): it would store the debug mode the environment set.
+        cls.set_value_from_key("geoserver_url", profile["url"] if profile else "")
+        cls.set_value_from_key(
+            "geoserver_auth_cfg_id", profile["auth_cfg_id"] if profile else ""
         )
-        cls.save_from_object(settings)
+        cls.set_value_from_key(
+            "geoserver_verify_tls",
+            bool(profile.get("verify_tls", True)) if profile else True,
+        )
         cls.set_value_from_key("active_profile", profile["name"] if profile else "")

@@ -253,22 +253,161 @@ class TestForms(unittest.TestCase):
         self.assertFalse(_is_secret("Expose primary keys"))
 
 
-class TestUploadBodyRedirect(unittest.TestCase):
-    def test_requests_notes_where_to_rewind_the_body_to(self):
-        # `requests` records a body position, and rewinds to it on a redirect,
-        # only for a body it can iterate; with read() alone the redirected PUT
-        # announced its length and sent nothing, until the server's timeout.
+class TestUnreadableCredentials(unittest.TestCase):
+    """Every reason was "the master password was probably declined"."""
+
+    def setUp(self):
+        from qgis.core import QgsApplication
+
+        self.manager = QgsApplication.authManager()
+        if not self.manager.masterPasswordIsSet():
+            self.manager.setMasterPassword("test-master-password", True)
+        self.made = []
+        self.addCleanup(
+            lambda: [self.manager.removeAuthenticationConfig(i) for i in self.made]
+        )
+
+    def settings(self, auth_cfg_id):
+        from geoserver_manager.toolbelt.preferences import PlgSettingsStructure
+
+        return PlgSettingsStructure(
+            geoserver_url="https://gs.example.org/geoserver",
+            geoserver_auth_cfg_id=auth_cfg_id,
+            geoserver_verify_tls=False,
+        )
+
+    def refused(self, auth_cfg_id):
+        dlg = SyncDialog()
+        errors = []
+        dlg.show_error_message = errors.append
+        self.assertIsNone(dlg._build_client(self.settings(auth_cfg_id)))
+        self.assertEqual(len(errors), 1)
+        return errors[0]
+
+    def test_a_config_that_is_gone_is_said_to_be_gone(self):
+        message = self.refused("gone123")
+        self.assertIn("no longer", message)
+        self.assertNotIn("master password", message)
+
+    def test_a_config_of_another_method_is_named(self):
+        from qgis.core import QgsAuthMethodConfig
+
+        other = QgsAuthMethodConfig()
+        other.setName("Header")
+        other.setMethod("APIHeader")
+        other.setConfig("X-Key", "abc")
+        self.manager.storeAuthenticationConfig(other)
+        self.made.append(other.id())
+        message = self.refused(other.id())
+        self.assertIn("APIHeader", message)
+        self.assertNotIn("master password", message)
+
+    def test_the_client_records_what_the_saved_settings_compare_with(self):
+        # run() and a change in QGIS's Options compare the two to reconnect.
+        own = self.settings("").save_credentials("admin", "geoserver")
+        self.made.append(own)
+        settings = self.settings(own)
+        dlg = SyncDialog()
+        self.assertIsNotNone(dlg._build_client(settings))
+        self.assertEqual(dlg.gs_connection, settings.connection())
+
+
+class TestRedirects(unittest.TestCase):
+    """A local server that sends /r301/..., /r302/... and /r307/... on to /gs/...
+
+    Only a 307 or 308 resends a write whole. After a 301 `requests` resends a
+    PUT without its body, after a 302 as a GET, and the server's 200 passed
+    for a save that worked.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+        received = cls.received = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def answer(self):
+                length = int(self.headers.get("Content-Length") or 0)
+                received.append((self.command, self.path, self.rfile.read(length)))
+                first, _, rest = self.path[1:].partition("/")
+                if first in ("r301", "r302", "r307", "sso"):
+                    # "sso": a proxy that sends every request to its login page
+                    self.send_response(302 if first == "sso" else int(first[1:]))
+                    self.send_header(
+                        "Location", "/login" if first == "sso" else f"/gs/{rest}"
+                    )
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                body = b'{"workspaces": ""}'
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            do_GET = do_PUT = answer
+
+            def log_message(self, *args):
+                pass
+
+        cls.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        cls.base = f"http://127.0.0.1:{cls.server.server_address[1]}"
+        threading.Thread(target=cls.server.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+
+    def setUp(self):
+        self.received.clear()
+
+    def upload(self, code):
         import io
 
-        import requests
+        from geoservercloud.services.restclient import RestClient
 
-        from geoserver_manager.toolbelt.rest import ProgressReader
+        from geoserver_manager.toolbelt.rest import ProgressReader, raw_rest
 
+        client = RestClient(f"{self.base}/r{code}", ("admin", "geoserver"))
         body = ProgressReader(io.BytesIO(b"0123456789"), 10)
-        request = requests.Request("PUT", "http://gs.example.org/x", data=body)
-        prepared = request.prepare()
-        self.assertEqual(prepared._body_position, 0)
-        self.assertEqual(prepared.headers["Content-Length"], "10")
+        return raw_rest(client, "put", "/rest/file.gpkg", data=body)
+
+    def test_the_probe_refuses_a_url_that_redirects_and_names_where_to(self):
+        from geoserver_manager.toolbelt.probe import probe
+
+        status, message = probe(f"{self.base}/r301", ("admin", "geoserver"), True)
+        self.assertEqual(status, "Redirected")
+        self.assertIn(f"{self.base}/gs.", message)  # the address to put instead
+        self.assertEqual(len(self.received), 1)  # not followed
+
+    def test_a_redirect_to_something_else_is_not_the_rest_api(self):
+        from geoserver_manager.toolbelt.probe import probe
+
+        status, message = probe(f"{self.base}/sso", ("admin", "geoserver"), True)
+        self.assertEqual(status, "Not a GeoServer REST endpoint")
+        self.assertIn(f"{self.base}/login", message)
+
+    def test_a_307_resends_the_upload_whole(self):
+        self.assertEqual(self.upload(307).status_code, 200)
+        self.assertEqual(
+            self.received[-1], ("PUT", "/gs/rest/file.gpkg", b"0123456789")
+        )
+
+    def test_a_301_or_302_is_refused_instead_of_reading_as_saved(self):
+        for code, resent in ((301, ("PUT", b"")), (302, ("GET", b""))):
+            with self.subTest(code=code):
+                self.received.clear()
+                with self.assertRaises(RuntimeError) as caught:
+                    self.upload(code)
+                # What reached the server: the upload without its body, or a read.
+                method, path, body = self.received[-1]
+                self.assertEqual((method, body), resent)
+                self.assertIn(f"HTTP {code}", str(caught.exception))
+                self.assertIn(f"{self.base}/gs/rest/file.gpkg", str(caught.exception))
 
 
 if __name__ == "__main__":

@@ -15,7 +15,8 @@ Usage from the repo root folder:
 import os
 from unittest.mock import patch
 
-from qgis.testing import unittest
+from qgis.core import QgsApplication, QgsAuthMethodConfig
+from qgis.testing import start_app, unittest
 
 # project
 from geoserver_manager.__about__ import __version__
@@ -24,6 +25,17 @@ from geoserver_manager.toolbelt.preferences import (
     PlgOptionsManager,
     PlgSettingsStructure,
 )
+
+start_app()
+
+
+def auth_manager():
+    """This test profile's QgsAuthManager, unlocked: nothing prompts."""
+    manager = QgsApplication.authManager()
+    if not manager.masterPasswordIsSet():
+        manager.setMasterPassword("test-master-password", True)
+    return manager
+
 
 # ############################################################################
 # ########## Classes #############
@@ -99,6 +111,7 @@ class TestServerProfiles(unittest.TestCase):
     """Saved connections (#47), stored in this test profile's QgsSettings."""
 
     KEYS = (
+        "debug_mode",
         "geoserver_url",
         "geoserver_auth_cfg_id",
         "geoserver_verify_tls",
@@ -182,6 +195,116 @@ class TestServerProfiles(unittest.TestCase):
     def test_a_damaged_list_reads_as_empty_instead_of_raising(self):
         PlgOptionsManager.set_value_from_key("profiles", "[{not json")
         self.assertEqual(PlgOptionsManager.get_profiles(), [])
+
+    PROD = {
+        "name": "prod",
+        "url": "https://prod.example.org/geoserver",
+        "auth_cfg_id": "prd0001",
+        "verify_tls": True,
+    }
+
+    def test_the_environment_cannot_pick_the_server(self):
+        # It outlived a profile switch: the environment's server with the
+        # new profile's credentials.
+        PlgOptionsManager.activate_profile(self.PROD)
+        environment = {
+            f"{PREFIX_ENV_VARIABLE}GEOSERVER_URL": "http://env.example.org",
+            f"{PREFIX_ENV_VARIABLE}GEOSERVER_AUTH_CFG_ID": "env0001",
+        }
+        with patch.dict(os.environ, environment):
+            current = PlgOptionsManager.get_plg_settings()
+        self.assertEqual(current.geoserver_url, self.PROD["url"])
+        self.assertEqual(current.geoserver_auth_cfg_id, "prd0001")
+
+    def test_a_profile_switch_does_not_store_the_environments_debug_mode(self):
+        with patch.dict(os.environ, {f"{PREFIX_ENV_VARIABLE}DEBUG_MODE": "true"}):
+            PlgOptionsManager.activate_profile(self.PROD)
+        with patch.dict(os.environ):
+            os.environ.pop(f"{PREFIX_ENV_VARIABLE}DEBUG_MODE", None)
+            self.assertIs(PlgOptionsManager.get_plg_settings().debug_mode, False)
+
+
+class TestAuthConfigs(unittest.TestCase):
+    """Only a config the plugin made is written to or removed: another one
+    may be what other QGIS connections log in with."""
+
+    def setUp(self):
+        self.manager = auth_manager()
+        self.made = []
+        self.addCleanup(self.remove_made)
+
+    def remove_made(self):
+        for auth_cfg_id in set(self.made) & set(self.manager.configIds()):
+            self.manager.removeAuthenticationConfig(auth_cfg_id)
+
+    def store(self, name, method, **config):
+        auth_cfg = QgsAuthMethodConfig()
+        auth_cfg.setName(name)
+        auth_cfg.setMethod(method)
+        for key, value in config.items():
+            auth_cfg.setConfig(key, value)
+        self.manager.storeAuthenticationConfig(auth_cfg)
+        self.made.append(auth_cfg.id())
+        return auth_cfg.id()
+
+    def config_map(self, auth_cfg_id):
+        auth_cfg = QgsAuthMethodConfig()
+        self.manager.loadAuthenticationConfig(auth_cfg_id, auth_cfg, True)
+        return auth_cfg.configMap()
+
+    def save(self, auth_cfg_id):
+        saved = PlgSettingsStructure(geoserver_auth_cfg_id=auth_cfg_id)
+        new_id = saved.save_credentials("admin", "geoserver")
+        self.made.append(new_id)
+        return new_id
+
+    def test_the_plugins_own_config_is_updated_in_place(self):
+        own = self.save("")
+        self.assertTrue(own)
+        self.assertEqual(self.save(own), own)
+        self.assertEqual(
+            PlgSettingsStructure(geoserver_auth_cfg_id=own).get_credentials(),
+            ("admin", "geoserver"),
+        )
+
+    def test_a_config_of_another_program_gets_a_new_one_beside_it(self):
+        for other in (
+            self.store("Header", "APIHeader", **{"X-Key": "abc"}),
+            self.store("Intranet", "Basic", username="me", password="mine"),
+        ):
+            before = self.config_map(other)
+            with self.subTest(other=before):
+                new_id = self.save(other)
+                self.assertNotIn(new_id, ("", other))
+                self.assertEqual(self.config_map(other), before)
+                self.assertEqual(
+                    PlgSettingsStructure(geoserver_auth_cfg_id=new_id).auth_method(),
+                    "Basic",
+                )
+
+    def test_a_config_that_is_gone_gets_a_new_one(self):
+        # "Could not store the credentials... master password" on every save.
+        new_id = self.save("gone123")
+        self.assertNotIn(new_id, ("", "gone123"))
+
+    def test_a_refused_store_hands_back_no_id(self):
+        # PyQGIS returns (ok, config), and (False, config) is true.
+        def refuse(auth_cfg, overwrite=False):
+            auth_cfg.setId("never01")
+            return False, auth_cfg
+
+        with patch.object(self.manager, "storeAuthenticationConfig", refuse):
+            self.assertEqual(self.save(""), "")
+
+    def test_only_the_plugins_own_config_is_removed(self):
+        own = self.save("")
+        other = self.store("Header", "APIHeader", **{"X-Key": "abc"})
+        for auth_cfg_id in (own, other):
+            removed = PlgSettingsStructure(geoserver_auth_cfg_id=auth_cfg_id)
+            removed.remove_credentials()
+            self.assertEqual(removed.geoserver_auth_cfg_id, "")
+        self.assertNotIn(own, self.manager.configIds())
+        self.assertIn(other, self.manager.configIds())
 
 
 # ############################################################################

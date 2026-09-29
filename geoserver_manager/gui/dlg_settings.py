@@ -277,7 +277,9 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
                     Qgis.MessageLevel.Critical,
                 )
 
-        if self._password_travels_in_clear(url, username, password):
+        # The saved URL, not the typed one: a refused one can hold user:pass@.
+        saved_url = settings.geoserver_url
+        if self._password_travels_in_clear(saved_url, username, password):
             # Informs rather than refuses: apply() cannot stop the options
             # dialog from closing, and a plain-HTTP server on a trusted
             # network is a legitimate setup. The settings are saved either way.
@@ -285,15 +287,16 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
                 self.tr(
                     "{url} is plain HTTP, so the password is sent unencrypted with "
                     "every request. Use https:// where the server offers it."
-                ).format(url=url)
+                ).format(url=saved_url)
             )
 
     def _url_problem(self, url):
         """What is wrong with a GeoServer URL, or None. One check, two callers
         (Save and Test connection), so their messages cannot drift apart."""
-        if not url.startswith(("http://", "https://")):
-            return self.tr("The GeoServer URL must start with http:// or https://.")
         parsed = urlparse(url)
+        # urlparse lowers the scheme: HTTP:// is a URL every request accepts.
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            return self.tr("The GeoServer URL must start with http:// or https://.")
         if parsed.username or parsed.password:
             # user:pass@host would surface in the window title, the status
             # line, every error banner and the persistent QGIS log.
@@ -335,10 +338,10 @@ class ConfigOptionsPage(QgsOptionsPageWidget):
 
     def load_settings(self) -> None:
         """Load options from QgsSettings + QgsAuthManager into UI form."""
-        settings: PlgSettingsStructure = self.plg_settings.get_plg_settings()
-
-        # global
-        self.opt_debug.setChecked(settings.debug_mode)
+        # The saved value, not the environment's: an OK would store that one.
+        self.opt_debug.setChecked(
+            bool(self.plg_settings.get_value_from_key("debug_mode", False, bool))
+        )
 
         # Profiles: edits are kept per profile until Save (or dropped by
         # Cancel); a removed profile's credentials go only on Save.

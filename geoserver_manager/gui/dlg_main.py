@@ -178,6 +178,7 @@ class GeoServerMainDialog(
         self.iface = iface
         self.log = PlgLogger().log
         self.gs = None
+        self.gs_connection = None  # what self.gs is built from, see _build_client
 
         uic.loadUi(Path(__file__).parent / "dlg_main.ui", self)
         self.plg_settings = PlgOptionsManager()
@@ -441,17 +442,36 @@ class GeoServerMainDialog(
         username, password = settings.get_credentials()
         if not username or not password:
             self._set_status(self.tr("Auth error"), "error")
-            self.show_error_message(
-                self.tr(
+            method = settings.auth_method()
+            if not method:
+                message = self.tr(
+                    "The saved credentials are no longer in QGIS's authentication "
+                    "database. Open Settings and enter them again."
+                )
+            elif method != "Basic":
+                message = self.tr(
+                    "The saved authentication configuration uses {}, and "
+                    "GeoServer Manager only sends a user name and password. Open "
+                    "Settings and enter them."
+                ).format(method)
+            else:
+                message = self.tr(
                     "Could not read the credentials from QGIS's authentication "
                     "database. Its master password was probably declined. Open "
                     "Settings and save them again."
                 )
-            )
+            self.show_error_message(message)
             return None
 
         from geoservercloud import GeoServerCloud
 
+        # The same shape as settings.connection(): run() compares the two.
+        self.gs_connection = (
+            settings.geoserver_url,
+            bool(settings.geoserver_verify_tls),
+            username,
+            password,
+        )
         return GeoServerCloud(
             url=settings.geoserver_url,
             user=username,
