@@ -112,9 +112,15 @@ _SECRET_WORDS = (
 
 def _shown(key, value):
     """A parameter as the form shows it: secrets masked, an empty one blank."""
-    if _is_secret(key):
+    if _is_masked(key, value):
         return _MASKED
     return "" if value is None else str(value)
+
+
+def _is_masked(key, value):
+    """A secret's value, unless it is an on/off flag: PMTiles'
+    "…use-default-credentials-provider" is true or false, not a secret."""
+    return _is_secret(key) and str(value).strip().lower() not in ("true", "false")
 
 
 def _is_secret(key):
@@ -708,9 +714,12 @@ class DatastoreTabMixin:
 
     @staticmethod
     def _parse_params(pairs):
-        """The form's key/value pairs as a dict, keys and values stripped."""
+        """The form's key/value pairs as a dict, keys and values stripped,
+        except a secret's value: its edge spaces are part of it."""
         return {
-            str(key).strip(): str(value).strip()
+            str(key).strip(): (
+                str(value) if _is_masked(str(key), value) else str(value).strip()
+            )
             for key, value in (pairs or {}).items()
             if str(key).strip()
         }

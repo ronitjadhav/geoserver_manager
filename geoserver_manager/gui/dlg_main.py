@@ -2041,9 +2041,22 @@ class GeoServerMainDialog(
         """(name, workspace label) pairs of a resource that lives globally or
         in a workspace: the global names first, then each workspace's, listed
         in parallel by `list_in(ws)`. A workspace that cannot be listed is a
-        failure beside the names, not the end of the listing. In a worker."""
+        failure beside the names, not the end of the listing, and so is one
+        named GLOBAL: its rows would be the global ones, and act on them. In a
+        worker."""
         pairs = [(name, GLOBAL) for name in global_names]
         failures = []
+        if GLOBAL in workspace_names:
+            workspace_names = [ws for ws in workspace_names if ws != GLOBAL]
+            failures.append(
+                (
+                    GLOBAL,
+                    ValueError(
+                        f"a workspace named {GLOBAL} reads as the global scope; "
+                        "rename it on the Workspaces tab to manage it here"
+                    ),
+                )
+            )
         for ws_name, (items, error) in zip(
             workspace_names, self._fan_out(list_in, workspace_names, task)
         ):
