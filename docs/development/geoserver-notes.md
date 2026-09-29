@@ -167,7 +167,10 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   (no store, no coverage, no file), but a *Replace* keeps the store, coverage and layer configured while
   GeoServer has already deleted the previous file, i.e. a layer with no data behind it. So the upload streams
   through `_run_upload`, and its `on_cancel` (`_store_upload_cancelled`, then `_report_cancelled_upload`) GETs the store afterwards and says which of the two
-  happened, and closing the dialog lets an upload finish rather than stopping it. **CRS**: GeoServer declares an
+  happened, and closing the dialog lets an upload finish rather than stopping it. A *Replace* whose PUT fails
+  before it completes (a reset, a proxy, a timeout) drops the connection mid-body as the cancel does (not
+  measured apart), so `_store_upload_ended` warns the same way when the store is still there, and logs it
+  when the upload ends after the dialog closed. **CRS**: GeoServer declares an
   SRS by EPSG code, so `qgis_export.require_crs()` refuses a layer without a CRS and `reprojection_target()`
   names EPSG:4326 for a CRS without an EPSG code. A vector is reprojected on export
   (`export_to_geopackage(target_crs=…)`), a raster is refused because it is uploaded as it is.
@@ -231,8 +234,13 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   removed with DELETE; and `defaultLocale` must be `""` when empty: `null` makes GeoServer's `LocaleConverter`
   throw an NPE (500). The library's `unset_default_locale_for_service()` silently does nothing at all.
 - **Coverages** (rows 21–24 of #50): there is no `get_coverage_stores(ws)` at all; `get_coverages` hardcodes
-  `list=all`, so "what is published" needs its own call (`list=configured`); the difference is what the
-  *Publish* action offers; `CoverageStore` drops the store's description and its `put_payload()` raises
+  `list=all`, so "what is published" needs its own call (`list=configured`; `list=available` answers the
+  same). The two do not compare as they are: `list=all` answers the store's native names, `list=configured`
+  the published ones, and `sfdem` published as `elev` keeps `nativeName` `sfdem` (an uploaded raster also
+  writes it as `nativeCoverageName`, and a rename keeps both). GeoServer accepts a second publish of the same
+  native coverage (201, a duplicate layer), so the *Publish* action offers `list=all` minus each published
+  coverage's `nativeCoverageName`, else its `nativeName`, read with `get_coverage()`;
+  `CoverageStore` drops the store's description and its `put_payload()` raises
   `NotImplementedError` (no store edit anywhere); `Coverage.asdict()` drops the bounding boxes and keywords.
   Two GeoServer facts the tab depends on: a grid range's `high` is the **exclusive** bound (size = high − low,
   checked against gdalinfo), and store metadata GeoServer does not understand (`CogSettings.Key` without the

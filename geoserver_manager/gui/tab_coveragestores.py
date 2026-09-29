@@ -19,6 +19,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from qgis.core import Qgis
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QDialog
 
@@ -363,6 +364,9 @@ class CoverageStoreTabMixin:
             fields=self._coverage_store_info_fields(),
             values=before,
             parent=self,
+            validate=self._form_check(
+                lambda values: self._check_store_rename(ws_name, name, values["name"])
+            ),
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -396,11 +400,16 @@ class CoverageStoreTabMixin:
         there is no update in the library (row 23); a partial PUT merges
         (measured on 2.28.5).
         """
-        if "name" in body:
-            self._require_safe_name(body["name"])
-            self._refuse_existing_store(ws_name, body["name"])
+        self._check_store_rename(ws_name, name, body.get("name", name))
         path = self.gs.rest_service.rest_endpoints.coveragestore(_q(ws_name), _q(name))
         self._raw_rest("put", path, json={"coverageStore": body})
+
+    def _check_store_rename(self, ws_name, name, new_name):
+        """Refuse a new name a URL would eat, or one taken. Reads only: the
+        edit form runs it before it closes, the save again."""
+        if new_name != name:
+            self._require_safe_name(new_name)
+            self._refuse_existing_store(ws_name, new_name)
 
     def _reset_coverage_store(self, row_data):
         """Make GeoServer re-read the store: a replaced file, a changed mosaic.
@@ -585,9 +594,11 @@ class CoverageStoreTabMixin:
     def _publishable_coverages(self, workspace_name, store_name):
         """Coverages the store exposes that are not published yet.
 
-        The library's get_coverages() answers `list=all` (everything the store
-        can expose), so the candidates are that list minus what is already
-        configured (see _published_coverage_names).
+        The library's get_coverages() answers `list=all`, the store's native
+        names; `list=configured` answers the published names. Measured on
+        2.28.5: "sfdem" published as "elev" keeps nativeName "sfdem" and stays
+        in `list=all`, so each published coverage is read for the native name
+        it came from (one GET each, usually one or two).
         """
         every = [
             self._name_of(coverage)
@@ -595,7 +606,14 @@ class CoverageStoreTabMixin:
                 self.gs.get_coverages, workspace_name, store_name
             )
         ]
-        published = set(self._published_coverage_names(workspace_name, store_name))
+        published = set()
+        for name in self._published_coverage_names(workspace_name, store_name):
+            detail = self._check(
+                self.gs.get_coverage(_q(workspace_name), _q(store_name), _q(name))
+            )
+            published.add(
+                detail.get("nativeCoverageName") or detail.get("nativeName") or name
+            )
         return [name for name in every if name not in published]
 
     def _publish_coverage(self, row_data):
@@ -844,8 +862,13 @@ class CoverageStoreTabMixin:
 
         values = dlg.get_values()
         if values["type"] == QGIS_RASTER:
-            # A file leaves this machine: in a task, with progress and Cancel.
-            self._publish_qgis_raster(values)
+            # The checks and the export raise here; the upload reports itself.
+            self._run_action(
+                lambda: self._publish_qgis_raster(values),
+                translate(
+                    "CoverageStoreTabMixin", "Failed to publish raster '{}'"
+                ).format(geoserver_name(values["name"])),
+            )
             return
         if values["type"] == MOSAIC_ZIP:
             self._upload_mosaic_zip(values)
@@ -995,10 +1018,12 @@ class CoverageStoreTabMixin:
         reach it, and deleting the store leaves the file in the data directory.
 
         The layer, its CRS, the name check and the export happen here on the
-        GUI thread (a live QGIS layer, invariant 9), and the PUTs stream in a
-        task through _upload_file, with progress and Cancel. `layer` is given
-        when the Layers tab's *Publish a Layer* routes a raster here; else it
-        is the one the coverage-store form picked.
+        GUI thread (a live QGIS layer, invariant 9), and raise into the
+        caller's _run_action: a Cancel during the checks is an Abandoned, which
+        stops a batch. The PUTs then stream in a task through _upload_file,
+        with progress and Cancel. `layer` is given when the Layers tab's
+        *Publish a Layer* routes a raster here; else it is the one the
+        coverage-store form picked.
 
         TODO(#50): upstream as create_coverage_store_from_file(ws, name, path,
         coverage_name=None). create_coverage_store() only points at a path
@@ -1014,14 +1039,7 @@ class CoverageStoreTabMixin:
         failure = translate(
             "CoverageStoreTabMixin", "Failed to publish raster '{}'"
         ).format(name)
-        prepared = self._fetch(
-            lambda: self._prepare_qgis_raster(ws_name, name, values, layer),
-            failure,
-            in_worker=False,  # a live QGIS layer, and a local export
-        )
-        if prepared is None:
-            return False
-        source, folder = prepared
+        source, folder = self._prepare_qgis_raster(ws_name, name, values, layer)
         client = self.gs.rest_service.rest_client
         endpoints = self.gs.rest_service.rest_endpoints
         upload_path = endpoints.coveragestore(_q(ws_name), _q(name), "file", "geotiff")
@@ -1038,8 +1056,10 @@ class CoverageStoreTabMixin:
             "Raster '{}' is published, but its title, abstract and keywords "
             "could not be set",
         ).format(name)
+        landed = []
 
         def after(client):
+            landed.append(True)  # the file is stored
             if metadata:
                 # A partial coverage PUT merges (measured), so the SRS, bounds
                 # and grid read from the file stay. TODO(#50): update_coverage(
@@ -1071,7 +1091,9 @@ class CoverageStoreTabMixin:
             self._store_upload_cancelled(ws_name, name),
             folder=folder,
             after=after,
-            on_done=on_done,
+            on_done=self._store_upload_ended(
+                ws_name, name, values.get("replace"), landed, on_done
+            ),
         )
 
     def _check_new_coverage_store(self, values):
@@ -1094,6 +1116,8 @@ class CoverageStoreTabMixin:
 
         Reads only: the form runs it before it closes, the upload again.
         """
+        # The library's reads take the workspace raw: "sf#x" reads "sf".
+        self._require_safe_name(ws_name)
         if not replace:
             self._refuse_existing_store(
                 ws_name,
@@ -1103,7 +1127,12 @@ class CoverageStoreTabMixin:
         self._refuse_layer_clash(ws_name, name, replace, "coverage", "GeoTIFF")
 
     def _refuse_existing_store(self, ws_name, name, hint=""):
-        """Raise when the store exists: its creators upsert, or PUT over it."""
+        """Raise when the store exists: its creators upsert, or PUT over it.
+
+        A workspace a path cannot carry is refused first: the library builds
+        this read's path from the raw name, and "sf#x" read "sf".
+        """
+        self._require_safe_name(ws_name)
         if self._resource_exists(self.gs.get_coverage_store, ws_name, name):
             message = translate(
                 "CoverageStoreTabMixin", "Coverage store '{}' already exists in '{}'."
@@ -1118,6 +1147,44 @@ class CoverageStoreTabMixin:
             lambda: self._resource_exists(self.gs.get_coverage_store, ws_name, name),
             name,
         )
+
+    def _store_upload_ended(self, ws_name, name, replace, landed, on_done):
+        """The on_done of a raster upload: warn when a Replace did not land.
+
+        A body cut short (a reset, a proxy, a timeout) closes the connection
+        as a Cancel does, and a cancelled Replace leaves the store and its
+        layer without their file (measured on 2.28.5). The cancel says so
+        itself; a failure says it here, and any end after the dialog closed
+        says it in the log. `landed` is filled once the PUT succeeded, and
+        `on_done` (a batch) runs after.
+        """
+
+        def ended(outcome):
+            if replace and not landed:
+                lost = translate(
+                    "CoverageStoreTabMixin",
+                    "Upload of '{}' did not finish. GeoServer may have removed the "
+                    "data file of the coverage store it was replacing, leaving its "
+                    "layer without data. Upload it again with Replace ticked, or "
+                    "delete the coverage store.",
+                ).format(name)
+                if self._closing:
+                    self.log(lost, log_level=Qgis.MessageLevel.Warning)
+                elif outcome == "failed":  # a cancel has said it already
+                    try:
+                        kept = self._wait_for(
+                            lambda: self._resource_exists(
+                                self.gs.get_coverage_store, ws_name, name
+                            )
+                        )
+                    except Exception:  # unknown, and the warning says "may"
+                        kept = None
+                    if kept is not False:
+                        self.show_warning_message(lost)
+            if on_done is not None:
+                on_done(outcome)
+
+        return ended
 
     def _prepare_qgis_raster(self, ws_name, name, values, layer=None):
         """GUI-thread half of the raster upload: the checks, then the file to send.
