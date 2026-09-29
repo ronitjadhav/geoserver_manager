@@ -40,6 +40,25 @@ CONTEXTS = {
     "tab_server.py": "ServerTabMixin",
 }
 
+# Every context a .ts may name: the mixins', and the classes and modules
+# that translate under their own.
+KNOWN_CONTEXTS = set(CONTEXTS.values()) | {
+    "ConfigOptionsPage",
+    "ConnectionProbe",
+    "Dependencies",
+    "GeoServerMainDialog",
+    "GeoServerMainDialogBase",
+    "GeoServerManagerPlugin",
+    "LayerTreeMenu",
+    "QgisExport",
+    "Sld",
+    "LayerPreviewDialog",
+    "ListTable",
+    "ResourceFormDialog",
+    "Scope",
+    "wdg_geoserver_manager_settings",
+}
+
 _CALL = re.compile(r"self\.tr\(")
 _TRANSLATE = re.compile(r'\btranslate\(\s*"([^"]+)"')
 
@@ -110,6 +129,11 @@ class TestExtractionContextMatchesTheCode(unittest.TestCase):
         onto several lines, or whose text is written as adjacent literals:
         65 of 455 strings when measured. When this fails, regenerate the .ts
         with `python scripts/update_translations.py`.
+
+        A call under a known context is checked whatever it is named: an
+        alias (t = translate) or a wrapper (_tr(text)) hid every Server-tab
+        label and connection message from pylupdate6, which only extracts
+        translate() and tr() with literals.
         """
         root = ElementTree.parse(I18N / "geoserver_manager_en.ts").getroot()
         extracted = {
@@ -131,7 +155,15 @@ class TestExtractionContextMatchesTheCode(unittest.TestCase):
                     for arg in node.args[:2]
                     if isinstance(arg, ast.Constant) and isinstance(arg.value, str)
                 ]
-                if name == "translate" and len(literals) == 2:
+                first = node.args[0] if node.args else None
+                context = first.value if isinstance(first, ast.Constant) else None
+                if context in KNOWN_CONTEXTS and (
+                    name != "translate" or len(literals) < 2
+                ):
+                    missing.append(
+                        f"{path.name}:{node.lineno} {name}() is not extracted"
+                    )
+                elif name == "translate" and len(literals) == 2:
                     if tuple(literals) not in extracted:
                         missing.append(f"{path.name}:{node.lineno} {literals[1]!r}")
                 elif name == "tr" and literals and literals[0] not in anywhere:
@@ -300,27 +332,11 @@ class TestShippedFrenchLocale(unittest.TestCase):
 
     def test_every_context_it_names_still_exists_in_the_code(self):
         """Catches a .ts left behind by a renamed class."""
-        known = set(CONTEXTS.values()) | {
-            "ConfigOptionsPage",
-            "ConnectionProbe",
-            "Dependencies",
-            "GeoServerMainDialog",
-            "GeoServerMainDialogBase",
-            "GeoServerManagerPlugin",
-            "LayerTreeMenu",
-            "QgisExport",
-            "Sld",
-            "LayerPreviewDialog",
-            "ListTable",
-            "ResourceFormDialog",
-            "Scope",
-            "wdg_geoserver_manager_settings",
-        }
         named = {
             context.find("name").text
             for context in self.tree.getroot().findall("context")
         }
-        self.assertEqual(named - known, set())
+        self.assertEqual(named - KNOWN_CONTEXTS, set())
 
 
 if __name__ == "__main__":

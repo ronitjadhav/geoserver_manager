@@ -392,6 +392,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **A URL that redirects is refused.** The connection check read a URL
+  behind a redirect (the usual http:// to https:// rule) as Connected. Every
+  save then reached GeoServer without its body, or as a read, and GeoServer
+  answered it as a success. The status line now says *Redirected* and names
+  the address to put in Settings, and a redirect to a login page says the
+  URL is not the REST API. An upload that a server redirects with a 301, 302
+  or 303 fails instead of reading as saved.
+- **Settings saved in QGIS's Options reach an open dialog.** A toolbar click
+  only brings a connected dialog forward, so a changed URL, TLS setting or
+  password left the table on the old server while Add to QGIS, the previews
+  and the Server tab's links used the new one. The dialog now reconnects
+  when these change.
+- The Server tab's form and the connection check's messages can now be
+  translated. None of them could be before.
+- **Only debug mode comes from the environment.** An environment URL
+  outlived a profile switch and was paired with the new profile's
+  credentials, and the next OK or profile switch saved the environment's
+  debug mode for good. `QGIS_GEOSERVER_MANAGER_DEBUG_MODE` still wins over
+  the saved value, and is not saved.
+- The plain-HTTP warning no longer repeats a URL that was refused for
+  holding a user name and password. That put the password in the message bar
+  and the QGIS log.
+- **Auth error says why the credentials cannot be read:** they are gone from
+  QGIS's authentication database, or are not a user name and password (the
+  message names the method). Only otherwise does it say the master password
+  was declined. Settings no longer writes into, and Reset or Remove no
+  longer deletes, an authentication configuration the plugin did not make,
+  which other QGIS connections may log in with: a new one is created beside
+  it. Saving for a profile whose configuration was erased works again.
+- A URL with an upper-case scheme (`HTTP://`, `Https://`) is accepted, and a
+  scheme without a host is refused.
 - A selection no longer moves to other resources: a page, sort or filter
   change clears it, so *Delete Selected*, Del and Enter act only on the rows
   you picked.
@@ -507,8 +538,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **A save abandoned at the waiting box holds off Refresh and the profile
   switch until it ends.** Its remaining requests read the connection, so a
   switch meanwhile sent the rest of the save to the other server.
-- **An upload the server redirects is sent again in full.** The redirected
-  request announced its length and sent nothing, until the server gave up.
+- **An upload a server sends on with a 307 or 308 is sent again in full.** The
+  redirected request announced its length and sent nothing, until the server
+  gave up.
 - A warning or an error is logged without reading the settings first; every
   log line read the whole block to learn whether debug mode was on.
 - **Switching to another saved profile applies its TLS setting.** Saved

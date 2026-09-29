@@ -44,11 +44,24 @@ def raw_rest(client, method, path, accept=(), **kwargs):
     so the message the user sees has the same shape as `_check`'s. `accept`
     lists the error statuses to return instead: a 404 that means "none of
     its own" (a workspace's service settings) is an answer, not a failure.
-    Every caller is a library gap: list it in issue #50 and mark it
-    TODO(#50). Module-level so a worker thread can hold the client it was
-    given instead of reading `dialog.gs`, which a Refresh clears mid-flight.
+    `accept` can only name what the library lets through, a GET or DELETE
+    404 and a POST 409: the library raises on any other error status itself.
+    A write that a 301, 302 or 303 redirected raises too: `requests` resent
+    it without its body, or as a GET. Every caller is a library gap: list it
+    in issue #50 and mark it TODO(#50). Module-level so a worker thread can
+    hold the client it was given instead of reading `dialog.gs`, which a
+    Refresh clears mid-flight.
     """
     response = getattr(client, method)(path, **kwargs)
+    if method != "get":
+        # TODO(#50): the library's writes follow a redirect and cannot be told not to.
+        for hop in getattr(response, "history", ()):
+            if hop.status_code in (301, 302, 303):
+                raise RuntimeError(
+                    f"HTTP {hop.status_code}: redirected to {response.url}, where "
+                    "it arrived without its body or as a read. Put the address "
+                    "the server redirects to in Settings."
+                )
     if response.status_code >= 400 and response.status_code not in accept:
         raise RuntimeError(
             f"HTTP {response.status_code}: {summarise_body(response.text)}"
@@ -107,15 +120,16 @@ class ProgressReader:
 
     def __iter__(self):
         # What makes `requests` note the body's start and rewind to it on a
-        # redirect: a body with read() alone was resent as nothing.
+        # 307 or 308: a body with read() alone was resent as nothing.
         return iter(lambda: self.read(8192), b"")
 
     def tell(self):
         return self.sent
 
     def seek(self, offset, whence=0):
-        """Rewind, which is all `requests` needs: a redirect (an http:// URL the
-        server sends to https://) makes it resend the body from the start."""
+        """Rewind, which is all `requests` needs: a 307 or 308 redirect makes
+        it resend the body from the start. After a 301 or 302 it sends no
+        body at all (or a GET), which raw_rest refuses."""
         if offset != 0 or whence != 0:
             raise OSError("an upload body can only be rewound to its start")
         self._handle.seek(0)

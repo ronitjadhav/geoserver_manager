@@ -347,35 +347,44 @@ class ServerTabMixin:
         def check(key, label, **extra):
             return {"key": key, "label": label, "type": "checkbox", **extra}
 
-        t = translate
         if kind == "contact":
-            address = t("ServerTabMixin", "Address")
+            address = translate("ServerTabMixin", "Address")
             return [
-                text("person", t("ServerTabMixin", "Contact person")),
-                text("position", t("ServerTabMixin", "Position")),
-                text("organization", t("ServerTabMixin", "Organization")),
-                text("email", t("ServerTabMixin", "Email")),
-                text("phone", t("ServerTabMixin", "Phone")),
-                text("online_resource", t("ServerTabMixin", "Web site")),
+                text("person", translate("ServerTabMixin", "Contact person")),
+                text("position", translate("ServerTabMixin", "Position")),
+                text("organization", translate("ServerTabMixin", "Organization")),
+                text("email", translate("ServerTabMixin", "Email")),
+                text("phone", translate("ServerTabMixin", "Phone")),
+                text("online_resource", translate("ServerTabMixin", "Web site")),
                 {
                     "key": "welcome",
-                    "label": t("ServerTabMixin", "Welcome message"),
+                    "label": translate("ServerTabMixin", "Welcome message"),
                     "type": "textarea",
-                    "help": t("ServerTabMixin", "Shown on GeoServer's home page"),
+                    "help": translate(
+                        "ServerTabMixin", "Shown on GeoServer's home page"
+                    ),
                 },
-                text("address", t("ServerTabMixin", "Street"), group=address),
-                text("city", t("ServerTabMixin", "City"), group=address),
-                text("state", t("ServerTabMixin", "State or province"), group=address),
-                text("postal_code", t("ServerTabMixin", "Postal code"), group=address),
-                text("country", t("ServerTabMixin", "Country"), group=address),
+                text("address", translate("ServerTabMixin", "Street"), group=address),
+                text("city", translate("ServerTabMixin", "City"), group=address),
+                text(
+                    "state",
+                    translate("ServerTabMixin", "State or province"),
+                    group=address,
+                ),
+                text(
+                    "postal_code",
+                    translate("ServerTabMixin", "Postal code"),
+                    group=address,
+                ),
+                text("country", translate("ServerTabMixin", "Country"), group=address),
             ]
         if kind == "global":
             return [
                 text(
                     "proxy_base_url",
-                    t("ServerTabMixin", "Proxy base URL"),
+                    translate("ServerTabMixin", "Proxy base URL"),
                     placeholder="https://maps.example.org/geoserver",
-                    help=t(
+                    help=translate(
                         "ServerTabMixin",
                         "The public address GeoServer writes into capabilities "
                         "documents, when it sits behind a proxy",
@@ -383,26 +392,28 @@ class ServerTabMixin:
                 ),
                 check(
                     "use_headers_proxy",
-                    t("ServerTabMixin", "Use headers for the proxy URL"),
-                    help=t(
+                    translate("ServerTabMixin", "Use headers for the proxy URL"),
+                    help=translate(
                         "ServerTabMixin",
                         "Build it from the request's X-Forwarded headers instead",
                     ),
                 ),
-                text("charset", t("ServerTabMixin", "Character set")),
+                text("charset", translate("ServerTabMixin", "Character set")),
                 {
                     "key": "num_decimals",
-                    "label": t("ServerTabMixin", "Decimals"),
+                    "label": translate("ServerTabMixin", "Decimals"),
                     "type": "spinbox",
                     "min": 0,
                     "max": 20,
-                    "help": t("ServerTabMixin", "In GML and GeoJSON coordinates"),
+                    "help": translate(
+                        "ServerTabMixin", "In GML and GeoJSON coordinates"
+                    ),
                 },
-                check("verbose", t("ServerTabMixin", "Verbose output")),
+                check("verbose", translate("ServerTabMixin", "Verbose output")),
                 check(
                     "verbose_exceptions",
-                    t("ServerTabMixin", "Verbose exceptions"),
-                    help=t(
+                    translate("ServerTabMixin", "Verbose exceptions"),
+                    help=translate(
                         "ServerTabMixin",
                         "Java stack traces in service errors: for debugging only",
                     ),
@@ -412,7 +423,7 @@ class ServerTabMixin:
             return [
                 {
                     "key": "level",
-                    "label": t("ServerTabMixin", "Profile"),
+                    "label": translate("ServerTabMixin", "Profile"),
                     "type": "combo",
                     "options": list(LOG_LEVELS)
                     + [
@@ -423,28 +434,32 @@ class ServerTabMixin:
                 },
                 text(
                     "location",
-                    t("ServerTabMixin", "Log file"),
-                    help=t("ServerTabMixin", "Relative to the data directory"),
+                    translate("ServerTabMixin", "Log file"),
+                    help=translate("ServerTabMixin", "Relative to the data directory"),
                 ),
-                check("stdout", t("ServerTabMixin", "Also log to standard output")),
+                check(
+                    "stdout", translate("ServerTabMixin", "Also log to standard output")
+                ),
             ]
         fields = [
-            check("enabled", t("ServerTabMixin", "Enabled")),
+            check("enabled", translate("ServerTabMixin", "Enabled")),
             text(
                 "capabilities",
-                t("ServerTabMixin", "Capabilities URL"),
+                translate("ServerTabMixin", "Capabilities URL"),
                 read_only=True,
-                help=t("ServerTabMixin", "What a client such as QGIS connects to"),
+                help=translate(
+                    "ServerTabMixin", "What a client such as QGIS connects to"
+                ),
             ),
-            text("title", t("ServerTabMixin", "Title")),
+            text("title", translate("ServerTabMixin", "Title")),
             {
                 "key": "abstract",
-                "label": t("ServerTabMixin", "Abstract"),
+                "label": translate("ServerTabMixin", "Abstract"),
                 "type": "textarea",
             },
             {
                 "key": "keywords",
-                "label": t("ServerTabMixin", "Keywords"),
+                "label": translate("ServerTabMixin", "Keywords"),
                 "type": "list",
             },
         ]
@@ -452,21 +467,27 @@ class ServerTabMixin:
             fields.append(
                 {
                     "key": "max_features",
-                    "label": t("ServerTabMixin", "Maximum features"),
+                    "label": translate("ServerTabMixin", "Maximum features"),
                     "type": "spinbox",
                     "min": 0,
                     "max": 2147483647,
-                    "help": t("ServerTabMixin", "Per GetFeature request"),
+                    "help": translate("ServerTabMixin", "Per GetFeature request"),
                 }
             )
-        contact = t("ServerTabMixin", "Contact")
+        contact = translate("ServerTabMixin", "Contact")
         fields += [
-            text("maintainer", t("ServerTabMixin", "Maintainer"), group=contact),
-            text("online_resource", t("ServerTabMixin", "Web site"), group=contact),
-            text("fees", t("ServerTabMixin", "Fees"), group=contact),
+            text(
+                "maintainer", translate("ServerTabMixin", "Maintainer"), group=contact
+            ),
+            text(
+                "online_resource",
+                translate("ServerTabMixin", "Web site"),
+                group=contact,
+            ),
+            text("fees", translate("ServerTabMixin", "Fees"), group=contact),
             text(
                 "access_constraints",
-                t("ServerTabMixin", "Access constraints"),
+                translate("ServerTabMixin", "Access constraints"),
                 group=contact,
             ),
         ]

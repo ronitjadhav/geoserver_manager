@@ -120,6 +120,39 @@ class TestStylePathExtensions(unittest.TestCase):
             self.assertEqual(endpoints.style("s", format=bare), "/rest/styles/s")
 
 
+class TestPathBuildersInterpolateRaw(unittest.TestCase):
+    def test_names_reach_the_path_as_they_were_given(self):
+        """The plugin quotes names before these builders see them: _q in
+        tab_cascaded and tab_coveragestores, _datastore_path, _style_path,
+        _group_path, _resource_path and the layer-group listing. A library
+        that quoted them too would send "a b" as a%2520b, and every such
+        request would 404."""
+        from geoservercloud.services.restservice import RestService
+
+        endpoints = RestService.RestEndpoints("/rest")
+        ws, name = "a b", "c#d"
+        built = {
+            endpoints.datastore(ws, name): "datastores/c#d.json",
+            endpoints.featuretype(ws, name, name): (
+                "datastores/c#d/featuretypes/c#d.json"
+            ),
+            endpoints.style(name, ws): "styles/c#d.json",
+            endpoints.coveragestore(ws, name): "coveragestores/c#d.json",
+            endpoints.coveragestore(ws, name, "file", "geotiff"): (
+                "coveragestores/c#d/file.geotiff"
+            ),
+            endpoints.coverage(ws, name, name): "coveragestores/c#d/coverages/c#d.json",
+            endpoints.layergroup(ws, name): "layergroups/c#d.json",
+            endpoints.layergroups(ws): "layergroups.json",
+            endpoints.wmsstore(ws, name): "wmsstores/c#d.json",
+            endpoints.wmtsstore(ws, name): "wmtsstores/c#d.json",
+            endpoints.wmslayer(ws, name, name): "wmsstores/c#d/wmslayers/c#d.json",
+            endpoints.wmtslayer(ws, name, name): "wmtsstores/c#d/layers/c#d.json",
+        }
+        for path, rest in built.items():
+            self.assertEqual(path, f"/rest/workspaces/a b/{rest}")
+
+
 # ############################################################################
 # ####### Stand-alone run ########
 # ################################

@@ -479,9 +479,11 @@ The status line at the bottom of the dialog says what went wrong:
 | Status | Meaning | What to do |
 | :----- | :------ | :--------- |
 | Not configured | no URL or credentials saved | open *Settings* |
+| Auth error | the credentials cannot be read: the master password was declined, or they are gone from QGIS's authentication database, or are not a user name and password | open *Settings* and enter them again |
 | Server unreachable | nothing answers at that address (after 10 s at most) | check the URL, the network, and that GeoServer runs |
 | Certificate not trusted | this machine does not trust the TLS certificate | fix the certificate, or untick the check for one you trust |
 | Authentication failed | GeoServer refused the username or password | check them in *Settings* |
+| Redirected | the address sends every request elsewhere, such as `http://` to `https://`; a save sent through a redirect can arrive empty | put the address the message names in *Settings* |
 | HTTP error *N* | something answered, but not the REST API | check the URL; it usually ends in `/geoserver` |
 | Not a GeoServer REST endpoint | a web page came back, such as a proxy login | check the URL, or the proxy in front of GeoServer |
 
