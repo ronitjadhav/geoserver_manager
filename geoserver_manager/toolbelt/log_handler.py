@@ -37,8 +37,8 @@ class PlgLogger:
         :param application: the log panel's tab; the plugin's title by default
         :param log_level: any `Qgis.MessageLevel`, Info by default
         :param push: also show it in QGIS's message bar, above the map canvas
-        :param duration: seconds on the message bar; by default
-            `(log_level + 1) * 3`, and 0 means until the user closes it
+        :param duration: seconds on the message bar, 0 until the user closes
+            it; by default 0 for a warning or an error, else `(log_level + 1) * 3`
 
         :Example:
 
@@ -83,7 +83,12 @@ class PlgLogger:
         # optionally, display message on QGIS Message bar (above the map canvas)
         if push and iface is not None:
             if duration is None:
-                duration = (int(log_level) + 1) * 3
+                # A warning or an error says what to do next: it stays.
+                stays = log_level in (
+                    Qgis.MessageLevel.Warning,
+                    Qgis.MessageLevel.Critical,
+                )
+                duration = 0 if stays else (int(log_level) + 1) * 3
             iface.messageBar().pushMessage(
                 title=application, text=message, level=log_level, duration=duration
             )

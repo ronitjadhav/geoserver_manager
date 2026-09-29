@@ -25,6 +25,7 @@ from qgis.PyQt.QtCore import QCoreApplication, Qt
 from qgis.PyQt.QtWidgets import QApplication, QDialog
 
 from geoserver_manager.__about__ import __title__
+from geoserver_manager.gui.dlg_main import _UNSAFE_IN_NAMES
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.icons import icon
 from geoserver_manager.toolbelt.log_handler import PlgLogger
@@ -135,8 +136,9 @@ class LayerTreeMenu:
         A layer the plugin (or QGIS's browser) added carries the answer in its
         data source: the WFS `typename`, or the WMS/WMTS `layers` parameter,
         which a workspace's own service ({base}/{ws}/ows) names bare.
-        Only trusted when the source's host is the configured server, so a
-        layer from another GeoServer does not name a target here. Pure.
+        Only trusted when the source's URL is under the configured one (same
+        scheme and host, a path below its path), so a layer from another
+        GeoServer, even one on the same host, does not name a target here. Pure.
         """
         source = layer.source()
         if layer.providerType().casefold() == "wfs":
@@ -154,9 +156,16 @@ class LayerTreeMenu:
                 name = f"{unquote(workspace)}:{name}"
         if ":" not in name or not url:
             return None
-        if urlparse(url).netloc.casefold() != urlparse(base_url).netloc.casefold():
-            return None
-        return name
+        source_url, server = urlparse(url), urlparse(base_url)
+        same_server = (
+            source_url.scheme.casefold() == server.scheme.casefold()
+            and source_url.netloc.casefold() == server.netloc.casefold()
+            # Two GeoServers behind one host differ by path: /geoserver, /gs2.
+            and (source_url.path.rstrip("/") + "/").startswith(
+                server.path.rstrip("/") + "/"
+            )
+        )
+        return name if same_server else None
 
     @staticmethod
     def matching_server_layers(layer_name, server_layers):
@@ -216,7 +225,7 @@ class LayerTreeMenu:
             )
             return None
         if len(candidates) == 1:
-            return candidates[0]
+            return candidates[0] if self._addressable(candidates[0]) else None
         form = ResourceFormDialog(
             title=title,
             description=translate(
@@ -237,7 +246,27 @@ class LayerTreeMenu:
         )
         if form.exec() != QDialog.DialogCode.Accepted:
             return None
-        return form.get_values().get("target") or candidates[0]
+        target = form.get_values().get("target") or candidates[0]
+        return target if self._addressable(target) else None
+
+    def _addressable(self, target):
+        """True unless the name cannot go into a REST path; then say so.
+
+        The dialog's _addressable for this dispatch point (invariant 10):
+        `requests` sends layers/ws:a#b.json as layers/ws:a, another layer.
+        """
+        if not any(c in target for c in _UNSAFE_IN_NAMES):
+            return True
+        self._say(
+            translate(
+                "LayerTreeMenu",
+                "'{}' has a '/', '?', '#' or '%' in its name, which "
+                "changes the address the plugin would use. Rename it "
+                "in GeoServer's web interface to manage it here.",
+            ).format(target),
+            Qgis.MessageLevel.Warning,
+        )
+        return False
 
     # -- Push --------------------------------------------------------------------
 
@@ -475,8 +504,17 @@ class LayerTreeMenu:
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             return True, fn()
-        except Abandoned:
-            return False, None  # the user pressed Cancel: nothing to report
+        except Abandoned as abandoned:
+            # The user pressed Cancel: they know. A save goes on regardless.
+            if abandoned.write:
+                self._say(
+                    translate(
+                        "LayerTreeMenu",
+                        "Stopped waiting. GeoServer may still apply the change.",
+                    ),
+                    Qgis.MessageLevel.Warning,
+                )
+            return False, None
         except Exception as error:  # noqa: BLE001 (anything, reported as text)
             detail = dlg._error_text(error)
             self._say(f"{failure_message}: {detail}", Qgis.MessageLevel.Critical)

@@ -10,15 +10,37 @@ Usage from the repo root folder:
     QT_QPA_PLATFORM=offscreen python -m unittest tests.qgis.test_log_handler
 """
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from qgis.core import Qgis
 from qgis.testing import start_app, unittest
 
-from geoserver_manager.toolbelt import preferences
+from geoserver_manager.toolbelt import log_handler, preferences
 from geoserver_manager.toolbelt.log_handler import PlgLogger
 
 start_app()
+
+
+class TestPushDuration(unittest.TestCase):
+    """Review F48: a pushed warning faded after 6 s, an error after 9 s."""
+
+    @staticmethod
+    def pushed(level):
+        durations = []
+        bar = SimpleNamespace(pushMessage=lambda **kw: durations.append(kw["duration"]))
+        fake_iface = SimpleNamespace(messageBar=lambda: bar)
+        with patch.object(log_handler, "iface", fake_iface):
+            PlgLogger.log("message", log_level=level, push=True)
+        return durations[0]
+
+    def test_warnings_and_errors_stay_until_closed(self):
+        self.assertEqual(self.pushed(Qgis.MessageLevel.Warning), 0)
+        self.assertEqual(self.pushed(Qgis.MessageLevel.Critical), 0)
+
+    def test_good_news_still_fades(self):
+        self.assertGreater(self.pushed(Qgis.MessageLevel.Info), 0)
+        self.assertGreater(self.pushed(Qgis.MessageLevel.Success), 0)
 
 
 class TestLogGate(unittest.TestCase):
