@@ -392,6 +392,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- In a workspace layer group, a global group picked from the list is that
+  global group, even when the workspace has a layer or group of the same
+  name. It went out as the workspace's namesake, and in an edit of `ws:g`
+  the global `g` nested the group in itself.
+- A layer group in a workspace refuses an Earth Observation root layer of
+  another workspace before the form closes; GeoServer answered a bare error
+  after it had.
+- An Earth Observation group's recomputed bounds include its root layer,
+  after an edit of its layers or of the root alone; the stored box could
+  leave the root out.
+- Saving an untouched layer group whose title or abstract has spaces at its
+  ends or Windows line endings no longer sends an update and says it saved.
+- The layer group preview opens with one request fewer: the WMS layer
+  already knows the group's extent.
+- **A `.zip` style (an SLD with its images) is created in one request.** A
+  zip GeoServer refuses no longer leaves an empty style behind, so a retry
+  is no longer refused as taken. A file that is no style is refused before
+  the form closes.
+- Renaming a style in its form, and *Copy*, refuse a taken or unsafe name
+  before the form closes, with what you typed still there.
+- Save in a style's form works again; it failed with KeyError 'legend'.
+- *Copy* into another workspace names the icons and fill images the SLD
+  points to beside itself: they are not copied, and the copy draws without
+  them.
+- A style's legend is drawn with a layer of its kind. When the first layer
+  at hand was of the other kind, a raster style came back blank and a vector
+  style as an error.
+- *Delete* no longer says the style's file is removed: GeoServer keeps it in
+  the data directory as a `.bak` backup, as the tooltip and the confirmation
+  now say.
 - **Add to QGIS reaches the layers of an isolated workspace:** the layer,
   the map preview and a layer group now load through their workspace's own
   service, where GeoServer lists them. Before, they were invalid.
@@ -510,8 +540,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - A failed connection check, and a workspace that was saved but could not be
   made the default, reach the QGIS log at their level. Outside debug mode
   they were dropped.
-- A layer group in a workspace is offered the global groups too; GeoServer
-  accepts them, and the same name typed already worked.
+- A layer group in a workspace is offered the global groups too, and takes
+  one only when everything in it (its nested groups, their styles and an
+  Earth Observation root layer) is in that workspace. GeoServer refuses the
+  others with a bare error, so the form refuses them first and names what is
+  in another workspace.
 - The cascaded layer viewer shows an international title and abstract; a
   layer that had one showed a blank title.
 - **A layer added to QGIS as WFS keeps its own CRS.** It asked GeoServer for
@@ -699,7 +732,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Copy and Save to disk keep an SLD 1.1 style as it is stored, not as its
   1.0 rendition.
 - Renaming a style to a taken name is refused before the new body is saved.
-- An SLD file in another encoding than UTF-8 uploads as it is.
+- An SLD in another encoding than UTF-8 keeps its accents. GeoServer reads
+  every SLD as UTF-8 whatever its declaration names, so an upload, a *Copy*,
+  a body edit and *Apply to a QGIS layer* send it as UTF-8 under a
+  declaration that says so, and the style's form shows a body in the
+  encoding it declares.
 - *Used by* lists a layer group it cannot read instead of failing whole.
 - A translated layer group title or abstract stays read-only in its form, so
   a save no longer flattens it into every language.

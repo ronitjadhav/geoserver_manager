@@ -52,6 +52,31 @@ def point_layer(name, colour="#3388ff"):
     return layer
 
 
+class TestApplyInAnotherEncoding(unittest.TestCase):
+    def test_the_text_reaches_qgis_under_a_utf8_declaration(self):
+        """QGIS reads the file in the encoding its declaration names. The text
+        of an ISO-8859-1 style was written as UTF-8 under that declaration,
+        so "Café" arrived as "CafÃ©"."""
+        import xml.etree.ElementTree as ElementTree
+
+        read = []
+
+        class Layer:
+            def loadSldStyle(self, path):  # noqa: N802
+                read.append(ElementTree.parse(path).getroot().findtext("Title"))
+                return True, ""
+
+            def triggerRepaint(self):  # noqa: N802
+                pass
+
+        sld = (
+            '<?xml version="1.0" encoding="ISO-8859-1"?>'
+            "<StyledLayerDescriptor><Title>Caf\xe9</Title></StyledLayerDescriptor>"
+        )
+        self.assertEqual(apply_sld_to_layer(Layer(), sld), (True, ""))
+        self.assertEqual(read, ["Caf\xe9"])
+
+
 class TestLayerToSld(unittest.TestCase):
     def test_a_qgis_export_is_sld_1_1(self):
         """The fact the upload's content type hangs on."""
@@ -112,9 +137,12 @@ class TestLayerToSld(unittest.TestCase):
         import glob
         import tempfile
 
+        # What this call leaves, not what the directory holds: another
+        # process may have its own export folder there.
+        before = set(glob.glob(f"{tempfile.gettempdir()}/gsm_sld_*"))
         layer_to_sld(point_layer("towns"))
-        leftovers = glob.glob(f"{tempfile.gettempdir()}/gsm_sld_*")
-        self.assertEqual(leftovers, [])
+        leftovers = set(glob.glob(f"{tempfile.gettempdir()}/gsm_sld_*")) - before
+        self.assertEqual(leftovers, set())
 
 
 class TestApplySldToLayer(unittest.TestCase):
@@ -136,8 +164,10 @@ class TestApplySldToLayer(unittest.TestCase):
         import glob
         import tempfile
 
+        before = set(glob.glob(f"{tempfile.gettempdir()}/gsm_sld_*"))
         apply_sld_to_layer(point_layer("towns"), layer_to_sld(point_layer("other")))
-        self.assertEqual(glob.glob(f"{tempfile.gettempdir()}/gsm_sld_*"), [])
+        after = set(glob.glob(f"{tempfile.gettempdir()}/gsm_sld_*"))
+        self.assertEqual(after - before, set())
 
 
 class TestStyleableProjectLayers(unittest.TestCase):

@@ -42,11 +42,15 @@ class FakeGS:
     def __init__(self, broken_workspace=_NONE):
         self.broken_workspace = broken_workspace
         self.calls = []
+        self.body = SLD.encode()
         outer = self
 
         class Response:
             status_code = 200
-            content = SLD.encode()
+
+            @property
+            def content(inner):
+                return outer.body
 
             def json(inner):
                 return {}
@@ -143,6 +147,58 @@ class Recording(ResourceFormDialog):
 # ############################################################################
 # ########## Tests ###############
 # ################################
+
+
+LATIN1_SLD = (
+    '<?xml version="1.0" encoding="ISO-8859-1"?>'
+    '<StyledLayerDescriptor version="1.0.0"><Title>Caf\xe9</Title>'
+    "</StyledLayerDescriptor>"
+)
+
+
+class TestOtherEncodings(unittest.TestCase):
+    """GeoServer reads an SLD body as UTF-8 whatever its declaration names
+    (measured on 2.28.5): a Latin-1 one was stored with replacement
+    characters."""
+
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.dlg.gs = FakeGS()
+
+    def posted(self):
+        ((_verb, _path, kwargs),) = [c for c in self.dlg.gs.calls if c[0] == "POST"]
+        return kwargs["data"]
+
+    def test_a_latin1_file_is_uploaded_as_utf8_under_its_declaration_rewritten(self):
+        with tempfile.NamedTemporaryFile(suffix=".sld", delete=False) as handle:
+            handle.write(LATIN1_SLD.encode("latin-1"))
+        self.dlg._create_style_from_values(
+            {
+                "name": "brand_new",
+                "workspace": GLOBAL,
+                "source": "From file",
+                "file": handle.name,
+            }
+        )
+        self.assertEqual(
+            self.posted(), LATIN1_SLD.replace("ISO-8859-1", "UTF-8").encode("utf-8")
+        )
+
+    def test_a_copy_of_a_latin1_style_keeps_its_accents(self):
+        self.dlg.gs.body = LATIN1_SLD.encode("latin-1")
+        self.dlg._copy_style_to("population", None, "new_population", "topp")
+        self.assertIn("Caf\xe9".encode("utf-8"), self.posted())
+
+    def test_the_editor_shows_a_latin1_body_as_it_reads(self):
+        # Decoded as UTF-8 with replacement, a save wrote U+FFFD back.
+        self.dlg.gs.body = LATIN1_SLD.encode("latin-1")
+        self.assertIn("Caf\xe9", self.dlg._style_body("population", None, "sld"))
+
+    def test_an_edited_latin1_body_is_put_as_utf8(self):
+        self.dlg._put_sld_body("population", None, LATIN1_SLD)
+        body = self.dlg.gs.calls[-1][-1]
+        self.assertIn(b'encoding="UTF-8"', body)
+        self.assertIn("Caf\xe9".encode("utf-8"), body)
 
 
 class TestStylesTab(unittest.TestCase):
@@ -303,19 +359,48 @@ class TestStylesTab(unittest.TestCase):
         self.assertEqual(kwargs["data"], SLD.encode())
         self.assertFalse(any(c[0] == "from_file" for c in self.dlg.gs.calls))
 
-    def test_a_zip_or_mbstyle_file_still_goes_through_the_library(self):
-        # Those are not SLD documents: the library packs and posts them.
+    def test_a_zip_is_one_post_of_the_archive(self):
+        """The library's create_style_from_file() POSTs the definition, then
+        PUTs the zip: a zip GeoServer refused left an empty style behind, and
+        the retry was refused as taken. One POST with ?name= creates it with
+        its images, and a refused one leaves nothing (measured on 2.28.5)."""
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as handle:
+            handle.write(b"PK\x03\x04 an archive")
         self.dlg._create_style_from_values(
             {
                 "name": "brand_new",
                 "workspace": "topp",
                 "source": "From file",
-                "file": "/tmp/bundle.zip",
+                "file": handle.name,
             }
         )
-        self.assertEqual(
-            self.dlg.gs.calls[-1], ("from_file", "brand_new", "topp", "/tmp/bundle.zip")
-        )
+        ((verb, path, kwargs),) = [
+            c for c in self.dlg.gs.calls if c[0] in ("POST", "PUT", "from_file")
+        ]
+        self.assertEqual((verb, path), ("POST", "/rest/workspaces/topp/styles.json"))
+        self.assertEqual(kwargs["params"], {"name": "brand_new"})
+        self.assertEqual(kwargs["headers"], {"Content-Type": "application/zip"})
+        self.assertEqual(kwargs["data"], b"PK\x03\x04 an archive")
+
+    def test_a_file_of_no_style_kind_is_refused_before_the_form_closes(self):
+        # The library raised "Unsupported file extension", untranslated,
+        # after the form had closed.
+        seen = {}
+
+        class Uploading(ResourceFormDialog):
+            def exec(inner):
+                inner.set_values({"name": "brand_new", "source": "From file"})
+                inner.get_widget("file").setFilePath("/tmp/style.xml")
+                inner._on_accept()
+                seen["open"] = not inner.result()
+                seen["said"] = inner._validation_label.text()
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_styles, "ResourceFormDialog", Uploading):
+            self.dlg._add_style()
+        self.assertTrue(seen["open"])
+        self.assertIn("style.xml", seen["said"])
+        self.assertEqual(self.dlg.gs.calls, [])
 
     def test_upload_refuses_an_existing_style(self):
         with self.assertRaises(ValueError):
@@ -344,8 +429,13 @@ class TestStylesTab(unittest.TestCase):
         )
 
     def test_delete_purges_and_recurses(self):
-        self.dlg._confirm_delete = lambda question, labels=(), cascade="": True
+        cascades = []
+        self.dlg._confirm_delete = lambda question, labels=(), cascade="": (
+            cascades.append(cascade) or True
+        )
         self.dlg._delete_selected_styles([["roads_style", "topp"], ["generic", GLOBAL]])
+        # purge renames the file to .bak, it does not remove it (2.28.5).
+        self.assertIn(".bak", cascades[0])
         deletes = [c for c in self.dlg.gs.calls if c[0] == "DELETE"]
         self.assertEqual(
             [(path, kw["params"]) for _, path, kw in deletes],
@@ -678,20 +768,33 @@ def png_bytes():
     return bytes(buffer.data())
 
 
-class LegendFakeGS(FakeGS):
-    """Published layers to draw with, and a GetLegendGraphic that answers a PNG
-    or an OGC exception (HTTP 200 with XML, as GeoServer does)."""
+RASTER_SLD = (
+    '<StyledLayerDescriptor version="1.0.0"><sld:RasterSymbolizer><ColorMap/>'
+    "</sld:RasterSymbolizer></StyledLayerDescriptor>"
+)
 
-    def __init__(self, layers=("tiger:poi", "topp:states"), exception=None):
+
+class LegendFakeGS(FakeGS):
+    """Feature types and coverages to draw with, and a GetLegendGraphic that
+    answers a PNG or an OGC exception (HTTP 200 with XML, as GeoServer does)."""
+
+    def __init__(
+        self,
+        layers=("tiger:poi", "topp:states"),
+        exception=None,
+        coverages=("nurc:mosaic",),
+        body=SLD,
+    ):
         super().__init__()
         self.layers = list(layers)
+        self.coverages = list(coverages)
         self.exception = exception
         self.legend_calls = []
         outer = self
 
         class Response:
             status_code = 200
-            content = SLD.encode()
+            content = body.encode()
 
             def __init__(inner, payload=None):
                 inner._payload = payload or {}
@@ -702,19 +805,20 @@ class LegendFakeGS(FakeGS):
         class Client:
             def get(inner, path, **kwargs):
                 outer.calls.append(("GET", path, kwargs))
-                if path == "/rest/layers.json":
-                    layer = [{"name": name} for name in outer.layers]
-                    return Response({"layers": {"layer": layer} if layer else ""})
-                if path.startswith("/rest/workspaces/") and path.endswith(
-                    "/layers.json"
-                ):
-                    workspace = path.split("/")[3]
-                    layer = [
+                parts = path.split("/")
+                if path.startswith("/rest/workspaces/") and len(parts) == 5:
+                    workspace, collection = parts[3], parts[4]
+                    names, key, item = (
+                        (outer.coverages, "coverages", "coverage")
+                        if collection == "coverages.json"
+                        else (outer.layers, "featureTypes", "featureType")
+                    )
+                    found = [
                         {"name": name.split(":", 1)[1]}
-                        for name in outer.layers
+                        for name in names
                         if name.startswith(f"{workspace}:")
                     ]
-                    return Response({"layers": {"layer": layer} if layer else ""})
+                    return Response({key: {item: found} if found else ""})
                 return Response()
 
         class Endpoints(type(self.rest_service.rest_endpoints)):
@@ -722,6 +826,10 @@ class LegendFakeGS(FakeGS):
 
         self.rest_service.rest_client = Client()
         self.rest_service.rest_endpoints = Endpoints()
+
+    def get_workspaces(self):
+        names = sorted({n.split(":")[0] for n in self.layers + self.coverages})
+        return ([{"name": name} for name in names or ["topp"]], 200)
 
     def get_legend_graphic(
         self, layer, format="image/png", language=None, style=None, workspace_name=None
@@ -817,13 +925,25 @@ class TestLegendPreview(unittest.TestCase):
         self.assertEqual(self.dlg._legend_layer("topp"), "topp:states")
         # the workspace's own collection was asked, not the whole server's
         self.assertIn(
-            "/rest/workspaces/topp/layers.json",
+            "/rest/workspaces/topp/featuretypes.json",
             [call[1] for call in self.dlg.gs.calls if call[0] == "GET"],
         )
         self.assertEqual(self.dlg._legend_layer("nurc"), "tiger:poi")
         self.assertEqual(self.dlg._legend_layer(None), "tiger:poi")
-        self.dlg.gs = LegendFakeGS(layers=())
+        self.dlg.gs = LegendFakeGS(layers=(), coverages=())
         self.assertIsNone(self.dlg._legend_layer("topp"))
+
+    def test_a_layer_of_the_styles_kind_draws_its_legend(self):
+        """Measured on 2.28.5: a raster style drawn with a vector layer is a
+        blank 20x20 image, a vector style drawn with a raster layer an
+        exception. The first layer of the workspace was taken, any kind."""
+        self.assertEqual(self.dlg._legend_layer("topp", raster=True), "nurc:mosaic")
+        self.dlg.gs = LegendFakeGS(
+            layers=("nurc:bounds",), coverages=("nurc:mosaic",), body=RASTER_SLD
+        )
+        with patch.object(tab_styles, "ResourceFormDialog", Recording):
+            self.dlg._show_style_info(["rain", "nurc"])
+        self.assertEqual(self.dlg.gs.legend_calls, [("nurc:mosaic", "nurc:rain", None)])
 
     def test_the_legend_lands_in_the_open_dialog(self):
         with patch.object(tab_styles, "ResourceFormDialog", Recording):
@@ -852,7 +972,7 @@ class TestLegendPreview(unittest.TestCase):
         with patch.object(tab_styles, "ResourceFormDialog", Recording):
             self.dlg._show_style_info(["population", GLOBAL])
         label = Recording.opened[0].get_widget("legend")
-        self.assertIn("No published layer", label.text())
+        self.assertIn("No vector layer", label.text())
         self.assertEqual(self.dlg.gs.legend_calls, [])
 
     def test_a_dialog_closed_or_gone_before_the_legend_lands_is_left_alone(self):
@@ -977,6 +1097,65 @@ class TestRenameCopyAndUsage(unittest.TestCase):
         self.assertEqual(self.calls("PUT"), [])
         self.assertEqual(len(errors), 1)
         self.assertIn("already exists", errors[0])
+
+    def test_a_rename_onto_a_taken_name_stays_in_the_form(self):
+        seen = {}
+
+        class Renaming(ResourceFormDialog):
+            def exec(inner):
+                inner.get_widget("name").setText("generic")
+                inner._on_accept()
+                seen["open"] = not inner.result()
+                seen["said"] = inner._validation_label.text()
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_styles, "ResourceFormDialog", Renaming):
+            self.dlg._show_style_info(["population", GLOBAL])
+        self.assertTrue(seen["open"])
+        self.assertIn("already exists", seen["said"])
+
+    def test_a_copy_onto_a_taken_or_unsafe_name_stays_in_the_form(self):
+        for typed, said in (("generic", "already exists"), ("a#b", "#")):
+            seen = {}
+
+            class Copying(ResourceFormDialog):
+                def exec(inner):
+                    inner.get_widget("name").setText(typed)
+                    inner._on_accept()
+                    seen["open"] = not inner.result()
+                    seen["said"] = inner._validation_label.text()
+                    return QDialog.DialogCode.Rejected
+
+            with patch.object(tab_styles, "ResourceFormDialog", Copying):
+                self.dlg._copy_style(["population", GLOBAL])
+            self.assertTrue(seen["open"], typed)
+            self.assertIn(said, seen["said"])
+        self.assertEqual(self.calls("POST"), [])
+
+    def test_a_copy_elsewhere_warns_of_the_files_the_style_points_to(self):
+        """GeoServer finds a relative icon in the style's own folder, and a
+        copy into another workspace does not take the files along."""
+        self.dlg.gs.body = (
+            '<StyledLayerDescriptor version="1.0.0"><ExternalGraphic>'
+            '<OnlineResource xlink:type="simple" xlink:href="icons/pin.png"/>'
+            '<OnlineResource xlink:href="http://example.org/far.png"/>'
+            "</ExternalGraphic></StyledLayerDescriptor>"
+        ).encode()
+        seen = {}
+
+        class Copying(ResourceFormDialog):
+            def exec(inner):
+                seen["here"] = "files" in inner._hidden_keys
+                inner.set_values({"workspace": "topp"})
+                seen["elsewhere"] = "files" not in inner._hidden_keys
+                seen["files"] = inner.get_values()["files"]
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_styles, "ResourceFormDialog", Copying):
+            self.dlg._copy_style(["population", GLOBAL])
+        self.assertEqual(
+            seen, {"here": True, "elsewhere": True, "files": "icons/pin.png"}
+        )
 
     def test_a_pasted_css_style_is_posted_with_its_content_type(self):
         self.dlg._create_style_from_values(

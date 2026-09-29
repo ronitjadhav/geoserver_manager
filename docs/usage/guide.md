@@ -360,11 +360,14 @@ Row actions:
   CSS or YSLD style arrives as GeoServer converts it to SLD.
 - **Save to disk** saves the definition.
 - **Copy** makes a new style from the same definition, under another name or
-  in another workspace.
+  in another workspace. The icons and fill images an SLD points to beside
+  itself are not copied: for another workspace, the form names the files the
+  copy will draw without.
 - **Used by** lists the layers and layer groups that use the style, before
   you edit or delete it.
-- **Delete** removes the style and its file; layers that used it fall back
-  to GeoServer's default style.
+- **Delete** removes the style; GeoServer keeps its file in the data
+  directory only as a `.bak` backup. Layers that used it fall back to
+  GeoServer's default style.
 
 ## Tile cache
 
