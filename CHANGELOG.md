@@ -392,6 +392,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- A selection no longer moves to other resources: a page, sort or filter
+  change clears it, so *Delete Selected*, Del and Enter act only on the rows
+  you picked.
+- Enter in the search box selects the first match at once. Pressed before
+  the list had filtered, it selected the first row of the unfiltered list,
+  and a second Enter opened that row.
+- A link click or *Delete Selected* that has to wait for the server acts on
+  the rows it was clicked on, even if the list reloads during the wait.
+- A read or save that finishes just as its waiting box's Cancel is pressed
+  keeps its result. An abandoned save that ends while its Cancel is being
+  handled still reloads the list.
+- A delete batch that ends after the dialog is closed writes its failures to
+  the QGIS log. An upload cancelled after Close says in the log that a
+  replaced store may have kept no data file.
+- A form check that meets a sign-in page (an expired session) says so,
+  instead of "Expecting value: line 1 column 1 (char 0)".
+- The "Unexpected response (not a JSON list)" message is translated.
+- **Closing the dialog during a load and reopening it without a refresh**
+  (the layer tree's *Publish*) reloads the open tab. The dialog used to say
+  Cancel and "Loading..." over an empty table, or "Nothing here yet" as if
+  the server were empty.
+- A refused or cancelled sort on a detail column puts the header's sort
+  arrow back where it was.
+- An upload cancelled before it started removes the exported copy of the
+  layer from the temporary directory.
+- Sorting on a detail column no longer fetches the page's details twice.
+- A failed connection check, and a workspace that was saved but could not be
+  made the default, reach the QGIS log at their level. Outside debug mode
+  they were dropped.
 - A layer group in a workspace is offered the global groups too; GeoServer
   accepts them, and the same name typed already worked.
 - The cascaded layer viewer shows an international title and abstract; a

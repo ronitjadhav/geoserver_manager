@@ -23,6 +23,7 @@ class PlgLogger:
     @staticmethod
     def log(
         message: str,
+        *,
         application: str = __title__,
         log_level: Qgis.MessageLevel = Qgis.MessageLevel.Info,
         push: bool = False,

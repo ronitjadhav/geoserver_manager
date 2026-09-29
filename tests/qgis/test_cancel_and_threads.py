@@ -12,17 +12,25 @@ Usage from the repo root folder:
     QT_QPA_PLATFORM=offscreen python -m unittest tests.qgis.test_cancel_and_threads
 """
 
+import shutil
+import tempfile
 import threading
 import time
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from qgis.core import QgsApplication
+from qgis.core import Qgis, QgsApplication
+from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QApplication
 from qgis.testing import start_app, unittest
 
 from geoserver_manager.gui import dlg_main
 from geoserver_manager.gui.dlg_main import GeoServerMainDialog
+from geoserver_manager.toolbelt import log_handler
+from geoserver_manager.toolbelt.rest import UploadCancelled
 from tests.qgis.sync_dialog import SyncDialog
+from tests.qgis.test_i18n import Spy
 
 start_app()
 
@@ -113,6 +121,32 @@ class TestTasks(unittest.TestCase):
             )
         self.dlg._side = None
         self.assertNotIn("Failed", added[0].description())
+
+    def test_an_upload_cancelled_before_it_started_removes_its_export(self):
+        # run() never ran, so neither did the finally that removes the
+        # folder: a full copy of the layer stayed in the temp directory.
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, folder, True)
+        source = folder / "roads.gpkg"
+        source.write_bytes(b"data")
+        added = []
+        with patch.object(QgsApplication.taskManager(), "addTask", added.append):
+            self.dlg._upload_file(
+                "Failed",
+                None,
+                "path",
+                source,
+                {},
+                {},
+                print,
+                lambda task: None,
+                folder=folder,
+            )
+        task = added[0]
+        task.cancel()  # QGIS's task bar, before the thread pool started it
+        task.finished(False)  # what the task manager then calls
+        self.assertIsNone(self.dlg._upload)
+        self.assertFalse(folder.exists())
 
 
 class CancelledBox:
@@ -238,6 +272,156 @@ class TestLifecycle(unittest.TestCase):
         time.sleep(1)
         self.assertLess(len(asked), 40)
 
+    def late_cancel_box(self):
+        """The waiting box, Cancel pressed in the event pass where the work lands."""
+        release, before = self.release, set(dlg_main._RUNNING)
+
+        class LateCancel(CancelledBox):
+            def wasCanceled(self):  # noqa: N802
+                release.set()
+                for thread in dlg_main._RUNNING - before:
+                    thread.wait(5000)
+                return True
+
+        for name, value in (
+            ("QProgressDialog", LateCancel),
+            ("_WAIT_BEFORE_BOX", 0.01),
+        ):
+            patcher = patch.object(dlg_main, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def test_a_read_that_lands_as_cancel_is_pressed_is_kept(self):
+        # Its value was dropped for an Abandoned.
+        self.late_cancel_box()
+        value = self.dlg._wait_for(lambda: self.release.wait(5) and "landed")
+        self.assertEqual(value, "landed")
+
+    def test_a_save_that_lands_as_cancel_is_pressed_is_a_success(self):
+        # "It may still apply the change" was said of a save already done,
+        # and the reload, connected after its thread ended, never came.
+        self.late_cancel_box()
+        value = self.dlg._wait_for_save(lambda: self.release.wait(5) and "saved")
+        self.assertEqual(value, "saved")
+
+    def test_a_save_ending_while_its_cancel_is_handled_still_reloads(self):
+        # The reload was connected to a finished() already emitted: never ran.
+        self.wait_box_cancels()
+        reloads = []
+        self.dlg._reload_current_tab = lambda: reloads.append(True)
+        release, before = self.release, set(dlg_main._RUNNING)
+
+        class EndsTheSave:
+            def set(inner):
+                release.set()
+                for thread in dlg_main._RUNNING - before:
+                    thread.wait(5000)
+
+        with self.assertRaises(dlg_main.Abandoned):
+            self.dlg._wait_for(
+                lambda: self.release.wait(5), write=True, stop=EndsTheSave()
+            )
+        settle(lambda: reloads, timeout=3)
+
+    def test_a_fast_save_does_not_hold_off_a_refresh(self):
+        # Its thread left _RUNNING only once the event loop turned, so every
+        # later refresh_ui() in a headless run was refused as "still running".
+        self.dlg._wait_for_save(lambda: None)
+        self.assertFalse(self.dlg._refuse_while_writing())
+
+    def test_a_delete_batch_ending_after_close_logs_its_failures(self):
+        # Only its banner logged them, and a closed dialog shows none.
+        logged = []
+        self.dlg.log = lambda message, **kwargs: logged.append(message)
+
+        def refused():
+            self.release.wait(5)
+            raise RuntimeError("HTTP 403: referenced by layer group 'x'")
+
+        with patch.object(self.dlg, "_confirm_delete", return_value=True):
+            self.dlg._delete_many(
+                [("a", refused)],
+                lambda: None,
+                ask=dlg_main.GeoServerMainDialog._one_or_many(
+                    "Delete '{}'?", lambda n: ""
+                ),
+                done=dlg_main.GeoServerMainDialog._one_or_many(
+                    "'{}' deleted.", lambda n: ""
+                ),
+            )
+        self.dlg.show()
+        self.dlg.close()
+        self.release.set()
+        settle(lambda: self.dlg._delete is None)
+        self.assertTrue(any("referenced by layer group" in m for m in logged), logged)
+
+    def test_an_upload_cancelled_after_close_says_what_a_replace_leaves(self):
+        # The log read "Failed to publish 'roads': ", and nothing said the
+        # store may have lost its data file.
+        logged = []
+        self.dlg.log = lambda message, **kwargs: logged.append(message)
+
+        def work(task):
+            self.release.wait(5)
+            if task.isCanceled():
+                raise UploadCancelled()
+
+        self.dlg._launch_task(
+            "_upload", "Failed to publish 'roads'", work, print, print
+        )
+        self.dlg.show()
+        self.dlg.close()
+        self.dlg._upload.cancel()  # QGIS's task bar
+        self.release.set()
+        settle(lambda: self.dlg._upload is None)
+        self.assertTrue(
+            any("'roads'" in m and "data file" in m for m in logged), logged
+        )
+
+    def test_a_load_dropped_by_close_is_reloaded_when_shown_again(self):
+        # Shown again without a refresh (the layer tree's Publish), it said
+        # Cancel and "Loading…" over an empty table while nothing ran.
+        self.dlg.show()
+        self.dlg._run_in_task("Failed", lambda t: self.release.wait(5), print)
+        self.dlg.close()
+        self.release.set()
+        settle(lambda: self.dlg._task is None)
+        self.assertEqual(self.dlg.btn_refresh.text(), "Refresh")
+        self.assertNotIn("Loading", self.dlg.lbl_page_info.text())
+        reloads = []
+        self.dlg._reload_current_tab = lambda: reloads.append(True)
+        self.dlg.show()
+        self.assertEqual(reloads, [True])
+        self.dlg.close()
+        self.dlg.show()
+        self.assertEqual(reloads, [True])  # once, for the load it dropped
+
+    def test_a_load_still_running_when_shown_again_is_reloaded(self):
+        # Its request was in flight at Close and returned after the show: the
+        # late finish stayed quiet, and the empty table said "Nothing here yet".
+        started, landed = threading.Event(), []
+        self.dlg.show()
+        self.dlg._run_in_task(
+            "Failed", lambda t: started.set() or self.release.wait(5), print
+        )
+        dropped = self.dlg._task
+        settle(started.is_set)
+        self.dlg.close()
+        self.dlg._reload_current_tab = lambda: self.dlg._run_in_task(
+            "Failed", lambda t: "rows", landed.append
+        )
+        self.dlg.show()
+        self.release.set()
+        settle(
+            lambda: self.dlg._task is None
+            and dropped.status()
+            in (dropped.TaskStatus.Complete, dropped.TaskStatus.Terminated)
+        )
+        QApplication.processEvents()
+        self.assertEqual(landed, ["rows"])
+        self.assertEqual(self.messages, [])  # the dropped load stays quiet
+        self.assertEqual(self.dlg.btn_refresh.text(), "Refresh")
+
     def test_a_truncate_runs_off_the_gui_thread(self):
         # Nine writes ran on the GUI thread: a slow server froze QGIS.
         waited = []
@@ -267,19 +451,98 @@ class TestSignInPage(unittest.TestCase):
         self.assertIn("Sign in", str(caught.exception))
         self.assertNotIn("<html>", str(caught.exception))
 
+    def test_a_list_read_of_it_is_reported_in_the_users_language(self):
+        # The banner carried English prose whatever the locale.
+        spy = Spy(["GeoServerMainDialog"])
+        QCoreApplication.installTranslator(spy)
+        self.addCleanup(QCoreApplication.removeTranslator, spy)
+        with self.assertRaises(RuntimeError) as caught:
+            SyncDialog()._fetch_list(lambda: ("<html>Sign in</html>", 200))
+        self.assertTrue(
+            str(caught.exception).startswith(
+                "[GeoServerMainDialog] Unexpected response"
+            ),
+            str(caught.exception),
+        )
+
+    def test_a_form_check_that_meets_it_says_what_it_is(self):
+        # "Expecting value: line 1 column 1 (char 0)" under the form.
+        import json
+
+        def check(values):
+            return json.loads("<html><title>Sign in</title></html>")
+
+        with self.assertRaises(ValueError) as caught:
+            SyncDialog()._form_check(check)({})
+        self.assertIn("sign-in page", str(caught.exception))
+
+    def test_a_form_checks_own_refusal_keeps_its_words(self):
+        def check(values):
+            raise ValueError("Workspace 'topp' already exists.")
+
+        with self.assertRaises(ValueError) as caught:
+            SyncDialog()._form_check(check)({})
+        self.assertEqual(str(caught.exception), "Workspace 'topp' already exists.")
+
 
 class TestConnection(unittest.TestCase):
     def test_cancelling_the_probe_says_not_connected(self):
-        # It stayed on "Connecting…" with the old rows and no client.
-        dlg = SyncDialog()
-        captured = {}
-        dlg._run_in_task = lambda message, work, on_success, **kw: captured.update(kw)
+        # It stayed on "Connecting…" with the old rows and no client: the
+        # Cancel button let go of the probe, so its on_cancel never ran.
+        dlg = GeoServerMainDialog()
+        self.addCleanup(dlg.close)
+        dlg.show_warning_message = lambda text: None
+        release = threading.Event()
+        self.addCleanup(release.set)
         dlg._build_client = lambda settings: object()
+
+        def hung_probe(gs, url):
+            release.wait(5)  # a host that swallows the request
+
+        dlg._probe = hung_probe
         dlg._populate_rows([["old", "ws"]])
         dlg.refresh_ui()
-        captured["on_cancel"](None)
+        task = dlg._task
+        dlg._on_refresh_clicked()  # Cancel, while the probe hangs
         self.assertEqual(dlg.lbl_status.text(), "Not connected")
         self.assertEqual(dlg._all_rows, [])
+        self.assertEqual(dlg.btn_refresh.text(), "Refresh")
+        release.set()
+        settle(
+            lambda: task.status()
+            in (task.TaskStatus.Complete, task.TaskStatus.Terminated)
+        )
+        QApplication.processEvents()
+        self.assertEqual(dlg.lbl_status.text(), "Not connected")
+
+    def test_a_superseded_probe_leaves_the_newer_refresh_alone(self):
+        # Its cancel set "Not connected" over the new probe's "Connecting…".
+        dlg = SyncDialog()
+        captured = []
+        dlg._run_in_task = lambda message, work, on_success, **kw: captured.append(
+            kw["on_cancel"]
+        )
+        dlg._build_client = lambda settings: object()
+        dlg.refresh_ui()
+        dlg.refresh_ui()
+        captured[0](SimpleNamespace(superseded=True))
+        self.assertEqual(dlg.lbl_status.text(), "Connecting…")
+
+    def test_a_failed_connection_check_is_logged_as_an_error(self):
+        # The level went positionally into the logger's application slot,
+        # and a message at the default level was dropped.
+        dlg = SyncDialog()
+        dlg.show_error_message = lambda text: None
+        dlg._build_client = lambda settings: object()
+        dlg._probe = lambda gs, url: ("Server unreachable", "Is it running?")
+        with patch.object(log_handler, "QgsMessageLog") as message_log:
+            dlg.refresh_ui()
+        levels = [
+            call.kwargs["level"]
+            for call in message_log.logMessage.call_args_list
+            if "Connection check failed" in call.kwargs["message"]
+        ]
+        self.assertEqual(levels, [Qgis.MessageLevel.Critical])
 
     def test_a_delete_ending_during_a_refresh_does_not_reload(self):
         # Its load would cancel the probe: "Connecting…" for good.

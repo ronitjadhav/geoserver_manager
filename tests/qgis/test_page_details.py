@@ -11,6 +11,9 @@ Usage from the repo root folder:
     QT_QPA_PLATFORM=offscreen python -m unittest tests.qgis.test_page_details
 """
 
+from unittest.mock import patch
+
+from qgis.PyQt.QtCore import Qt
 from qgis.testing import start_app, unittest
 
 from geoserver_manager.gui.scope import PENDING
@@ -93,6 +96,61 @@ class TestPageDetails(unittest.TestCase):
         reloaded = [[f"store{n:02}", "topp", PENDING] for n in range(45)]
         self.dlg._populate_rows(reloaded)
         self.assertIsNone(self.dlg._sort)
+
+    def test_a_refused_sort_puts_the_arrow_back(self):
+        # Qt moves the arrow before the click reaches the dialog: it stayed
+        # on the detail column while the rows kept their order.
+        self.dlg.show_warning_message = lambda text: None
+        self.dlg._populate_rows(self.rows)
+        self.dlg._on_header_clicked(0)
+        header = self.dlg.resultsTable.horizontalHeader()
+        self.dlg.gs = None  # a Refresh is probing: the sort is refused
+        header.setSortIndicator(2, Qt.SortOrder.AscendingOrder)  # what Qt does
+        self.dlg._on_header_clicked(2)
+        self.assertEqual(self.dlg._sort, (0, False))
+        self.assertEqual(header.sortIndicatorSection(), 0)
+
+    def hold_the_fills(self):
+        """Park each page fill in its slot, running, as a slow server would."""
+        fills = []
+
+        class Fill:
+            cancelled = False
+
+            def cancel(inner):
+                inner.cancelled = True
+
+            def isCanceled(inner):  # noqa: N802
+                return inner.cancelled
+
+        def launch(slot, message, work, on_success, on_cancel, **kwargs):
+            fills.append(Fill())
+            setattr(self.dlg, slot, fills[-1])
+
+        self.dlg._launch_task = launch
+        return fills
+
+    def test_a_sort_takes_over_the_page_fill_rather_than_repeat_it(self):
+        # The page's rows were fetched twice: by its fill, then by the sort.
+        fills = self.hold_the_fills()
+        self.dlg._populate_rows(self.rows)
+        self.dlg._on_header_clicked(2)
+        self.assertTrue(fills[0].cancelled)
+        self.assertEqual(sorted(self.asked), [row[0] for row in self.rows])
+
+    def test_a_cancelled_sort_gives_the_page_its_fill_back(self):
+        fills = self.hold_the_fills()
+        self.dlg._populate_rows(self.rows)
+        with patch.object(self.dlg, "_fetch", return_value=None):  # Cancel
+            self.dlg._on_header_clicked(2)
+        self.assertEqual(len(fills), 2)
+        self.assertFalse(fills[1].cancelled)
+
+    def test_a_row_action_leaves_the_page_fill_running(self):
+        fills = self.hold_the_fills()
+        self.dlg._populate_rows(self.rows)
+        self.assertTrue(self.dlg._addressable([self.rows[0]]))
+        self.assertFalse(fills[0].cancelled)  # the other rows still need it
 
     def test_a_long_detail_cell_has_its_whole_text_on_hover(self):
         long_text = "EPSG:4326, EPSG:900913, WebMercatorQuad, GlobalCRS84Pixel"

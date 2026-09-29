@@ -16,7 +16,9 @@ import threading
 import time
 from unittest.mock import patch
 
-from qgis.PyQt.QtCore import QCoreApplication, QEventLoop, QObject, QTimer
+from qgis.core import Qgis
+from qgis.PyQt.QtCore import QCoreApplication, QEventLoop, QObject, Qt, QTimer
+from qgis.PyQt.QtTest import QTest
 from qgis.PyQt.QtWidgets import QApplication, QDialog, QProgressDialog, QPushButton
 from qgis.testing import start_app, unittest
 
@@ -491,6 +493,20 @@ class TestDefaultWorkspaceHandling(unittest.TestCase):
         self.assertEqual(self.warnings, [])
         self.assertIn("could not be made the default", warning[0])
 
+    def test_a_set_default_failure_is_logged_as_a_warning(self):
+        # The level went positionally into the logger's application slot.
+        levels = []
+        self.dlg.log = lambda message, *args, **kwargs: levels.append(
+            kwargs.get("log_level")
+        )
+
+        def boom(name):
+            raise RuntimeError("HTTP 403: forbidden")
+
+        self.dlg._set_default_workspace = boom
+        self.dlg._save_workspace({"name": "ws", "isolated": False, "set_default": True})
+        self.assertEqual(levels, [Qgis.MessageLevel.Warning])
+
     def test_default_workspace_name_raises_when_unreadable(self):
         # Swallowed here, every row of the list read "No" without a word; the
         # list reports it, the edit form's prefill treats it as unknown.
@@ -670,6 +686,53 @@ class TestLinkCells(unittest.TestCase):
         self.dlg._page_next()
         self.dlg._on_cell_clicked(0, 0)
         self.assertEqual(self.opened, [["ds20", "topp", "PostGIS"]])
+
+    def reload_during_the_wait(self, rows):
+        """_addressable, with a reload landing behind its waiting box."""
+        self.dlg._filtered_rows = [["other", "topp", "PostGIS"]] * 25
+        return True
+
+    def test_a_click_opens_the_row_it_was_on_after_a_wait(self):
+        # The row was read again after the wait: another resource opened.
+        self.dlg._addressable = self.reload_during_the_wait
+        self.dlg._on_cell_clicked(1, 0)
+        self.assertEqual(self.opened, [["ds01", "topp", "PostGIS"]])
+
+    def test_delete_selected_acts_on_the_rows_it_checked(self):
+        deleted = []
+        self.dlg._setup_delete_selected_button(deleted.append)
+        self.dlg.resultsTable.selectRow(2)
+        self.dlg._addressable = self.reload_during_the_wait
+        self.dlg.btn_delete_selected.click()
+        self.assertEqual(deleted, [[["ds02", "topp", "PostGIS"]]])
+
+    def test_a_selection_does_not_move_to_other_rows(self):
+        # Kept by position across a page, a sort or a filter, Delete
+        # Selected then acted on whatever moved into the highlighted rows.
+        self.dlg._setup_delete_selected_button(lambda rows: None)
+        table = self.dlg.resultsTable
+        table.selectRow(3)
+        self.assertTrue(self.dlg.btn_delete_selected.isEnabled())
+        self.dlg._page_next()
+        self.assertEqual(self.dlg._get_selected_rows(), [])
+        self.assertFalse(self.dlg.btn_delete_selected.isEnabled())
+        table.selectRow(0)
+        self.dlg._on_header_clicked(0)
+        self.assertEqual(self.dlg._get_selected_rows(), [])
+        table.selectRow(0)
+        self.dlg.searchBox.setText("ds1")
+        self.dlg._apply_filter()
+        self.assertEqual(self.dlg._get_selected_rows(), [])
+
+    def test_enter_in_the_search_selects_the_first_match_at_once(self):
+        # Pressed within the search delay, Enter selected the first row of
+        # the unfiltered list, which a second Enter then opened.
+        self.dlg.show()
+        self.addCleanup(self.dlg.close)
+        self.dlg.searchBox.setFocus()
+        QTest.keyClicks(self.dlg.searchBox, "ds24")
+        QTest.keyClick(self.dlg.searchBox, Qt.Key.Key_Return)
+        self.assertEqual(self.dlg._get_selected_rows(), [["ds24", "topp", "PostGIS"]])
 
 
 class TestTlsVerification(unittest.TestCase):

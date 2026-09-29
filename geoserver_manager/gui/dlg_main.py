@@ -112,7 +112,7 @@ class _ReadThread(QThread):
     def __init__(self, work, write=False):
         super().__init__()
         self._work = work
-        # A save: abandoned, it still runs its requests, which read self.gs.
+        # True while a save's requests run: they read self.gs (see _wait_for).
         self.write = write
         _RUNNING.add(self)
         self.finished.connect(lambda: _RUNNING.discard(self))
@@ -220,6 +220,7 @@ class GeoServerMainDialog(
         self._side = None  # a quiet side task (a dialog's legend): _run_quietly
         # The visible page's detail cells, fetched after the names: _fill_details
         self._detail = None
+        self._detail_rows = []  # the rows the running _detail fill fetches
         self._row_detail = None  # row -> its detail cells; runs in a worker
         self._detail_columns = ()  # the columns _row_detail fills
         self._cell_display = {}  # column -> label for a value (see _setup_table)
@@ -228,6 +229,7 @@ class GeoServerMainDialog(
         # supersede `_task`) cannot stop it half way without a word.
         self._delete = None
         self._closing = False  # set in closeEvent: a late finish must stay away
+        self._reload_on_show = False  # a load Close dropped: showEvent reloads
         self._announce_after_load = None  # banner to show once rows have landed
 
         # Tooltips
@@ -317,9 +319,14 @@ class GeoServerMainDialog(
             # Never the dialog's default button: Enter in the search box
             # opened the Add form. From the search, Enter goes to the results,
             # where the next one opens the row.
-            if self.focusWidget() is self.searchBox and self.resultsTable.rowCount():
-                self.resultsTable.setFocus()
-                self.resultsTable.selectRow(0)
+            if self.focusWidget() is self.searchBox:
+                if self._search_timer.isActive():
+                    # Its re-render would drop the row selected below.
+                    self._search_timer.stop()
+                    self._apply_filter()
+                if self.resultsTable.rowCount():
+                    self.resultsTable.setFocus()
+                    self.resultsTable.selectRow(0)
             return
         if (
             key == Qt.Key.Key_Delete
@@ -345,6 +352,10 @@ class GeoServerMainDialog(
         # next layer of a batch) was dropped as if the dialog were gone.
         self._closing = False
         super().showEvent(event)
+        if self._reload_on_show:
+            # Close dropped a load; the layer tree's Publish shows no new one.
+            self._reload_on_show = False
+            self._reload_current_tab()
 
     def closeEvent(self, event):
         # A running task would call back into widgets that are on their way out.
@@ -352,6 +363,9 @@ class GeoServerMainDialog(
         # replaced store without its file (measured, see _run_upload), and the
         # task is visible in QGIS's own task bar with its own Cancel.
         self._closing = True
+        if self._task is not None:
+            # Its finish may land after a show again, where it stays quiet.
+            self._reload_on_show = True
         self._cancel_load()
         if self._side is not None:
             self._side.cancel()
@@ -522,7 +536,8 @@ class GeoServerMainDialog(
                 self._set_status(status, "error")
                 self.show_error_message(message)
                 self.log(
-                    f"Connection check failed: {status}", Qgis.MessageLevel.Critical
+                    f"Connection check failed: {status}",
+                    log_level=Qgis.MessageLevel.Critical,
                 )
                 # Clearing only the visible rows would leave the dead server's
                 # data in the row cache, reachable through search and pagination.
@@ -540,9 +555,11 @@ class GeoServerMainDialog(
                 self._announce_after_load = self.tr("Resources loaded.")
             self._on_nav_changed(self.navList.currentRow())
 
-        def probe_cancelled(_task):
+        def probe_cancelled(task):
             # Cancel on the probe: without this the status kept "Connecting…"
             # and the old connection's rows stayed, with no client behind them.
+            if task.superseded:
+                return  # a newer refresh owns the status and the table
             self._set_status(self.tr("Not connected"), "error")
             self._reset_table_state()
 
@@ -710,7 +727,22 @@ class GeoServerMainDialog(
             # reporting it cancelled told the user its data file was gone.
             completed = getattr(task, "completed", False)
             if self._closing:
-                if error is not None:
+                if not quiet:
+                    # Else a dialog shown again said Cancel and "Loading…".
+                    self._set_loading(self._loading())
+                if slot == "_task":
+                    self._reload_on_show = True  # its rows were dropped
+                if slot == "_upload" and task.isCanceled() and not completed:
+                    # on_cancel needs the dialog, which is gone: say it in the log.
+                    self.log(
+                        QCoreApplication.translate(
+                            "GeoServerMainDialog",
+                            "{}: the upload was cancelled. If it replaced a store, "
+                            "GeoServer may have kept the store without its data file.",
+                        ).format(failure_message),
+                        log_level=Qgis.MessageLevel.Warning,
+                    )
+                elif error is not None:
                     self.log(
                         f"{failure_message}: {self._error_text(error)}",
                         log_level=Qgis.MessageLevel.Critical,
@@ -757,6 +789,8 @@ class GeoServerMainDialog(
         # The description is what QGIS's task bar shows while it runs: never
         # the failure message ("Failed to load styles") of work going fine.
         task = _FetchTask(busy_text or __title__, work, finished)
+        # What a user Cancel runs at once, since it lets go of a load's task.
+        task.on_cancel = on_cancel
         setattr(self, slot, task)
         if not quiet:
             self._set_loading(True, busy_text)
@@ -806,7 +840,9 @@ class GeoServerMainDialog(
                 self._task = None
             task.cancel()
             if user:
-                self._say_load_cancelled()
+                # Its finish finds the slot empty: its on_cancel runs here.
+                self._set_loading(self._loading())
+                task.on_cancel(task)
         # Its worker reads self.gs too (invariant 10): stopped with the load.
         if self._detail is not None:
             self._detail.cancel()
@@ -1038,13 +1074,14 @@ class GeoServerMainDialog(
             self.btn_delete_selected.clicked.disconnect()
         except TypeError:
             pass
-        self.btn_delete_selected.clicked.connect(
-            lambda: (
-                self._require_connection()
-                and self._addressable(self._get_selected_rows())
-                and callback(self._get_selected_rows())
-            )
-        )
+
+        def delete_selected():
+            # Read once: a reload during _addressable's wait moves the rows.
+            rows = self._get_selected_rows()
+            if self._require_connection() and self._addressable(rows):
+                callback(rows)
+
+        self.btn_delete_selected.clicked.connect(delete_selected)
 
     def _setup_table(self, columns):
         """Reset the table with the given column headers."""
@@ -1177,7 +1214,9 @@ class GeoServerMainDialog(
         if column in self._detail_columns and not self._complete_rows(
             self._filtered_rows
         ):
-            return  # sorting on a column needs every row's value
+            # Sorting on a column needs every row's value. Qt moved the arrow.
+            self._show_sort_indicator()
+            return
         same = self._sort is not None and self._sort[0] == column
         self._sort = (column, same and not self._sort[1])
         # Re-rendering also puts the indicator back where _sort says, after Qt
@@ -1219,6 +1258,8 @@ class GeoServerMainDialog(
         start = self._current_page * self._page_size
         end = min(start + self._page_size, total)
         page_rows = self._filtered_rows[start:end]
+        # A selection is a row position: kept, it moved to other resources.
+        self.resultsTable.clearSelection()
 
         data_col_count = self.resultsTable.columnCount()
         if self._row_actions:
@@ -1332,10 +1373,12 @@ class GeoServerMainDialog(
         if callback is None or not self._require_connection():
             return
         index = self._current_page * self._page_size + row
-        if index < len(self._filtered_rows) and self._addressable(
-            [self._filtered_rows[index]]
-        ):
-            callback(self._filtered_rows[index])
+        if index >= len(self._filtered_rows):
+            return
+        # Read once: a reload during _addressable's wait replaces the rows.
+        row_data = self._filtered_rows[index]
+        if self._addressable([row_data]):
+            callback(row_data)
 
     def _make_action_widget(self, row_data):
         """Keep frequent actions visible and give secondary actions readable labels."""
@@ -1607,6 +1650,7 @@ class GeoServerMainDialog(
             self._report_partial_failures(self._apply_details(todo, results))
             self._repaint_details()
 
+        self._detail_rows = todo
         self._launch_task(
             "_detail",
             self.tr("Failed to load the details"),
@@ -1627,6 +1671,13 @@ class GeoServerMainDialog(
             return True
         if not self._require_connection():
             return False
+        fetching = {id(row) for row in todo}
+        took_over = self._detail is not None and all(
+            id(row) in fetching for row in self._detail_rows
+        )
+        if took_over:
+            # The page's fill is after these rows too (a sort): GET them once.
+            self._detail.cancel()
         detail, stop = self._row_detail, threading.Event()
         # The waiting box's Cancel stops the fan-out between rounds: it kept
         # GETting every remaining row after the sort was dropped.
@@ -1636,6 +1687,10 @@ class GeoServerMainDialog(
             stop=stop,
         )
         if results is None:
+            if took_over and (self._detail is None or self._detail.isCanceled()):
+                # The page shown still needs the cells its fill was after.
+                start = self._current_page * self._page_size
+                self._fill_details(self._filtered_rows[start : start + self._page_size])
             return False
         self._report_partial_failures(self._apply_details(todo, results))
         self._repaint_details()
@@ -1840,9 +1895,19 @@ class GeoServerMainDialog(
             except Exception as e:  # re-raised on the GUI thread, below
                 outcome["error"] = e
             finally:
+                # Here, not on finished: that one waits for the event loop.
+                thread.write = False
                 done.set()
 
+        abandoned = threading.Event()
         thread = _ReadThread(work, write)
+        if write:
+            # Before start(): connected on Cancel, it missed a save just ended.
+            thread.finished.connect(
+                lambda: abandoned.is_set()
+                and not sip.isdeleted(self)
+                and self._reload_current_tab()
+            )
         thread.start()
         if not done.wait(_WAIT_BEFORE_BOX):
             box = QProgressDialog(
@@ -1860,11 +1925,11 @@ class GeoServerMainDialog(
             try:
                 while not done.wait(0.05):
                     QCoreApplication.processEvents()
-                    if box.wasCanceled():
+                    # A result that landed meanwhile is kept, Cancel or not.
+                    if box.wasCanceled() and not done.is_set():
                         if stop is not None:
                             stop.set()
-                        if write:
-                            thread.finished.connect(self._reload_current_tab)
+                        abandoned.set()
                         raise Abandoned(write)
             finally:
                 box.close()
@@ -1886,9 +1951,15 @@ class GeoServerMainDialog(
         def validate(values):
             try:
                 self._wait_for(lambda: check(values))
-            except (ValueError, Abandoned):
+            except Abandoned:
                 raise
             except Exception as error:
+                # A check's refusal keeps its words; a sign-in page's .json() not.
+                if (
+                    isinstance(error, ValueError)
+                    and type(error).__name__ != "JSONDecodeError"
+                ):
+                    raise
                 raise ValueError(self._error_text(error)) from error
 
         return validate
@@ -1930,7 +2001,9 @@ class GeoServerMainDialog(
         if not isinstance(result, list):
             # A sign-in page came out as its whole markup in the banner.
             raise RuntimeError(
-                f"Unexpected response (not a JSON list): {summarise_body(str(result))}"
+                QCoreApplication.translate(
+                    "GeoServerMainDialog", "Unexpected response (not a JSON list): {}"
+                ).format(summarise_body(str(result)))
             )
         return result
 
@@ -2118,14 +2191,15 @@ class GeoServerMainDialog(
                 try:
                     delete_fn()
                 except Exception as e:
-                    errors.append((label, self._error_text(e)))
+                    detail = self._error_text(e)
+                    errors.append((label, detail))
+                    # Logged here: a batch that ends after Close shows no banner.
+                    self.log(f"{label}: {detail}", log_level=Qgis.MessageLevel.Critical)
                 if task is not None:
                     task.setProgress(100 * (index + 1) / len(labeled_deletes))
             return errors
 
         def listed(errors):
-            for label, detail in errors:
-                self.log(f"{label}: {detail}", log_level=Qgis.MessageLevel.Critical)
             return "\n".join(f"{label}: {detail}" for label, detail in errors)
 
         def report(errors):
@@ -2249,8 +2323,15 @@ class GeoServerMainDialog(
                 if folder is not None:
                     shutil.rmtree(folder, ignore_errors=True)
 
+        def ended(outcome):
+            # A task cancelled before it started never ran work's finally.
+            if folder is not None:
+                shutil.rmtree(folder, ignore_errors=True)
+            if on_done is not None:
+                on_done(outcome)
+
         return self._run_upload(
-            failure_message, work, on_success, on_cancel, on_done=on_done
+            failure_message, work, on_success, on_cancel, on_done=ended
         )
 
     def _report_cancelled_upload(self, kind, tab, exists, name):
