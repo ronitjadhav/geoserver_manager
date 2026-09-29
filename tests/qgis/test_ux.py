@@ -92,6 +92,17 @@ class TestThemeColours(unittest.TestCase):
             ratio = contrast_ratio(hint_colour(palette), background)
             self.assertGreater(ratio, 1.5, f"hint on {name} is {ratio:.1f}:1")
 
+    def test_a_half_alpha_placeholder_is_blended_not_drawn_as_the_text(self):
+        # Qt's default: the text at alpha 128, which #rrggbb drew as the text.
+        for window, text in (("#f0f0f0", "#202020"), ("#232629", "#eff0f1")):
+            palette = palette_for(window, text)
+            placeholder = QColor(text)
+            placeholder.setAlpha(128)
+            palette.setColor(QPalette.ColorRole.PlaceholderText, placeholder)
+            hint = hint_colour(palette)
+            self.assertNotEqual(hint, QColor(text).name())
+            self.assertGreaterEqual(contrast_ratio(hint, window), 3.0, hint)
+
     def test_contrast_ratio_matches_the_wcag_extremes(self):
         self.assertAlmostEqual(contrast_ratio("#000000", "#ffffff"), 21.0, places=1)
         self.assertAlmostEqual(contrast_ratio("#777777", "#777777"), 1.0, places=1)

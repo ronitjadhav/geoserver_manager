@@ -61,7 +61,9 @@ def hint_colour(palette):
     """Colour for secondary text: descriptions, field hints.
 
     `PlaceholderText` is the role Qt itself uses for text that should read as
-    subdued without disappearing, and every QGIS theme sets it.
+    subdued without disappearing, and every QGIS theme sets it. Qt's default
+    is the text colour at half alpha, which a stylesheet's #rrggbb would
+    drop, so the colour comes back already blended over the window colour.
     """
     colour = palette.color(QPalette.ColorRole.PlaceholderText)
     if not colour.isValid() or colour.alpha() == 0:
@@ -70,7 +72,14 @@ def hint_colour(palette):
         colour = palette.color(
             QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText
         )
-    return colour.name()
+    window = palette.color(QPalette.ColorRole.Window)
+    alpha = colour.alphaF()
+    return QColor(
+        *(
+            round(alpha * ink + (1 - alpha) * paper)
+            for ink, paper in zip(colour.getRgb()[:3], window.getRgb()[:3])
+        )
+    ).name()
 
 
 def invalid_field_colour(palette):

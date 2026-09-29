@@ -3957,32 +3957,32 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="886" />
+        <location filename="../../gui/dlg_resource_form.py" line="904" />
         <source>Discard your changes?</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="904" />
+        <location filename="../../gui/dlg_resource_form.py" line="926" />
         <source>Close</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="948" />
+        <location filename="../../gui/dlg_resource_form.py" line="970" />
         <source>'{}' is picked in '{}' but not added: press Add, or clear it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="952" />
+        <location filename="../../gui/dlg_resource_form.py" line="974" />
         <source>'{}' must start with http:// or https://.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="954" />
+        <location filename="../../gui/dlg_resource_form.py" line="976" />
         <source>'{}' has nothing to choose from.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/dlg_resource_form.py" line="956" />
+        <location filename="../../gui/dlg_resource_form.py" line="978" />
         <source>'{}' is required.</source>
         <translation type="unfinished" />
     </message>

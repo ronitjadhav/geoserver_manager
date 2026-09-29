@@ -189,9 +189,14 @@ class ListTable(QWidget):
                 cell = QSpinBox()
                 # One below the minimum is "no value", shown as none_text:
                 # Qt's own special-value mechanism, not a sentinel string.
-                cell.setRange(spec.get("min", 0) - 1, spec.get("max", 99))
+                low, high = spec.get("min", 0), spec.get("max", 99)
+                number = None if value is None else int(value)
+                if number is not None:
+                    # Never narrower than the stored value: clamped, Save rewrote it.
+                    low, high = min(low, number), max(high, number)
+                cell.setRange(low - 1, high)
                 cell.setSpecialValueText(spec.get("none_text", "-"))
-                cell.setValue(cell.minimum() if value is None else int(value))
+                cell.setValue(cell.minimum() if number is None else number)
                 cell.setReadOnly(self._read_only)
                 self.table.setCellWidget(index, column, cell)
             else:
