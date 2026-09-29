@@ -178,7 +178,7 @@ class LayerTreeMenu:
 
         TODO(#50): the facade has no get_layers() and RestEndpoints no path for
         GeoServer's layer list (its layers() / layer() are GeoWebCache's), so
-        this GETs /rest/layers.json like StyleTabMixin._legend_layer does.
+        this GETs /rest/layers.json.
         """
         base = dlg.gs.rest_service.rest_endpoints.base_url
         payload = dlg._raw_rest("get", f"{base}/layers.json").json()

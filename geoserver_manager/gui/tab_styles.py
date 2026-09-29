@@ -23,10 +23,14 @@ from geoserver_manager.toolbelt.payload import unwrap
 from geoserver_manager.toolbelt.sld import (
     SLD_1_0,
     apply_sld_to_layer,
+    has_raster_symbolizer,
     layer_to_sld,
+    relative_hrefs,
     sld_content_type,
     sld_version,
+    style_text,
     styleable_project_layers,
+    utf8_sld,
 )
 
 # Styles live either globally or inside a workspace; the label for the global
@@ -46,9 +50,10 @@ _EDITABLE_FORMATS = tuple(_CONTENT_TYPES)
 _FORMAT_NAMES = {"sld": "SLD", "css": "CSS", "ysld": "YSLD", "mbstyle": "MBStyle"}
 # How the form's code editor highlights each format; YSLD stays plain.
 _CODE_LANGUAGES = {"sld": "xml", "css": "css", "mbstyle": "json"}
-# A file's format, from its extension; .zip stays the library's job.
+# A file's format, from its extension; a .zip is an SLD with its images.
 _FORMAT_OF_SUFFIX = {
     ".sld": "sld",
+    ".zip": "zip",
     ".css": "css",
     ".ysld": "ysld",
     ".yaml": "ysld",
@@ -134,8 +139,9 @@ class StyleTabMixin:
                 self._delete_style,
                 translate(
                     "StyleTabMixin",
-                    "Delete: remove the style and its file; layers that used it "
-                    "fall back to the default style (asks first).",
+                    "Delete: remove the style; its file stays in the data "
+                    "directory only as a .bak backup. Layers that used it fall "
+                    "back to the default style (asks first).",
                 ),
             ),
         ]
@@ -240,7 +246,7 @@ class StyleTabMixin:
         return self._style_body(name, workspace_name, "sld")
 
     def _style_body(self, name, workspace_name, style_format):
-        """The style document itself (SLD, CSS, …), as text.
+        """The style document itself (SLD, CSS, …), as text (`style_text`).
 
         TODO(#50): upstream as get_style_body(name, ws, format) on the facade.
         rest_service.get_style() exists but its endpoint only knows json / sld /
@@ -248,8 +254,7 @@ class StyleTabMixin:
         body. Workaround: GET the style path with the definition's own format.
         """
         path = self._style_path(name, workspace_name, style_format)
-        content = self._raw_rest("get", path).content
-        return content.decode("utf-8", errors="replace")
+        return style_text(self._raw_rest("get", path).content)
 
     def _save_style_body(self, name, workspace_name, style_format, body):
         """PUT a new body for an existing style, leaving its definition alone."""
@@ -284,19 +289,22 @@ class StyleTabMixin:
         SLD 1.1 document (which is what QgsMapLayer.saveSldStyle() writes,
         always) is stored with languageVersion 1.0.0: accepted, rendered, and
         mislabelled. Sending application/vnd.ogc.se+xml records it as 1.1.0.
+        The body goes as UTF-8 (`utf8_sld`): GeoServer reads it so, whatever
+        its declaration says.
         """
         content_type = sld_content_type(sld)
+        data = utf8_sld(sld)
         if content_type == SLD_1_0:
             self._check(
                 self.gs.rest_service.create_style(
-                    name, sld.encode("utf-8"), workspace_name, format="sld"
+                    name, data, workspace_name, format="sld"
                 )
             )
             return
         self._raw_rest(
             "put",
             self._style_path(name, workspace_name, "sld"),
-            data=sld.encode("utf-8"),
+            data=data,
             headers={"Content-Type": content_type},
         )
 
@@ -438,6 +446,12 @@ class StyleTabMixin:
         editable = style_format in _EDITABLE_FORMATS
         language_version = self._language_version(definition)
 
+        def check(values):
+            new_name = values["name"].strip()
+            if new_name != name:
+                self._require_safe_name(new_name)
+                self._refuse_taken_style(new_name, workspace_name)
+
         dlg = ResourceFormDialog(
             title=translate("StyleTabMixin", "Style '{}'").format(name),
             description=(
@@ -459,8 +473,11 @@ class StyleTabMixin:
                 "body": body,
             },
             parent=self,
+            validate=self._form_check(check),
         )
-        self._load_legend(dlg, name, workspace_name)
+        self._load_legend(
+            dlg, name, workspace_name, body if style_format == "sld" else None
+        )
         if not editable:
             dlg.hide_save_button()
         if dlg.exec() != QDialog.DialogCode.Accepted:
@@ -518,29 +535,38 @@ class StyleTabMixin:
 
     # -- Legend ----------------------------------------------------------------
 
-    def _legend_layer(self, workspace_name):
-        """A published layer to draw the legend with, or None when there is none.
+    def _legend_layer(self, workspace_name, raster=False):
+        """A layer of the style's kind to draw the legend with, or None.
 
-        GetLegendGraphic needs a LAYER even for a stored style; the layer only
-        supplies the rendering context, so any published layer does. One from
-        the style's own workspace is preferred. TODO(#50): the facade has no
-        get_layers() and RestEndpoints has no path for GeoServer's layer list
-        (its layers() / layer() are GeoWebCache's), so this GETs
-        /rest/layers.json: the global list, qualified names included.
+        GetLegendGraphic needs a LAYER even for a stored style, and its kind
+        matters (measured on 2.28.5): a raster style drawn with a vector layer
+        is a blank 20x20 image, a vector style drawn with a raster layer an
+        exception. So a coverage for a raster style, else a feature type, from
+        the style's own workspace first, then from the others.
+        TODO(#50): the library lists coverages and feature types per store
+        only, so this GETs a workspace's collection across its stores.
         """
         base = self.gs.rest_service.rest_endpoints.base_url
-        if workspace_name:
-            # The workspace's own collection: names come back bare there.
-            path = f"{base}/workspaces/{quote(workspace_name, safe='')}/layers.json"
+        collection, list_key, item_key = (
+            ("coverages", "coverages", "coverage")
+            if raster
+            else ("featuretypes", "featureTypes", "featureType")
+        )
+
+        def workspaces():
+            if workspace_name:
+                yield workspace_name
+            yield from (
+                ws for ws in self._get_workspace_names() if ws != workspace_name
+            )
+
+        for ws in workspaces():
+            path = f"{base}/workspaces/{quote(ws, safe='')}/{collection}.json"
             payload = self._raw_rest("get", path).json()
-            for entry in self._unwrap(payload, "layers", "layer"):
-                name = self._name_of(entry)
-                return name if ":" in name else f"{workspace_name}:{name}"
-        payload = self._raw_rest("get", f"{base}/layers.json").json()
-        names = [
-            self._name_of(entry) for entry in self._unwrap(payload, "layers", "layer")
-        ]
-        return names[0] if names else None
+            # A layer is named as its resource, bare within the workspace.
+            for entry in self._unwrap(payload, list_key, item_key):
+                return f"{ws}:{self._name_of(entry)}"
+        return None
 
     def _legend_png(self, layer, name, workspace_name):
         """The legend GeoServer renders for the style, as PNG bytes.
@@ -570,24 +596,37 @@ class StyleTabMixin:
             return lines[0][:200]
         return translate("StyleTabMixin", "GeoServer returned no image")
 
-    def _load_legend(self, dlg, name, workspace_name):
+    def _load_legend(self, dlg, name, workspace_name, sld=None):
         """Fetch the legend into the dialog's image field, off the GUI thread.
 
         The dialog is modal and may be closed, even gone, before the picture
         lands, so the landing looks before it paints. Failures land in the
         field too: a banner would sit behind the modal.
+
+        :param sld: the style's SLD when the dialog holds it; else its SLD
+            rendition is read, to tell a raster style from a vector one.
         """
         closed = []
         dlg.finished.connect(lambda _result: closed.append(True))
 
         def work(task):
             try:
-                layer = self._legend_layer(workspace_name)
+                body = self._sld_of(name, workspace_name) if sld is None else sld
+                raster = has_raster_symbolizer(body)
+                layer = self._legend_layer(workspace_name, raster)
                 if layer is None:
-                    return None, translate(
-                        "StyleTabMixin",
-                        "No published layer to draw the legend with. "
-                        "GetLegendGraphic needs one.",
+                    return None, (
+                        translate(
+                            "StyleTabMixin",
+                            "No raster layer to draw this raster style's legend "
+                            "with. GetLegendGraphic needs one.",
+                        )
+                        if raster
+                        else translate(
+                            "StyleTabMixin",
+                            "No vector layer to draw the legend with. "
+                            "GetLegendGraphic needs one.",
+                        )
                     )
                 return self._legend_png(layer, name, workspace_name), None
             except Exception as e:
@@ -760,6 +799,16 @@ class StyleTabMixin:
         runs it before it closes, the upload again."""
         name = values["name"].strip()
         self._require_safe_name(name)
+        if values.get("source") == _SOURCE_FILE:
+            path = Path(values["file"])
+            if path.suffix.lower() not in _FORMAT_OF_SUFFIX:
+                raise ValueError(
+                    translate(
+                        "StyleTabMixin",
+                        "'{}' is not a style file GeoServer reads: pick a .sld, "
+                        ".zip, .css, .ysld or .mbstyle file.",
+                    ).format(path.name)
+                )
         # create_style_* upsert (and rewrite the definition's filename)
         self._refuse_taken_style(name, scope(values["workspace"]))
 
@@ -770,16 +819,13 @@ class StyleTabMixin:
         source = values.get("source")
         if source == _SOURCE_FILE:
             path = Path(values["file"])
-            style_format = _FORMAT_OF_SUFFIX.get(path.suffix.lower())
-            if style_format is None:
-                # A .zip carries an SLD plus its resources: the library's job.
-                self._check(
-                    self.gs.create_style_from_file(name, str(path), workspace_name)
-                )
-                return
-            # Bytes, as the file is: an ISO-8859-1 SLD failed to decode, and one
-            # that did was re-encoded under its own encoding declaration.
-            self._create_style(name, workspace_name, style_format, path.read_bytes())
+            # Bytes: an SLD is decoded as it declares, then sent as UTF-8.
+            self._create_style(
+                name,
+                workspace_name,
+                _FORMAT_OF_SUFFIX[path.suffix.lower()],
+                path.read_bytes(),
+            )
         else:
             # A QGIS layer arrives here as a pasted SLD: _add_style exports it
             # on the GUI thread first (invariant 9).
@@ -795,13 +841,19 @@ class StyleTabMixin:
         request, measured on 2.28.5: an SLD 1.1 body is recorded as 1.1, and
         a body GeoServer refuses leaves nothing. Creating the definition
         first left an empty style behind, and the retry "already exists".
+        The same POST takes a .zip (an SLD and its images, stored beside it)
+        as application/zip; the library's create_style_from_file() sends it
+        in two requests. An SLD goes as UTF-8, which is how GeoServer reads
+        it whatever its declaration says (`utf8_sld`).
         """
-        data = body if isinstance(body, bytes) else body.encode("utf-8")
-        content_type = (
-            sld_content_type(data.decode("utf-8", errors="replace"))
-            if style_format == "sld"
-            else _CONTENT_TYPES[style_format]
-        )
+        if style_format == "sld":
+            data = utf8_sld(body)
+            content_type = sld_content_type(data.decode("utf-8"))
+        elif style_format == "zip":
+            data, content_type = body, "application/zip"
+        else:
+            data = body if isinstance(body, bytes) else body.encode("utf-8")
+            content_type = _CONTENT_TYPES[style_format]
         collection = self._style_path(name, workspace_name, "json")
         collection = collection.rsplit("/", 1)[0] + ".json"
         self._raw_rest(
@@ -929,12 +981,24 @@ class StyleTabMixin:
     def _copy_style(self, row_data):
         """Copy a style under a new name, in its own or another workspace."""
         name, workspace_name = row_data[0], scope(row_data[1])
-        workspace_names = self._fetch(
-            self._get_workspace_names,
-            translate("StyleTabMixin", "Failed to load the workspaces"),
+        fetched = self._fetch(
+            lambda: (
+                self._get_workspace_names(),
+                self._style_as_stored(name, workspace_name),
+            ),
+            translate("StyleTabMixin", "Failed to load style '{}'").format(name),
         )
-        if workspace_names is None:
+        if fetched is None:
             return
+        workspace_names, stored = fetched
+        _definition, style_format, body = stored
+        # GeoServer finds an icon or a fill image in the style's own folder.
+        files = relative_hrefs(style_text(body)) if style_format == "sld" else []
+
+        def check(values):
+            self._require_safe_name(values["name"])
+            self._refuse_taken_style(values["name"], scope(values["workspace"]))
+
         dlg = ResourceFormDialog(
             title=translate("StyleTabMixin", "Copy Style '{}'").format(name),
             description=translate(
@@ -956,9 +1020,30 @@ class StyleTabMixin:
                     "options": [(global_label(), GLOBAL)] + list(workspace_names),
                     "default": row_data[1],
                 },
+                {
+                    "key": "files",
+                    "label": translate("StyleTabMixin", "Files it uses"),
+                    "type": "text",
+                    "read_only": True,
+                    "default": ", ".join(files),
+                    "visible": False,
+                    "help": translate(
+                        "StyleTabMixin",
+                        "They sit beside the style on the server and are not "
+                        "copied: in another workspace, the copy draws without "
+                        "them.",
+                    ),
+                },
             ],
             parent=self,
             ok_label=translate("StyleTabMixin", "Copy"),
+            validate=self._form_check(check),
+        )
+        dlg.on_value_changed(
+            "workspace",
+            lambda value: dlg.set_field_visible(
+                "files", bool(files) and scope(value) != workspace_name
+            ),
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -966,7 +1051,9 @@ class StyleTabMixin:
         target, target_ws = values["name"].strip(), scope(values["workspace"])
         if self._run_action(
             lambda: self._wait_for_save(
-                lambda: self._copy_style_to(name, workspace_name, target, target_ws)
+                lambda: self._copy_style_to(
+                    name, workspace_name, target, target_ws, stored
+                )
             ),
             translate("StyleTabMixin", "Failed to copy style '{}'").format(name),
         ):
@@ -977,11 +1064,16 @@ class StyleTabMixin:
             )
             self._load_styles()
 
-    def _copy_style_to(self, name, workspace_name, target, target_ws):
-        """Create `target` from the body of `name`, in the same format."""
+    def _copy_style_to(self, name, workspace_name, target, target_ws, stored=None):
+        """Create `target` from the body of `name`, in the same format.
+
+        :param stored: what `_style_as_stored` answered, when the form read it.
+        """
         self._require_safe_name(target)
         self._refuse_taken_style(target, target_ws)
-        _definition, style_format, body = self._style_as_stored(name, workspace_name)
+        _definition, style_format, body = stored or self._style_as_stored(
+            name, workspace_name
+        )
         if style_format not in _CONTENT_TYPES:
             raise ValueError(
                 translate("StyleTabMixin", "A {} style cannot be copied here.").format(
@@ -1134,13 +1226,15 @@ class StyleTabMixin:
             ),
             cascade=translate(
                 "StyleTabMixin",
-                "The style file is removed from the server too, and layers that used "
-                "it fall back to GeoServer's default style.",
+                "The style goes away, and its file stays in the data directory "
+                "only as a .bak backup. Layers that used it fall back to "
+                "GeoServer's default style.",
             ),
         )
 
     def _do_delete_style(self, name, workspace_name):
-        """DELETE a style, its file (purge) and its references (recurse).
+        """DELETE a style and its references (recurse); purge renames its file
+        to a .bak (measured on 2.28.5), it does not remove it.
 
         TODO(#50): upstream as delete_style(name, ws, purge=True, recurse=True):
         the library has no delete for styles. Workaround: DELETE the style path

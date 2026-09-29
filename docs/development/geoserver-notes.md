@@ -50,13 +50,14 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
 - **Legend and browser preview** (rows 39–40 of #50): `get_legend_graphic()` is a plain GET through the REST client
   (stateless, so worker-safe), but it returns the raw `Response`: an OGC exception is **HTTP 200 with an
   XML body**, so the content type decides, and it runs with the client's 120 s timeout. GetLegendGraphic
-  needs a `LAYER` even for a stored style; the layer only supplies the rendering context, so
-  `tab_styles.py` takes the first layer of the style's own workspace collection,
-  `/rest/workspaces/{ws}/layers.json` (names come back **bare** there, so it re-qualifies them), and
-  the global `/rest/layers.json` for a global style (the facade has no `get_layers()` and `RestEndpoints`
-  no path for either; its `layers()` / `layer()` are GeoWebCache's), and explains in the `image` field
-  when there is none. The legend lands through `_run_quietly` (its own task slot, so it neither
-  supersedes a load nor turns Refresh into Cancel) into a modal dialog that may already be closed; the
+  needs a `LAYER` even for a stored style, and **of the style's kind** (measured on 2.28.5): a
+  raster style drawn with a vector layer is a blank 20x20 image, a vector style drawn with a raster
+  layer a ServiceException "we need a RasterSymbolizer". So `tab_styles.py` takes, for an SLD with a
+  `RasterSymbolizer`, the first coverage of `/rest/workspaces/{ws}/coverages.json`, else the first
+  feature type of `…/featuretypes.json` (a workspace's resources across its stores, names **bare**,
+  which it qualifies; the library lists them per store only), the style's own workspace first, and
+  explains in the `image` field when there is none. The legend lands through `_run_quietly` (its own
+  task slot, so it neither supersedes a load nor turns Refresh into Cancel) into a modal dialog that may already be closed; the
   landing checks `finished` and `sip.isdeleted` first. The Styles table's Format and Version columns
   cost one definition GET per style, fanned out: whether a style is SLD decides what *Apply to a QGIS
   layer* can do with it. *Preview in a
@@ -128,7 +129,8 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   capabilities and the features arrive native (`sf:archsites`, EPSG:26713, easting first; measured
   on 2.28.5 / QGIS 3.40); with `srsname=EPSG:4326` GeoServer reprojected every feature and QGIS
   reprojected them again to the canvas. The embedded preview's WMS layer likewise reads its extent
-  from the capabilities, in the URI's EPSG:4326, so no resource GET is needed for its bounds.
+  from the capabilities, in the URI's EPSG:4326, so no resource GET is needed for its bounds, nor a
+  group GET for a layer group's (spearfish, stored in EPSG:26713, comes back as its lon/lat box).
 - **Add to QGIS as WMTS**: the URI names the tile matrix set (`EPSG:900913`) and *no* `crs=`. With
   `crs=EPSG:4326` beside it QGIS accepted the layer, reported it as 4326 and reprojected every tile on the
   fly (measured against the sandbox); without it the layer takes the tile matrix's own CRS.
@@ -247,7 +249,19 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   carries the parser's reason in its "Message" line, which `summarise_body` keeps; a well-formed but
   meaningless SLD is accepted, even with `validate=true`. A `PUT` of `name` renames a style, and the layers and
   groups using it follow (they link by id; a layer names a workspace style `ws:name`). There is no endpoint
-  listing a style's users, so *Used by* reads every layer and group.
+  listing a style's users, so *Used by* reads every layer and group. **An SLD body is read as UTF-8**
+  whatever its XML declaration names: an ISO-8859-1 SLD 1.0 `POST`ed or `PUT` without a `charset` is
+  stored with replacement characters (GeoServer re-serialises it as UTF-8), and an SLD 1.1 one is
+  stored byte for byte but read, rendered and served as `.sld` with them. With `; charset=ISO-8859-1`,
+  or sent as UTF-8, the accents are kept; `toolbelt/sld.utf8_sld()` sends every SLD as UTF-8 under a
+  declaration rewritten to say so. A **`.zip`** (an SLD and its images) is created by the same
+  `POST ?name=` with `application/zip`: the images land beside the style, the SLD inside is renamed
+  after `name`, and a zip without an SLD is a 403 "No sld file provided" that leaves nothing (the
+  library's `create_style_from_file()` creates the definition first). A relative `OnlineResource` href
+  is resolved against the style's own folder: a workspace's zip style drew its icon in the legend, and
+  its SLD posted as a global style drew none, which is why *Copy* names those files. A
+  `DELETE ?purge=true` does not remove the style's file: it renames it `<file>.bak` (then `.bak.1`,
+  and so on) in the data directory.
 - **Workspace WMS settings** (rows 25–26 of #50): `WmsSettings` models none of the service metadata
   (`title`, `abstrct`, `keywords`, `srs`, …) and there is no delete, so `tab_workspaces.py` GETs, PUTs and
   DELETEs the settings path itself. GeoServer facts behind that code: the abstract's JSON key is **`abstrct`**;
@@ -316,11 +330,19 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   needs a `styles` list of the same length (`""` for a layer's default), or it is refused; a group holding a
   nested group needs `styles` even on a create (HTTP 500 without). GeoServer **never recomputes the bounds on a
   PUT**: a new layer list keeps the old box, and `"bounds": null` stores a zero one, so the plugin sends the
-  union of the members' lon/lat boxes (`_group_bounds`). A name GeoServer does not know is **dropped with a
+  union of the members' lon/lat boxes (`_group_bounds`), and of an Earth Observation group's root layer,
+  which GeoServer's own box for a new EO group holds too, whenever the layers or that root change. A name GeoServer does not know is **dropped with a
   200**, so every line is checked first. A rename is forbidden (403). An EO group needs `rootLayer` and
   `rootLayerStyle`, and cannot leave EO mode: JSON null, `""`, `{}` and an empty XML element are all refused.
-  A workspace group can hold that workspace's layers and groups, and the global groups (a group in `sf`
-  holding a global group is created, 201, and stored as it is); a layer of another workspace is a bare 500. A group may share a layer's qualified name.
+  A workspace group holds that workspace's layers, groups and styles, and a global group only when
+  everything in it is in that workspace too: GeoServer follows its nested groups, their styles and an EO
+  root layer. A global group of the workspace's own layers is created, 201, and stored bare; one holding
+  `topp:states`, even two levels down, or an EO root of `topp`, is a 500 "Layer group within a workspace
+  (ws) can not contain resources from other workspace: topp", and a style of another workspace one that
+  "can not contain styles from other workspace". A layer of another workspace in the group itself, or
+  as its EO root, gets the same 500. The form refuses those layers, and such a global group
+  (`_foreign_member`, one GET per global group reached). In a workspace group a bare `layerGroup` name is the global group, even when the workspace has a
+  group of that name (`ws:name`). A group may share a layer's qualified name.
 - The bundled wheel is the upstream 0.8.5 with `geoserver_acceptance_tests/` removed (15 MB of fixtures):
   16 MB → 49 KB. On a version bump, strip the new wheel the same way. The procedure is in
   `toolbelt/dependencies.py`; see [packaging and release](packaging.md). `GSC_REQUIRED` pins the version;

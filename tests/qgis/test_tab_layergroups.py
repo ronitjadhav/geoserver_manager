@@ -12,7 +12,7 @@ Usage from the repo root folder:
 import json
 from unittest.mock import patch
 
-from qgis.core import QgsCoordinateTransformContext
+from qgis.core import QgsCoordinateTransformContext, QgsRectangle
 from qgis.PyQt.QtWidgets import QDialog
 from qgis.testing import start_app, unittest
 
@@ -503,12 +503,128 @@ class TestCreateLayerGroup(unittest.TestCase):
         self.assertIn("no_such_style", str(caught.exception))
         self.assertEqual(self.posted(), [])
 
-    def test_parsing_keeps_the_order_and_qualifies_bare_names(self):
-        layers, styles = self.dlg._parse_group_layers(
-            rows(" b:two = s2 \n\none\n"), "topp"
-        )
-        self.assertEqual(layers, ["b:two", "topp:one"])
+    def test_parsing_keeps_the_order_and_the_names_as_typed(self):
+        layers, styles = self.dlg._parse_group_layers(rows(" b:two = s2 \n\none\n"))
+        self.assertEqual(layers, ["b:two", "one"])
         self.assertEqual(styles, ["s2", ""])
+
+    def test_a_bare_pick_is_the_global_group_beside_a_workspace_namesake(self):
+        """GeoServer reads a bare name in a workspace group as the global group
+        (measured on 2.28.5). The row was qualified first, so the pick went
+        out as the workspace's own layer or group of that name."""
+        self.dlg._create_layer_group_from_values(
+            {
+                "name": "ws_group",
+                "workspace": "topp",
+                "mode": "SINGLE",
+                "layers": rows("tasmania\ntopp:roads_group"),
+            },
+            ["topp:tasmania", "topp:tasmania_roads"],
+            ["tasmania", "topp:tasmania", "topp:roads_group"],
+        )
+        group = self.posted()[0][2]["json"]["layerGroup"]
+        self.assertEqual(
+            group["publishables"]["published"],
+            [
+                {"@type": "layerGroup", "name": "tasmania"},
+                {"@type": "layerGroup", "name": "topp:roads_group"},
+            ],
+        )
+
+    def test_a_global_group_holding_another_workspaces_layer_is_refused(self):
+        """GeoServer follows the nested groups and answers 500 "can not contain
+        resources from other workspace" (measured on 2.28.5), after the form
+        closed."""
+        details = {
+            "outer": {
+                "publishables": {"published": {"@type": "layerGroup", "name": "inner"}}
+            },
+            "inner": {
+                "publishables": {"published": {"@type": "layer", "name": "nurc:mosaic"}}
+            },
+        }
+        self.dlg._group_detail = lambda name, ws: details[name]
+        with self.assertRaises(ValueError) as caught:
+            self.dlg._create_layer_group_from_values(
+                {
+                    "name": "ws_group",
+                    "workspace": "topp",
+                    "mode": "SINGLE",
+                    "layers": rows("topp:tasmania_roads\nouter"),
+                },
+                ["topp:tasmania_roads"],
+                ["outer", "inner"],
+            )
+        self.assertIn("'outer' holds 'nurc:mosaic'", str(caught.exception))
+        self.assertEqual(self.posted(), [])
+
+    def test_a_global_group_with_another_workspaces_style_or_root_is_refused(self):
+        for detail, named in (
+            (
+                {
+                    "publishables": {"published": {"@type": "layer", "name": "topp:a"}},
+                    "styles": {"style": {"name": "ne:disputed"}},
+                },
+                "ne:disputed",
+            ),
+            (
+                {
+                    "mode": "EO",
+                    "publishables": {"published": {"@type": "layer", "name": "topp:a"}},
+                    "rootLayer": {"name": "nurc:mosaic"},
+                    "rootLayerStyle": {"name": "raster"},
+                },
+                "nurc:mosaic",
+            ),
+        ):
+            self.dlg._group_detail = lambda name, ws, detail=detail: detail
+            with self.assertRaises(ValueError) as caught:
+                self.dlg._group_publishables(rows("g"), "topp", ["topp:a"], ["g"])
+            self.assertIn(named, str(caught.exception))
+
+    def test_a_global_group_of_the_workspaces_own_content_is_accepted(self):
+        # tasmania holds topp layers only, one of them with a global style.
+        published, _styles = self.dlg._group_publishables(
+            rows("solo"), "topp", [], ["solo", "tasmania"]
+        )
+        self.assertEqual(published, [{"@type": "layerGroup", "name": "solo"}])
+
+    def test_the_create_form_refuses_a_mixed_global_group_before_it_closes(self):
+        seen = {}
+
+        class Adding(ResourceFormDialog):
+            def exec(inner):
+                inner.set_values(
+                    {"name": "g", "workspace": "topp", "layers": rows("eo_group")}
+                )
+                inner._on_accept()
+                seen["open"] = not inner.result()
+                seen["said"] = inner._validation_label.text()
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_layergroups, "ResourceFormDialog", Adding):
+            self.dlg._add_layer_group()
+        self.assertTrue(seen["open"])
+        self.assertIn("nurc:mosaic", seen["said"])
+
+    def test_a_workspace_group_refuses_a_root_layer_of_another_workspace(self):
+        # GeoServer answers a 500 for it (measured on 2.28.5), after the
+        # form closed; the rows had the check, the root did not.
+        with self.assertRaises(ValueError) as caught:
+            self.dlg._create_layer_group_from_values(
+                {
+                    "name": "eo",
+                    "workspace": "topp",
+                    "mode": "EO",
+                    "layers": rows("topp:tasmania_roads"),
+                    "root_layer": "nurc:mosaic",
+                    "root_style": "simple_roads",
+                },
+                ["topp:tasmania_roads", "nurc:mosaic"],
+                [],
+            )
+        self.assertIn("another workspace", str(caught.exception))
+        self.assertEqual(self.posted(), [])
 
     def test_refuses_an_existing_name(self):
         self.dlg.gs = FakeGS(exists=True)
@@ -564,7 +680,7 @@ class TestEditLayerGroup(unittest.TestCase):
     """Measured on 2.28.5: a partial PUT merges, a new layer list needs one
     style per entry, and the bounds are never recomputed on a PUT."""
 
-    LAYERS = ["topp:tasmania_roads", "nurc:mosaic"]
+    LAYERS = ["topp:tasmania_state_boundaries", "topp:tasmania_roads", "nurc:mosaic"]
     GROUPS = ["solo", "tasmania", "topp:roads_group"]
 
     def setUp(self):
@@ -607,6 +723,101 @@ class TestEditLayerGroup(unittest.TestCase):
         saved, puts, _bounds = self.save(layers=self.before["layers"] + [["", ""]])
         self.assertFalse(saved)
         self.assertEqual(puts, [])
+
+    def test_an_untouched_form_with_crlf_text_sends_nothing(self):
+        """The form hands the abstract back stripped and with LF line ends,
+        which read as an edit: a PUT, and "saved"."""
+        group = dict(TASMANIA, title=" Tasmania ", abstractTxt="One.\r\nTwo.\r\n")
+        real = self.dlg.gs.payload_for
+        self.dlg.gs.payload_for = lambda path: (
+            {"layerGroup": group} if path.endswith("/tasmania.json") else real(path)
+        )
+        banners = []
+        self.dlg.show_success_message = banners.append
+
+        class Saving(ResourceFormDialog):
+            def exec(self):
+                return QDialog.DialogCode.Accepted
+
+        with patch.object(tab_layergroups, "ResourceFormDialog", Saving):
+            self.dlg._show_layer_group_info(["tasmania", GLOBAL])
+        self.assertEqual([call for call in self.dlg.gs.calls if call[0] == "PUT"], [])
+        self.assertEqual(banners, [])
+
+    def test_a_workspace_edit_picks_the_global_namesake_not_itself(self):
+        """In an edit of topp:roads_group, the global roads_group went out as
+        topp:roads_group: the group nested in itself."""
+        before = LayerGroupTabMixin._group_form_values(
+            ROADS_GROUP, "roads_group", "topp"
+        )
+        self.dlg._group_detail = lambda name, ws: {
+            "publishables": {"published": {"@type": "layer", "name": "topp:x"}}
+        }
+        with patch.object(
+            LayerGroupTabMixin, "_group_bounds", return_value={"crs": "EPSG:4326"}
+        ):
+            self.dlg._save_layer_group(
+                "roads_group",
+                "topp",
+                before,
+                dict(before, layers=rows("topp:tasmania_roads\nroads_group")),
+                ["topp:tasmania_roads"],
+                ["roads_group", "topp:roads_group"],
+                self.CONTEXT,
+            )
+        puts = [call for call in self.dlg.gs.calls if call[0] == "PUT"]
+        self.assertEqual(
+            puts[0][2]["json"]["layerGroup"]["publishables"]["published"][1],
+            {"@type": "layerGroup", "name": "roads_group"},
+        )
+
+    def test_an_earth_observation_groups_bounds_hold_its_root_layer(self):
+        # GeoServer's own box for a new EO group holds the root layer; the
+        # recomputed one cut it off after any edit of the layer list.
+        before = LayerGroupTabMixin._group_form_values(EO_GROUP, "eo_group", GLOBAL)
+        with patch.object(
+            LayerGroupTabMixin, "_group_bounds", return_value={"crs": "EPSG:4326"}
+        ) as bounds:
+            self.dlg._save_layer_group(
+                "eo_group",
+                None,
+                before,
+                dict(before, layers=rows("nurc:mosaic\ntopp:tasmania_roads")),
+                self.LAYERS,
+                self.GROUPS,
+                self.CONTEXT,
+            )
+        self.assertIn(
+            {"@type": "layer", "name": "topp:tasmania_roads"},
+            bounds.call_args.args[0][2:],
+        )
+
+    def test_a_new_root_layer_alone_recomputes_the_bounds(self):
+        # GeoServer keeps the stored box on a PUT, which then left the new
+        # root out when only the root changed.
+        before = LayerGroupTabMixin._group_form_values(EO_GROUP, "eo_group", GLOBAL)
+        with patch.object(
+            LayerGroupTabMixin, "_group_bounds", return_value={"crs": "EPSG:4326"}
+        ) as bounds:
+            self.dlg._save_layer_group(
+                "eo_group",
+                None,
+                before,
+                dict(before, root_layer="nurc:mosaic"),
+                self.LAYERS,
+                self.GROUPS,
+                self.CONTEXT,
+            )
+        puts = [call for call in self.dlg.gs.calls if call[0] == "PUT"]
+        group = puts[0][2]["json"]["layerGroup"]
+        self.assertEqual(sorted(group), ["bounds", "rootLayer", "rootLayerStyle"])
+        self.assertEqual(
+            bounds.call_args.args[0],
+            [
+                {"@type": "layer", "name": "nurc:mosaic"},
+                {"@type": "layer", "name": "nurc:mosaic"},
+            ],
+        )
 
     def test_new_layers_carry_a_style_each_and_fresh_bounds(self):
         _saved, puts, bounds = self.save(layers=rows("nurc:mosaic\nsolo"))
@@ -891,19 +1102,23 @@ class TestPreviewInBrowser(unittest.TestCase):
         # Every action says what it does, as on the Layers tab.
         self.assertTrue(all(len(action) > 3 for action in self.dlg._row_actions))
 
-    def test_the_in_qgis_preview_opens_on_the_reprojected_bounds(self):
-        # spearfish's bounds are in EPSG:26713; the preview map is lon/lat.
+    def test_the_in_qgis_preview_opens_on_the_wms_layers_own_extent(self):
+        """The WMS layer reads the group's lon/lat extent from the capabilities
+        (measured on 2.28.5, spearfish stored in EPSG:26713 included): the
+        group GET and its reprojection were a second read of the same."""
         opened = []
-        detail = {
-            "bounds": {
-                "minx": 589425.9,
-                "maxx": 609518.7,
-                "miny": 4913959.2,
-                "maxy": 4928082.9,
-                "crs": {"@class": "projected", "$": "EPSG:26713"},
-            }
-        }
-        self.dlg._group_detail = lambda name, ws: detail
+
+        class Layer:
+            def isValid(self):
+                return True
+
+            def extent(self):
+                return QgsRectangle(-103.88, 44.37, -103.62, 44.50)
+
+        def no_read(name, ws):
+            raise AssertionError("the group was read again")
+
+        self.dlg._group_detail = no_read
         with (
             patch.object(
                 tab_layergroups,
@@ -911,13 +1126,12 @@ class TestPreviewInBrowser(unittest.TestCase):
                 lambda name, layer, bbox, parent: opened.append((name, bbox))
                 or type("D", (), {"show": lambda inner: None})(),
             ),
-            patch.object(tab_layers, "QgsRasterLayer", lambda *args: object()),
+            patch.object(tab_layers, "QgsRasterLayer", lambda *args: Layer()),
         ):
             self.dlg._preview_group(["spearfish", GLOBAL])
         ((name, bbox),) = opened
         self.assertEqual(name, "spearfish")
-        self.assertAlmostEqual(bbox[0], -103.87, places=1)
-        self.assertAlmostEqual(bbox[3], 44.5, places=1)
+        self.assertEqual(bbox, (-103.88, 44.37, -103.62, 44.50))
 
 
 # ############################################################################

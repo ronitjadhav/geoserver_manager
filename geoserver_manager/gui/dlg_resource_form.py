@@ -918,7 +918,8 @@ class ResourceFormDialog(QDialog):
         values = self.get_values()
         for field in self._fields:
             key = field["key"]
-            if key in self._hidden_keys:  # not applicable to the current form
+            # Not applicable to the current form, or an image: no value.
+            if key in self._hidden_keys or key not in values:
                 continue
             value = values[key]
             # A URL field keeps the dialog open on a bad value: checked after

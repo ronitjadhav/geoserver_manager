@@ -2,8 +2,8 @@
 
 """
 SLD helpers shared by the Styles and Layers tabs: what version a document is,
-which content type GeoServer wants for it, and how to move a style between a
-QGIS layer and an SLD string.
+which content type and encoding GeoServer wants for it, and how to move a
+style between a QGIS layer and an SLD string.
 
 Nothing here imports `qgis` at module level, so `sld_version` and
 `sld_content_type` (the part with the rules worth pinning) are testable in an
@@ -27,6 +27,16 @@ _VERSION = re.compile(
 )
 # QGIS writes Symbology Encoding elements (se:PolygonSymbolizer, …) for SLD 1.1.
 _SE_NAMESPACE = re.compile(r"xmlns:se\s*=|<\s*se:", re.IGNORECASE)
+# An XML declaration up to its encoding's name, which a rewrite replaces.
+_DECLARATION = re.compile(
+    r"^(\ufeff?\s*<\?xml\b[^>]*?\bencoding\s*=\s*[\"'])([\w.:-]+)"
+)
+_RASTER = re.compile(r"<\s*(?:\w+:)?RasterSymbolizer\b")
+_HREF = re.compile(
+    r"<\s*(?:\w+:)?OnlineResource\b[^>]*?\b(?:\w+:)?href\s*=\s*[\"']([^\"']+)[\"']"
+)
+# A path from the root, or a URI of any scheme but "file:" without a slash.
+_ABSOLUTE = re.compile(r"^(?:[/\\]|file:/|(?!file:)[A-Za-z][\w+.-]*:)", re.IGNORECASE)
 
 
 def sld_version(sld):
@@ -45,6 +55,53 @@ def sld_version(sld):
 def sld_content_type(sld):
     """The content type GeoServer needs in order to parse this document."""
     return SLD_1_1 if sld_version(sld) == "1.1.0" else SLD_1_0
+
+
+def style_text(data):
+    """A style body as text: UTF-8, else the encoding its XML declaration names.
+
+    GeoServer reads a style as UTF-8, whatever its declaration says. A file
+    put in the data directory by hand is served byte for byte, and a Latin-1
+    one is no valid UTF-8: it is decoded as it declares.
+    """
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        pass
+    match = _DECLARATION.match(data[:200].decode("latin-1"))
+    try:
+        return data.decode(match.group(2) if match else "utf-8", errors="replace")
+    except LookupError:  # an encoding Python does not know, or not a text one
+        return data.decode("utf-8", errors="replace")
+
+
+def utf8_sld(sld):
+    """An SLD, text or bytes, as UTF-8 bytes under a declaration that says so.
+
+    GeoServer reads an SLD body as UTF-8 whatever its declaration names
+    (measured on 2.28.5): an ISO-8859-1 SLD 1.0 was stored with replacement
+    characters, and an SLD 1.1 one, stored as sent, was read with them.
+    """
+    text = style_text(sld) if isinstance(sld, bytes) else sld
+    match = _DECLARATION.match(text)
+    if match and match.group(2).upper() not in ("UTF-8", "UTF8"):
+        text = match.group(1) + "UTF-8" + text[match.end() :]
+    return text.encode("utf-8")
+
+
+def has_raster_symbolizer(sld):
+    """Whether an SLD draws a raster: GetLegendGraphic then needs a raster layer."""
+    return _RASTER.search(sld or "") is not None
+
+
+def relative_hrefs(sld):
+    """The files an SLD points to beside itself, once each, in order.
+
+    GeoServer resolves a relative OnlineResource href (an ExternalGraphic's
+    icon, a fill image) against the style's own folder on the server.
+    """
+    found = [href for href in _HREF.findall(sld or "") if not _ABSOLUTE.match(href)]
+    return list(dict.fromkeys(found))
 
 
 def styleable_project_layers():
@@ -102,7 +159,8 @@ def apply_sld_to_layer(layer, sld):
     """
     path = Path(tempfile.mkdtemp(prefix="gsm_sld_")) / "style.sld"
     try:
-        path.write_text(sld, encoding="utf-8")
+        # QGIS reads the file in the encoding its declaration names.
+        path.write_bytes(utf8_sld(sld))
         result = layer.loadSldStyle(str(path))
     finally:
         if path.exists():
