@@ -4,8 +4,8 @@
 
 Manage a GeoServer through its REST API without leaving QGIS: workspaces,
 datastores, coverage stores, cascaded WMS and WMTS stores, layers, layer
-groups, styles and the tile cache. Publish a table or a layer of the open
-project, and bring what the server has back in as WMS, WFS or WMTS.
+groups, styles, the tile cache and the server-wide settings. Publish a table
+or a layer of the open project, and bring what the server has back in as WMS, WFS or WMTS.
 
 ```{image} static/screenshot-layers.png
 :alt: The Layers tab, listing a server's layers with their workspace, type, store and default style
@@ -48,14 +48,15 @@ Set up an environment, run the tests, and find the work that is waiting.
 
 | Tab | In one line |
 | :-- | :---------- |
-| Workspaces | create, rename, isolate, set the default, edit the WMS service settings |
+| Workspaces | create, rename, isolate, set the default and the namespace URI, edit the WMS, WFS, WCS and WMTS settings |
 | Datastores | PostGIS, shapefiles, GeoPackage, PMTiles and cascaded WFS, created and edited across every workspace |
 | Coverage stores | GeoTIFF, COG and ImageMosaic, or a raster of the open project uploaded and published in one request |
 | Cascaded stores | the WMS and WMTS stores that proxy another server, with the layers they advertise |
 | Layers | every layer whatever its type, published, restyled, previewed and added back to QGIS |
 | Layer groups | global and per workspace, built from ordered layers with their styles |
 | Styles | pasted, uploaded or made from a QGIS layer's symbology, edited beside the legend GeoServer renders |
-| Tile cache | what GeoWebCache holds, its gridsets and formats, truncated or reconfigured |
+| Tile cache | what GeoWebCache holds, its gridsets and formats, seeded, truncated or reconfigured |
+| Server | contact details, global settings, each service's settings, logging and the log, catalog reload and reset |
 
 Every list loads in the background, and is searchable, sortable and paginated.
 Credentials live in the QGIS authentication database, never in a project file.

@@ -217,7 +217,8 @@ Publishing a table. The *Table* list only offers tables not published yet.
 
 The upload runs as a QGIS task. The task bar shows its progress, and the
 *Refresh* button turns into *Cancel*. The layer name is made safe for
-GeoServer first: spaces and accents become `_`. A vector whose CRS has no EPSG
+GeoServer first: spaces and symbols become `_`, and accents are dropped
+(*Rivière* becomes *Riviere*). A vector whose CRS has no EPSG
 code is reprojected to EPSG:4326 on the way. A raster in such a CRS is refused
 instead, because rasters are uploaded as they are: reproject it in QGIS first.
 

@@ -297,4 +297,5 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   `tests/qgis/test_library_contract.py` asserts the pin equals the shipped wheel.
 - Extracted library source, when you need to read it: unzip the wheel into a scratch dir; the plugin
   only uses `geoservercloud/geoservercloud.py`, `services/restclient.py`, `services/restservice.py`,
-  `models/datastore.py`, `models/workspace.py`.
+  `models/datastore.py`, `models/workspace.py`, `models/featuretype.py` (a table publish) and
+  `models/layer.py` (a layer's styles).
