@@ -315,6 +315,21 @@ class TestListing(unittest.TestCase):
             ("Yes", "EPSG:4326", "-"),
         )
 
+    def test_an_unexpected_answer_is_translated_and_summarised(self):
+        # A sign-in page answering 200 reached the log as 200 characters of
+        # markup, in English whatever the locale.
+        page = "<html><head><title>Sign in</title></head><body>" + "x" * 500
+        self.gs.get_gwc_layer = lambda workspace, layer: (page, 200)
+        marked = lambda context, text, *rest: f"[{context}] {text}"  # noqa: E731
+        with (
+            patch.object(tab_gwc, "translate", marked),
+            self.assertRaises(RuntimeError) as caught,
+        ):
+            self.dlg._gwc_layer_detail("topp:states")
+        self.assertEqual(
+            str(caught.exception), "[GwcTabMixin] Unexpected response: Sign in"
+        )
+
     def test_gridsets_and_uncached_layers_come_from_the_server(self):
         self.assertEqual(self.dlg._gridset_names(), sorted(GRIDSETS))
         self.assertEqual(
@@ -348,8 +363,8 @@ class TestDocument(unittest.TestCase):
         )
 
     def test_a_bad_edit_stays_in_the_form(self):
-        # A zoom range with one end, refused after the form closed, lost
-        # every other change of the edit with it.
+        # A backwards zoom range, refused after the form closed, lost every
+        # other change of the edit with it.
         dlg = SyncDialog()
         dlg.gs = FakeGS()
         seen = {}
@@ -357,7 +372,7 @@ class TestDocument(unittest.TestCase):
         class Editing(ResourceFormDialog):
             def exec(inner):
                 table = inner.get_widget("gridsets")
-                table.set_rows([["EPSG:4326", 3, None]])
+                table.set_rows([["EPSG:4326", 9, 3]])
                 inner._on_accept()
                 seen["open"] = not inner.result()
                 seen["said"] = inner._validation_label.text()
@@ -378,7 +393,7 @@ class TestDocument(unittest.TestCase):
         class Adding(ResourceFormDialog):
             def exec(inner):
                 table = inner.get_widget("gridsets")
-                table.set_rows([["EPSG:4326", 3, None]])
+                table.set_rows([["EPSG:4326", 9, 3]])
                 inner._on_accept()
                 seen["open"] = not inner.result()
                 seen["said"] = inner._validation_label.text()
@@ -458,13 +473,31 @@ class TestDocument(unittest.TestCase):
         )
         self.assertIsNone(root.find("gridSubsets/gridSubset/zoomStart"))
 
-    def test_a_bad_zoom_range_is_refused(self):
-        # Only one end given, or the first after the last.
-        for row in (["EPSG:4326", 12, None], ["EPSG:4326", 9, 3]):
-            with self.assertRaises(ValueError, msg=row):
-                GwcTabMixin._gwc_xml_with_values(
-                    STATES_XML, {"formats": ["image/png"], "gridsets": [row]}
-                )
+    def test_a_backwards_zoom_range_is_refused(self):
+        with self.assertRaises(ValueError):
+            GwcTabMixin._gwc_xml_with_values(
+                STATES_XML,
+                {"formats": ["image/png"], "gridsets": [["EPSG:4326", 9, 3]]},
+            )
+
+    def test_a_zoom_range_with_one_end_is_kept(self):
+        # GWC keeps a lone zoomStart or zoomStop; the form showed "all" to
+        # "all" and every Save dropped it.
+        document = STATES_XML.replace("<zoomStart>0</zoomStart>", "").replace(
+            "<gridSetName>EPSG:900913</gridSetName>",
+            "<gridSetName>EPSG:900913</gridSetName><zoomStart>3</zoomStart>",
+        )
+        values = GwcTabMixin._gwc_form_values(document)
+        self.assertEqual(
+            values["gridsets"], [["EPSG:4326", None, 12], ["EPSG:900913", 3, None]]
+        )
+        subsets = ElementTree.fromstring(
+            GwcTabMixin._gwc_xml_with_values(document, values)
+        ).findall("gridSubsets/gridSubset")
+        self.assertEqual(
+            [(s.findtext("zoomStart"), s.findtext("zoomStop")) for s in subsets],
+            [(None, "12"), ("3", None)],
+        )
 
     def test_parameter_filters_are_replaced_from_their_xml(self):
         values = {
@@ -722,6 +755,27 @@ class TestSeed(unittest.TestCase):
         ):
             with self.assertRaises(ValueError, msg=bad):
                 GwcTabMixin._seed_request("topp:states", dict(self.VALUES, **bad))
+
+    def test_a_bad_seed_stays_in_the_form(self):
+        # Refused after the form closed, and for a Truncate after it asked,
+        # with every other field lost.
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        seen = {}
+
+        class Starting(ResourceFormDialog):
+            def exec(inner):
+                inner.get_widget("zoom_start").setValue(7)
+                inner.get_widget("zoom_stop").setValue(3)
+                inner._on_accept()
+                seen["open"] = not inner.result()
+                seen["said"] = inner._validation_label.text()
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_gwc, "ResourceFormDialog", Starting):
+            dlg._seed_gwc_layer(STATES_ROW)
+        self.assertTrue(seen["open"])
+        self.assertIn("zoom", seen["said"])
 
     def test_the_task_list_reads_as_sentences(self):
         text = GwcTabMixin._seed_tasks_text(

@@ -239,8 +239,9 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   a 500 naming it, a zoom beyond the published range is accepted. `GET` of the same path lists the tasks as
   `[tiles done, tiles total, seconds left, task id, state]` (state -1 aborted, 0 pending, 1 running, 2 done; -1
   for a count not made yet). A form `POST` of `kill_all=all` to `/seed/{layer}` stops them and answers GWC's HTML
-  seed page. A gridSubset's `zoomStart`/`zoomStop` (published levels) and `min`/`maxCachedLevel`, and
-  `parameterFilters` of any kind, survive an XML `PUT`; a misspelt filter element is a bare 500 naming it.
+  seed page. A gridSubset's `zoomStart`/`zoomStop` (published levels, either one alone too) and
+  `min`/`maxCachedLevel`, and `parameterFilters` of any kind, survive an XML `PUT`; a misspelt filter element
+  is a bare 500 naming it.
 - **Other style formats, rename and usage** (row 58, measured on 2.28.5): CSS, YSLD and MBStyle each need their
   extension; without it GeoServer answers 500 "No such style handler". Their bodies read and write at
   `{style}.css` / `.ysld` / `.mbstyle` with their own content types, and a new one is created by a `POST` to the

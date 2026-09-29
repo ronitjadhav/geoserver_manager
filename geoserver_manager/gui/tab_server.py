@@ -18,8 +18,9 @@ import threading
 from collections import deque
 
 import requests
+from qgis.core import Qgis
 from qgis.PyQt.QtCore import QCoreApplication
-from qgis.PyQt.QtWidgets import QDialog
+from qgis.PyQt.QtWidgets import QDialog, QMessageBox
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.toolbelt.payload import changed, keyword_list, words
@@ -321,6 +322,9 @@ class ServerTabMixin:
         for key, value in values.items():
             if value is None:
                 values[key] = ""
+            elif isinstance(value, str):
+                # As the form gives it back, or an untouched Save is an edit.
+                values[key] = value.replace("\r\n", "\n").replace("\r", "\n").strip()
         if kind == "global":
             # 8 only when unset: "or 8" also turned a stored 0 into 8.
             decimals = settings.get("numDecimals")
@@ -529,20 +533,26 @@ class ServerTabMixin:
         """A Show the log button on the logging form."""
         button = dlg.add_button(translate("ServerTabMixin", "Show the log"))
         button.clicked.connect(
-            lambda: self._show_server_log(dlg.get_values().get("location"))
+            lambda: self._show_server_log(dlg.get_values().get("location"), dlg)
         )
 
-    def _show_server_log(self, location):
-        """The end of GeoServer's log file, read in the background."""
+    def _show_server_log(self, location, form):
+        """The end of GeoServer's log file, read in the background.
+
+        `form` is the modal logging form: a refusal or a failure is said in a
+        box over it, since the message bar sits behind it until it closes.
+        """
         location = (location or "logs/geoserver.log").strip()
         if location.startswith("/") or ":" in location.split("/")[0]:
             # The REST resource API only reaches the data directory.
-            self.show_warning_message(
+            QMessageBox.warning(
+                form,
+                form.windowTitle(),
                 translate(
                     "ServerTabMixin",
                     "The log is written to {}, outside GeoServer's data directory, "
                     "which the REST API cannot read. Open it on the server.",
-                ).format(location)
+                ).format(location),
             )
             return
         client = self.gs.rest_service.rest_client
@@ -552,12 +562,19 @@ class ServerTabMixin:
         # Cancel stops the download: the read went on to the end of a file
         # of hundreds of MB after the box was gone.
         stop = threading.Event()
-        tail = self._fetch(
-            lambda: self._log_tail(client, path, stop=stop),
-            translate("ServerTabMixin", "Failed to read the log"),
-            stop=stop,
-        )
-        if tail is None:
+        try:
+            tail = self._wait_for(
+                lambda: self._log_tail(client, path, stop=stop), stop=stop
+            )
+        except Abandoned:
+            return  # the user pressed Cancel: they know
+        except Exception as error:
+            problem = "{}: {}".format(
+                translate("ServerTabMixin", "Failed to read the log"),
+                self._error_text(error),
+            )
+            self.log(problem, log_level=Qgis.MessageLevel.Critical)
+            QMessageBox.warning(form, form.windowTitle(), problem)
             return
         dlg = ResourceFormDialog(
             title=translate("ServerTabMixin", "GeoServer Log"),

@@ -16,7 +16,7 @@ import copy
 import threading
 from unittest.mock import patch
 
-from qgis.PyQt.QtWidgets import QDialog
+from qgis.PyQt.QtWidgets import QDialog, QPushButton
 from qgis.testing import start_app, unittest
 
 from geoserver_manager.gui import tab_server
@@ -91,6 +91,8 @@ class FakeGS:
         outer = self
 
         class Client:
+            url, auth, verifytls = "http://gs", ("u", "p"), True
+
             def get(inner, path, **kwargs):
                 outer.calls.append(("GET", path, kwargs))
                 if any(path.endswith(f"/{name}/settings.json") for name in broken):
@@ -277,6 +279,19 @@ class TestServerFormSaves(unittest.TestCase):
         self.assertEqual(self.dlg.gs.puts(), [])
         self.assertEqual(self.successes, [])
 
+    def test_what_the_form_normalises_is_not_an_edit(self):
+        # The form strips its text and gives CRLF lines back as LF; the
+        # prefill kept both, so an untouched Save sent a PUT and said saved.
+        stored = {
+            "wms": {"enabled": True, "title": "Maps ", "abstrct": "One\r\ntwo"},
+            "contact": {"contactPerson": " Hypatia", "welcome": "Hi\r\nthere\n"},
+        }
+        self.dlg._server_read = lambda kind: copy.deepcopy(stored[kind])
+        self.open_and_save(["WMS", "-"])
+        self.open_and_save(["Contact", "-"])
+        self.assertEqual(self.dlg.gs.puts(), [])
+        self.assertEqual(self.successes, [])
+
     def test_a_cancelled_save_says_the_change_may_still_land(self):
         self.dlg._wait_for = _cancel_writes
         self.open_and_save(["WFS", "-"], title="Features")
@@ -303,6 +318,18 @@ class TestServerFormSaves(unittest.TestCase):
             any("may still apply" in warning for warning in self.warnings),
             self.warnings,
         )
+
+
+def log_form(dlg, location):
+    """A logging form with its Show the log button, as the user clicks it."""
+    form = ResourceFormDialog(
+        title="Logging",
+        fields=[{"key": "location", "label": "Location", "type": "text"}],
+        values={"location": location},
+    )
+    dlg._add_log_button(form)
+    [button] = [b for b in form.findChildren(QPushButton) if b.text() == "Show the log"]
+    return form, button
 
 
 class TestLogAndCatalog(unittest.TestCase):
@@ -357,6 +384,60 @@ class TestLogAndCatalog(unittest.TestCase):
             with self.assertRaises(Abandoned):
                 ServerTabMixin._log_tail(Client(), "/rest/resource/x", stop=stop)
         self.assertEqual(len(served), 3)
+
+    def test_a_log_that_cannot_be_read_is_said_over_the_form(self):
+        # The banner went to the message bar, behind the modal logging form.
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        banners = []
+        dlg.show_error_message = dlg.show_warning_message = banners.append
+        form, button = log_form(dlg, "logs/geoserver.log")
+
+        class Missing:
+            status_code, text = 404, "Undefined resource path."
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        with (
+            patch.object(tab_server.requests, "get", return_value=Missing()),
+            patch.object(tab_server, "QMessageBox", create=True) as box,
+        ):
+            button.click()
+        box.warning.assert_called_once()
+        parent, _title, text = box.warning.call_args.args
+        self.assertIs(parent, form)
+        self.assertIn("HTTP 404: Undefined resource path.", text)
+        self.assertEqual(banners, [])
+
+    def test_cancel_on_the_waiting_box_stops_that_download(self):
+        # _log_tail stops on its event; nothing checked that the waiting
+        # box's Cancel sets that same one.
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        form, button = log_form(dlg, "logs/geoserver.log")
+        downloads = []
+
+        def tail(client, path, stop=None, **kwargs):
+            downloads.append(stop)
+            return ""
+
+        def cancelled(action, write=False, stop=None):
+            action()  # the download has started
+            if stop is not None:
+                stop.set()
+            raise Abandoned()
+
+        dlg._log_tail = tail
+        dlg._wait_for = cancelled
+        with patch.object(tab_server, "QMessageBox", create=True) as box:
+            button.click()
+        [stop] = downloads
+        self.assertTrue(stop is not None and stop.is_set())
+        box.warning.assert_not_called()
 
     def test_reload_and_reset_post_to_their_endpoint(self):
         dlg = SyncDialog()
