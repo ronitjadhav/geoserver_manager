@@ -14,7 +14,7 @@ Usage from the repo root folder:
 import sys
 from unittest.mock import patch
 
-from qgis.PyQt.QtWidgets import QDialog
+from qgis.PyQt.QtWidgets import QDialog, QPushButton
 from qgis.testing import start_app, unittest
 
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
@@ -230,12 +230,29 @@ class TestServer(unittest.TestCase):
         self.assertEqual(values["num_decimals"], 0)
 
     def test_a_log_outside_the_data_directory_is_said_not_requested(self):
+        # Said over the logging form: a banner sat behind it, out of reach.
+        from geoserver_manager.gui import tab_server
+
         dlg = SyncDialog()
         warnings = []
         dlg.show_warning_message = warnings.append
-        dlg._fetch = lambda *args, **kwargs: self.fail("no request")
-        dlg._show_server_log("/var/log/geoserver.log")
-        self.assertIn("outside GeoServer's data directory", warnings[0])
+        dlg._fetch = dlg._wait_for = lambda *args, **kwargs: self.fail("no request")
+        form = ResourceFormDialog(
+            title="Logging",
+            fields=[{"key": "location", "label": "Location", "type": "text"}],
+            values={"location": "/var/log/geoserver.log"},
+        )
+        dlg._add_log_button(form)
+        [button] = [
+            b for b in form.findChildren(QPushButton) if b.text() == "Show the log"
+        ]
+        with patch.object(tab_server, "QMessageBox", create=True) as box:
+            button.click()
+        box.warning.assert_called_once()
+        parent, _title, text = box.warning.call_args.args
+        self.assertIs(parent, form)
+        self.assertIn("outside GeoServer's data directory", text)
+        self.assertEqual(warnings, [])
 
 
 class TestForms(unittest.TestCase):

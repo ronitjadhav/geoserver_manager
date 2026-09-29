@@ -41,9 +41,9 @@ request is already sent, so after a *Cancel* it may still be applied, and
 the tab reloads once GeoServer answers.
 
 In a form, a name that is taken, a layer that is not on the server or a
-zoom range with one end is refused before the form closes, with what you
-typed still there. Enter in a list's picker adds the name. Esc, *Cancel*
-or the window's close button asks before throwing an edit away.
+zoom range that ends before it starts is refused before the form closes,
+with what you typed still there. Enter in a list's picker adds the name.
+Esc, *Cancel* or the window's close button asks before throwing an edit away.
 
 Every delete asks first and says what else goes with it. GeoServer deletes
 recursively: a workspace takes its stores, layers and styles along.
@@ -380,7 +380,7 @@ The tile cache (GeoWebCache) stores map tiles so they are drawn only once.
 
 **Click a name** to change how a layer is cached: on or off, its gridsets and
 its image formats, both picked from lists. Set a gridset's *From zoom* and
-*To zoom* to serve only those levels; "all" serves every one. Meta-tiling, gutter and expiry are on the *Advanced* tab. The
+*To zoom* to serve only those levels; "all" leaves that end open. Meta-tiling, gutter and expiry are on the *Advanced* tab. The
 *Parameter filters* tab holds GeoWebCache's filters as XML: which STYLES,
 CQL_FILTER or TIME values get a cache of their own.
 

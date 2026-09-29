@@ -25,7 +25,7 @@ from qgis.PyQt.QtWidgets import QDialog
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.scope import GLOBAL, PENDING
 from geoserver_manager.toolbelt.payload import as_list
-from geoserver_manager.toolbelt.rest import raw_rest
+from geoserver_manager.toolbelt.rest import raw_rest, summarise_body
 
 _XML = {"Content-Type": "application/xml"}
 
@@ -216,7 +216,11 @@ class GwcTabMixin:
             # global layer group (cached under its bare name) is out of reach.
             payload = self._raw_rest("get", self._gwc_layer_path(name)).json()
         if not isinstance(payload, dict):
-            raise RuntimeError(f"Unexpected response: {str(payload)[:200]}")
+            raise RuntimeError(
+                translate("GwcTabMixin", "Unexpected response: {}").format(
+                    summarise_body(str(payload))
+                )
+            )
         return payload.get("GeoServerLayer") or {}
 
     def _gwc_layer_xml(self, name):
@@ -320,26 +324,24 @@ class GwcTabMixin:
 
     @staticmethod
     def _gridset_row(row):
-        """(name, (start, stop) or None) of a gridset row [name, from, to].
+        """(name, (start, stop)) of a gridset row [name, from, to].
 
-        The range is the published zoom levels (zoomStart / zoomStop); both
-        blank means every level of the gridset.
+        The range is the published zoom levels (zoomStart / zoomStop). Each
+        end is its own: None ("all") leaves it open, and GeoWebCache keeps
+        either one alone.
         ponytail: the cached levels (min/maxCachedLevel) are left as they are;
         add two columns when someone needs to cache less than is served.
         """
         name = (row[0] or "").strip()
         start = row[1] if len(row) > 1 else None
         stop = row[2] if len(row) > 2 else None
-        if start is None and stop is None:
-            return name, None
-        if start is None or stop is None or start > stop:
+        if start is not None and stop is not None and start > stop:
             raise ValueError(
                 translate(
-                    "GwcTabMixin",
-                    "'{}': give both zoom levels, the first no higher than the last.",
+                    "GwcTabMixin", "'{}': the first zoom level is after the last."
                 ).format(name)
             )
-        return name, (int(start), int(stop))
+        return name, tuple(None if end is None else int(end) for end in (start, stop))
 
     @staticmethod
     def _parse_xml(xml_text):
@@ -393,9 +395,7 @@ class GwcTabMixin:
         """One gridSubset as a form row: [name, from, to], blanks as None."""
         name = element.findtext("gridSetName") or ""
         start, stop = element.findtext("zoomStart"), element.findtext("zoomStop")
-        if start is None or stop is None:
-            return [name, None, None]
-        return [name, int(start), int(stop)]
+        return [name, int(start) if start else None, int(stop) if stop else None]
 
     @staticmethod
     def _gwc_xml_with_values(xml_text, values):
@@ -403,8 +403,8 @@ class GwcTabMixin:
 
         Everything the form does not model (the id, a gridset's extent and
         cached levels) stays as GeoServer wrote it: a kept gridset keeps its
-        element, only new ones are created bare. A line without a zoom range
-        clears the gridset's; the filters are replaced only when the form
+        element, only new ones are created bare. A zoom end left at "all"
+        clears that end only; the filters are replaced only when the form
         has them.
         """
         # One subset per gridset: a second row naming one was dropped
@@ -463,12 +463,11 @@ class GwcTabMixin:
             if element is None:
                 element = ElementTree.Element("gridSubset")
                 element.append(leaf("gridSetName", name))
-            for tag in ("zoomStart", "zoomStop"):
+            for tag, level in zip(("zoomStart", "zoomStop"), levels):
                 for old in element.findall(tag):
                     element.remove(old)
-            if levels is not None:
-                element.append(leaf("zoomStart", str(levels[0])))
-                element.append(leaf("zoomStop", str(levels[1])))
+                if level is not None:
+                    element.append(leaf(tag, str(level)))
             subsets.append(element)
         replace_children("gridSubsets", subsets)
         if "filters" in values:
@@ -518,8 +517,8 @@ class GwcTabMixin:
     def _check_new_gwc_layer(self, values):
         """(name, document) of the cache the Add form would create, or a
         ValueError: no layer, a name a URL eats, one cached already, a zoom
-        range with one end, filters that are not XML. Reads only: the form
-        runs it before it closes, so a refusal keeps what was typed."""
+        range backwards, filters that are not XML. Reads only: the form runs
+        it before it closes, so a refusal keeps what was typed."""
         name = (values.get("layer") or "").strip()
         if not name:
             raise ValueError(translate("GwcTabMixin", "Pick a layer."))
@@ -643,7 +642,7 @@ class GwcTabMixin:
                 "help": translate(
                     "GwcTabMixin",
                     "The tile grids the layer is cached in. Set the zoom levels "
-                    'to serve only those; "all" serves every level.',
+                    'to serve only those; "all" leaves that end open.',
                 ),
             },
             {
@@ -754,7 +753,7 @@ class GwcTabMixin:
             fields=self._gwc_fields(gridset_names),
             values=self._gwc_form_values(xml_text),
             parent=self,
-            # Pure: a zoom range with one end, a gridset twice or filters
+            # Pure: a zoom range backwards, a gridset twice or filters
             # that are not XML stay in the form, with the rest of the edit.
             validate=lambda values: self._gwc_xml_with_values(xml_text, values),
         )
@@ -812,7 +811,7 @@ class GwcTabMixin:
             },
             parent=self,
             ok_label=translate("GwcTabMixin", "Create"),
-            # A refusal (a zoom range with one end, a layer cached meanwhile)
+            # A refusal (a zoom range backwards, a layer cached meanwhile)
             # stays in the form, with the rest of what was typed.
             validate=self._form_check(self._check_new_gwc_layer),
         )
@@ -1041,6 +1040,8 @@ class GwcTabMixin:
             fields=self._seed_fields(gridsets, current["formats"], canvas),
             parent=self,
             ok_label=translate("GwcTabMixin", "Start"),
+            # Pure: a refusal stays in the form, before a Truncate asks.
+            validate=lambda values: self._seed_request(name, values),
         )
         dlg.get_widget("gridset").currentTextChanged.connect(
             lambda gridset: dlg.set_extent_crs("bounds", crs.get(gridset))

@@ -392,6 +392,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **Tile cache:** a gridset's zoom range with only a first or only a last
+  level is kept. The form showed it as "all" to "all", and every Save
+  removed it. A range is refused only when its first level is after the
+  last; "all" leaves that end open.
+- A refused *Seed* or *Truncate* (a zoom range that ends before it starts,
+  an area that is not a box) keeps the form open with what was typed, before
+  a Truncate asks for confirmation.
+- **Server tab:** saving a form without changing anything sends nothing. A
+  stored value with spaces at its edges or Windows line breaks was sent
+  again and reported as saved.
+- *Show the log* says why it cannot read the log (a log outside the data
+  directory, a read that failed) in a box over the logging form. The message
+  went to the main window, behind the form.
+- An unexpected answer to a cached layer's read (a sign-in page) is logged
+  translated and shortened to its title, not as 200 characters of markup.
 - A tile cache's gridset stored with a zoom level outside the form's range
   (such as 45) keeps it: the edit form no longer clamps it to 40, and saving
   without touching it no longer rewrites it.
@@ -641,8 +656,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Server tab:** cancelling the wait on a save, a catalog reload or a reset
   now says the change may still apply and reloads the tab; it was silent, and
   the row kept its old summary.
-- **Tile cache:** a refused *Add a Layer to the Cache* form (a zoom range with
-  one end, filters that are not XML, a layer cached meanwhile) stays open with
+- **Tile cache:** a refused *Add a Layer to the Cache* form (a zoom range that
+  ends before it starts, filters that are not XML, a layer cached meanwhile) stays open with
   what was typed, as the edit form does.
 - Cancelling *Show the log* stops the download; the whole file kept streaming
   in the background.
@@ -683,7 +698,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   fills them, and the search box is described as it works: it matches the
   columns loaded so far.
 - **A refused form keeps what was typed.** A name that is taken, a layer or
-  style not on the server, a zoom range with one end, filters that are not
+  style not on the server, a zoom range that ends before it starts, filters that are not
   XML or an SRS that is not an EPSG code were refused after the form
   closed: a whole PostGIS form, its password included, had to be typed
   again. They are checked on Save, and the form stays open with the reason.
