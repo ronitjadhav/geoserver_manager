@@ -23,6 +23,7 @@ group the implementation issues. Library gaps and existing workarounds are track
 - [x] Edit / rename workspace
 - [x] Delete workspace (single + bulk)
 - [x] View/edit workspace WMS settings
+- [x] Workspace WFS, WCS and WMTS settings, and the namespace URI
 
 ## Datastores
 
@@ -34,6 +35,8 @@ group the implementation issues. Library gaps and existing workarounds are track
 - [x] Delete datastore (single + bulk, with recurse)
 - [x] Cross-navigation: click workspace name → open workspace detail
 - [x] Web Feature Server (NG): cascade a remote WFS as a datastore (typed form)
+- [x] Shapefile, directory of shapefiles and GeoPackage stores, and any other type through its parameter table
+- [x] Rename a datastore, and reset it (GeoServer re-reads the store)
 
 ## Layers / Feature Types
 
@@ -43,11 +46,14 @@ group the implementation issues. Library gaps and existing workarounds are track
 - [x] View feature type details (SRS, bounding box, title, keywords)
 - [x] Publish a DB table as a new feature type
 - [x] Delete feature type (single + bulk)
+- [x] Edit a layer: name, title, abstract, keywords, SRS, projection policy, CQL filter, enabled, advertised
+- [x] Update a layer from its data, and set its default and other styles
 
 ## Coverage Stores & Coverages
 
 - [x] List coverage stores across workspaces
-- [x] Create coverage store (ImageMosaic, GeoTIFF/COG)
+- [x] Create coverage store (ImageMosaic, GeoTIFF/COG, ArcGrid, WorldImage)
+- [x] Edit a coverage store (name, URL, description, enabled), and reset it
 - [x] Delete coverage store
 - [x] List and view coverages within a store
 
@@ -62,15 +68,18 @@ group the implementation issues. Library gaps and existing workarounds are track
 - [x] Upload a style from a QGIS layer's symbology (Styles tab, and one click
       from the Layers tab: upload and assign)
 - [x] Apply a server style to a QGIS project layer
-- [x] Save a style to disk as `.sld`
+- [x] Save a style to disk, in its own format
+- [x] CSS and YSLD styles, beside SLD and MBStyle
+- [x] Rename and copy a style, and see what uses it
 - [x] Legend preview for a style (GetLegendGraphic, rendered by GeoServer)
 - [x] Layer-tree context menu: push a layer's style to GeoServer, apply the
       server's style to it
 
 ## Layer Groups
 
-- [x] List layer groups per workspace
+- [x] List layer groups, global and per workspace
 - [x] Create layer group (select layers, styles, mode)
+- [x] Edit a layer group, nest groups, recompute its bounds, preview it
 - [x] Delete layer group
 
 ## WMS / WMTS Stores (Cascaded Layers)
@@ -80,6 +89,7 @@ group the implementation issues. Library gaps and existing workarounds are track
 - [x] Create/delete cascaded WMS layers (publish what the remote
       advertises, view one, delete one)
 - [x] Create/delete WMTS stores, and their layers
+- [x] Edit a cascaded store: URL, credentials, connections, timeouts, enabled
 
 ## Layer Upload (QGIS → GeoServer)
 
@@ -115,6 +125,8 @@ group the implementation issues. Library gaps and existing workarounds are track
       configuration (meta-tiling, expiry, gutter)
 - [x] Publish / un-publish layer to GWC: add a layer to the cache, truncate
       its tiles, stop caching it
+- [x] Zoom levels per gridset and parameter filters
+- [x] Seed, reseed or truncate part of a layer, and follow or stop the tasks
 - [ ] Create custom gridsets, [#85](https://github.com/ronitjadhav/geoserver_manager/issues/85)
       (the picker lists the server's; creating one is an XML PUT the library's
       `create_gridset()` only knows for three EPSG codes)
@@ -130,6 +142,13 @@ group the implementation issues. Library gaps and existing workarounds are track
 - [ ] View ACL data rules
 - [ ] Create / delete ACL rules
 - [ ] Create / delete admin rules
+
+## Server
+
+- [x] Contact details and global settings (proxy base URL, character set, decimals, verbosity)
+- [x] Each service's settings (on or off, title, abstract, keywords; WFS maximum features)
+- [x] Logging profile, and the last lines of the log
+- [x] Reload the catalog, reset the caches
 
 ## Layer Preview
 

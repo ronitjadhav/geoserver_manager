@@ -185,10 +185,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   names pushed from QGIS go through the same rule.
 - **Styles now travel both ways between QGIS and GeoServer.** Upload a style
   from the symbology of a layer in the current project (a third source in the
-  upload dialog), or push it in one step from the Layers tab with *Style from
-  QGIS*, which uploads the style into the layer's workspace and makes it the
+  upload dialog), or push it in one step from the Layers tab with *Push style
+  from QGIS*, which uploads the style into the layer's workspace and makes it the
   layer's default. In the other direction, *Apply to a QGIS layer* loads a
-  server style into a project layer, and *Save as SLD* writes any style's body
+  server style into a project layer, and *Save to disk* writes any style's body
   to disk.
 - Every SLD upload now carries the content type its own version needs. QGIS
   writes SLD 1.1 (Symbology Encoding); sent as 1.0 (all the library can do),
@@ -222,7 +222,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   styles and any nested group), title, abstract and bounds; create a group
   from an ordered list of layers, pick them from every published layer on
   the server, rasters included, mix workspaces in a global group, and give a
-  layer a style other than its default with `layer = style`;
+  layer a style other than its default in its row's style column;
   **Add to QGIS** loads a group as a single WMS layer; delete (single and
   bulk). GeoServer computes the group's bounds from its layers.
 - **Styles tab**: global and per-workspace styles; open one to see its
@@ -235,8 +235,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Add to QGIS** from the Layers tab: load any GeoServer layer into the current
   project as WMS, WFS (the actual features) or WMTS (via GeoWebCache). The layer
   source carries the plugin's QGIS authentication config id, never a password.
-- **Layers tab**: every feature type on the server, with its workspace,
-  datastore, SRS and enabled flag; search and pagination; a detail view with
+- **Layers tab**: every published layer (vector, raster and cascaded), with
+  its workspace, type, store and default style; search and pagination; a detail view with
   native name, projection policy, title, abstract, keywords, bounding box and
   attributes; **publish a table** (workspace → datastore → not-yet-published
   tables, with declared SRS, title, abstract, keywords); delete (single and
@@ -244,8 +244,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Error banners now include GeoServer's own explanation. A failed delete used
   to read "500 Server Error: for url: …"; it now says, for example, "Unable to
   delete layer referenced by layer group 'tasmania'".
-- Any datastore type can be edited. Types without a dedicated form (Shapefile,
-  GeoPackage, …) get a `key = value` editor for their connection parameters;
+- Any datastore type can be edited. Types without a dedicated form (Properties,
+  Oracle, CSV, …) get a key and value table for their connection parameters;
   the save merges onto the server's stored map exactly as the typed forms do.
 - *Verify the server's TLS certificate* setting (default on); a private-CA or
   self-signed server is now reported as a certificate problem, not as
@@ -458,7 +458,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   form's checks (each style, the root layer) ran on the interface thread on
   Save. A Cancel while saving now says the change may still land, and the
   list reloads once it does.
-- A layer group's edit lists only its own workspace's groups, and a create
+- A layer group's edit lists its own workspace's groups and the global ones,
+  not every workspace's, and a create
   fetches each style and the workspace list once; the form's checks ran three
   times per create.
 - Recomputing a group's bounds no longer reads the QGIS project from the
@@ -584,7 +585,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - A translated layer group title or abstract stays read-only in its form, so
   a save no longer flattens it into every language.
 - A workspace layer group refuses another workspace's layer before GeoServer
-  answers with a bare error; its picker offers only its own.
+  answers with a bare error; its picker offers only its own
+  workspace's layers and groups, and the global groups.
 - One workspace whose groups cannot be listed no longer breaks creating and
   editing every layer group.
 - Pushing the style of a layer removed from the project meanwhile is an error
@@ -667,7 +669,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Counts read naturally: "3 workspaces deleted" instead of "3 workspace(s)
   deleted", in the delete confirmations, their result banners and the
   "could not be listed" warning. Each locale gets its own plural forms,
-  French included. A failed batch delete now says "Could not delete:",
+  French included. A failed batch delete now says "These failed:",
   followed by each item and its reason.
 - Opening a form, a detail view, a preview or *Add to QGIS* no longer
   freezes QGIS when the server is slow or gone. Each of those reads now runs

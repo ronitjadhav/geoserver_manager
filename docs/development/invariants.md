@@ -11,7 +11,8 @@ These rules prevent regressions found in testing or observed against GeoServer. 
 2. **Qt's table sorting stays off** (`_setup_table` forces it); a header click sorts `_filtered_rows` itself
    (`_on_header_clicked`), so the order on screen *is* the order of the row cache. Rows are mapped back by
    index, and Qt reordering the items on its own would make *Delete Selected* act on a different resource
-   than the one highlighted. The sort survives a reload of the same tab and is dropped when the columns change.
+   than the one highlighted. The sort survives a reload of the same tab and is dropped when the columns change, or when it is on a
+   detail column whose cells are pending again after the reload.
 3. **Edits merge onto what the server has.** GeoServer applies a datastore PUT by *replacing* the whole
    `connectionParameters` map. Never route an edit through the typed `create_*` helpers. Use
    `_update_datastore_from_values`, which overlays only the form's own keys onto the fetched params and
@@ -40,9 +41,10 @@ These rules prevent regressions found in testing or observed against GeoServer. 
    captured on the GUI side, and progress goes through `task.setProgress`.
 10. **A loaded table outlives its connection.** `refresh_ui()` clears `self.gs` at once and re-probes in a
    task, so for up to `PROBE_TIMEOUT` the rows on screen and their buttons belong to a client that is gone.
-   Every user-triggered action therefore passes `_require_connection()`, and that check lives at the five
-   places actions are dispatched: the Add button, Delete Selected, the row-action buttons, the link-cell
-   click and the Del key (a selection change re-enables the button while the probe runs). It never lives in
+   Every user-triggered action therefore passes `_require_connection()`, and that check lives at the
+   places actions are dispatched: the Add button, Delete Selected, the row-action buttons and their More
+   or Actions menu entries, the link-cell click, Enter on a row and the Del key (a selection change
+   re-enables the button while the probe runs). It never lives in
    the twenty methods behind them, so a new tab cannot forget it. A refresh also disables the
    header buttons immediately; the loader re-arms them. This was a reported crash:
    `AttributeError: 'NoneType' object has no attribute 'get_workspaces'` from *Publish a Layer*.
@@ -52,7 +54,8 @@ These rules prevent regressions found in testing or observed against GeoServer. 
    `test_a_refresh_cancels_the_load_before_it_drops_the_client` guards it. A delete batch and an upload
    are not cancelled by a refresh, and their later steps read `self.gs`: a profile switch mid-batch sent the
    rest of a recursive delete to the other server. So `refresh_ui()` and the profile switch refuse, with a
-   warning, while either runs (`_refuse_while_writing`). The same dispatch points also pass
+   warning, while either runs, and while a save abandoned at the waiting box still runs in its thread
+   (`_refuse_while_writing`, which looks for a `_ReadThread` with `write` set). The same dispatch points also pass
    `_addressable(rows)`: a row whose name holds `/ ? # %` is refused, because `requests` sends
    `datastores/a#b` as `datastores/a` and the delete of "a#b" deleted "a".
 11. **Nav labels in `TABS` are logic keys as well as text.** The `tr("Actions")` column and the
