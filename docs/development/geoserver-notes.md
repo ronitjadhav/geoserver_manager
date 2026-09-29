@@ -106,8 +106,11 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   resource's: `/rest/layers` ignores it. `?recalculate=nativebbox,latlonbbox` recomputes both boxes, and
   `POST …/{ft|c}/reset` makes GeoServer re-read the source. The other allowed styles are the layer's
   `styles` (the library's `update_layer` sends them; a workspace style as `ws:style`, an empty list
-  clears). **Cascaded WMS layers cannot be edited over REST**: any PUT on `…/wmslayers/{l}`, JSON, XML
-  or the document a GET returned, fails with `UnsupportedOperationException`.
+  clears). A cascaded WMS layer takes **no default style**: a layer PUT with a `defaultStyle` answers
+  200 and keeps `{"name": ""}`, while its `styles` are stored and listed in the capabilities; a
+  cascaded WMTS layer takes one like any layer. **Cascaded WMS layers cannot be edited over REST**:
+  any PUT on `…/wmslayers/{l}`, JSON, XML or the document a GET returned, fails with
+  `UnsupportedOperationException`.
 - **Publishing a table: send no bounding box** (row 52 of #50). The facade's `create_feature_type(epsg=…)`
   fills both boxes from a table of three EPSG codes, so it raises `KeyError` for any other code and gives
   those three a world extent. A POST without either box makes GeoServer compute both from the data
@@ -129,6 +132,25 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
 - **Add to QGIS as WMTS**: the URI names the tile matrix set (`EPSG:900913`) and *no* `crs=`. With
   `crs=EPSG:4326` beside it QGIS accepted the layer, reported it as 4326 and reprojected every tile on the
   fly (measured against the sandbox); without it the layer takes the tile matrix's own CRS.
+- **Add to QGIS goes through the workspace's own service** (measured on 2.28.5 / QGIS 3.44): an
+  isolated workspace's layers are in no global capabilities, so on `{base}/ows` and
+  `{base}/gwc/service/wmts` its WMS and WMTS layers were invalid ("Cannot calculate extent", "Tile
+  layer or tile matrix set not found") and its WFS layer too, while `{base}/{ws}/ows` and
+  `{base}/{ws}/gwc/service/wmts` gave valid ones. There WMS and WMTS take the **bare** name (the
+  qualified one is invalid the same way, for a normal workspace too) and WFS takes either, so the URI
+  keeps the qualified type name. `sf:archsites`, `topp:states` and `nurc:mosaic`, the `ne:world`
+  group and the global `tasmania` group (on the global service) are all valid through these URIs, and
+  the embedded preview and the layer groups use the same ones. The layer tree reads the workspace back
+  from the URL path to know which server layer such a QGIS layer is.
+- **Add to QGIS behind a proxy** (measured with a proxy that forwards `Host: inside.invalid:8080`,
+  as nginx's default `proxy_set_header Host $proxy_host` does): GeoServer writes every
+  OnlineResource of its capabilities from its Proxy base URL or, without one, from the Host it
+  receives. The WMS and WMTS layers were still valid, since the capabilities came from the right
+  URL, but drew nothing: every GetMap, GetTile and GetFeatureInfo went to the inside address.
+  With `IgnoreGetMapUrl=1` and `IgnoreGetFeatureInfoUrl=1` (WMS) and `IgnoreGetMapUrl=1` (WMTS),
+  both accepted by the provider, they went to the URL the plugin gave and the map was drawn. The WFS
+  provider has no such option: it followed the advertised DescribeFeatureType address and the layer
+  was invalid with an empty error, so *Add to QGIS* names the Proxy base URL setting instead.
 - **A pushed style is confirmed before it replaces one.** `create_style_definition()` upserts and a style is
   shared by every layer that references it, so `_push_qgis_style` checks `get_style_definition()` first and
   asks; it returns False when the user keeps the existing style, and its callers (the Layers row action, the

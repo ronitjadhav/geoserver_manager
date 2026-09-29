@@ -568,8 +568,8 @@ class TestEveryLayerType(unittest.TestCase):
         self.assertIsNone(bbox)
         self.assertIs(parent, self.dlg)
         # built like Add to QGIS builds it, never added to the project
-        self.assertIn("layers=sf:sfdem", layer.source())
-        self.assertIn("url=http://127.0.0.1:1/geoserver/ows", layer.source())
+        self.assertIn("layers=sfdem&", layer.source())
+        self.assertIn("url=http://127.0.0.1:1/geoserver/sf/ows", layer.source())
         from qgis.core import QgsProject
 
         self.assertNotIn(layer.id(), QgsProject.instance().mapLayers())
@@ -672,17 +672,63 @@ class TestAddToQgis(unittest.TestCase):
             "WMS", self.BASE, "topp:roads", "abc123"
         )
         self.assertEqual(provider, "wms")
-        self.assertIn("layers=topp:roads", uri)
-        self.assertIn("url=http://gs.example.org/geoserver/ows", uri)
+        self.assertIn("layers=roads&", uri)
+        self.assertIn("url=http://gs.example.org/geoserver/topp/ows&", uri)
         self.assertIn("authcfg=abc123", uri)
         self.assertNotIn("//geoserver//", uri)
+
+    def test_a_layer_goes_through_its_workspaces_own_service(self):
+        """An isolated workspace's layers are in no global capabilities, so
+        the global service could not reach any of them (measured)."""
+        wms, _ = GeoServerMainDialog._layer_uri("WMS", self.BASE, "iso:roads")
+        wmts, _ = GeoServerMainDialog._layer_uri("WMTS", self.BASE, "iso:roads")
+        wfs, _ = GeoServerMainDialog._layer_uri("WFS", self.BASE, "iso:roads")
+        # bare for WMS and WMTS: a qualified name is not in those capabilities
+        self.assertIn("layers=roads&", wms)
+        self.assertIn("url=http://gs.example.org/geoserver/iso/ows&", wms)
+        self.assertIn("layers=roads&", wmts)
+        self.assertIn("url=http://gs.example.org/geoserver/iso/gwc/service/wmts?", wmts)
+        self.assertIn("url='http://gs.example.org/geoserver/iso/ows'", wfs)
+        self.assertIn("typename='iso:roads'", wfs)
+        # a global layer group has no workspace: the global service
+        group, _ = GeoServerMainDialog._layer_uri("WMS", self.BASE, "tasmania")
+        self.assertIn("layers=tasmania&", group)
+        self.assertIn("url=http://gs.example.org/geoserver/ows&", group)
+
+    def test_qgis_stays_on_the_plugins_url_behind_a_proxy(self):
+        """GetMap went to the address the capabilities advertise, an inside
+        one behind a proxy: the layer was valid and drew nothing."""
+        wms, _ = GeoServerMainDialog._layer_uri("WMS", self.BASE, "topp:roads")
+        wmts, _ = GeoServerMainDialog._layer_uri("WMTS", self.BASE, "topp:roads")
+        self.assertIn("&IgnoreGetMapUrl=1&IgnoreGetFeatureInfoUrl=1", wms)
+        self.assertIn("&IgnoreGetMapUrl=1", wmts)
+
+    def test_an_invalid_wfs_layer_names_the_proxy_base_url(self):
+        """The WFS provider follows the advertised address and fails with no
+        message: the banner said only that the layer could not be added."""
+        from qgis.core import QgsVectorLayer
+
+        from geoserver_manager.gui import tab_layers
+
+        class Accepting(ResourceFormDialog):
+            def exec(self):
+                return QDialog.DialogCode.Accepted
+
+        dlg = SyncDialog()
+        dlg._server_layer = lambda *args: QgsVectorLayer("/nonexistent.gpkg", "r")
+        errors = []
+        dlg.show_error_message = errors.append
+        with patch.object(tab_layers, "ResourceFormDialog", Accepting):
+            dlg._add_layer_to_qgis(["roads", "topp", "VECTOR", "ds", ""])
+        self.assertIn("Could not add 'roads'", errors[0])
+        self.assertIn("Proxy base URL", errors[0])
 
     def test_wmts_goes_through_geowebcache(self):
         uri, provider = GeoServerMainDialog._layer_uri(
             "WMTS", self.BASE, "topp:roads", "abc123"
         )
         self.assertEqual(provider, "wms")
-        self.assertIn("gwc/service/wmts", uri)
+        self.assertIn("geoserver/topp/gwc/service/wmts", uri)
         self.assertIn("tileMatrixSet=EPSG:900913", uri)
         self.assertIn("authcfg=abc123", uri)
         # a crs= of its own made QGIS reproject every 900913 tile (measured)
@@ -742,7 +788,9 @@ class TestAddToQgis(unittest.TestCase):
 
 class PublishFakeGS(FakeGS):
     """Adds the pieces the publish flow touches: raw REST for ?list=available,
-    an existence check, and a create that records what it was asked."""
+    the layer list's existence check, and a create that records what it was
+    asked. A table is taken where LAYERS publishes it: topp:tasmania_roads
+    comes from store taz_shapes."""
 
     def __init__(self):
         super().__init__()
@@ -750,23 +798,32 @@ class PublishFakeGS(FakeGS):
         outer = self
 
         class Response:
-            status_code = 200
+            def __init__(inner, payload, status_code=200):
+                inner._payload, inner.status_code = payload, status_code
+                inner.text = str(payload)
 
             def json(inner):
-                return {"list": {"string": ["plugin_demo", "another"]}}
+                return inner._payload
 
         class Client:
             def get(inner, path, **kwargs):
+                if path.startswith(f"{BASE}/layers/"):
+                    return Response(*outer.answer(path))
                 outer.last_query = (path, kwargs.get("params"))
-                return Response()
+                return Response({"list": {"string": ["plugin_demo", "another"]}})
 
         class Endpoints:
+            base_url = BASE
+
             def featuretypes(inner, ws, ds):
                 return f"/rest/workspaces/{ws}/datastores/{ds}/featuretypes.json"
 
         class Rest:
             rest_client = Client()
             rest_endpoints = Endpoints()
+
+            def resource_exists(inner, path):
+                return inner.rest_client.get(path).status_code == 200
 
             def create_feature_type(inner, feature_type):
                 # What GeoServer would receive: the real model's payload.
@@ -776,9 +833,20 @@ class PublishFakeGS(FakeGS):
         self.rest_service = Rest()
 
     def get_feature_type(self, ws, ds, name):
-        if name == "plugin_demo":
-            return ("<html>Not Found</html>", 404)  # free
-        return ({"name": name}, 200)  # taken
+        published = LAYERS.get(f"{ws}:{name}")
+        if published and published[2] == ds:
+            return ({"name": name}, 200)  # taken in this store
+        return ("<html>Not Found</html>", 404)
+
+
+class Rejecting(ResourceFormDialog):
+    """A form that records itself and closes as if cancelled."""
+
+    opened = []
+
+    def exec(self):
+        Rejecting.opened.append(self)
+        return QDialog.DialogCode.Rejected
 
 
 class TestPublish(unittest.TestCase):
@@ -889,6 +957,50 @@ class TestPublish(unittest.TestCase):
             )
         self.assertIn("already exists", str(ctx.exception))
         self.assertEqual(self.dlg.gs.created, [])  # upsert never reached
+
+    def test_a_table_whose_name_another_store_publishes_is_refused_in_the_form(self):
+        """The Table list offers the tables unpublished in *this* store, so
+        the feature type check always passed; the POST then failed on the
+        workspace-wide layer name, after the form had closed."""
+        with patch.object(tab_layers, "ResourceFormDialog", Rejecting):
+            self.dlg._publish_layer()
+        values = {
+            "source": tab_layers._SOURCE_TABLE,
+            "workspace": "topp",
+            "datastore": "pg",
+            "table": "tasmania_roads",  # published from taz_shapes
+            "epsg": "4326",
+        }
+        with self.assertRaises(ValueError) as ctx:
+            Rejecting.opened[-1]._validate(values)
+        self.assertIn("topp:tasmania_roads", str(ctx.exception))
+        self.assertIn("taz_shapes", str(ctx.exception))
+        self.assertEqual(self.dlg.gs.created, [])
+
+    def test_a_taken_name_from_the_qgis_project_is_refused_in_the_form(self):
+        """The Metadata tab is on screen for this source too: refused after
+        the form closed, the title, abstract and keywords typed were lost."""
+        from qgis.core import QgsProject, QgsVectorLayer
+
+        layer = QgsVectorLayer("Point?crs=epsg:4326", "Roads (2024)", "memory")
+        QgsProject.instance().addMapLayers([layer])
+        self.addCleanup(QgsProject.instance().removeAllMapLayers)
+        self.dlg.gs = GpkgPublishFakeGS(datastore_exists=True)
+        with patch.object(tab_layers, "ResourceFormDialog", Rejecting):
+            self.dlg._publish_layer(layer=layer)
+        values = {
+            "source": tab_layers._SOURCE_QGIS,
+            "workspace": "topp",
+            "qgis_layer": layer,
+            "name": "Roads (2024)",
+            "replace": False,
+            "title": "Main roads",
+        }
+        with self.assertRaises(ValueError) as ctx:
+            Rejecting.opened[-1]._validate(values)
+        self.assertIn("Datastore 'Roads_2024' already exists", str(ctx.exception))
+        Rejecting.opened[-1]._validate(dict(values, replace=True))
+        self.assertEqual(self.dlg.gs.style_calls, [])  # the check only reads
 
     def test_dialog_combos_cascade_from_the_workspace(self):
         from unittest.mock import patch
@@ -1150,6 +1262,38 @@ class TestBatchPublish(unittest.TestCase):
         self.finish("cancelled")
         self.assertEqual(len(self.calls), 2)  # c never started
         self.assertIn("Published: a.", self.warnings[-1])
+        self.assertIn("Cancelled: b.", self.warnings[-1])
+        self.assertIn("Not started: c.", self.warnings[-1])
+
+    def test_closed_during_the_last_upload_it_warns_and_logs_that_layer(self):
+        """The layer in flight was in no list, and with nothing left to
+        start the batch ended on a success banner nobody saw or logged."""
+        logs = []
+        self.dlg.log = lambda text, **kwargs: logs.append(text)
+        self.dlg._publish_layers(self.layers)
+        self.finish("done")
+        self.finish("done")
+        self.dlg._closing = True  # the dialog closed while c uploaded
+        self.addCleanup(setattr, self.dlg, "_closing", False)
+        self.finish("cancelled")
+        self.assertEqual(self.successes, [])
+        self.assertIn("Published: a, b.", self.warnings[-1])
+        self.assertIn("Uploading when the dialog closed: c.", self.warnings[-1])
+        self.assertEqual(logs, [self.warnings[-1]])
+
+    def test_a_cancel_after_the_upload_stops_the_batch_and_says_so(self):
+        """A Cancel while a layer's title or style was saved counted it as
+        published, started the next one and ended on success."""
+        self.dlg._publish_layers(self.layers)
+        self.finish("done")
+        self.finish("stopped")
+        self.assertEqual(len(self.calls), 2)  # c never started
+        self.assertEqual(self.successes, [])
+        self.assertIn("Published: a.", self.warnings[-1])
+        self.assertIn(
+            "Published, stopped waiting for its title, keywords or style: b.",
+            self.warnings[-1],
+        )
         self.assertIn("Not started: c.", self.warnings[-1])
 
     def test_a_cancel_while_a_layer_is_checked_stops_the_batch_too(self):
@@ -1451,7 +1595,7 @@ class TestSetLayerStyle(unittest.TestCase):
         self.assertEqual(default, "simple_roads")
         self.assertEqual(others, ["population"])
 
-    def run_form(self, **edits):
+    def run_form(self, row=None, **edits):
         from unittest.mock import patch
 
         from qgis.PyQt.QtWidgets import QDialog
@@ -1474,9 +1618,36 @@ class TestSetLayerStyle(unittest.TestCase):
 
         with patch.object(tab_layers, "ResourceFormDialog", Editing):
             self.dlg._set_layer_style(
-                ["tasmania_roads", "topp", "VECTOR", "taz_shapes", "simple_roads"]
+                row
+                or ["tasmania_roads", "topp", "VECTOR", "taz_shapes", "simple_roads"]
             )
         return opened[0]
+
+    def test_a_cascaded_wms_layer_is_offered_its_other_styles_only(self):
+        """GeoServer answers 200 to a cascaded WMS layer's new default and
+        keeps none (measured on 2.28.5): the first style was preselected, and
+        an untouched form wrote it and said the styles were saved."""
+        cascaded = ["roads_cascade", "sf", "WMS", "remote_wms", "-"]
+        from qgis.PyQt.QtWidgets import QLabel
+
+        form = self.run_form(row=cascaded)
+        self.assertNotIn("style", form.get_values())
+        texts = " ".join(label.text() for label in form.findChildren(QLabel))
+        self.assertIn("remote server's default style", texts)
+        self.assertEqual(self.update_calls, [])
+        self.run_form(row=cascaded, others=["population"])
+        self.assertEqual(
+            self.update_calls,
+            [
+                (
+                    "sf",
+                    {
+                        "name": "roads_cascade",
+                        "styles": {"style": [{"name": "population"}]},
+                    },
+                )
+            ],
+        )
 
     def test_the_other_styles_are_listed_and_written_through_the_library(self):
         form = self.run_form(others=["population", "topp:roads_ws"])
@@ -1831,6 +2002,22 @@ class TestStyleFromQgis(unittest.TestCase):
         )
         self.assertIn("uploaded", self.messages["success"][0])
 
+    def test_a_cascaded_wms_layer_gets_the_style_uploaded_not_assigned(self):
+        """GeoServer answers 200 to a cascaded WMS layer's new default and
+        keeps none: "'x' styled from 'y'" was said of an assignment that did
+        not happen."""
+        self.add_layer("roads_cascade")
+        self.push(["roads_cascade", "sf", "WMS", "remote_wms", "-"])
+        self.assertEqual(
+            self.dlg.gs.style_calls[0][:2], ("POST", "/rest/workspaces/sf/styles.json")
+        )
+        self.assertFalse(
+            [call for call in self.dlg.gs.style_calls if call[0] == "set_default"]
+        )
+        self.assertEqual(
+            self.messages["success"], ["Style 'roads_cascade' uploaded to 'sf'."]
+        )
+
     def test_an_empty_project_is_a_banner_not_a_dialog(self):
         from geoserver_manager.gui import tab_layers
 
@@ -1855,6 +2042,8 @@ class TestStyleFromQgis(unittest.TestCase):
 class GpkgPublishFakeGS(StyleFakeGS):
     """Adds what the GeoPackage publish path touches."""
 
+    layer_default = None  # the published layer's default style
+
     def __init__(self, datastore_exists=False, layer_exists=False):
         super().__init__()
         self.datastore_exists = datastore_exists
@@ -1874,9 +2063,12 @@ class GpkgPublishFakeGS(StyleFakeGS):
                 return Response()
 
             def get(inner, path, **kwargs):
-                # The store Replace would overwrite: the plugin's own kind.
                 response = Response()
-                response.json = lambda: {"dataStore": {"type": "GeoPackage"}}
+                if "/layers/" in path:  # the layer's document: its default style
+                    style = {"name": outer.layer_default}
+                    response.json = lambda: {"layer": {"defaultStyle": style}}
+                else:  # the store Replace would overwrite: the plugin's own kind
+                    response.json = lambda: {"dataStore": {"type": "GeoPackage"}}
                 return response
 
             def put(inner, path, **kwargs):
@@ -2118,6 +2310,46 @@ class TestPublishQgisLayer(unittest.TestCase):
         self.dlg._publish_qgis_layer(self.values(with_style=True))
         self.assertIn("Roads_2024", warnings[0])
         self.assertIn("left as it is", warnings[0])
+        self.assertIn("not assigned", warnings[0])
+
+    def test_a_kept_style_that_is_the_default_is_not_said_unassigned(self):
+        """On a Replace the style of the name is usually the one the first
+        publish assigned: 'not assigned to the layer' was wrong there."""
+        self.add_layer()
+        self.dlg.gs = GpkgPublishFakeGS(datastore_exists=True)
+        self.dlg.gs.layer_default = "topp:Roads_2024"
+        warnings = []
+        self.dlg.show_warning_message = warnings.append
+        self.dlg.show_success_message = lambda text: self.fail(f"claimed: {text}")
+        self.dlg._push_qgis_style = lambda *args, **kwargs: False
+        self.dlg._publish_qgis_layer(self.values(with_style=True, replace=True))
+        self.assertEqual(
+            warnings,
+            ["Layer 'Roads_2024' published. Style 'Roads_2024' left as it is."],
+        )
+
+    def test_a_cancel_after_the_upload_reports_the_layer_stopped(self):
+        """Cancel on the waiting box of the metadata step: the upload still
+        reported 'done', so a batch went on as if all of it was set."""
+        from geoserver_manager.toolbelt.rest import Abandoned
+
+        self.add_layer()
+        outcomes = []
+
+        def abandon(*args):
+            raise Abandoned(write=True)
+
+        self.dlg._set_feature_type_metadata = abandon
+        self.dlg._publish_qgis_layer(
+            self.values(title="Roads"), on_done=outcomes.append
+        )
+        self.assertEqual(outcomes, ["stopped"])
+        self.dlg.gs = GpkgPublishFakeGS()
+        self.dlg._set_feature_type_metadata = lambda *args: None
+        self.dlg._publish_qgis_layer(
+            self.values(title="Roads"), on_done=outcomes.append
+        )
+        self.assertEqual(outcomes, ["stopped", "done"])
 
     def test_nothing_is_left_in_the_temporary_folder(self):
         import glob

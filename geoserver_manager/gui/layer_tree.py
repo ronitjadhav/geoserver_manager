@@ -18,7 +18,7 @@ and disconnected in `unload()`. A hook left behind survives a plugin reload and
 fires into the dead plugin, and plugin_reloader is how this repo is developed.
 """
 
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from qgis.core import Qgis, QgsDataSourceUri, QgsMapLayer
 from qgis.PyQt.QtCore import QCoreApplication, Qt
@@ -36,6 +36,8 @@ from geoserver_manager.toolbelt.sld import apply_sld_to_layer, layer_to_sld
 translate = QCoreApplication.translate
 
 _STYLEABLE = (QgsMapLayer.LayerType.VectorLayer, QgsMapLayer.LayerType.RasterLayer)
+# The paths LayerTabMixin._layer_uri puts after a workspace's own segment.
+_SERVICES = ("ows", "gwc/service/wmts")
 
 
 class LayerTreeMenu:
@@ -131,7 +133,8 @@ class LayerTreeMenu:
         """'workspace:name' when the layer was loaded from *this* GeoServer.
 
         A layer the plugin (or QGIS's browser) added carries the answer in its
-        data source: the WFS `typename`, or the WMS/WMTS `layers` parameter.
+        data source: the WFS `typename`, or the WMS/WMTS `layers` parameter,
+        which a workspace's own service ({base}/{ws}/ows) names bare.
         Only trusted when the source's host is the configured server, so a
         layer from another GeoServer does not name a target here. Pure.
         """
@@ -143,6 +146,12 @@ class LayerTreeMenu:
             params = parse_qs(source, keep_blank_values=True)
             url = (params.get("url") or [""])[0]
             name = (params.get("layers") or [""])[0]
+            base_path = urlparse(base_url).path.rstrip("/") + "/"
+            path = urlparse(url).path
+            workspace, _, service = path.removeprefix(base_path).partition("/")
+            bare = name and ":" not in name
+            if bare and path.startswith(base_path) and service in _SERVICES:
+                name = f"{unquote(workspace)}:{name}"
         if ":" not in name or not url:
             return None
         if urlparse(url).netloc.casefold() != urlparse(base_url).netloc.casefold():

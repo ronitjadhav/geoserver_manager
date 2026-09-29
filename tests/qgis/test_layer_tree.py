@@ -379,6 +379,18 @@ class TestWhichServerLayer(unittest.TestCase):
         found = LayerTreeMenu.server_layer_from_source(Source(uri, provider), BASE)
         self.assertEqual(found, "topp:states")
 
+    def test_the_workspace_of_a_bare_name_comes_from_its_service_path(self):
+        """WMS and WMTS name a layer bare on {base}/{ws}/..., where the
+        plugin's URIs go since isolated workspaces (review 2026-09-28)."""
+        uri, provider = SyncDialog._layer_uri("WMTS", BASE, "topp:states", "cfg1")
+        found = LayerTreeMenu.server_layer_from_source(Source(uri, provider), BASE)
+        self.assertEqual(found, "topp:states")
+        # a global group, on the global service, has no workspace to name
+        uri, provider = SyncDialog._layer_uri("WMS", BASE, "tasmania", "cfg1")
+        self.assertIsNone(
+            LayerTreeMenu.server_layer_from_source(Source(uri, provider), BASE)
+        )
+
     def test_a_layer_from_another_server_is_not_a_target(self):
         uri, provider = SyncDialog._layer_uri(
             "WFS", "http://other.example.org/geoserver", "topp:states"

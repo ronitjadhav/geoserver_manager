@@ -1026,11 +1026,17 @@ class LayerTabMixin:
         return workspace_names
 
     def _check_publish_form(self, values):
-        """What publishing a table would be refused for, before the form
-        closes: a bad EPSG code, a layer that exists. Reads only; the QGIS
-        source is checked by its own publish, after the export."""
+        """What the publish would be refused for, before the form closes: a
+        bad EPSG code, a layer or a store that exists. Reads only, in a
+        worker; the publish checks again, before its export."""
         if values.get("source") == _SOURCE_TABLE:
             self._check_publish_table(values)
+            return
+        ws_name, name = values["workspace"], geoserver_name(values["name"])
+        if isinstance(values["qgis_layer"], QgsRasterLayer):
+            self._check_raster_target(ws_name, name, values.get("replace"))
+        else:
+            self._refuse_vector_clash(ws_name, name, values)
 
     def _publish_layer(self, layer=None):
         """Open the publish form: pick workspace, datastore and table.
@@ -1158,10 +1164,11 @@ class LayerTabMixin:
         values = dlg.get_values()
         queue = list(zip(layers, names))
         published, failed = [], []
+        ended = []  # how the layer that stopped the batch ended, in words
 
         def summary(stopped):
             left = [name for _layer, name in queue]
-            if not failed and not left:
+            if not stopped and not failed:
                 self.show_success_message(
                     translate(
                         "LayerTabMixin", "%n layer(s) published.", None, len(published)
@@ -1177,6 +1184,7 @@ class LayerTabMixin:
                 parts.append(
                     translate("LayerTabMixin", "Failed: {}.").format(", ".join(failed))
                 )
+            parts += ended
             if stopped and left:
                 parts.append(
                     translate("LayerTabMixin", "Not started: {}.").format(
@@ -1196,12 +1204,30 @@ class LayerTabMixin:
             layer, name = queue.pop(0)
 
             def done(outcome):
-                if outcome == "cancelled":
-                    # The cancelled layer itself is reported by the upload.
-                    summary(stopped=True)
+                if outcome == "stopped":
+                    ended.append(
+                        translate(
+                            "LayerTabMixin",
+                            "Published, stopped waiting for its title, keywords "
+                            "or style: {}.",
+                        ).format(name)
+                    )
+                elif outcome == "cancelled" and self._closing:
+                    # Its upload ran on, and the log says how it ended.
+                    ended.append(
+                        translate(
+                            "LayerTabMixin", "Uploading when the dialog closed: {}."
+                        ).format(name)
+                    )
+                elif outcome == "cancelled":
+                    ended.append(
+                        translate("LayerTabMixin", "Cancelled: {}.").format(name)
+                    )
+                else:
+                    (published if outcome == "done" else failed).append(name)
+                    next_layer()
                     return
-                (published if outcome == "done" else failed).append(name)
-                next_layer()
+                summary(stopped=True)
 
             started, stopped = [], []
 
@@ -1255,9 +1281,11 @@ class LayerTabMixin:
         Stores tab's path (_publish_qgis_raster), the same Replace semantics.
 
         `layer` overrides the form's pick (a batch hands each one in), and
-        `on_done(outcome)` runs once the upload has ended however it ended.
-        Returns True when an upload started, so a batch can tell a layer
-        refused before any request from one still on its way.
+        `on_done(outcome)` runs once the upload has ended however it ended,
+        with "stopped" for a vector published whose title, keywords or style
+        a Cancel stopped waiting for. Returns True when an upload started, so
+        a batch can tell a layer refused before any request from one still on
+        its way.
 
         TODO(#50): upstream as create_datastore_from_file(ws, name, path); the
         library can only create datastores from connection parameters, so the
@@ -1305,11 +1333,12 @@ class LayerTabMixin:
             "/file.gpkg"
         )
         failure = translate("LayerTabMixin", "Failed to publish '{}'").format(name)
+        abandoned = []  # a Cancel stopped the steps after the upload
 
         def published(_result):
             # self.gs is still the client the upload used: a Refresh and a
             # profile switch are refused while an upload runs.
-            kept = []
+            kept = []  # the style of the name was kept: is it the default?
 
             def server_side():
                 # Best effort: the data is published at this point, so a
@@ -1325,11 +1354,19 @@ class LayerTabMixin:
                 self._set_feature_type_metadata(ws_name, name, values)
 
             def finish():
-                self._wait_for_save(server_side)  # requests, off the GUI thread
-                if sld is not None and not self._push_qgis_style(
-                    name, ws_name, sld, name, True
-                ):
-                    kept.append(name)  # a style of the name exists, kept as it is
+                try:
+                    self._wait_for_save(server_side)  # requests, off the GUI thread
+                    if sld is not None and not self._push_qgis_style(
+                        name, ws_name, sld, name, True
+                    ):
+                        # A Replace usually finds it still the layer's default.
+                        default, _others = self._wait_for(
+                            lambda: self._layer_styles(ws_name, name)
+                        )
+                        kept.append(default == f"{ws_name}:{name}")
+                except Abandoned:
+                    abandoned.append(name)
+                    raise
 
             done = translate(
                 "LayerTabMixin",
@@ -1337,7 +1374,14 @@ class LayerTabMixin:
                 "could not be set",
             ).format(name)
             if self._run_action(lambda: self._partly_saved(finish, done), failure):
-                if kept:
+                if kept == [True]:
+                    self.show_warning_message(
+                        translate(
+                            "LayerTabMixin",
+                            "Layer '{}' published. Style '{}' left as it is.",
+                        ).format(name, name)
+                    )
+                elif kept:
                     # Not assigned either: it may not be this layer's style.
                     self.show_warning_message(
                         translate(
@@ -1352,6 +1396,9 @@ class LayerTabMixin:
                     )
             # The user may have moved to another tab while it uploaded.
             self._reload_current_tab()
+
+        def upload_done(outcome):
+            on_done("stopped" if abandoned and outcome == "done" else outcome)
 
         return self._upload_file(
             failure,
@@ -1368,7 +1415,7 @@ class LayerTabMixin:
                 name,
             ),
             folder=folder,
-            on_done=on_done,
+            on_done=upload_done if on_done is not None else None,
         )
 
     def _make_datastore_read_only(self, workspace_name, name):
@@ -1423,17 +1470,18 @@ class LayerTabMixin:
         """Refuse, before any write, a table publish GeoServer would take badly;
         returns the EPSG code as a number. Reads only: the form runs it before
         it closes, the publish again."""
-        ws_name, ds_name, table = (
-            values["workspace"],
-            values["datastore"],
-            values["table"],
-        )
-        # create_feature_type upserts, so an existing layer would be overwritten
-        if self._resource_exists(self.gs.get_feature_type, ws_name, ds_name, table):
+        # A layer name is unique in its workspace: the Table list only offers
+        # tables unpublished in this store, so the clash is another store's.
+        qualified = f"{values['workspace']}:{values['table']}"
+        if self.gs.rest_service.resource_exists(self._layers_url(qualified)):
+            _kind, store, _style = self._layer_summary(qualified)
             raise ValueError(
                 translate(
-                    "LayerTabMixin", "Layer '{}' already exists in {}/{}."
-                ).format(table, ws_name, ds_name)
+                    "LayerTabMixin",
+                    "Layer '{}' already exists, published from store '{}'. A "
+                    "layer name is unique in its workspace: rename or delete "
+                    "that layer first.",
+                ).format(qualified, store)
             )
         epsg = str(values.get("epsg") or "").strip().upper().removeprefix("EPSG:")
         if not epsg.isdigit():
@@ -1520,9 +1568,11 @@ class LayerTabMixin:
         The other styles are what a client may ask for with STYLES=; GeoServer
         lists them in the capabilities. One layer PUT through the library's
         Layer model carries whichever of the two changed: the PUT replaces
-        the list (measured on 2.28.5; an empty list clears it).
+        the list (measured on 2.28.5; an empty list clears it). A cascaded WMS
+        layer is offered its other styles only: GeoServer answers 200 to a new
+        default and keeps none (measured on 2.28.5).
         """
-        name, ws_name = row_data[0], row_data[1]
+        name, ws_name, kind = row_data[0], row_data[1], row_data[2]
         fetched = self._fetch(
             lambda: (
                 self._style_choices(ws_name),
@@ -1535,14 +1585,19 @@ class LayerTabMixin:
         choices, (current, others) = fetched
         if current and current not in choices:
             choices.insert(0, current)
-
-        dlg = ResourceFormDialog(
-            title=translate("LayerTabMixin", "Styles of '{}'").format(name),
-            description=translate(
+        description = translate(
+            "LayerTabMixin",
+            "Global styles and the styles of workspace '{}'.",
+        ).format(ws_name)
+        fields = []
+        if kind == WMS:
+            description += " " + translate(
                 "LayerTabMixin",
-                "Global styles and the styles of workspace '{}'.",
-            ).format(ws_name),
-            fields=[
+                "A cascaded WMS layer keeps the remote server's default style: "
+                "only its other styles can be set.",
+            )
+        else:
+            fields.append(
                 {
                     "key": "style",
                     "label": translate("LayerTabMixin", "Default style"),
@@ -1550,7 +1605,14 @@ class LayerTabMixin:
                     "options": choices,
                     "default": current,
                     "required": True,
-                },
+                }
+            )
+
+        dlg = ResourceFormDialog(
+            title=translate("LayerTabMixin", "Styles of '{}'").format(name),
+            description=description,
+            fields=fields
+            + [
                 {
                     "key": "others",
                     "label": translate("LayerTabMixin", "Other styles"),
@@ -1572,7 +1634,7 @@ class LayerTabMixin:
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         values = dlg.get_values()
-        style = values["style"]
+        style = values.get("style", current)
         try:  # the form checked it already; a caller that skipped it did not
             wanted = self._wanted_styles(values, choices)
         except ValueError as error:
@@ -1608,7 +1670,7 @@ class LayerTabMixin:
     def _wanted_styles(values, choices):
         """The other styles picked, once each, refusing a name not on the
         server. Pure: the form runs it before it closes."""
-        style = values["style"]
+        style = values.get("style")
         wanted = [name.strip() for name in values["others"] if name.strip()]
         wanted = list(dict.fromkeys(s for s in wanted if s != style))  # no repeats
         unknown = [s for s in wanted if s not in choices]
@@ -1637,8 +1699,12 @@ class LayerTabMixin:
         return None
 
     def _style_from_qgis(self, row_data):
-        """Upload a QGIS layer's symbology as this layer's style."""
-        name, ws_name = row_data[0], row_data[1]
+        """Upload a QGIS layer's symbology as this layer's style.
+
+        A cascaded WMS layer takes no default style (GeoServer answers 200 and
+        keeps none), so there the style is only uploaded.
+        """
+        name, ws_name, kind = row_data[0], row_data[1], row_data[2]
         layers = styleable_project_layers()
         if not layers:
             self.show_warning_message(
@@ -1649,15 +1715,34 @@ class LayerTabMixin:
             )
             return
         match = self._matching_project_layer(name, layers)
+        description = translate(
+            "LayerTabMixin",
+            "The layer's symbology is exported as SLD and uploaded to "
+            "workspace '{}'. A style of that name there is replaced, that "
+            "is how you push a change you just made in QGIS.",
+        ).format(ws_name)
+        default_field = []
+        if kind == WMS:
+            description += " " + translate(
+                "LayerTabMixin",
+                "A cascaded WMS layer keeps the remote server's default style: "
+                "the style is uploaded, not assigned.",
+            )
+        else:
+            default_field.append(
+                {
+                    "key": "set_default",
+                    "label": translate(
+                        "LayerTabMixin", "Make it the layer's default style"
+                    ),
+                    "type": "checkbox",
+                    "default": True,
+                }
+            )
 
         dlg = ResourceFormDialog(
             title=translate("LayerTabMixin", "Style '{}' from QGIS").format(name),
-            description=translate(
-                "LayerTabMixin",
-                "The layer's symbology is exported as SLD and uploaded to "
-                "workspace '{}'. A style of that name there is replaced, that "
-                "is how you push a change you just made in QGIS.",
-            ).format(ws_name),
+            description=description,
             fields=[
                 {
                     "key": "qgis_layer",
@@ -1683,15 +1768,8 @@ class LayerTabMixin:
                     "default": geoserver_name(name),
                     "required": True,
                 },
-                {
-                    "key": "set_default",
-                    "label": translate(
-                        "LayerTabMixin", "Make it the layer's default style"
-                    ),
-                    "type": "checkbox",
-                    "default": True,
-                },
-            ],
+            ]
+            + default_field,
             parent=self,
             ok_label=translate("LayerTabMixin", "Upload"),
         )
@@ -1713,13 +1791,12 @@ class LayerTabMixin:
             return
 
         style_name = geoserver_name(values["style"])
+        set_default = values.get("set_default", False)
         outcome = {}
         if not self._run_action(
             lambda: outcome.setdefault(
                 "pushed",
-                self._push_qgis_style(
-                    style_name, ws_name, sld, name, values["set_default"]
-                ),
+                self._push_qgis_style(style_name, ws_name, sld, name, set_default),
             ),
             translate("LayerTabMixin", "Failed to upload the style of '{}'").format(
                 layer.name()
@@ -1737,7 +1814,7 @@ class LayerTabMixin:
                 translate("LayerTabMixin", "'{}' styled from '{}'.").format(
                     name, layer.name()
                 )
-                if values["set_default"]
+                if set_default
                 else translate("LayerTabMixin", "Style '{}' uploaded to '{}'.").format(
                     style_name, ws_name
                 )
@@ -1838,16 +1915,29 @@ class LayerTabMixin:
     def _layer_uri(protocol, base_url, qualified_name, authcfg=""):
         """Provider URI for one GeoServer layer. Returns (uri, provider_key).
 
+        A workspace's layer goes through that workspace's own service,
+        {base}/{ws}/ows: an isolated workspace's layers are in no other
+        capabilities. There WMS and WMTS name it bare (a qualified name is
+        not in those capabilities, measured), WFS by its qualified type
+        name. A global layer group stays on the global service.
+
+        IgnoreGetMapUrl and IgnoreGetFeatureInfoUrl keep QGIS on this URL,
+        the one the plugin reached, instead of the one the capabilities
+        advertise: behind a proxy that can be an inside address.
+
         Credentials never go in the URI: `authcfg` is the id of the QGIS
         authentication config the plugin already stores, and the providers
         resolve it themselves, so a saved project holds no password.
         """
         base = base_url.rstrip("/")
+        workspace, _, name = qualified_name.rpartition(":")
+        if workspace:
+            base = f"{base}/{quote(workspace, safe='')}"
         auth = f"&authcfg={authcfg}" if authcfg else ""
         if protocol == "WMS":
             return (
-                f"crs=EPSG:4326&format=image/png&layers={qualified_name}&styles="
-                f"&url={base}/ows{auth}",
+                f"crs=EPSG:4326&format=image/png&layers={name}&styles="
+                f"&url={base}/ows&IgnoreGetMapUrl=1&IgnoreGetFeatureInfoUrl=1{auth}",
                 "wms",
             )
         if protocol == "WMTS":
@@ -1855,9 +1945,10 @@ class LayerTabMixin:
             # crs=EPSG:4326 alongside made QGIS accept the layer and reproject
             # every tile on the fly (measured on 2.28.5 / QGIS 3.44).
             return (
-                f"format=image/png&layers={qualified_name}&styles="
+                f"format=image/png&layers={name}&styles="
                 f"&tileMatrixSet={_WMTS_TILE_MATRIX_SET}"
-                f"&url={base}/gwc/service/wmts?REQUEST=GetCapabilities{auth}",
+                f"&url={base}/gwc/service/wmts?REQUEST=GetCapabilities"
+                f"&IgnoreGetMapUrl=1{auth}",
                 "wms",
             )
         if protocol == "WFS":
@@ -2042,12 +2133,23 @@ class LayerTabMixin:
             return
         protocol = dlg.get_values()["protocol"]
 
+        def build():
+            layer = self._server_layer(protocol, f"{ws_name}:{name}", name)
+            if protocol == "WFS" and not layer.isValid():
+                # WFS follows the advertised address, silently (measured).
+                hint = translate(
+                    "LayerTabMixin",
+                    "GeoServer may advertise another address for its WFS than "
+                    "the one the plugin uses. Check the Proxy base URL in the "
+                    "Server tab's Global settings.",
+                )
+                raise RuntimeError(f"{layer.error().message()} {hint}".strip())
+            return self._valid_layer(layer)
+
         # Built and checked here, not through iface.addRasterLayer(), so an
         # unreachable layer becomes our banner rather than QGIS's modal.
         layer = self._fetch(
-            lambda: self._valid_layer(
-                self._server_layer(protocol, f"{ws_name}:{name}", name)
-            ),
+            build,
             translate("LayerTabMixin", "Could not add '{}' to QGIS").format(name),
         )
         if layer is not None:

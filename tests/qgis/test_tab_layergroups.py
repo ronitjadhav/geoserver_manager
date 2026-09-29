@@ -792,7 +792,7 @@ class TestDeleteAndAddToQgis(unittest.TestCase):
             ("DELETE", "/rest/layergroups/tasmania.json", {}), self.dlg.gs.calls
         )
 
-    def test_add_to_qgis_uses_the_qualified_name_and_wms(self):
+    def test_add_to_qgis_uses_the_groups_own_service_and_wms(self):
         built = []
 
         class Settings:
@@ -819,7 +819,10 @@ class TestDeleteAndAddToQgis(unittest.TestCase):
             self.dlg._add_group_to_qgis(["roads_group", "topp", "CONTAINER", "1"])
         self.assertEqual(instance.call_count, 2)
         self.assertIn("layers=tasmania&", built[0][0])  # global: the bare name
-        self.assertIn("layers=topp:roads_group&", built[1][0])
+        self.assertIn("url=http://gs.example.org/geoserver/ows&", built[0][0])
+        # a workspace group: bare too, on its workspace's own service
+        self.assertIn("layers=roads_group&", built[1][0])
+        self.assertIn("url=http://gs.example.org/geoserver/topp/ows&", built[1][0])
         self.assertIn("authcfg=abc123", built[0][0])
         self.assertEqual([provider for _uri, _name, provider in built], ["wms", "wms"])
 
