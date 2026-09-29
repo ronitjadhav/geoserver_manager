@@ -392,6 +392,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- Renaming a coverage store onto a taken name, or onto one a URL cannot
+  carry, is refused before the edit form closes, so the rest of the edit is
+  kept.
+- **A raster Replace upload that fails part-way now warns that the coverage
+  store may have lost its data file**, the same warning a cancelled one
+  gives. It used to be reported as a plain failure. If the dialog is already
+  closed, the warning goes to the QGIS log.
+- *Publish a coverage* no longer offers a coverage that is already published
+  under another layer name. Publishing it again made a duplicate layer.
+- A workspace whose name holds `#` or `?` is refused before any request when
+  you publish a raster or a vector, or add a coverage store or a cascaded
+  store. The checks used to read a different workspace from the one the
+  upload wrote to.
 - **Saving a workspace's namespace URI keeps it isolated.** The URI went to
   GeoServer without the isolation, so an isolated workspace lost it, and a
   URI it shared with another workspace was refused.

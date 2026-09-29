@@ -15,7 +15,7 @@
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="679" />
+        <location filename="../../gui/tab_cascaded.py" line="681" />
         <location filename="../../gui/tab_cascaded.py" line="550" />
         <location filename="../../gui/tab_cascaded.py" line="122" />
         <location filename="../../gui/tab_cascaded.py" line="84" />
@@ -23,7 +23,7 @@
         <translation type="unfinished">Espace de travail</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="705" />
+        <location filename="../../gui/tab_cascaded.py" line="707" />
         <location filename="../../gui/tab_cascaded.py" line="91" />
         <source>Cascaded layers</source>
         <translation type="unfinished" />
@@ -54,28 +54,28 @@
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="678" />
+        <location filename="../../gui/tab_cascaded.py" line="680" />
         <location filename="../../gui/tab_cascaded.py" line="544" />
         <location filename="../../gui/tab_cascaded.py" line="121" />
         <source>Name</source>
         <translation type="unfinished">Nom</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="680" />
+        <location filename="../../gui/tab_cascaded.py" line="682" />
         <location filename="../../gui/tab_cascaded.py" line="557" />
         <location filename="../../gui/tab_cascaded.py" line="123" />
         <source>Type</source>
         <translation type="unfinished">Type</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="697" />
+        <location filename="../../gui/tab_cascaded.py" line="699" />
         <location filename="../../gui/tab_cascaded.py" line="337" />
         <location filename="../../gui/tab_cascaded.py" line="124" />
         <source>Enabled</source>
         <translation type="unfinished">Activé</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="686" />
+        <location filename="../../gui/tab_cascaded.py" line="688" />
         <location filename="../../gui/tab_cascaded.py" line="564" />
         <location filename="../../gui/tab_cascaded.py" line="125" />
         <source>GetCapabilities URL</source>
@@ -238,7 +238,7 @@
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="690" />
+        <location filename="../../gui/tab_cascaded.py" line="692" />
         <location filename="../../gui/tab_cascaded.py" line="572" />
         <source>As GeoServer reaches it, from its own machine, not from yours.</source>
         <translation type="unfinished" />
@@ -274,52 +274,52 @@
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="636" />
+        <location filename="../../gui/tab_cascaded.py" line="638" />
         <source>Cascaded store '{}' already exists in workspace '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="663" />
+        <location filename="../../gui/tab_cascaded.py" line="665" />
         <source>Cascaded store '{}' created, but its credentials and limits could not be set: {}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="708" />
+        <location filename="../../gui/tab_cascaded.py" line="710" />
         <source>Layers</source>
         <translation type="unfinished">Couches</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="709" />
+        <location filename="../../gui/tab_cascaded.py" line="711" />
         <source>Open the Cascaded layers action for one layer's details.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="767" />
+        <location filename="../../gui/tab_cascaded.py" line="769" />
         <source>Failed to load cascaded store '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="776" />
+        <location filename="../../gui/tab_cascaded.py" line="778" />
         <source>Cascaded Store '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="793" />
+        <location filename="../../gui/tab_cascaded.py" line="795" />
         <source>Failed to save cascaded store '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="798" />
+        <location filename="../../gui/tab_cascaded.py" line="800" />
         <source>Cascaded store '{}' saved.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="833" />
+        <location filename="../../gui/tab_cascaded.py" line="835" />
         <source>Are you sure you want to delete cascaded store '{}'?</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_cascaded.py" line="837" />
+        <location filename="../../gui/tab_cascaded.py" line="839" />
         <source>Are you sure you want to delete %n cascaded store(s)?</source>
         <translation>
             <numerusform>Voulez-vous vraiment supprimer %n entrepôt en cascade ?</numerusform>
@@ -327,12 +327,12 @@
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="845" />
+        <location filename="../../gui/tab_cascaded.py" line="847" />
         <source>Cascaded store '{}' deleted.</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_cascaded.py" line="846" />
+        <location filename="../../gui/tab_cascaded.py" line="848" />
         <source>%n cascaded store(s) deleted.</source>
         <translation>
             <numerusform>%n entrepôt en cascade supprimé.</numerusform>
@@ -340,7 +340,7 @@
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_cascaded.py" line="851" />
+        <location filename="../../gui/tab_cascaded.py" line="853" />
         <source>Every cascaded layer published from it is deleted too; the remote server is not touched.</source>
         <translation type="unfinished" />
     </message>
@@ -546,432 +546,438 @@
 </context><context>
     <name>CoverageStoreTabMixin</name>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="66" />
+        <location filename="../../gui/tab_coveragestores.py" line="67" />
         <source>GeoTIFF (COG)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="67" />
+        <location filename="../../gui/tab_coveragestores.py" line="68" />
         <source>ImageMosaic (server directory)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="70" />
+        <location filename="../../gui/tab_coveragestores.py" line="71" />
         <source>ImageMosaic (properties ZIP)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="71" />
+        <location filename="../../gui/tab_coveragestores.py" line="72" />
         <source>A raster layer from this QGIS project</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="822" />
-        <location filename="../../gui/tab_coveragestores.py" line="122" />
+        <location filename="../../gui/tab_coveragestores.py" line="840" />
+        <location filename="../../gui/tab_coveragestores.py" line="123" />
         <source>Add a Coverage Store</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="123" />
+        <location filename="../../gui/tab_coveragestores.py" line="124" />
         <source>Create a raster store from a GeoTIFF, a COG, an ImageMosaic, or a raster layer of this project, uploaded and published</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="696" />
-        <location filename="../../gui/tab_coveragestores.py" line="285" />
-        <location filename="../../gui/tab_coveragestores.py" line="182" />
-        <location filename="../../gui/tab_coveragestores.py" line="133" />
+        <location filename="../../gui/tab_coveragestores.py" line="714" />
+        <location filename="../../gui/tab_coveragestores.py" line="286" />
+        <location filename="../../gui/tab_coveragestores.py" line="183" />
+        <location filename="../../gui/tab_coveragestores.py" line="134" />
         <source>Workspace</source>
         <translation>Espace de travail</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="322" />
-        <location filename="../../gui/tab_coveragestores.py" line="184" />
-        <location filename="../../gui/tab_coveragestores.py" line="140" />
+        <location filename="../../gui/tab_coveragestores.py" line="323" />
+        <location filename="../../gui/tab_coveragestores.py" line="185" />
+        <location filename="../../gui/tab_coveragestores.py" line="141" />
         <source>Coverages</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="142" />
+        <location filename="../../gui/tab_coveragestores.py" line="143" />
         <source>Coverages: the rasters this store publishes, with their details. Publish a coverage offers the ones not published yet.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="151" />
+        <location filename="../../gui/tab_coveragestores.py" line="152" />
         <source>Publish a coverage</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="153" />
+        <location filename="../../gui/tab_coveragestores.py" line="154" />
         <source>Publish a coverage: make one of the store's rasters a layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="160" />
+        <location filename="../../gui/tab_coveragestores.py" line="161" />
         <source>Reset</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="162" />
+        <location filename="../../gui/tab_coveragestores.py" line="163" />
         <source>Reset: GeoServer re-reads the store, after its file was replaced or a mosaic changed.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="170" />
+        <location filename="../../gui/tab_coveragestores.py" line="171" />
         <source>Delete</source>
         <translation>Supprimer</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="172" />
+        <location filename="../../gui/tab_coveragestores.py" line="173" />
         <source>Delete: remove the store, its coverages and their layers (asks first).</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="690" />
-        <location filename="../../gui/tab_coveragestores.py" line="279" />
-        <location filename="../../gui/tab_coveragestores.py" line="181" />
+        <location filename="../../gui/tab_coveragestores.py" line="708" />
+        <location filename="../../gui/tab_coveragestores.py" line="280" />
+        <location filename="../../gui/tab_coveragestores.py" line="182" />
         <source>Name</source>
         <translation type="unfinished">Nom</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="703" />
-        <location filename="../../gui/tab_coveragestores.py" line="291" />
-        <location filename="../../gui/tab_coveragestores.py" line="183" />
+        <location filename="../../gui/tab_coveragestores.py" line="721" />
+        <location filename="../../gui/tab_coveragestores.py" line="292" />
+        <location filename="../../gui/tab_coveragestores.py" line="184" />
         <source>Type</source>
         <translation>Type</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="191" />
+        <location filename="../../gui/tab_coveragestores.py" line="192" />
         <source>Failed to load coverage stores</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="710" />
-        <location filename="../../gui/tab_coveragestores.py" line="297" />
+        <location filename="../../gui/tab_coveragestores.py" line="728" />
+        <location filename="../../gui/tab_coveragestores.py" line="298" />
         <source>URL</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="300" />
+        <location filename="../../gui/tab_coveragestores.py" line="301" />
         <source>A path on the GeoServer machine (file:...) or a URL, as GeoServer reaches it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="506" />
-        <location filename="../../gui/tab_coveragestores.py" line="308" />
+        <location filename="../../gui/tab_coveragestores.py" line="515" />
+        <location filename="../../gui/tab_coveragestores.py" line="309" />
         <source>Enabled</source>
         <translation>Activé</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="313" />
+        <location filename="../../gui/tab_coveragestores.py" line="314" />
         <source>Description</source>
         <translation>Description</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="319" />
+        <location filename="../../gui/tab_coveragestores.py" line="320" />
         <source>Published coverages</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="323" />
+        <location filename="../../gui/tab_coveragestores.py" line="324" />
         <source>Open the Coverages action for one coverage's details.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="351" />
+        <location filename="../../gui/tab_coveragestores.py" line="352" />
         <source>Failed to load coverage store '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="360" />
+        <location filename="../../gui/tab_coveragestores.py" line="361" />
         <source>Coverage Store '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="377" />
+        <location filename="../../gui/tab_coveragestores.py" line="381" />
         <source>Failed to save coverage store '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="383" />
+        <location filename="../../gui/tab_coveragestores.py" line="387" />
         <source>Coverage store '{}' saved.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="416" />
+        <location filename="../../gui/tab_coveragestores.py" line="425" />
         <source>Failed to reset '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="419" />
+        <location filename="../../gui/tab_coveragestores.py" line="428" />
         <source>'{}' reset: GeoServer re-reads it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="633" />
-        <location filename="../../gui/tab_coveragestores.py" line="494" />
+        <location filename="../../gui/tab_coveragestores.py" line="651" />
+        <location filename="../../gui/tab_coveragestores.py" line="503" />
         <source>Coverage</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="502" />
+        <location filename="../../gui/tab_coveragestores.py" line="511" />
         <source>Native name</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="781" />
-        <location filename="../../gui/tab_coveragestores.py" line="645" />
-        <location filename="../../gui/tab_coveragestores.py" line="503" />
+        <location filename="../../gui/tab_coveragestores.py" line="799" />
+        <location filename="../../gui/tab_coveragestores.py" line="663" />
+        <location filename="../../gui/tab_coveragestores.py" line="512" />
         <source>Title</source>
         <translation type="unfinished">Titre</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="504" />
+        <location filename="../../gui/tab_coveragestores.py" line="513" />
         <source>SRS</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="505" />
+        <location filename="../../gui/tab_coveragestores.py" line="514" />
         <source>Native format</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="507" />
+        <location filename="../../gui/tab_coveragestores.py" line="516" />
         <source>Size in pixels</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="508" />
+        <location filename="../../gui/tab_coveragestores.py" line="517" />
         <source>Bounds</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="509" />
+        <location filename="../../gui/tab_coveragestores.py" line="518" />
         <source>Keywords</source>
         <translation type="unfinished">Mots-clés</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="788" />
-        <location filename="../../gui/tab_coveragestores.py" line="515" />
+        <location filename="../../gui/tab_coveragestores.py" line="806" />
+        <location filename="../../gui/tab_coveragestores.py" line="524" />
         <source>Abstract</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="524" />
-        <location filename="../../gui/tab_coveragestores.py" line="521" />
+        <location filename="../../gui/tab_coveragestores.py" line="533" />
+        <location filename="../../gui/tab_coveragestores.py" line="530" />
         <source>Bands</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="533" />
+        <location filename="../../gui/tab_coveragestores.py" line="542" />
         <source>Failed to load coverage '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="549" />
+        <location filename="../../gui/tab_coveragestores.py" line="558" />
         <source>Failed to load the coverages of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="557" />
+        <location filename="../../gui/tab_coveragestores.py" line="566" />
         <source>'{}' has no published coverage yet. Use Publish a coverage.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="565" />
+        <location filename="../../gui/tab_coveragestores.py" line="574" />
         <source>Coverages of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="568" />
+        <location filename="../../gui/tab_coveragestores.py" line="577" />
         <source>Read-only view of what this store publishes.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="606" />
+        <location filename="../../gui/tab_coveragestores.py" line="624" />
         <source>Failed to list the coverages of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="614" />
+        <location filename="../../gui/tab_coveragestores.py" line="632" />
         <source>Every coverage of '{}' is already published.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="622" />
+        <location filename="../../gui/tab_coveragestores.py" line="640" />
         <source>Publish a coverage of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="625" />
+        <location filename="../../gui/tab_coveragestores.py" line="643" />
         <source>Publishing a coverage makes it a layer. Leave the layer name empty to reuse the coverage's own name.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="640" />
+        <location filename="../../gui/tab_coveragestores.py" line="658" />
         <source>Layer name</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="650" />
+        <location filename="../../gui/tab_coveragestores.py" line="668" />
         <source>Publish</source>
         <translation>Publier</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="672" />
+        <location filename="../../gui/tab_coveragestores.py" line="690" />
         <source>Failed to publish '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="677" />
+        <location filename="../../gui/tab_coveragestores.py" line="695" />
         <source>'{}' published as a layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="714" />
+        <location filename="../../gui/tab_coveragestores.py" line="732" />
         <source>A path on the GeoServer machine (file:…) or, for a COG, an http(s):// or s3:// URL. Paths are resolved by the server, not by QGIS.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="723" />
+        <location filename="../../gui/tab_coveragestores.py" line="741" />
         <source>Directory</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="728" />
+        <location filename="../../gui/tab_coveragestores.py" line="746" />
         <source>A directory on the GeoServer machine holding the granules. Its coverages are discovered and published automatically.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="736" />
+        <location filename="../../gui/tab_coveragestores.py" line="754" />
         <source>Properties ZIP</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="740" />
+        <location filename="../../gui/tab_coveragestores.py" line="758" />
         <source>ZIP (*.zip);;All files (*)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="743" />
+        <location filename="../../gui/tab_coveragestores.py" line="761" />
         <source>A ZIP holding indexer.properties, datastore.properties and at least one granule. GeoServer refuses a properties-only archive. Nothing is published yet. Give the indexer a Name nobody used before: deleting a mosaic store leaves its granule index table behind, and a re-used name picks it up.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="754" />
+        <location filename="../../gui/tab_coveragestores.py" line="772" />
         <source>QGIS layer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="761" />
+        <location filename="../../gui/tab_coveragestores.py" line="779" />
         <source>File-based rasters of this project. The layer is written to a GeoTIFF and uploaded (a copy, not a link), and GeoServer publishes it under the store's name. The export to GeoTIFF runs before the upload and may take a moment; the upload itself runs in the background.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="772" />
+        <location filename="../../gui/tab_coveragestores.py" line="790" />
         <source>Replace it if it already exists</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="791" />
-        <location filename="../../gui/tab_coveragestores.py" line="784" />
+        <location filename="../../gui/tab_coveragestores.py" line="809" />
+        <location filename="../../gui/tab_coveragestores.py" line="802" />
         <source>Optional</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="807" />
+        <location filename="../../gui/tab_coveragestores.py" line="825" />
         <source>Failed to load the workspaces</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="814" />
+        <location filename="../../gui/tab_coveragestores.py" line="832" />
         <source>No workspaces available. Create a workspace first.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="823" />
+        <location filename="../../gui/tab_coveragestores.py" line="841" />
         <source>A coverage store is a source of rasters. Creating it does not publish anything, except an ImageMosaic from a directory, which discovers its coverages itself, and a raster uploaded from this project, which GeoServer publishes as a layer on arrival.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="832" />
+        <location filename="../../gui/tab_coveragestores.py" line="850" />
         <source>Create</source>
         <translation>Créer</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="941" />
-        <location filename="../../gui/tab_coveragestores.py" line="857" />
-        <source>Failed to create coverage store '{}'</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_coveragestores.py" line="957" />
-        <location filename="../../gui/tab_coveragestores.py" line="862" />
-        <source>Coverage store '{}' created.</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_coveragestores.py" line="888" />
-        <source>'{}' was created, but GeoServer dropped the COG settings. It will read whole files instead of ranges. Is the COG extension installed on the server?</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_coveragestores.py" line="968" />
-        <source>Upload of '{}' cancelled. Check the Coverage Stores tab for what was left.</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../../gui/tab_coveragestores.py" line="1014" />
+        <location filename="../../gui/tab_coveragestores.py" line="1039" />
+        <location filename="../../gui/tab_coveragestores.py" line="868" />
         <source>Failed to publish raster '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="1036" />
+        <location filename="../../gui/tab_coveragestores.py" line="964" />
+        <location filename="../../gui/tab_coveragestores.py" line="880" />
+        <source>Failed to create coverage store '{}'</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_coveragestores.py" line="980" />
+        <location filename="../../gui/tab_coveragestores.py" line="885" />
+        <source>Coverage store '{}' created.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_coveragestores.py" line="911" />
+        <source>'{}' was created, but GeoServer dropped the COG settings. It will read whole files instead of ranges. Is the COG extension installed on the server?</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_coveragestores.py" line="991" />
+        <source>Upload of '{}' cancelled. Check the Coverage Stores tab for what was left.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_coveragestores.py" line="1054" />
         <source>Raster '{}' is published, but its title, abstract and keywords could not be set</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="1055" />
+        <location filename="../../gui/tab_coveragestores.py" line="1075" />
         <source>Raster '{}' uploaded and published as a layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="1101" />
+        <location filename="../../gui/tab_coveragestores.py" line="1125" />
         <source>Tick Replace to overwrite it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="1108" />
+        <location filename="../../gui/tab_coveragestores.py" line="1137" />
         <source>Coverage store '{}' already exists in '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="1116" />
+        <location filename="../../gui/tab_coveragestores.py" line="1145" />
         <source>coverage store</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="1117" />
+        <location filename="../../gui/tab_coveragestores.py" line="1146" />
         <source>Coverage Stores</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="1135" />
+        <location filename="../../gui/tab_coveragestores.py" line="1164" />
+        <source>Upload of '{}' did not finish. GeoServer may have removed the data file of the coverage store it was replacing, leaving its layer without data. Upload it again with Replace ticked, or delete the coverage store.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../../gui/tab_coveragestores.py" line="1202" />
         <source>'{}' has no file to upload. A WMS, XYZ or other remote raster cannot be published this way.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="1144" />
+        <location filename="../../gui/tab_coveragestores.py" line="1211" />
         <source>'{}' uses a CRS without an EPSG code, which GeoServer cannot declare. Reproject the raster in QGIS first, rasters are uploaded as they are.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="1186" />
+        <location filename="../../gui/tab_coveragestores.py" line="1253" />
         <source>Are you sure you want to delete coverage store '{}'?</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_coveragestores.py" line="1190" />
+        <location filename="../../gui/tab_coveragestores.py" line="1257" />
         <source>Are you sure you want to delete %n coverage store(s)?</source>
         <translation>
             <numerusform>Voulez-vous vraiment supprimer %n entrepôt de couvertures ?</numerusform>
@@ -979,12 +985,12 @@
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="1198" />
+        <location filename="../../gui/tab_coveragestores.py" line="1265" />
         <source>Coverage store '{}' deleted.</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_coveragestores.py" line="1199" />
+        <location filename="../../gui/tab_coveragestores.py" line="1266" />
         <source>%n coverage store(s) deleted.</source>
         <translation>
             <numerusform>%n entrepôt de couvertures supprimé.</numerusform>
@@ -992,7 +998,7 @@
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_coveragestores.py" line="1203" />
+        <location filename="../../gui/tab_coveragestores.py" line="1270" />
         <source>Its coverages and the layers published from them are deleted too. The raster files stay on the server.</source>
         <translation type="unfinished" />
     </message>
@@ -2933,7 +2939,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1044" />
+        <location filename="../../gui/tab_layers.py" line="1046" />
         <location filename="../../gui/tab_layers.py" line="97" />
         <source>Publish a Layer</source>
         <translation>Publier une couche</translation>
@@ -2944,8 +2950,8 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="821" />
-        <location filename="../../gui/tab_layers.py" line="507" />
+        <location filename="../../gui/tab_layers.py" line="823" />
+        <location filename="../../gui/tab_layers.py" line="509" />
         <location filename="../../gui/tab_layers.py" line="186" />
         <location filename="../../gui/tab_layers.py" line="107" />
         <source>Workspace</source>
@@ -3032,13 +3038,13 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished">Type</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="508" />
+        <location filename="../../gui/tab_layers.py" line="510" />
         <location filename="../../gui/tab_layers.py" line="188" />
         <source>Store</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1546" />
+        <location filename="../../gui/tab_layers.py" line="1548" />
         <location filename="../../gui/tab_layers.py" line="189" />
         <source>Default style</source>
         <translation type="unfinished" />
@@ -3049,355 +3055,355 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="249" />
+        <location filename="../../gui/tab_layers.py" line="251" />
         <source>Datastore '{}' already exists in '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="253" />
+        <location filename="../../gui/tab_layers.py" line="255" />
         <source>Tick Replace to overwrite it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="275" />
+        <location filename="../../gui/tab_layers.py" line="277" />
         <source>Layer '{}' already exists. Tick Replace to overwrite it, or pick another name.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="284" />
+        <location filename="../../gui/tab_layers.py" line="286" />
         <source>Layer '{}' is published from store '{}', which this upload would not replace. Pick another name.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="301" />
+        <location filename="../../gui/tab_layers.py" line="303" />
         <source>Store '{}' is a {} store. Replace only overwrites a {} store this plugin published; pick another name.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="416" />
+        <location filename="../../gui/tab_layers.py" line="418" />
         <source>Data</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="902" />
-        <location filename="../../gui/tab_layers.py" line="420" />
+        <location filename="../../gui/tab_layers.py" line="904" />
+        <location filename="../../gui/tab_layers.py" line="422" />
         <source>Layer name</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="423" />
+        <location filename="../../gui/tab_layers.py" line="425" />
         <source>Renaming keeps the data: GeoServer updates the layer groups and the tile cache that use it. Clients that ask for the old name stop finding it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="869" />
-        <location filename="../../gui/tab_layers.py" line="432" />
+        <location filename="../../gui/tab_layers.py" line="871" />
+        <location filename="../../gui/tab_layers.py" line="434" />
         <source>Title</source>
         <translation>Titre</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="876" />
-        <location filename="../../gui/tab_layers.py" line="437" />
+        <location filename="../../gui/tab_layers.py" line="878" />
+        <location filename="../../gui/tab_layers.py" line="439" />
         <source>Abstract</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="883" />
-        <location filename="../../gui/tab_layers.py" line="443" />
+        <location filename="../../gui/tab_layers.py" line="885" />
+        <location filename="../../gui/tab_layers.py" line="445" />
         <source>Keywords</source>
         <translation>Mots-clés</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="852" />
-        <location filename="../../gui/tab_layers.py" line="448" />
+        <location filename="../../gui/tab_layers.py" line="854" />
+        <location filename="../../gui/tab_layers.py" line="450" />
         <source>SRS (EPSG code)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="452" />
+        <location filename="../../gui/tab_layers.py" line="454" />
         <source>The SRS GeoServer declares for the layer. Changing it recomputes the bounds.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="460" />
+        <location filename="../../gui/tab_layers.py" line="462" />
         <source>Projection policy</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="463" />
+        <location filename="../../gui/tab_layers.py" line="465" />
         <source>FORCE_DECLARED uses the declared SRS as it is; REPROJECT_TO_DECLARED reprojects from the data's own; NONE keeps the data's own.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="472" />
+        <location filename="../../gui/tab_layers.py" line="474" />
         <source>Enabled</source>
         <translation>Activé</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="474" />
+        <location filename="../../gui/tab_layers.py" line="476" />
         <source>Off: GeoServer stops serving the layer, and keeps it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="481" />
+        <location filename="../../gui/tab_layers.py" line="483" />
         <source>Advertised</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="483" />
+        <location filename="../../gui/tab_layers.py" line="485" />
         <source>Off: it is left out of the capabilities, but still served to whoever names it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="494" />
+        <location filename="../../gui/tab_layers.py" line="496" />
         <source>CQL filter</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="496" />
+        <location filename="../../gui/tab_layers.py" line="498" />
         <source>Optional, e.g. pop &gt; 1000</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="499" />
+        <location filename="../../gui/tab_layers.py" line="501" />
         <source>Only features matching it are served. Empty for all.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="506" />
+        <location filename="../../gui/tab_layers.py" line="508" />
         <source>Native name</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="509" />
+        <location filename="../../gui/tab_layers.py" line="511" />
         <source>Native bounding box</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="513" />
+        <location filename="../../gui/tab_layers.py" line="515" />
         <source>Native format</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="514" />
+        <location filename="../../gui/tab_layers.py" line="516" />
         <source>Size in pixels</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="531" />
+        <location filename="../../gui/tab_layers.py" line="533" />
         <source>Attributes</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="533" />
+        <location filename="../../gui/tab_layers.py" line="535" />
         <source>Bands</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="546" />
+        <location filename="../../gui/tab_layers.py" line="548" />
         <source>The details of '{}' could not be read. Refresh the list, then try again.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="2081" />
-        <location filename="../../gui/tab_layers.py" line="564" />
+        <location filename="../../gui/tab_layers.py" line="2083" />
+        <location filename="../../gui/tab_layers.py" line="566" />
         <source>Unsupported layer type '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1948" />
-        <location filename="../../gui/tab_layers.py" line="590" />
+        <location filename="../../gui/tab_layers.py" line="1950" />
+        <location filename="../../gui/tab_layers.py" line="592" />
         <source>Failed to load layer details</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="625" />
-        <location filename="../../gui/tab_layers.py" line="598" />
+        <location filename="../../gui/tab_layers.py" line="627" />
+        <location filename="../../gui/tab_layers.py" line="600" />
         <source>Layer '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="599" />
+        <location filename="../../gui/tab_layers.py" line="601" />
         <source>Cascaded through {type} store {ws}/{store}. Read-only: GeoServer's REST API cannot change a cascaded layer, its web UI can.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="626" />
+        <location filename="../../gui/tab_layers.py" line="628" />
         <source>Published from {ws}/{store}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="649" />
+        <location filename="../../gui/tab_layers.py" line="651" />
         <source>Failed to save layer '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="652" />
+        <location filename="../../gui/tab_layers.py" line="654" />
         <source>Layer '{}' saved.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="708" />
+        <location filename="../../gui/tab_layers.py" line="710" />
         <source>Layer '{}' already exists in '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1439" />
-        <location filename="../../gui/tab_layers.py" line="714" />
+        <location filename="../../gui/tab_layers.py" line="1441" />
+        <location filename="../../gui/tab_layers.py" line="716" />
         <source>The SRS must be an EPSG code number, such as 3857 or 4326.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="755" />
+        <location filename="../../gui/tab_layers.py" line="757" />
         <source>'{}' is a cascaded layer: GeoServer's REST API cannot update it, its web UI can.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="776" />
+        <location filename="../../gui/tab_layers.py" line="778" />
         <source>Failed to update '{}' from its data</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="781" />
+        <location filename="../../gui/tab_layers.py" line="783" />
         <source>'{}' re-read from its data, bounds recomputed.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="806" />
+        <location filename="../../gui/tab_layers.py" line="808" />
         <source>Source</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="810" />
+        <location filename="../../gui/tab_layers.py" line="812" />
         <source>A table in a datastore</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="814" />
+        <location filename="../../gui/tab_layers.py" line="816" />
         <source>A layer from this QGIS project</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="828" />
+        <location filename="../../gui/tab_layers.py" line="830" />
         <source>Datastore</source>
         <translation>Entrepôt de données</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="832" />
+        <location filename="../../gui/tab_layers.py" line="834" />
         <source>Datastores of the selected workspace</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="838" />
+        <location filename="../../gui/tab_layers.py" line="840" />
         <source>Table</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="842" />
+        <location filename="../../gui/tab_layers.py" line="844" />
         <source>Tables in the datastore that are not published yet. The layer takes the table's name.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="855" />
+        <location filename="../../gui/tab_layers.py" line="857" />
         <source>e.g. 3857</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="859" />
+        <location filename="../../gui/tab_layers.py" line="861" />
         <source>The SRS GeoServer declares for the layer: the table's own, as a bare EPSG number. A wrong value misplaces the data. Look it up in the table's geometry column; GeoServer's web UI can compute it.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="885" />
-        <location filename="../../gui/tab_layers.py" line="878" />
-        <location filename="../../gui/tab_layers.py" line="871" />
+        <location filename="../../gui/tab_layers.py" line="887" />
+        <location filename="../../gui/tab_layers.py" line="880" />
+        <location filename="../../gui/tab_layers.py" line="873" />
         <source>Metadata</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="879" />
-        <location filename="../../gui/tab_layers.py" line="872" />
+        <location filename="../../gui/tab_layers.py" line="881" />
+        <location filename="../../gui/tab_layers.py" line="874" />
         <source>Optional</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1662" />
-        <location filename="../../gui/tab_layers.py" line="889" />
+        <location filename="../../gui/tab_layers.py" line="1664" />
+        <location filename="../../gui/tab_layers.py" line="891" />
         <source>QGIS layer</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="893" />
+        <location filename="../../gui/tab_layers.py" line="895" />
         <source>A vector is written to a GeoPackage and becomes a datastore; a raster to a GeoTIFF and becomes a coverage store. Either way the data is copied to the server, not linked.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="906" />
+        <location filename="../../gui/tab_layers.py" line="908" />
         <source>Also the name of the store it creates (and, for a vector, of the table inside it). Anything a layer name cannot carry is replaced.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="915" />
+        <location filename="../../gui/tab_layers.py" line="917" />
         <source>Replace it if it already exists</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="922" />
+        <location filename="../../gui/tab_layers.py" line="924" />
         <source>Upload its symbology as the layer's style</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="928" />
+        <location filename="../../gui/tab_layers.py" line="930" />
         <source>Vector layers only. A raster's symbology is not uploaded.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1012" />
+        <location filename="../../gui/tab_layers.py" line="1014" />
         <source>Failed to load the workspaces</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1018" />
+        <location filename="../../gui/tab_layers.py" line="1020" />
         <source>No workspaces available. Create a workspace first.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1045" />
+        <location filename="../../gui/tab_layers.py" line="1047" />
         <source>Publish a table of a datastore, or a layer of this QGIS project, uploaded as a GeoPackage (a vector becomes a datastore) or as a GeoTIFF (a raster becomes a coverage store).</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1152" />
-        <location filename="../../gui/tab_layers.py" line="1053" />
+        <location filename="../../gui/tab_layers.py" line="1154" />
+        <location filename="../../gui/tab_layers.py" line="1055" />
         <source>Publish</source>
         <translation type="unfinished">Publier</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1305" />
-        <location filename="../../gui/tab_layers.py" line="1227" />
-        <location filename="../../gui/tab_layers.py" line="1093" />
-        <location filename="../../gui/tab_layers.py" line="1085" />
+        <location filename="../../gui/tab_layers.py" line="1307" />
+        <location filename="../../gui/tab_layers.py" line="1229" />
+        <location filename="../../gui/tab_layers.py" line="1095" />
+        <location filename="../../gui/tab_layers.py" line="1087" />
         <source>Failed to publish '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1349" />
-        <location filename="../../gui/tab_layers.py" line="1096" />
+        <location filename="../../gui/tab_layers.py" line="1351" />
+        <location filename="../../gui/tab_layers.py" line="1098" />
         <source>Layer '{}' published.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1116" />
+        <location filename="../../gui/tab_layers.py" line="1118" />
         <source>These layers would get the same GeoServer name: {}. Rename them in QGIS first.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1136" />
+        <location filename="../../gui/tab_layers.py" line="1138" />
         <source>Replace those that already exist</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_layers.py" line="1143" />
+        <location filename="../../gui/tab_layers.py" line="1145" />
         <source>Publish %n Layer(s)</source>
         <translation>
             <numerusform>Publier %n couche</numerusform>
@@ -3405,14 +3411,14 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1144" />
+        <location filename="../../gui/tab_layers.py" line="1146" />
         <source>Each layer is uploaded on its own, under the name shown: a vector as a GeoPackage datastore, a raster as a GeoTIFF coverage store.
 
 {}</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_layers.py" line="1164" />
+        <location filename="../../gui/tab_layers.py" line="1166" />
         <source>%n layer(s) published.</source>
         <translation>
             <numerusform>%n couche publiée.</numerusform>
@@ -3420,222 +3426,222 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1170" />
+        <location filename="../../gui/tab_layers.py" line="1172" />
         <source>Published: {}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1176" />
+        <location filename="../../gui/tab_layers.py" line="1178" />
         <source>Failed: {}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1180" />
+        <location filename="../../gui/tab_layers.py" line="1182" />
         <source>Not started: {}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1332" />
+        <location filename="../../gui/tab_layers.py" line="1334" />
         <source>Layer '{}' is published, but its title, keywords or style could not be set</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1341" />
+        <location filename="../../gui/tab_layers.py" line="1343" />
         <source>Layer '{}' published. Style '{}' already existed and was left as it is, not assigned to the layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1363" />
+        <location filename="../../gui/tab_layers.py" line="1365" />
         <source>datastore</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1364" />
+        <location filename="../../gui/tab_layers.py" line="1366" />
         <source>Datastores</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1432" />
+        <location filename="../../gui/tab_layers.py" line="1434" />
         <source>Layer '{}' already exists in {}/{}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1529" />
+        <location filename="../../gui/tab_layers.py" line="1531" />
         <source>Failed to load styles for '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1538" />
+        <location filename="../../gui/tab_layers.py" line="1540" />
         <source>Styles of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1539" />
+        <location filename="../../gui/tab_layers.py" line="1541" />
         <source>Global styles and the styles of workspace '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1554" />
+        <location filename="../../gui/tab_layers.py" line="1556" />
         <source>Other styles</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1559" />
+        <location filename="../../gui/tab_layers.py" line="1561" />
         <source>Style</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1560" />
+        <location filename="../../gui/tab_layers.py" line="1562" />
         <source>The styles a client may also ask for. Empty for none.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1567" />
+        <location filename="../../gui/tab_layers.py" line="1569" />
         <source>Set styles</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1598" />
+        <location filename="../../gui/tab_layers.py" line="1600" />
         <source>Failed to set the styles of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1601" />
+        <location filename="../../gui/tab_layers.py" line="1603" />
         <source>Styles of '{}' saved.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1615" />
+        <location filename="../../gui/tab_layers.py" line="1617" />
         <source>No style named {} on the server.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1643" />
+        <location filename="../../gui/tab_layers.py" line="1645" />
         <source>This QGIS project has no vector or raster layer to take a style from.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1652" />
+        <location filename="../../gui/tab_layers.py" line="1654" />
         <source>Style '{}' from QGIS</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1653" />
+        <location filename="../../gui/tab_layers.py" line="1655" />
         <source>The layer's symbology is exported as SLD and uploaded to workspace '{}'. A style of that name there is replaced, that is how you push a change you just made in QGIS.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1672" />
+        <location filename="../../gui/tab_layers.py" line="1674" />
         <source>No project layer matches '{}' by name.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1679" />
+        <location filename="../../gui/tab_layers.py" line="1681" />
         <source>Style name</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1686" />
+        <location filename="../../gui/tab_layers.py" line="1688" />
         <source>Make it the layer's default style</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1694" />
+        <location filename="../../gui/tab_layers.py" line="1696" />
         <source>Upload</source>
         <translation>Téléverser</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1705" />
+        <location filename="../../gui/tab_layers.py" line="1707" />
         <source>Could not export the symbology of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1722" />
+        <location filename="../../gui/tab_layers.py" line="1724" />
         <source>Failed to upload the style of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1729" />
+        <location filename="../../gui/tab_layers.py" line="1731" />
         <source>Style '{}' left as it is.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1735" />
+        <location filename="../../gui/tab_layers.py" line="1737" />
         <source>'{}' styled from '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1739" />
+        <location filename="../../gui/tab_layers.py" line="1741" />
         <source>Style '{}' uploaded to '{}'.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1794" />
+        <location filename="../../gui/tab_layers.py" line="1796" />
         <source>Replace the style?</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1795" />
+        <location filename="../../gui/tab_layers.py" line="1797" />
         <source>Style '{style}' already exists in '{workspace}'. Replace it? Every layer that uses it will render differently.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1831" />
+        <location filename="../../gui/tab_layers.py" line="1833" />
         <source>layer is not valid</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1938" />
+        <location filename="../../gui/tab_layers.py" line="1940" />
         <source>Could not open a browser for {}</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="1980" />
+        <location filename="../../gui/tab_layers.py" line="1982" />
         <source>Could not build the preview of '{}'</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="2007" />
+        <location filename="../../gui/tab_layers.py" line="2009" />
         <source>WFS loads the features themselves (editable, styled in QGIS); WMS and WMTS load rendered images. Credentials come from the plugin's saved connection, not from the layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="2016" />
+        <location filename="../../gui/tab_layers.py" line="2018" />
         <source>WMS and WMTS load rendered images. This layer has no features to serve over WFS. Credentials come from the plugin's saved connection, not from the layer.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="2023" />
+        <location filename="../../gui/tab_layers.py" line="2025" />
         <source>Add '{}' to QGIS</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="2028" />
+        <location filename="../../gui/tab_layers.py" line="2030" />
         <source>Load as</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="2037" />
+        <location filename="../../gui/tab_layers.py" line="2039" />
         <source>Add</source>
         <translation>Ajouter</translation>
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="2049" />
+        <location filename="../../gui/tab_layers.py" line="2051" />
         <source>Could not add '{}' to QGIS</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="2054" />
+        <location filename="../../gui/tab_layers.py" line="2056" />
         <source>'{}' added to the project as {}.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="2098" />
+        <location filename="../../gui/tab_layers.py" line="2100" />
         <source>Are you sure you want to delete layer '{}'?</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_layers.py" line="2101" />
+        <location filename="../../gui/tab_layers.py" line="2103" />
         <source>Are you sure you want to delete %n layer(s)?</source>
         <translation>
             <numerusform>Voulez-vous vraiment supprimer %n couche ?</numerusform>
@@ -3643,12 +3649,12 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="2109" />
+        <location filename="../../gui/tab_layers.py" line="2111" />
         <source>Layer '{}' deleted.</source>
         <translation type="unfinished" />
     </message>
     <message numerus="yes">
-        <location filename="../../gui/tab_layers.py" line="2110" />
+        <location filename="../../gui/tab_layers.py" line="2112" />
         <source>%n layer(s) deleted.</source>
         <translation>
             <numerusform>%n couche supprimée.</numerusform>
@@ -3656,7 +3662,7 @@ Enter your GeoServer's URL, user name and password on the settings page that ope
         </translation>
     </message>
     <message>
-        <location filename="../../gui/tab_layers.py" line="2115" />
+        <location filename="../../gui/tab_layers.py" line="2117" />
         <source>The published layer goes too; the table, file or remote layer behind it is not touched. GeoServer refuses while a layer group still uses the layer: remove it from the group first.</source>
         <translation type="unfinished" />
     </message>

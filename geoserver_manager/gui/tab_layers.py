@@ -242,6 +242,8 @@ class LayerTabMixin:
         The store first, then the layer: a layer of the name in another
         store is what _refuse_layer_clash catches.
         """
+        # The library's reads take the workspace raw: "sf#x" reads "sf".
+        self._require_safe_name(ws_name)
         if not values.get("replace") and self._resource_exists(
             self.gs.get_datastore, ws_name, name
         ):

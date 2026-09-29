@@ -196,6 +196,11 @@ class FakeGS:
         # The library answers list=all: everything the store can expose.
         return ([{"name": "mosaic"}, {"name": "extra"}], 200)
 
+    def get_coverage(self, workspace_name, store_name, name):
+        self.calls.append(("get_coverage", workspace_name, store_name, name))
+        # Published under its own name: GeoServer writes no nativeCoverageName.
+        return ({"name": name, "nativeName": name}, 200)
+
     def create_coverage_store(
         self, workspace_name, name, url, type=None, metadata=None
     ):
@@ -314,6 +319,34 @@ class TestCoverageStoresTab(unittest.TestCase):
         self.dlg.gs.PUBLISHED = {"mosaic": ["mosaic"]}
         self.assertEqual(self.dlg._publishable_coverages("nurc", "mosaic"), ["extra"])
 
+    def test_a_coverage_published_under_another_name_is_not_offered_again(self):
+        """list=all answers native names, list=configured the published ones:
+        "extra" published as "elev" stayed on offer, and a second publish made
+        a duplicate layer."""
+        self.dlg.gs.PUBLISHED = {"mosaic": ["elev"]}
+        # As GeoServer stores a coverage published under another name (measured).
+        self.dlg.gs.get_coverage = lambda ws, store, name: (
+            {"name": "elev", "nativeName": "extra"},
+            200,
+        )
+        self.assertEqual(self.dlg._publishable_coverages("nurc", "mosaic"), ["mosaic"])
+
+        # An uploaded raster renamed later: GeoServer also wrote nativeCoverageName.
+        self.dlg.gs.PUBLISHED = {"mosaic": ["elev", "dem"]}
+        stored = {
+            "elev": {"name": "elev", "nativeName": "extra"},
+            "dem": {
+                "name": "dem",
+                "nativeName": "mosaic",
+                "nativeCoverageName": "mosaic",
+            },
+        }
+        self.dlg.gs.get_coverage = lambda ws, store, name: (stored[name], 200)
+        with patch.object(tab_coveragestores, "ResourceFormDialog", Recording):
+            self.dlg._publish_coverage(["mosaic", "nurc"])
+        self.assertEqual(Recording.opened, [])
+        self.assertIn("Every coverage of 'mosaic' is already published.", self.warnings)
+
 
 class TestStoreAndCoverageDetail(unittest.TestCase):
     """The detail views read what GeoServer stores, not what the models keep."""
@@ -418,6 +451,31 @@ class TestStoreAndCoverageDetail(unittest.TestCase):
         dlg._resource_exists = lambda getter, *args: True
         with self.assertRaises(ValueError):
             dlg._save_coverage_store("sf", "sfdem", {"name": "taken"})
+        self.assertEqual(sent, [])
+
+    def test_a_rename_onto_a_taken_name_stays_in_the_form(self):
+        """Refused after the form closed, the rest of the edit was lost."""
+        dlg = SyncDialog()
+        dlg.gs = FakeGS(exists=True)
+        sent = []
+        dlg._raw_rest = lambda method, path, **kw: sent.append(method)
+        dlg._coverage_store_detail = lambda ws, name: dict(SFDEM_STORE)
+        dlg._published_coverage_names = lambda ws, name: ["sfdem"]
+        seen = {}
+
+        class Editing(ResourceFormDialog):
+            def exec(inner):
+                inner.get_widget("name").setText("taken")
+                inner.get_widget("description").setPlainText("Typed")
+                inner._on_accept()
+                seen["open"] = not inner.result()
+                seen["said"] = inner._validation_label.text()
+                return QDialog.DialogCode.Rejected
+
+        with patch.object(tab_coveragestores, "ResourceFormDialog", Editing):
+            dlg._show_coverage_store_info(["sfdem", "sf"])
+        self.assertTrue(seen["open"])
+        self.assertIn("'taken' already exists", seen["said"])
         self.assertEqual(sent, [])
 
     def test_reset_posts_to_the_stores_reset_path(self):
@@ -858,6 +916,15 @@ class TestPublishQgisRaster(RasterFixture):
     def puts(self):
         return [call for call in self.dlg.gs.calls if call[0] == "PUT"]
 
+    def publish(self, on_done=None, **extra):
+        """As the Add form and the Layers tab call it: under _run_action."""
+        return self.dlg._run_action(
+            lambda: self.dlg._publish_qgis_raster(
+                self.values(**extra), on_done=on_done
+            ),
+            "Failed to publish raster",
+        )
+
     def test_a_local_geotiff_is_uploaded_as_it_is_under_a_safe_name(self):
         self.add_layer("dem")
         self.dlg._publish_qgis_raster(self.values())
@@ -889,12 +956,12 @@ class TestPublishQgisRaster(RasterFixture):
     def test_an_existing_store_is_refused_unless_replace_is_ticked(self):
         self.add_layer("dem")
         self.dlg.gs = FakeGS(exists=True)
-        self.dlg._publish_qgis_raster(self.values())
+        self.publish()
         self.assertEqual(len(self.errors), 1)
         self.assertIn("Replace", self.errors[0])
         self.assertEqual(self.puts(), [])
 
-        self.dlg._publish_qgis_raster(self.values(replace=True))
+        self.publish(replace=True)
         self.assertEqual(len(self.puts()), 1)
 
     def test_the_form_check_asks_for_the_name_the_upload_will_use(self):
@@ -954,7 +1021,7 @@ class TestPublishQgisRaster(RasterFixture):
 
     def test_a_raster_without_a_crs_is_refused_before_anything_is_sent(self):
         self.add_layer("dem", epsg=None)
-        self.dlg._publish_qgis_raster(self.values())
+        self.publish()
         self.assertEqual(len(self.errors), 1)
         self.assertIn("CRS", self.errors[0])
         self.assertEqual(self.puts(), [])
@@ -967,10 +1034,97 @@ class TestPublishQgisRaster(RasterFixture):
                 "+ellps=WGS84 +units=m +no_defs"
             )
         )
-        self.dlg._publish_qgis_raster(self.values())
+        self.publish()
         self.assertEqual(len(self.errors), 1)
         self.assertIn("EPSG", self.errors[0])
         self.assertEqual(self.puts(), [])
+
+    def test_a_workspace_a_path_cannot_carry_is_refused_before_any_request(self):
+        """requests sends workspaces/sf#x/... as workspaces/sf: the existence
+        checks read another resource than the upload wrote to."""
+        self.add_layer("dem")
+        for values in (
+            {"name": "dem", "workspace": "sf#x", "type": GEOTIFF, "url": "file:x"},
+            self.values(workspace="sf#x", replace=True),
+            self.values(workspace="sf?x"),
+        ):
+            with self.assertRaises(ValueError) as refused:
+                self.dlg._check_new_coverage_store(values)
+            self.assertIn(values["workspace"], str(refused.exception))
+        self.publish(workspace="sf#x", replace=True)  # the Layers tab's route
+        self.assertIn("'sf#x'", self.errors[-1])
+        self.assertEqual(self.dlg.gs.calls, [])
+
+    def test_a_vector_into_such_a_workspace_is_refused_the_same_way(self):
+        """Publish a Layer's vector twin read the datastore of "sf" and
+        uploaded the GeoPackage to "sf#x"."""
+        layer = QgsVectorLayer("Point?crs=EPSG:4326", "roads", "memory")
+        QgsProject.instance().addMapLayer(layer)
+        self.dlg.gs.get_datastore = lambda ws, name: (
+            self.dlg.gs.calls.append(("get_datastore", ws, name)) or ({}, 404)
+        )
+        for workspace, replace in (("sf#x", False), ("sf?x", True)):
+            self.dlg._run_action(
+                lambda: self.dlg._publish_qgis_layer(
+                    {"workspace": workspace, "name": "roads", "replace": replace},
+                    layer=layer,
+                ),
+                "Failed to publish",
+            )
+        self.assertEqual(self.dlg.gs.calls, [])
+        self.assertEqual(len(self.errors), 2)
+        self.assertIn("'sf#x'", self.errors[0])
+        self.assertIn("'sf?x'", self.errors[1])
+
+    def test_a_cancel_during_a_raster_s_checks_stops_the_batch(self):
+        """Cancel on the waiting box while a raster of a batch was checked
+        counted it as failed and checked the next one; a vector stopped."""
+        from geoserver_manager.gui import tab_layers
+        from geoserver_manager.toolbelt.rest import Abandoned
+
+        layers = [self.add_layer("dem"), self.add_layer("dem2", "dem2.tif")]
+        checked = []
+
+        def cancelled(ws_name, name, replace):
+            checked.append(name)
+            raise Abandoned()  # what the waiting box's Cancel raises
+
+        self.dlg._check_raster_target = cancelled
+
+        class Accepting(ResourceFormDialog):
+            def exec(inner):
+                return QDialog.DialogCode.Accepted
+
+        with patch.object(tab_layers, "ResourceFormDialog", Accepting):
+            self.dlg._publish_layers(layers)
+        self.assertEqual(checked, ["dem"])
+        self.assertEqual(self.puts(), [])
+        self.assertEqual(self.errors, [])
+        self.assertIn("Not started: dem, dem2.", self.warnings[-1])
+
+    def test_a_replace_cut_short_says_the_store_may_have_lost_its_file(self):
+        """A connection dropped mid-body leaves what a cancel leaves; it was
+        reported as a plain failure."""
+        import requests
+
+        def reset(path, **kwargs):
+            raise requests.exceptions.ConnectionError("Connection reset by peer")
+
+        self.add_layer("dem")
+        outcomes = []
+        self.dlg.gs = FakeGS(exists=True)
+        self.dlg.gs.rest_service.rest_client.put = reset
+        self.publish(replace=True, on_done=outcomes.append)
+        self.assertIn("Connection reset", self.errors[-1])
+        self.assertIn("may have removed the data file", " ".join(self.warnings))
+        self.assertEqual(outcomes, ["failed"])  # a batch still goes on
+
+        # A Replace with nothing to replace: a failed first upload leaves nothing.
+        self.warnings.clear()
+        self.dlg.gs = FakeGS(exists=False)
+        self.dlg.gs.rest_service.rest_client.put = reset
+        self.publish(replace=True)
+        self.assertEqual(self.warnings, [])
 
     def test_a_cancelled_upload_says_what_the_server_kept(self):
         def report():
@@ -1107,6 +1261,32 @@ class TestRasterUploadRunsInATask(RasterFixture):
         self.assertIn("is published, but its title", warnings[0])
         self.assertIn("boom", warnings[0])
         self.assertEqual(outcomes, ["done"])
+
+    def test_a_replace_that_ends_after_the_dialog_closed_says_so_in_the_log(self):
+        """The closing branch logged the failure alone, never that the
+        replaced store may be left without its file."""
+        import requests
+
+        def reset(path, **kwargs):
+            raise requests.exceptions.ConnectionError("Connection reset by peer")
+
+        layer = self.add_layer("dem")
+        logged = []
+        self.dlg.log = lambda text, **kwargs: logged.append(text)
+        self.dlg.gs = FakeGS(exists=True)
+        self.dlg.gs.rest_service.rest_client.put = reset
+        self.dlg._publish_qgis_raster(
+            {"name": "dem", "workspace": "sf", "qgis_layer": layer, "replace": True}
+        )
+        self.dlg._closing = True  # closed while it uploads
+        waited = 0
+        while self.dlg._upload is not None and waited < 20000:
+            QTest.qWait(20)
+            waited += 20
+        self.assertTrue(
+            [line for line in logged if "may have removed the data file" in line],
+            logged,
+        )
 
     def test_the_viewer_prefers_the_abstract_over_the_generated_description(self):
         both = {"abstract": "Written by hand", "description": "Generated from GeoTIFF"}

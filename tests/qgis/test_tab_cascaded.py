@@ -607,6 +607,17 @@ class TestNamesInPaths(unittest.TestCase):
                 )
         self.assertEqual([c for c in self.gs.calls if c[0].startswith("create")], [])
 
+    def test_a_workspace_the_paths_cannot_carry_is_refused_first(self):
+        """The library sends workspaces/topp#x/... as workspaces/topp: the
+        check read the workspace and called the store taken."""
+        for bad in ("topp#x", "topp?x"):
+            with self.assertRaises(ValueError) as refused:
+                self.dlg._check_new_cascaded_store(
+                    {"workspace": bad, "name": "new", "type": WMS}
+                )
+            self.assertIn(bad, str(refused.exception))
+        self.assertEqual(self.gs.calls, [])
+
     def test_a_published_name_is_refused_the_same_way(self):
         with self.assertRaises(ValueError):
             self.dlg._create_cascaded_layer("topp", "remote", WMS, "topp:states", "a/b")

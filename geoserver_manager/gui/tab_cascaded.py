@@ -630,6 +630,8 @@ class CascadedStoreTabMixin:
         form runs it before it closes, the create again."""
         ws, name, kind = values["workspace"], values["name"].strip(), values["type"]
         self._require_safe_name(name)
+        # The library's paths take the workspace raw: "sf#x" reads "sf".
+        self._require_safe_name(ws)
         # create_* upserts, so an existing name would reconfigure a live store
         if self._cascaded_store_exists(ws, name, kind):
             raise ValueError(
