@@ -392,6 +392,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **Add to QGIS as WFS** is refused, and the message names both addresses,
+  when GeoServer advertises its WFS somewhere other than the address the
+  plugin connects to (for example behind a proxy without a Proxy base URL,
+  or through a tunnel). QGIS's WFS layer sent the saved credentials to that
+  other address, in plain HTTP when it was an http one. A WMTS layer's
+  feature info now stays on the plugin's address too.
+- When QGIS cannot load a layer (*Add to QGIS*, *Preview*), the banner, the
+  log and the preview now say why in plain words, such as "Download of
+  capabilities failed: Connection refused", or name the tab of QGIS's log
+  panel that holds the reason. They used to show HTML tags and the layer's
+  URI, and a WFS layer only said "layer is not valid".
+- A failed feature info request in the preview shows its message without
+  HTML tags.
+- **Publishing several layers:** a layer renamed in QGIS while the batch
+  runs is published under the name the form listed. It used to take its new
+  name, and with *Replace* could overwrite a layer the same batch had just
+  published.
+- A layer removed from the project, or a new project opened, while several
+  layers are being published is now reported as not started. It used to fail
+  with a Python error about a deleted object.
+- The preview window stays on its layer when QGIS opens a project, so
+  feature info still answers, and saving the project no longer writes the
+  preview into the .qgs file.
 - **An edit keeps what another client saved meanwhile.** Saving a datastore,
   a workspace or a tile cache now applies only the fields you changed onto
   what GeoServer has at that moment. A store disabled, a charset, a service

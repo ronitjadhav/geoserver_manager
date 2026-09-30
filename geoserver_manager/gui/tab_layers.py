@@ -11,14 +11,15 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
-from urllib.parse import quote, unquote, urlencode
+from urllib.parse import quote, unquote, urlencode, urlsplit
 
 from qgis.core import Qgis, QgsDataSourceUri, QgsProject, QgsRasterLayer, QgsVectorLayer
+from qgis.PyQt import sip
 from qgis.PyQt.QtCore import QCoreApplication, Qt, QUrl
 from qgis.PyQt.QtGui import QDesktopServices
 from qgis.PyQt.QtWidgets import QApplication, QDialog, QMessageBox
 
-from geoserver_manager.gui.dlg_preview import LayerPreviewDialog
+from geoserver_manager.gui.dlg_preview import LayerPreviewDialog, load_error
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.scope import PENDING
 from geoserver_manager.toolbelt.payload import (
@@ -86,6 +87,29 @@ def _kind_label(kind):
         WMS: translate("LayerTabMixin", "Cascaded WMS"),
         WMTS: translate("LayerTabMixin", "Cascaded WMTS"),
     }.get(kind, kind)
+
+
+def _origin(url):
+    """scheme://host[:port] of a URL, a default port left out; None without a host."""
+    parts = urlsplit(url)
+    if not parts.hostname:
+        return None
+    scheme = parts.scheme.lower()
+    port = parts.port if parts.port != {"http": 80, "https": 443}.get(scheme) else None
+    return f"{scheme}://{parts.hostname}" + (f":{port}" if port else "")
+
+
+def _hrefs(node):
+    """Every xlink:href under a node of a document xmltodict parsed."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "@xlink:href":
+                yield value
+            else:
+                yield from _hrefs(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _hrefs(item)
 
 
 class LayerTabMixin:
@@ -1109,11 +1133,12 @@ class LayerTabMixin:
         """Publish several project layers into one workspace, one after another.
 
         One small form (workspace, Replace, style) for all of them; each layer
-        keeps its own GeoServer-safe name. Only one upload runs at a time, so
-        each layer starts when the previous one has ended. A layer refused
-        before any request, or whose upload fails, is reported and skipped;
-        Cancel stops the batch, and the summary names what was published and
-        what was not.
+        keeps the GeoServer-safe name the form lists, even when it is renamed
+        in QGIS before its turn. Only one upload runs at a time, so each layer
+        starts when the previous one has ended. A layer refused before any
+        request, or whose upload fails, is reported and skipped, and so is one
+        no longer in the project when its turn comes; Cancel stops the batch,
+        and the summary names what was published and what was not.
         """
         names = [geoserver_name(layer.name()) for layer in layers]
         clashes = sorted({name for name in names if names.count(name) > 1})
@@ -1164,11 +1189,12 @@ class LayerTabMixin:
         values = dlg.get_values()
         queue = list(zip(layers, names))
         published, failed = [], []
+        gone = []  # removed from the project, or a new project, before their turn
         ended = []  # how the layer that stopped the batch ended, in words
 
         def summary(stopped):
             left = [name for _layer, name in queue]
-            if not stopped and not failed:
+            if not stopped and not failed and not gone:
                 self.show_success_message(
                     translate(
                         "LayerTabMixin", "%n layer(s) published.", None, len(published)
@@ -1184,6 +1210,12 @@ class LayerTabMixin:
                 parts.append(
                     translate("LayerTabMixin", "Failed: {}.").format(", ".join(failed))
                 )
+            if gone:
+                parts.append(
+                    translate(
+                        "LayerTabMixin", "Not started, no longer in the project: {}."
+                    ).format(", ".join(gone))
+                )
             parts += ended
             if stopped and left:
                 parts.append(
@@ -1198,6 +1230,9 @@ class LayerTabMixin:
                 self.log(text, log_level=Qgis.MessageLevel.Warning)
 
         def next_layer():
+            # A layer the project deleted meanwhile: its wrapper raises on any call.
+            while queue and sip.isdeleted(queue[0][0]):
+                gone.append(queue.pop(0)[1])
             if not queue:
                 summary(stopped=False)
                 return
@@ -1237,7 +1272,8 @@ class LayerTabMixin:
                         self._publish_qgis_layer(
                             {
                                 "workspace": values["workspace"],
-                                "name": layer.name(),
+                                # As listed and checked: a rename since then is ignored.
+                                "name": name,
                                 "replace": values.get("replace"),
                                 "with_style": values.get("with_style"),
                             },
@@ -1890,8 +1926,13 @@ class LayerTabMixin:
 
         The constructor reads the capabilities: a request, so build it in a
         worker (_fetch). It may be invalid; _valid_layer() makes that an error.
+        A WFS layer is refused first when its capabilities point elsewhere.
         """
         settings = self.plg_settings.get_plg_settings()
+        if protocol == "WFS":
+            self._refuse_foreign_wfs(
+                qualified_name.rpartition(":")[0], settings.geoserver_url
+            )
         uri, provider = self._layer_uri(
             protocol,
             settings.geoserver_url,
@@ -1901,14 +1942,37 @@ class LayerTabMixin:
         layer_class = QgsVectorLayer if provider == "WFS" else QgsRasterLayer
         return layer_class(uri, title, provider)
 
+    def _refuse_foreign_wfs(self, workspace_name, base_url):
+        """Refuse a WFS whose capabilities send QGIS to another address.
+
+        The WFS provider sends DescribeFeatureType and GetFeature, with the
+        saved credentials, to the URLs the capabilities advertise, and has no
+        option to stay on the one it is given (measured on QGIS 3.44).
+        GeoServer writes them from its Proxy base URL, or from the Host a
+        proxy forwards. A read, for the worker that builds the layer.
+        """
+        capabilities = self.gs.ows_service.get_wfs_capabilities(workspace_name)
+        metadata = (capabilities.get("wfs:WFS_Capabilities") or {}).get(
+            "ows:OperationsMetadata"
+        )
+        ours = _origin(base_url)
+        elsewhere = sorted({_origin(url) for url in _hrefs(metadata)} - {ours, None})
+        if elsewhere:
+            raise RuntimeError(
+                translate(
+                    "LayerTabMixin",
+                    "GeoServer advertises its WFS at {}, not at {} where the plugin "
+                    "connects, and QGIS would send the saved credentials there. "
+                    "Check the Proxy base URL in the Server tab's Global settings, "
+                    "or add the layer as WMS.",
+                ).format(", ".join(elsewhere), ours)
+            )
+
     @staticmethod
     def _valid_layer(layer):
         """The layer, or a RuntimeError with QGIS's reason when it is invalid."""
         if not layer.isValid():
-            raise RuntimeError(
-                layer.error().message()
-                or translate("LayerTabMixin", "layer is not valid")
-            )
+            raise RuntimeError(load_error(layer))
         return layer
 
     @staticmethod
@@ -1923,7 +1987,9 @@ class LayerTabMixin:
 
         IgnoreGetMapUrl and IgnoreGetFeatureInfoUrl keep QGIS on this URL,
         the one the plugin reached, instead of the one the capabilities
-        advertise: behind a proxy that can be an inside address.
+        advertise: behind a proxy that can be an inside address, which got
+        the saved credentials. A WMTS identify needs the second one too
+        (measured). WFS has no such option; see _refuse_foreign_wfs.
 
         Credentials never go in the URI: `authcfg` is the id of the QGIS
         authentication config the plugin already stores, and the providers
@@ -1948,7 +2014,7 @@ class LayerTabMixin:
                 f"format=image/png&layers={name}&styles="
                 f"&tileMatrixSet={_WMTS_TILE_MATRIX_SET}"
                 f"&url={base}/gwc/service/wmts?REQUEST=GetCapabilities"
-                f"&IgnoreGetMapUrl=1{auth}",
+                f"&IgnoreGetMapUrl=1&IgnoreGetFeatureInfoUrl=1{auth}",
                 "wms",
             )
         if protocol == "WFS":
@@ -2134,17 +2200,9 @@ class LayerTabMixin:
         protocol = dlg.get_values()["protocol"]
 
         def build():
-            layer = self._server_layer(protocol, f"{ws_name}:{name}", name)
-            if protocol == "WFS" and not layer.isValid():
-                # WFS follows the advertised address, silently (measured).
-                hint = translate(
-                    "LayerTabMixin",
-                    "GeoServer may advertise another address for its WFS than "
-                    "the one the plugin uses. Check the Proxy base URL in the "
-                    "Server tab's Global settings.",
-                )
-                raise RuntimeError(f"{layer.error().message()} {hint}".strip())
-            return self._valid_layer(layer)
+            return self._valid_layer(
+                self._server_layer(protocol, f"{ws_name}:{name}", name)
+            )
 
         # Built and checked here, not through iface.addRasterLayer(), so an
         # unreachable layer becomes our banner rather than QGIS's modal.

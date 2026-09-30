@@ -70,7 +70,11 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   offers `IdentifyValue`, which is how the dialog is tested without a server. The WMS provider needs the
   canvas extent and size to turn the point into a pixel. One map tool does both: a drag pans, a release
   within 3 px of the press identifies. `WA_DeleteOnClose` plus `stopRendering()` in `closeEvent` make
-  closing mid-render safe, and the window is non-modal so the main dialog's tasks carry on.
+  closing mid-render safe, and the window is non-modal so the main dialog's tasks carry on. Every
+  `QgsMapCanvas` connects itself to the project's `readProject` and `writeProject`: opening a
+  project moved the preview to that project's CRS and extent, where identify missed, and a save
+  wrote a nameless `<mapcanvas>` into the .qgs. PyQt cannot disconnect a connection QGIS made in
+  C++ ("disconnect() failed", measured), so the dialog connects after the canvas and undoes both.
 - **Thread safety:** the REST methods are stateless `requests.*` calls and are safe to run through
   `_fan_out` (the datastore list does this). `self.wms` / `self.wmts` on the client are shared state.
   OWS calls must not be fanned out the same way.
@@ -161,14 +165,26 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   the embedded preview and the layer groups use the same ones. The layer tree reads the workspace back
   from the URL path to know which server layer such a QGIS layer is.
 - **Add to QGIS behind a proxy** (measured with a proxy that forwards `Host: inside.invalid:8080`,
-  as nginx's default `proxy_set_header Host $proxy_host` does): GeoServer writes every
-  OnlineResource of its capabilities from its Proxy base URL or, without one, from the Host it
-  receives. The WMS and WMTS layers were still valid, since the capabilities came from the right
-  URL, but drew nothing: every GetMap, GetTile and GetFeatureInfo went to the inside address.
-  With `IgnoreGetMapUrl=1` and `IgnoreGetFeatureInfoUrl=1` (WMS) and `IgnoreGetMapUrl=1` (WMTS),
-  both accepted by the provider, they went to the URL the plugin gave and the map was drawn. The WFS
-  provider has no such option: it followed the advertised DescribeFeatureType address and the layer
-  was invalid with an empty error, so *Add to QGIS* names the Proxy base URL setting instead.
+  as nginx's default `proxy_set_header Host $proxy_host` does, and on QGIS 3.44 with one that
+  forwards another port and logs what reaches it): GeoServer writes every OnlineResource of its
+  capabilities from its Proxy base URL or, without one, from the Host it receives. The WMS and
+  WMTS layers were still valid, since the capabilities came from the right URL, but every GetMap,
+  GetTile and GetFeatureInfo went to the inside address, with the saved credentials, and drew
+  nothing when it was unreachable. With `IgnoreGetMapUrl=1` and `IgnoreGetFeatureInfoUrl=1`, which
+  the provider accepts for both, they went to the URL the plugin gave, the legend too. A WMTS
+  layer needs the second one as well: its identify uses GeoWebCache's RESTful FeatureInfo
+  template, which went to the advertised address without it. The WFS provider has no such option:
+  it sent DescribeFeatureType and every GetFeature, with the credentials, to the advertised
+  address, and was invalid with an empty error when that one was unreachable. So *Add to QGIS*
+  reads the workspace's WFS capabilities first, through the library's
+  `ows_service.get_wfs_capabilities()`, and refuses a WFS layer whose operation URLs name another
+  scheme, host or port than the plugin's URL, before QGIS sends a request.
+- **An invalid layer's reason** (measured on QGIS 3.44): `layer.error().message()` is HTML, and for
+  a failed request it only says "Provider is not valid" with the URI. The WMS provider keeps the
+  cause in `dataProvider().lastError()` ("Download of capabilities failed: Connection refused") and
+  a failed check in `dataProvider().error().summary()` ("Cannot calculate extent", "Tile layer or
+  tile matrix set not found"). The WFS provider only writes its reason to QGIS's log, on the WFS
+  tab, so `dlg_preview.load_error()` says so when the provider gives nothing.
 - **A pushed style is confirmed before it replaces one.** `create_style_definition()` upserts and a style is
   shared by every layer that references it, so `_push_qgis_style` checks `get_style_definition()` first and
   asks; it returns False when the user keeps the existing style, and its callers (the Layers row action, the

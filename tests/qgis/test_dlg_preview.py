@@ -19,9 +19,19 @@ import tempfile
 from pathlib import Path
 
 from osgeo import gdal, osr
-from qgis.core import Qgis, QgsPointXY, QgsRasterLayer, QgsRectangle
+from qgis.core import (
+    Qgis,
+    QgsCoordinateReferenceSystem,
+    QgsError,
+    QgsMapSettings,
+    QgsPointXY,
+    QgsProject,
+    QgsRasterLayer,
+    QgsRectangle,
+)
 from qgis.gui import QgsMapMouseEvent
 from qgis.PyQt.QtCore import QEvent, QPoint, Qt
+from qgis.PyQt.QtXml import QDomDocument
 from qgis.testing import start_app, unittest
 
 from geoserver_manager.gui.dlg_preview import LayerPreviewDialog
@@ -135,19 +145,18 @@ class TestLayerPreview(unittest.TestCase):
         self.assertIsNone(LayerPreviewDialog.identify_format(Mute()))
 
     def test_a_failed_identify_shows_the_providers_message(self):
-        class Error:
-            def message(self):
-                return "GetFeatureInfo refused"
+        """QgsError.message() is HTML: the plain text panel showed
+        '<p><b>WMS:</b> Cannot identify: ...'."""
 
         class Result:
             def isValid(self):  # noqa: N802
                 return False
 
             def error(self):
-                return Error()
+                return QgsError("Cannot identify: GetFeatureInfo refused", "WMS")
 
         text = LayerPreviewDialog.result_text(QgsPointXY(1, 2), Result())
-        self.assertEqual(text, "GetFeatureInfo refused")
+        self.assertEqual(text, "Cannot identify: GetFeatureInfo refused")
 
     def test_text_answers_are_shown_as_they_are(self):
         class Result:
@@ -171,6 +180,64 @@ class TestLayerPreview(unittest.TestCase):
         dlg.identify(
             QgsPointXY(0, 0)
         )  # no crash: the provider is asked, answers nothing
+        dlg.close()
+
+    def test_a_layer_that_did_not_load_says_why_in_plain_words(self):
+        """The window showed QGIS's HTML chain: 'Provider is not valid' and
+        the URI, never the request that failed."""
+        server = "http://127.0.0.1:1/geoserver/topp/ows"  # nothing listens here
+        broken = QgsRasterLayer(
+            f"crs=EPSG:4326&format=image/png&layers=roads&styles=&url={server}",
+            "roads",
+            "wms",
+        )
+        dlg = LayerPreviewDialog("topp:roads", broken, None)
+        self.assertEqual(
+            dlg.message.text(),
+            "The layer did not load: "
+            "Download of capabilities failed: Connection refused",
+        )
+        dlg.close()
+
+    def test_a_project_read_leaves_the_preview_on_its_layer(self):
+        """Every map canvas reads the project QGIS opens: the preview moved to
+        its EPSG:3857 over Europe, and a click sent metres as degrees."""
+        settings = QgsMapSettings()
+        settings.setDestinationCrs(QgsCoordinateReferenceSystem("EPSG:3857"))
+        settings.setExtent(QgsRectangle(-1000000, 4000000, 3000000, 7500000))
+        document = QDomDocument()
+        root = document.createElement("qgis")
+        document.appendChild(root)
+        canvas = document.createElement("mapcanvas")
+        canvas.setAttribute("name", "theMapCanvas")
+        root.appendChild(canvas)
+        settings.writeXml(canvas, document)
+        path = Path(self.folder.name) / "europe.qgs"
+        path.write_text(document.toString())
+        self.addCleanup(QgsProject.instance().clear)
+
+        dlg = self.dialog()
+        self.assertTrue(QgsProject.instance().read(str(path)))
+        self.assertEqual(
+            dlg.canvas.mapSettings().destinationCrs().authid(), "EPSG:4326"
+        )
+        self.assertTrue(dlg.canvas.extent().contains(QgsRectangle(0, 0, 4, 4)))
+        dlg.identify(QgsPointXY(0.5, 3.5))
+        self.assertIn("Band 1: 0", dlg.info.toPlainText())
+        dlg.close()
+
+    def test_saving_the_project_leaves_the_preview_out(self):
+        """A save wrote the preview's canvas into the .qgs, as a nameless one."""
+        path = Path(self.folder.name) / "saved.qgs"
+        self.addCleanup(QgsProject.instance().clear)
+
+        def canvases():
+            self.assertTrue(QgsProject.instance().write(str(path)))
+            return path.read_text().count("<mapcanvas")
+
+        before = canvases()
+        dlg = self.dialog()
+        self.assertEqual(canvases(), before)
         dlg.close()
 
     def test_closing_while_a_render_is_pending_is_fine(self):
