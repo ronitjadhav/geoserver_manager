@@ -10,7 +10,7 @@ identify the point, which for a WMS layer is a GetFeatureInfo request; QGIS
 already knows how to send it, so the plugin does not hand-roll the URL.
 """
 
-from qgis.core import Qgis, QgsCoordinateReferenceSystem, QgsRectangle
+from qgis.core import Qgis, QgsCoordinateReferenceSystem, QgsProject, QgsRectangle
 from qgis.gui import QgsMapCanvas, QgsMapTool
 from qgis.PyQt.QtCore import QCoreApplication, Qt
 from qgis.PyQt.QtGui import QCursor
@@ -24,10 +24,33 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from geoserver_manager.gui.theme import status_colour
+from geoserver_manager.toolbelt.rest import summarise_body
 
 WORLD = (-180.0, -90.0, 180.0, 90.0)
 # A press and release closer than this is a click; further apart is a drag.
 _CLICK_TOLERANCE_PX = 3
+
+
+def load_error(layer):
+    """Why QGIS could not load `layer`, as one line of plain text.
+
+    The layer's own error is HTML, and for a failed request it only says
+    "Provider is not valid" and the URI. The provider knows more: the request
+    that failed (lastError) or the check that did. The WFS provider only
+    writes its reason to QGIS's log, so then the text says where to look.
+    """
+    provider = layer.dataProvider()
+    if provider is None:
+        texts = [layer.error().summary()]
+    else:
+        texts = [provider.lastError(), provider.error().summary()]
+    for text in texts:
+        text = summarise_body(" ".join((text or "").split()))
+        if text:
+            return text
+    return QCoreApplication.translate(
+        "LayerPreviewDialog", "QGIS logged the reason in its log panel, on the {} tab"
+    ).format(layer.providerType().upper())
 
 
 class _ClickOrPanTool(QgsMapTool):
@@ -88,7 +111,13 @@ class LayerPreviewDialog(QDialog):
         self.message.setWordWrap(True)
         self.message.hide()
         self.canvas = QgsMapCanvas(self)
+        # The name finds the node it writes into a saved project.
+        self.canvas.setObjectName("geoserver_manager_preview")
         self.canvas.setDestinationCrs(QgsCoordinateReferenceSystem("EPSG:4326"))
+        self._view = self.extent_for(bbox)
+        # These run after the canvas's own: PyQt cannot drop QGIS's connections.
+        QgsProject.instance().readProject.connect(self._back_to_the_layer)
+        QgsProject.instance().writeProject.connect(self._out_of_the_project)
         self.info = QPlainTextEdit(self)
         self.info.setReadOnly(True)
         self.info.setPlaceholderText(
@@ -108,16 +137,11 @@ class LayerPreviewDialog(QDialog):
 
         if layer.isValid():
             self.canvas.setLayers([layer])
-            self.canvas.setExtent(self.extent_for(bbox))
+            self.canvas.setExtent(self._view)
             self.canvas.setMapTool(_ClickOrPanTool(self.canvas, self.identify))
             self.canvas.refresh()
         else:
-            self._say(
-                self.tr("The layer did not load: {}").format(
-                    layer.error().message()
-                    or self.tr("the provider gave no details, is the server up?")
-                )
-            )
+            self._say(self.tr("The layer did not load: {}").format(load_error(layer)))
 
     @staticmethod
     def extent_for(bbox):
@@ -125,6 +149,26 @@ class LayerPreviewDialog(QDialog):
         if bbox and bbox[2] > bbox[0] and bbox[3] > bbox[1]:
             return QgsRectangle(*bbox)
         return QgsRectangle(*WORLD)
+
+    def _back_to_the_layer(self, _document):
+        """Undo what the canvas read from a project: its CRS and its extent.
+
+        Every QgsMapCanvas follows the project QGIS opens. The preview moved
+        to that project's CRS and extent, and identify then missed: the
+        provider reads the point and the extent in the layer's EPSG:4326.
+        """
+        self.canvas.setDestinationCrs(QgsCoordinateReferenceSystem("EPSG:4326"))
+        self.canvas.setRotation(0)
+        self.canvas.setExtent(self._view)
+        self.canvas.refresh()
+
+    def _out_of_the_project(self, document):
+        """Remove the node the canvas just wrote into a project being saved."""
+        nodes = document.elementsByTagName("mapcanvas")
+        for index in reversed(range(nodes.count())):
+            element = nodes.item(index).toElement()
+            if element.attribute("name") == self.canvas.objectName():
+                element.parentNode().removeChild(element)
 
     def _say(self, text):
         self.message.setText(text)
@@ -193,7 +237,8 @@ class LayerPreviewDialog(QDialog):
     def result_text(point, result):
         """The panel's text for one identify result."""
         if not result.isValid():
-            return result.error().message() or QCoreApplication.translate(
+            # summary(): message() is HTML, which the plain text panel showed as tags.
+            return result.error().summary() or QCoreApplication.translate(
                 "LayerPreviewDialog", "GetFeatureInfo failed."
             )
         lines = [f"{point.x():.6f}, {point.y():.6f}"]

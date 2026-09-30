@@ -697,31 +697,139 @@ class TestAddToQgis(unittest.TestCase):
 
     def test_qgis_stays_on_the_plugins_url_behind_a_proxy(self):
         """GetMap went to the address the capabilities advertise, an inside
-        one behind a proxy: the layer was valid and drew nothing."""
+        one behind a proxy: the layer was valid and drew nothing. A WMTS
+        identify went there too, with the saved credentials (measured)."""
         wms, _ = GeoServerMainDialog._layer_uri("WMS", self.BASE, "topp:roads")
         wmts, _ = GeoServerMainDialog._layer_uri("WMTS", self.BASE, "topp:roads")
         self.assertIn("&IgnoreGetMapUrl=1&IgnoreGetFeatureInfoUrl=1", wms)
-        self.assertIn("&IgnoreGetMapUrl=1", wmts)
+        self.assertIn("&IgnoreGetMapUrl=1&IgnoreGetFeatureInfoUrl=1", wmts)
 
-    def test_an_invalid_wfs_layer_names_the_proxy_base_url(self):
-        """The WFS provider follows the advertised address and fails with no
-        message: the banner said only that the layer could not be added."""
-        from qgis.core import QgsVectorLayer
+    @staticmethod
+    def advertising(url, base="http://gs.example.org/geoserver/", authcfg="abc123"):
+        """A dialog connected to `base` whose GeoServer advertises its WFS at
+        `url`, the WFS 1.1.0 capabilities as the library parses them."""
 
+        class Settings:
+            geoserver_url = base
+            geoserver_auth_cfg_id = authcfg
+
+        class Prefs:
+            def get_plg_settings(self):
+                return Settings()
+
+        endpoint = {"@xlink:href": url}
+        http = {"ows:HTTP": {"ows:Get": endpoint, "ows:Post": endpoint}}
+
+        class Ows:
+            asked = []
+
+            def get_wfs_capabilities(self, workspace_name):
+                Ows.asked.append(workspace_name)
+                operations = [
+                    {"@name": name, "ows:DCP": http}
+                    for name in ("GetCapabilities", "DescribeFeatureType", "GetFeature")
+                ]
+                return {
+                    "wfs:WFS_Capabilities": {
+                        "ows:OperationsMetadata": {"ows:Operation": operations}
+                    }
+                }
+
+        class GS:
+            ows_service = Ows()
+
+        dlg = SyncDialog()
+        dlg.gs = GS()
+        dlg.plg_settings = Prefs()
+        return dlg
+
+    def test_a_wfs_advertised_elsewhere_is_never_built(self):
+        """The WFS provider sent DescribeFeatureType and GetFeature, with the
+        saved credentials, to the address the capabilities advertise, over
+        plain HTTP when that one said http (measured): nothing keeps it on
+        the plugin's URL, so such a layer is refused before QGIS asks."""
         from geoserver_manager.gui import tab_layers
 
         class Accepting(ResourceFormDialog):
             def exec(self):
                 return QDialog.DialogCode.Accepted
 
-        dlg = SyncDialog()
-        dlg._server_layer = lambda *args: QgsVectorLayer("/nonexistent.gpkg", "r")
-        errors = []
+        dlg = self.advertising("http://inside:8080/geoserver/topp/wfs")
+        built, errors = [], []
         dlg.show_error_message = errors.append
-        with patch.object(tab_layers, "ResourceFormDialog", Accepting):
+        with (
+            patch.object(tab_layers, "ResourceFormDialog", Accepting),
+            patch.object(tab_layers, "QgsVectorLayer", lambda *a: built.append(a)),
+        ):
             dlg._add_layer_to_qgis(["roads", "topp", "VECTOR", "ds", ""])
+        self.assertEqual(built, [])
+        self.assertEqual(dlg.gs.ows_service.asked, ["topp"])
         self.assertIn("Could not add 'roads'", errors[0])
+        self.assertIn("advertises its WFS at http://inside:8080,", errors[0])
+        self.assertIn("not at http://gs.example.org where", errors[0])
         self.assertIn("Proxy base URL", errors[0])
+
+    def test_a_wfs_advertised_where_the_plugin_connects_is_built(self):
+        from geoserver_manager.gui import tab_layers
+
+        # Another path and the default port spelt out: the same origin.
+        dlg = self.advertising("http://GS.example.org:80/geoserver/topp/wfs")
+        built = []
+        with patch.object(tab_layers, "QgsVectorLayer", lambda *a: built.append(a)):
+            dlg._server_layer("WFS", "topp:roads", "roads")
+        self.assertEqual(len(built), 1)
+        self.assertIn("typename='topp:roads'", built[0][0])
+
+    def test_an_invalid_wfs_layer_says_where_qgis_logged_why(self):
+        """The WFS provider writes its reason to QGIS's log only: the banner
+        said "layer is not valid" and nothing else."""
+        from qgis.core import QgsVectorLayer
+
+        uri, provider = GeoServerMainDialog._layer_uri(
+            "WFS", "http://127.0.0.1:1/geoserver", "topp:roads"
+        )
+        layer = QgsVectorLayer(uri, "roads", provider)
+        with self.assertRaises(RuntimeError) as raised:
+            GeoServerMainDialog._valid_layer(layer)
+        self.assertIn("log panel, on the WFS tab", str(raised.exception))
+
+    def test_an_invalid_layer_gives_the_providers_reason_as_text(self):
+        """The layer's own error is HTML: its <p> blocks pushed the reason
+        below the banner's fold, the log showed the tags, and for a failed
+        request it gave the URI instead of the cause."""
+        from qgis.core import QgsError, QgsRasterLayer
+
+        uri, provider = GeoServerMainDialog._layer_uri(
+            "WMS", "http://127.0.0.1:1/geoserver", "topp:roads"
+        )
+        with self.assertRaises(RuntimeError) as raised:
+            GeoServerMainDialog._valid_layer(QgsRasterLayer(uri, "roads", provider))
+        self.assertEqual(
+            str(raised.exception), "Download of capabilities failed: Connection refused"
+        )
+
+        class Provider:
+            def lastError(self):  # noqa: N802
+                return ""
+
+            def error(self):
+                return QgsError("Cannot calculate extent", "WMS provider")
+
+        class Layer:
+            def isValid(self):  # noqa: N802
+                return False
+
+            def dataProvider(self):  # noqa: N802
+                return Provider()
+
+            def error(self):
+                error = QgsError("Cannot calculate extent", "WMS provider")
+                error.append("Provider is not valid (provider: wms, URI: x", "Raster")
+                return error
+
+        with self.assertRaises(RuntimeError) as raised:
+            GeoServerMainDialog._valid_layer(Layer())
+        self.assertEqual(str(raised.exception), "Cannot calculate extent")
 
     def test_wmts_goes_through_geowebcache(self):
         uri, provider = GeoServerMainDialog._layer_uri(
@@ -765,16 +873,12 @@ class TestAddToQgis(unittest.TestCase):
             def exec(self):
                 return QDialog.DialogCode.Accepted
 
-        class Settings:
-            geoserver_url = "http://127.0.0.1:1/geoserver"  # nothing listens here
-            geoserver_auth_cfg_id = ""
-
-        class Prefs:
-            def get_plg_settings(self):
-                return Settings()
-
-        dlg = SyncDialog()
-        dlg.plg_settings = Prefs()
+        # Nothing listens there; the capabilities check passes, QGIS then fails.
+        dlg = self.advertising(
+            "http://127.0.0.1:1/geoserver/topp/wfs",
+            base="http://127.0.0.1:1/geoserver",
+            authcfg="",
+        )
         errors = []
         dlg.show_error_message = errors.append
         before = len(QgsProject.instance().mapLayers())
@@ -783,6 +887,7 @@ class TestAddToQgis(unittest.TestCase):
 
         self.assertEqual(len(errors), 1)
         self.assertIn("Could not add 'roads'", errors[0])
+        self.assertIn("on the WFS tab", errors[0])
         self.assertEqual(len(QgsProject.instance().mapLayers()), before)
 
 
@@ -1314,6 +1419,44 @@ class TestBatchPublish(unittest.TestCase):
         self.assertIn("Published: a.", self.warnings[-1])
         self.assertIn("Not started: b, c.", self.warnings[-1])
         self.assertEqual(self.errors, [])
+
+    def test_a_layer_renamed_before_its_turn_keeps_the_name_the_form_listed(self):
+        """Its turn read the live name: renamed "a" mid-batch, with Replace,
+        it overwrote the layer the batch had just published."""
+        self.dlg._publish_layers(self.layers)
+        self.layers[1].setName("a")
+        self.finish("done")
+        self.assertEqual([values["name"] for values, _l, _d in self.calls], ["a", "b"])
+        self.finish("done")
+        self.finish("done")
+        self.assertTrue(self.successes[0].startswith("3 layer"))
+
+    def test_a_layer_removed_before_its_turn_is_not_started(self):
+        """Its turn called the deleted layer: an error banner with Python's
+        'wrapped C/C++ object ... has been deleted', counted as failed."""
+        from qgis.core import QgsProject
+
+        self.dlg._publish_layers(self.layers)
+        QgsProject.instance().removeMapLayer(self.layers[1].id())
+        self.finish("done")
+        self.assertEqual([values["name"] for values, _l, _d in self.calls], ["a", "c"])
+        self.finish("done")
+        self.assertEqual(self.errors, [])
+        self.assertEqual(self.successes, [])
+        self.assertIn("Published: a, c.", self.warnings[-1])
+        self.assertIn("Not started, no longer in the project: b.", self.warnings[-1])
+        self.assertNotIn("Failed", self.warnings[-1])
+
+    def test_a_new_project_mid_batch_starts_nothing_more(self):
+        from qgis.core import QgsProject
+
+        self.dlg._publish_layers(self.layers)
+        QgsProject.instance().clear()  # every queued layer is deleted with it
+        self.finish("done")
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(self.errors, [])
+        self.assertIn("Published: a.", self.warnings[-1])
+        self.assertIn("Not started, no longer in the project: b, c.", self.warnings[-1])
 
     def test_two_layers_with_one_geoserver_name_are_refused_up_front(self):
         from qgis.core import QgsProject, QgsVectorLayer

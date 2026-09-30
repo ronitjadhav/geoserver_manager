@@ -507,6 +507,12 @@ The full details go to the QGIS log panel, on the *GeoServer Manager* tab.
   GeoServer's data directory.
 - The plugin's TLS setting does not reach QGIS's own WMS and WFS layers. A
   layer added to QGIS uses QGIS's certificate handling.
+- Behind a proxy, GeoServer writes its own idea of its address into its
+  capabilities: the *Proxy base URL* of the Server tab's Global settings, or
+  else the host name the proxy passes on. When that is not the address the
+  plugin connects to, WMS and WMTS layers added to QGIS still use the
+  plugin's address. A WFS layer would follow the other one, with the
+  credentials, so *Add to QGIS* refuses it and names that address.
 - Over plain `http://` to a remote server, the password travels unencrypted.
   The plugin warns once, when you save the settings.
 - The interface follows the QGIS theme, dark ones included. A partial French
