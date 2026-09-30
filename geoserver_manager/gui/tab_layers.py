@@ -245,7 +245,7 @@ class LayerTabMixin:
         # The library's reads take the workspace raw: "sf#x" reads "sf".
         self._require_safe_name(ws_name)
         if not values.get("replace") and self._resource_exists(
-            self.gs.get_datastore, ws_name, name
+            self._get_datastore, ws_name, name
         ):
             raise ValueError(
                 translate(
@@ -293,7 +293,7 @@ class LayerTabMixin:
             return
         # Through the library: both store models keep the type (it was a
         # raw GET, with no TODO and no row in #50 to say why).
-        getter = self.gs.get_datastore if kind == "data" else self.gs.get_coverage_store
+        getter = self._get_datastore if kind == "data" else self.gs.get_coverage_store
         detail, status = getter(ws_name, name)
         if status == 404:
             return

@@ -232,12 +232,13 @@ class GwcTabMixin:
         return self._raw_rest("get", self._gwc_layer_path(name, "xml")).text
 
     def _gwc_layer_exists(self, name):
-        """True when GeoWebCache already caches the layer."""
-        workspace, _, layer = name.rpartition(":")
-        if workspace:
-            return self._resource_exists(self.gs.get_gwc_layer, workspace, layer)
-        service = self.gs.rest_service  # TODO(#50): as in _gwc_layer_detail
-        return service.resource_exists(self._gwc_layer_path(name))
+        """True when GeoWebCache already caches the layer.
+
+        TODO(#50): read from the list the tab shows. A GET of a layer GWC does
+        not cache is a 404 "Unknown layer" on 2.28.5 but a 500 on 2.27 and
+        3.0 (measured), and get_gwc_layer() raises on the 500.
+        """
+        return name in self._gwc_layer_names()
 
     def _gridset_names(self):
         """The gridsets the server knows, for the picker.
@@ -508,11 +509,31 @@ class GwcTabMixin:
 
     # -- Writes ---------------------------------------------------------------
 
-    def _save_gwc_layer(self, name, xml_text, values):
-        """PUT the edited document back. Raises on a bad form or an HTTP error."""
+    def _save_gwc_layer(self, name, before, values):
+        """PUT the fields the user changed onto the document GWC has now.
+
+        `before` is what the form gave back untouched. The PUT replaces the
+        whole document, and creates the cache of a layer GWC does not cache,
+        so the document is read again: another client's edit survives, and a
+        cache removed since the form opened is refused, not recreated.
+        Raises on a bad form or an HTTP error.
+        """
+        if not self._gwc_layer_exists(name):
+            raise RuntimeError(
+                translate(
+                    "GwcTabMixin",
+                    "'{}' is no longer cached: its cache was removed since the form "
+                    "opened. Refresh the list.",
+                ).format(name)
+            )
+        current = self._gwc_layer_xml(name)
+        edits = {
+            key: value for key, value in values.items() if value != before.get(key)
+        }
+        values = {**self._gwc_form_values(current), **edits}
         # TODO(#50): no update of a cached layer in the library, and a JSON PUT
         # fails server-side ("Duplicate field mimeFormats"), so XML it is.
-        self._put_gwc_xml(name, self._gwc_xml_with_values(xml_text, values))
+        self._put_gwc_xml(name, self._gwc_xml_with_values(current, values))
 
     def _check_new_gwc_layer(self, values):
         """(name, document) of the cache the Add form would create, or a
@@ -757,13 +778,14 @@ class GwcTabMixin:
             # that are not XML stay in the form, with the rest of the edit.
             validate=lambda values: self._gwc_xml_with_values(xml_text, values),
         )
+        before = dlg.get_values()  # as the form gives it back untouched
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         values = dlg.get_values()
         if self._run_action(
             lambda: self._wait_for_save(
-                lambda: self._save_gwc_layer(name, xml_text, values)
+                lambda: self._save_gwc_layer(name, before, values)
             ),
             translate("GwcTabMixin", "Failed to save the tile cache of '{}'").format(
                 name

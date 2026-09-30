@@ -56,10 +56,12 @@ NE_WMS = {
 
 
 class FakeGS:
-    """Workspace 'ne' has its own WMS settings, 'topp' does not."""
+    """Workspace 'ne' has its own WMS settings, 'topp' does not. A workspace
+    it creates can be read back, unless `hidden`; a path in `gone` is 404."""
 
     def __init__(self):
         self.calls = []
+        self.created, self.hidden, self.gone = [], False, set()
         outer = self
 
         class Response:
@@ -74,6 +76,8 @@ class FakeGS:
         class Client:
             def get(inner, path, **kwargs):
                 outer.calls.append(("GET", path, kwargs))
+                if path in outer.gone:
+                    return Response("No such settings", 404)
                 if path.endswith("/workspaces/default.json"):
                     return Response({"workspace": {"name": "topp"}})
                 if path == "/rest/services/wfs/workspaces/ne/settings.json":
@@ -125,7 +129,8 @@ class FakeGS:
         return ([{"name": "ne"}, {"name": "topp"}], 200)
 
     def get_workspace(self, name):
-        if name not in ("ne", "topp"):
+        visible = () if self.hidden else self.created
+        if name not in ("ne", "topp", *visible):
             return ("No such workspace", 404)
         return ({"name": name, "isolated": False}, 200)
 
@@ -139,6 +144,7 @@ class FakeGS:
 
     def create_workspace(self, name, isolated=False):
         self.calls.append(("create_workspace", name, isolated))
+        self.created.append(name)
         return ("", 200)
 
 
@@ -346,7 +352,7 @@ class TestWorkspaceDialog(unittest.TestCase):
         with patch.object(tab_workspaces, "ResourceFormDialog", Accepting):
             self.dlg._show_workspace_info(["topp"])  # the fake's default
         puts = [call[1] for call in self.dlg.gs.calls if call[0] == "PUT"]
-        self.assertEqual(puts, ["/rest/workspaces/topp.json"])
+        self.assertEqual(puts, [])  # an untouched form sends nothing at all
 
     def test_a_rename_onto_a_taken_name_keeps_the_edit_form_open(self):
         # Refused after the form closed, every setting had to be typed again.
@@ -574,6 +580,134 @@ class TestNamespaceAndOtherServices(unittest.TestCase):
             self.save("ne", {}, set_default=True)
         self.assertIn("could not be made the default", str(caught.exception))
         self.assertIn("service settings were not", str(caught.exception))
+
+
+class TestEditSendsOnlyWhatChanged(unittest.TestCase):
+    """Measured on 2.28.5 (review 2026-09-29): a Save re-PUT every service
+    group the form opened with, which reverted another client's WMS and WFS
+    changes and recreated settings deleted meanwhile."""
+
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.gs = self.dlg.gs = FakeGS()
+        self.warnings, self.successes = [], []
+        self.dlg.show_warning_message = self.warnings.append
+        self.dlg.show_success_message = self.successes.append
+        self.dlg.show_error_message = lambda text: self.fail(f"unexpected: {text}")
+
+    def save(self, edit, meanwhile=lambda gs: None):
+        """Open 'ne' (its own WMS and WFS settings), edit, let another client
+        change the server, then Save."""
+        gs = self.gs
+
+        class Editing(ResourceFormDialog):
+            def exec(inner):
+                edit(inner)
+                meanwhile(gs)
+                return QDialog.DialogCode.Accepted
+
+        with patch.object(tab_workspaces, "ResourceFormDialog", Editing):
+            self.dlg._show_workspace_info(["ne"])
+        return [(path, kw["json"]) for verb, path, kw in gs.calls if verb == "PUT"]
+
+    def test_ticking_isolated_sends_the_workspace_and_no_service(self):
+        puts = self.save(lambda form: form.get_widget("isolated").setChecked(True))
+        self.assertEqual(
+            puts,
+            [
+                (
+                    "/rest/workspaces/ne.json",
+                    {"workspace": {"name": "ne", "isolated": True}},
+                )
+            ],
+        )
+
+    def test_a_changed_field_is_the_only_one_sent(self):
+        puts = self.save(lambda form: form.get_widget("wfs_title").setText("Roads"))
+        self.assertEqual(
+            puts,
+            [
+                (
+                    "/rest/services/wfs/workspaces/ne/settings.json",
+                    {
+                        "wfs": {
+                            "workspace": {"name": "ne"},
+                            "name": "WFS",
+                            "title": "Roads",
+                        }
+                    },
+                )
+            ],
+        )
+
+    def test_settings_removed_meanwhile_are_not_recreated(self):
+        wms = "/rest/services/wms/workspaces/ne/settings.json"
+        puts = self.save(
+            lambda form: form.get_widget("wms_title").setText("Maps"),
+            meanwhile=lambda gs: gs.gone.add(wms),
+        )
+        self.assertEqual(puts, [])
+        self.assertEqual(self.successes, [])
+        (warning,) = self.warnings
+        self.assertIn("own WMS settings were removed since the form opened", warning)
+
+
+def library_error(status, body, url):
+    """The HTTPError the library's raise_for_status() gives: no body in it."""
+    import requests
+
+    response = requests.Response()
+    response.status_code = status
+    response._content = body.encode()
+    response.url = url
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as error:
+        return error
+
+
+class TestWhatAnAccountMayNotDo(unittest.TestCase):
+    """Measured on 2.28.5 with a workspace administrator (review 2026-09-29)."""
+
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.gs = self.dlg.gs = FakeGS()
+        self.warnings, self.successes = [], []
+        self.dlg.show_warning_message = self.warnings.append
+        self.dlg.show_success_message = self.successes.append
+
+    def test_a_workspace_created_out_of_the_accounts_sight_is_not_called_created(self):
+        # POST answered 201, the workspace was hidden from its creator, and
+        # the banner said "created" over a table without it.
+        self.gs.hidden = True
+
+        class Filling(ResourceFormDialog):
+            def exec(inner):
+                inner.get_widget("name").setText("fresh")
+                inner.get_widget("uri").setText("http://fresh.example.org")
+                inner.get_widget("set_default").setChecked(True)
+                return QDialog.DialogCode.Accepted
+
+        with patch.object(tab_workspaces, "ResourceFormDialog", Filling):
+            self.dlg._add_workspace()
+        self.assertEqual(self.successes, [])
+        (warning,) = self.warnings
+        self.assertIn("cannot see or manage it", warning)
+        # Neither the URI nor the default was tried on a workspace it cannot see.
+        self.assertEqual([c for c in self.gs.calls if c[0] == "PUT"], [])
+
+    def test_a_refused_default_gives_geoservers_reason_not_the_url(self):
+        url = "http://localhost:8080/geoserver/rest/workspaces/default.json"
+
+        def refuse(name):
+            raise library_error(403, "Administrative privileges required", url)
+
+        self.dlg._set_default_workspace = refuse
+        warning = self.dlg._save_workspace(
+            {"name": "ne", "isolated": False, "set_default": True}, old_name="ne"
+        )
+        self.assertIn("Administrative privileges required", warning)
+        self.assertNotIn("for url", warning)
 
 
 # ############################################################################

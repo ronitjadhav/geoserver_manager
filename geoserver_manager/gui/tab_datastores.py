@@ -218,10 +218,32 @@ class DatastoreTabMixin:
 
     def _datastore_summary(self, workspace_name, datastore_name):
         """(type, enabled) for the list view. Raises on HTTP errors."""
-        detail = self._check(self.gs.get_datastore(workspace_name, datastore_name))
+        detail = self._check(self._get_datastore(workspace_name, datastore_name))
         if not isinstance(detail, dict):
             return ("-", "-")
-        return (detail.get("type", "-"), self._yes_no(detail.get("enabled", True)))
+        return (detail.get("type") or "-", self._yes_no(detail.get("enabled", True)))
+
+    def _get_datastore(self, workspace_name, datastore_name):
+        """gs.get_datastore(), for a store without a type too.
+
+        TODO(#50): DataStore.from_get_response_payload() reads "type" without
+        a default, so get_datastore() raises KeyError('type') for a store
+        GeoServer writes without one: 4 of the 5 demo stores on 2.27, or one
+        POSTed without it (measured). Such a store works, so it is read raw
+        and given the type None.
+        """
+        try:
+            return self.gs.get_datastore(workspace_name, datastore_name)
+        except KeyError:
+            from geoservercloud.models.datastore import DataStore
+
+            response = self._raw_rest(
+                "get", self._datastore_path(workspace_name, datastore_name)
+            )
+            content = response.json()
+            content["dataStore"].setdefault("type", None)
+            store = DataStore.from_get_response_payload(content)
+            return store.asdict(), response.status_code
 
     def _datastore_fields(self, workspace_names, edit_mode=False, typed=True):
         """Return datastore form field definitions with type-specific params.
@@ -779,7 +801,7 @@ class DatastoreTabMixin:
                 translate("DatastoreTabMixin", "Give the GeoServer type name.")
             )
         # create_* upserts, so an existing name would overwrite a live store
-        if self._resource_exists(self.gs.get_datastore, ws, name):
+        if self._resource_exists(self._get_datastore, ws, name):
             raise ValueError(
                 translate(
                     "DatastoreTabMixin",
@@ -867,7 +889,35 @@ class DatastoreTabMixin:
                 )
             )
 
-    def _update_datastore_from_values(self, values, detail, conn_params, old_name=None):
+    def _save_datastore_edit(self, values, before, old_name):
+        """The edit form's Save: read the store again, apply what was changed.
+
+        `before` is what the form gave back untouched. Another client may
+        have edited, renamed or deleted the store since the form opened:
+        their edits survive, and a store that is gone is refused, because
+        create_datastore() POSTs on a 404 and recreated it empty.
+        """
+        detail, status = self._get_datastore(values["workspace"], old_name)
+        if status == 404:
+            raise RuntimeError(
+                translate(
+                    "DatastoreTabMixin",
+                    "Datastore '{}' is no longer on the server: it was deleted or "
+                    "renamed since the form opened. Refresh the list.",
+                ).format(old_name)
+            )
+        detail = self._check((detail, status))
+        self._update_datastore_from_values(
+            values,
+            detail,
+            self._connection_params(detail),
+            old_name=old_name,
+            before=before,
+        )
+
+    def _update_datastore_from_values(
+        self, values, detail, conn_params, old_name=None, before=None
+    ):
         """Save an edit without discarding server-side configuration.
 
         The typed create_* helpers post a fixed connection-parameter template
@@ -877,6 +927,11 @@ class DatastoreTabMixin:
         disabled store. Merge the fields the form owns onto what the server
         actually has, and keep its own type and enabled flag.
 
+        `before` is what the form gave back untouched. With it, `detail` is
+        the store read again at Save, and only the fields the user changed
+        are applied to it: a charset or a disable another client saved
+        meanwhile is kept.
+
         A changed name is first applied by one PUT on the old path, which
         GeoServer treats as a rename (measured on 2.28.5: the feature types,
         layers, groups and tile cache follow); create_datastore() would upsert
@@ -885,8 +940,7 @@ class DatastoreTabMixin:
         TODO(#50): upstream as update_datastore(...) that merges server-side,
         and rename_datastore() (row 56).
         """
-        ds_type = detail.get("type") if isinstance(detail, dict) else None
-        if not ds_type:
+        if not isinstance(detail, dict):
             raise RuntimeError(
                 translate(
                     "DatastoreTabMixin",
@@ -894,7 +948,70 @@ class DatastoreTabMixin:
                     "be updated safely.",
                 )
             )
+        # None for a store without one: the PUT sends null, and GeoServer
+        # keeps it without a type (measured on 2.28.5).
+        ds_type = detail.get("type")
+        merged = self._merged_params(ds_type, values, conn_params)
+        # The form's own checkbox wins; without one (older callers, tests) the
+        # server's flag is kept.
+        enabled = (
+            values["enabled"] if "enabled" in values else detail.get("enabled", True)
+        )
+        # "" clears it; None leaves the key out of the PUT, and GeoServer
+        # keeps what it had (measured on 2.28.5).
+        description = values.get("description") or ""
+        if before is not None:
+            merged = self._changes_onto(
+                conn_params, self._merged_params(ds_type, before, conn_params), merged
+            )
+            if values.get("enabled") == before.get("enabled"):
+                enabled = detail.get("enabled", True)
+            if description == (before.get("description") or ""):
+                description = None
+        renamed = bool(old_name and values["name"] != old_name)
+        if renamed:
+            self._rename_datastore(values["workspace"], old_name, values["name"])
 
+        if isinstance(enabled, str):  # .json gives a bool, but do not assume
+            enabled = enabled.strip().lower() == "true"
+
+        try:
+            self._check(
+                self.gs.create_datastore(
+                    workspace_name=values["workspace"],
+                    datastore_name=values["name"],
+                    datastore_type=ds_type,
+                    connection_parameters=merged,
+                    description=description,
+                    enabled=bool(enabled),
+                )
+            )
+        except Exception as error:
+            if not renamed:
+                raise
+            # The table still showed the old name, whose row now answered 404.
+            raise PartlySaved(
+                translate(
+                    "DatastoreTabMixin",
+                    "Datastore renamed to '{}', but the rest of the edit was not "
+                    "saved: {}",
+                ).format(values["name"], self._error_text(error))
+            ) from error
+
+    @staticmethod
+    def _changes_onto(current, untouched, edited):
+        """`current` with what differs between `untouched` and `edited`:
+        a changed or added key set, a removed one dropped."""
+        result = dict(current)
+        for key, value in edited.items():
+            if key not in untouched or untouched[key] != value:
+                result[key] = value
+        for key in untouched.keys() - edited.keys():
+            result.pop(key, None)
+        return result
+
+    def _merged_params(self, ds_type, values, conn_params):
+        """The connection parameters the form's values make of `conn_params`."""
         merged = dict(conn_params)
         if ds_type == "PostGIS":
             merged.update(
@@ -942,42 +1059,7 @@ class DatastoreTabMixin:
             merged = self._merge_other_params(
                 merged, conn_params, ds_type, values["other_params"]
             )
-        renamed = bool(old_name and values["name"] != old_name)
-        if renamed:
-            self._rename_datastore(values["workspace"], old_name, values["name"])
-
-        # The form's own checkbox wins; without one (older callers, tests) the
-        # server's flag is kept.
-        enabled = (
-            values["enabled"] if "enabled" in values else detail.get("enabled", True)
-        )
-        if isinstance(enabled, str):  # .json gives a bool, but do not assume
-            enabled = enabled.strip().lower() == "true"
-
-        try:
-            self._check(
-                self.gs.create_datastore(
-                    workspace_name=values["workspace"],
-                    datastore_name=values["name"],
-                    datastore_type=ds_type,
-                    connection_parameters=merged,
-                    # "" clears it; None would leave the key out of the PUT, and
-                    # GeoServer keeps what it had (measured on 2.28.5).
-                    description=values.get("description") or "",
-                    enabled=bool(enabled),
-                )
-            )
-        except Exception as error:
-            if not renamed:
-                raise
-            # The table still showed the old name, whose row now answered 404.
-            raise PartlySaved(
-                translate(
-                    "DatastoreTabMixin",
-                    "Datastore renamed to '{}', but the rest of the edit was not "
-                    "saved: {}",
-                ).format(values["name"], self._error_text(error))
-            ) from error
+        return merged
 
     @staticmethod
     def _kept_port(stored, values):
@@ -1050,7 +1132,7 @@ class DatastoreTabMixin:
         if new_name == old_name:
             return
         self._require_safe_name(new_name)
-        if self._resource_exists(self.gs.get_datastore, workspace_name, new_name):
+        if self._resource_exists(self._get_datastore, workspace_name, new_name):
             raise ValueError(
                 translate(
                     "DatastoreTabMixin",
@@ -1144,16 +1226,16 @@ class DatastoreTabMixin:
         """Open a form dialog to view/edit an existing datastore."""
         ds_name, ws_name, ds_type = row_data[0], row_data[1], row_data[2]
         detail = self._fetch(
-            lambda: self._check(self.gs.get_datastore(ws_name, ds_name)),
+            lambda: self._check(self._get_datastore(ws_name, ds_name)),
             translate("DatastoreTabMixin", "Failed to load datastore details"),
         )
         if detail is None:
             return
 
         # The row's Type cell can be "-" after a transient GET failure at list
-        # time; the detail we just fetched is authoritative.
-        if isinstance(detail, dict) and detail.get("type"):
-            ds_type = detail["type"]
+        # time; the detail we just fetched is authoritative, "-" for no type.
+        if isinstance(detail, dict):
+            ds_type = detail.get("type") or "-"
         conn_params = self._connection_params(detail)
         values = self._datastore_form_values(
             ws_name, ds_name, ds_type, detail, conn_params
@@ -1189,15 +1271,14 @@ class DatastoreTabMixin:
             self._wire_type_combo(dlg, initial_type=values["type"], locked=True)
         else:
             self._show_generic_editor(dlg, ds_type)
+        before = dlg.get_values()  # as the form gives it back untouched
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         values = dlg.get_values()
         if self._run_action(
             lambda: self._wait_for_save(
-                lambda: self._update_datastore_from_values(
-                    values, detail, conn_params, old_name=ds_name
-                )
+                lambda: self._save_datastore_edit(values, before, ds_name)
             ),
             translate("DatastoreTabMixin", "Failed to update datastore '{}'").format(
                 values["name"]

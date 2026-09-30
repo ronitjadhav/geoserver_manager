@@ -539,8 +539,9 @@ class ServerTabMixin:
     def _show_server_log(self, location, form):
         """The end of GeoServer's log file, read in the background.
 
-        `form` is the modal logging form: a refusal or a failure is said in a
-        box over it, since the message bar sits behind it until it closes.
+        `form` is the modal logging form: a refusal, a failure or a log with
+        nothing in it is said in a box over it, since the message bar sits
+        behind it until it closes.
         """
         location = (location or "logs/geoserver.log").strip()
         if location.startswith("/") or ":" in location.split("/")[0]:
@@ -569,12 +570,26 @@ class ServerTabMixin:
         except Abandoned:
             return  # the user pressed Cancel: they know
         except Exception as error:
-            problem = "{}: {}".format(
-                translate("ServerTabMixin", "Failed to read the log"),
-                self._error_text(error),
+            detail = self._error_text(error)
+            if not detail.startswith("HTTP 404"):
+                problem = "{}: {}".format(
+                    translate("ServerTabMixin", "Failed to read the log"), detail
+                )
+                self.log(problem, log_level=Qgis.MessageLevel.Critical)
+                QMessageBox.warning(form, form.windowTitle(), problem)
+                return
+            tail = ""  # no such file: "Undefined resource path." (measured)
+        if not tail.strip():
+            QMessageBox.information(
+                form,
+                form.windowTitle(),
+                translate(
+                    "ServerTabMixin",
+                    "GeoServer has written nothing to {}. A server that logs to "
+                    "its standard output only, as GeoServer Cloud does, keeps no "
+                    "log file: read that output where the deployment collects it.",
+                ).format(location),
             )
-            self.log(problem, log_level=Qgis.MessageLevel.Critical)
-            QMessageBox.warning(form, form.windowTitle(), problem)
             return
         dlg = ResourceFormDialog(
             title=translate("ServerTabMixin", "GeoServer Log"),

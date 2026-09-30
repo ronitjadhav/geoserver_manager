@@ -11,13 +11,22 @@ Usage from the repo root folder:
     QT_QPA_PLATFORM=offscreen python -m unittest tests.qgis.test_tab_datastores
 """
 
+import copy
+import sys
 from unittest import mock
 
+from qgis.PyQt.QtWidgets import QDialog
 from qgis.testing import start_app, unittest
 
+from geoserver_manager.gui import tab_datastores
 from geoserver_manager.gui.dlg_resource_form import ResourceFormDialog
 from geoserver_manager.gui.tab_datastores import _MASKED, _OTHER
+from geoserver_manager.toolbelt.dependencies import BUNDLED_WHLS
 from tests.qgis.sync_dialog import SyncDialog
+
+for _whl in BUNDLED_WHLS:  # conftest does this under pytest; unittest needs it too
+    if str(_whl) not in sys.path:
+        sys.path.insert(0, str(_whl))
 
 start_app()
 
@@ -396,6 +405,221 @@ class TestEditFormChecksFirst(unittest.TestCase):
         self.assertTrue(seen["open"])
         self.assertIn("already exists", seen["said"])
         self.assertEqual(dlg.gs.created, [])
+
+
+# A directory store as get_datastore() hands it back.
+DIRECTORY = {
+    "name": "shp",
+    "type": "Directory of spatial files (shapefiles)",
+    "enabled": True,
+    "description": "old text",
+    "workspace": "topp",
+    "connectionParameters": {
+        "entry": {
+            "url": "file:data/sf",
+            "charset": "ISO-8859-1",
+            "memory mapped buffer": "false",
+            "namespace": "http://topp",
+        }
+    },
+}
+
+
+class LiveGS:
+    """One store, which another client edits or deletes while the form is open."""
+
+    def __init__(self):
+        self.stored = copy.deepcopy(DIRECTORY)  # None once deleted
+        self.created = []
+
+    def get_datastore(self, workspace_name, datastore_name):
+        if self.stored is None:
+            return ("No such datastore: topp,shp", 404)
+        return (copy.deepcopy(self.stored), 200)
+
+    def create_datastore(self, **kwargs):
+        # The library POSTs a new store when its GET answers 404.
+        self.created.append(kwargs)
+        return ("", 200)
+
+
+class TestEditMeetsTheServerAsItIsNow(unittest.TestCase):
+    """Measured on 2.28.5 (review 2026-09-29): the save sent the snapshot the
+    form opened with, which reverted another client's edits and recreated a
+    store deleted meanwhile, empty, reported as saved."""
+
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.gs = self.dlg.gs = LiveGS()
+        self.errors, self.successes = [], []
+        self.dlg.show_error_message = self.errors.append
+        self.dlg.show_success_message = self.successes.append
+        self.dlg._warn_if_reaches_nothing = lambda values: None
+        self.dlg._load_datastores = lambda: None
+
+    def edit(self, meanwhile, **typed):
+        """Open the store's form, let another client change it, type, Save."""
+        gs = self.gs
+
+        class Editing(ResourceFormDialog):
+            def exec(inner):
+                meanwhile(gs)
+                for key, text in typed.items():
+                    inner.get_widget(key).setText(text)
+                return QDialog.DialogCode.Accepted
+
+        with mock.patch.object(tab_datastores, "ResourceFormDialog", Editing):
+            self.dlg._show_datastore_info(["shp", "topp", DIRECTORY["type"]])
+        return gs.created
+
+    def test_a_store_deleted_meanwhile_is_refused_not_recreated(self):
+        def delete(gs):
+            gs.stored = None
+
+        self.assertEqual(self.edit(delete, description="new text"), [])
+        self.assertIn("no longer on the server", self.errors[0])
+        self.assertEqual(self.successes, [])
+
+    def test_what_another_client_changed_meanwhile_survives_the_save(self):
+        def reconfigure(gs):
+            gs.stored["enabled"] = False
+            gs.stored["connectionParameters"]["entry"].update(
+                {
+                    "charset": "UTF-8",
+                    "memory mapped buffer": "true",
+                    "cache and reuse memory maps": "true",
+                }
+            )
+
+        (sent,) = self.edit(reconfigure, description="new text")
+        params = sent["connection_parameters"]
+        self.assertIs(sent["enabled"], False)
+        self.assertEqual(params["charset"], "UTF-8")
+        self.assertEqual(params["memory mapped buffer"], "true")
+        self.assertEqual(params["cache and reuse memory maps"], "true")
+        self.assertEqual(sent["description"], "new text")
+
+    def test_only_what_the_user_changed_is_applied(self):
+        def reconfigure(gs):
+            gs.stored["description"] = "their text"
+            gs.stored["connectionParameters"]["entry"]["charset"] = "UTF-8"
+
+        (sent,) = self.edit(reconfigure, file_url="file:data/other")
+        self.assertEqual(sent["connection_parameters"]["url"], "file:data/other")
+        self.assertEqual(sent["connection_parameters"]["charset"], "UTF-8")
+        # Left out of the PUT, so GeoServer keeps theirs.
+        self.assertIsNone(sent["description"])
+
+
+# GET /rest/workspaces/sf/datastores/sf.json on 2.27: no "type" at all.
+UNTYPED = {
+    "dataStore": {
+        "name": "sf",
+        "enabled": True,
+        "workspace": {"name": "sf", "href": "http://gs/rest/workspaces/sf.json"},
+        "connectionParameters": {
+            "entry": [
+                {"@key": "url", "$": "file:data/sf"},
+                {"@key": "namespace", "$": "http://www.openplans.org/spearfish"},
+            ]
+        },
+    }
+}
+
+
+class UntypedGS:
+    """The bundled library over a store GeoServer writes without a type."""
+
+    def __init__(self):
+        self.created = []
+
+        class Reply:
+            status_code, history = 200, ()
+            text = str(UNTYPED)
+
+            def json(inner):
+                return copy.deepcopy(UNTYPED)
+
+        class Client:
+            def get(inner, path, **kwargs):
+                return Reply()
+
+        class Endpoints:
+            base_url = "/rest"
+
+            def datastore(inner, ws, name):
+                return f"/rest/workspaces/{ws}/datastores/{name}.json"
+
+        class Rest:
+            rest_client = Client()
+            rest_endpoints = Endpoints()
+
+            def resource_exists(inner, path):
+                return False  # no layer of that name
+
+        self.rest_service = Rest()
+
+    def get_datastore(self, workspace_name, datastore_name):
+        from geoservercloud.models.datastore import DataStore
+
+        # What the library does with that payload: KeyError('type').
+        store = DataStore.from_get_response_payload(copy.deepcopy(UNTYPED))
+        return store.asdict(), 200
+
+    def create_datastore(self, **kwargs):
+        self.created.append(kwargs)
+        return ("", 200)
+
+
+class TestStoreWithoutAType(unittest.TestCase):
+    """4 of the 5 demo stores on 2.27, or one POSTed without a type: it
+    works, but the library's model raised KeyError('type') on every read."""
+
+    def setUp(self):
+        self.dlg = SyncDialog()
+        self.gs = self.dlg.gs = UntypedGS()
+
+    def test_it_is_listed_with_no_type(self):
+        self.assertEqual(self.dlg._datastore_summary("sf", "sf"), ("-", "Yes"))
+
+    def test_its_name_is_taken_for_a_new_store_and_a_publish(self):
+        with self.assertRaises(ValueError) as caught:
+            self.dlg._check_new_datastore(
+                {"workspace": "sf", "name": "sf", "type": "Shapefile"}
+            )
+        self.assertIn("already exists", str(caught.exception))
+        with self.assertRaises(ValueError) as caught:
+            self.dlg._refuse_vector_clash("sf", "sf", {"replace": False})
+        self.assertIn("already exists", str(caught.exception))
+        with self.assertRaises(ValueError) as caught:
+            self.dlg._refuse_vector_clash("sf", "sf", {"replace": True})
+        self.assertIn(
+            "Replace only overwrites a GeoPackage store", str(caught.exception)
+        )
+
+    def test_it_opens_in_the_parameter_editor_and_saves_without_a_type(self):
+        self.dlg._warn_if_reaches_nothing = lambda values: None
+        self.dlg._load_datastores = lambda: None
+        errors = []
+        self.dlg.show_error_message = errors.append
+        opened = []
+
+        class Editing(ResourceFormDialog):
+            def exec(inner):
+                opened.append(inner)
+                inner.get_widget("description").setText("Spearfish")
+                return QDialog.DialogCode.Accepted
+
+        with mock.patch.object(tab_datastores, "ResourceFormDialog", Editing):
+            self.dlg._show_datastore_info(["sf", "sf", "-"])
+        self.assertEqual(errors, [])
+        (form,) = opened
+        self.assertNotIn("raw_params", form._hidden_keys)
+        (sent,) = self.gs.created
+        # The PUT carries a null type, which GeoServer keeps as none (measured).
+        self.assertIsNone(sent["datastore_type"])
+        self.assertEqual(sent["connection_parameters"]["url"], "file:data/sf")
+        self.assertEqual(sent["description"], "Spearfish")
 
 
 if __name__ == "__main__":

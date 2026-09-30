@@ -55,10 +55,13 @@ class TestPartlySaved(unittest.TestCase):
 
     def test_a_workspace_whose_uri_fails_is_reported_created(self):
         class GS:
+            created = []
+
             def get_workspace(self, name):
-                return ("no", 404)
+                return ("", 200) if name in self.created else ("no", 404)
 
             def create_workspace(self, name, isolated=False):
+                self.created.append(name)
                 return ("", 201)
 
         self.dlg.gs = GS()
@@ -135,7 +138,7 @@ class TestBlankFieldsClear(unittest.TestCase):
     def test_an_emptied_namespace_uri_goes_back_to_the_default(self):
         dlg = SyncDialog()
         put = []
-        dlg._save_workspace = lambda values, old_name=None: None
+        dlg._save_workspace = lambda values, old_name=None, before=None: None
         dlg._put_namespace_uri = lambda name, uri, isolated: put.append(uri)
         dlg._apply_wms_settings = lambda *args: None
         dlg._save_workspace_and_wms(

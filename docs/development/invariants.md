@@ -16,7 +16,10 @@ These rules prevent regressions found in testing or observed against GeoServer. 
 3. **Edits merge onto what the server has.** GeoServer applies a datastore PUT by *replacing* the whole
    `connectionParameters` map. Never route an edit through the typed `create_*` helpers. Use
    `_update_datastore_from_values`, which overlays only the form's own keys onto the fetched params and
-   keeps the server's `type`; `enabled` is the edit form's checkbox when it has one, else the server's.
+   keeps the server's `type`. The edit form's Save fetches them again (`_save_datastore_edit`) and applies
+   only what the user changed, `enabled` included: an edit another client saved while the form was open
+   survives, and a store deleted or renamed meanwhile is refused, where `create_datastore` POSTed it back
+   empty. The workspace and tile cache forms do the same.
    GeoServer ignores `enabled: false` on a POST (the store is created enabled, measured on 2.28.5). Only a
    PUT disables one, which is why the checkbox exists in edit mode only.
 4. **Add refuses an existing name.** `create_workspace` / `create_datastore` are upserts (POST, then PUT
