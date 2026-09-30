@@ -119,7 +119,23 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   model without `epsg_code`.
 - **An emptied datastore description has to be sent as `""`.** The library leaves a `None` field out of the
   payload, and a PUT without `description` keeps the old one (measured on 2.28.5: "old text" survived a PUT
-  with `description=None`, and `""` cleared it). The edit sends the form's value as it is, empty included.
+  with `description=None`, and `""` cleared it). The edit sends the form's value when the user changed it,
+  empty included, and leaves an untouched one out, so GeoServer keeps its own.
+- **An edit meets the server as it is now** (measured on 2.28.5). A datastore PUT replaces the whole
+  `connectionParameters` map and a tile cache XML PUT the whole document, so a form's snapshot sent back
+  reverted what another client saved while it was open. Both also create what is gone:
+  `create_datastore()` POSTs when its GET is a 404, which brought a store deleted meanwhile back empty
+  (its feature types and layers stayed 404), and the XML PUT cached a layer again. A workspace's service
+  settings merge a partial PUT, but a PUT onto removed ones recreates them from the fields it carries
+  alone (`maxRenderingTime` 0, no abstract), and a workspace rename moves them to the new name. So each
+  edit form reads the resource again at Save, applies only the fields the user changed, and refuses one
+  that is gone.
+- **A datastore without a type** (#50, measured): GeoServer writes no `type` for a store saved without
+  one: 4 of the 5 demo stores on 2.27 (2.28.5's demo data added it), or one POSTed without it on 2.28.5.
+  Such a store works (`list=available` names its shapefiles), but `DataStore.from_get_response_payload()`
+  reads the type without a default, so `get_datastore()` raises `KeyError('type')`. `_get_datastore`
+  reads such a store raw and gives it the type `None`; a PUT with `"type": null` keeps it without one,
+  and the edit form opens it in the parameter editor.
 - **Cascaded WFS datastores** (row 41 of #50): type `Web Feature Server (NG)`, every parameter prefixed
   `WFSDataStoreFactory:` (`GET_CAPABILITIES_URL`, `USERNAME`, `PASSWORD`, `TIMEOUT`, `MAXFEATURES`, `LENIENT`);
   GeoServer adds `namespace` itself. A PUT without a key drops it (the map is replaced, invariant 3), and
@@ -221,8 +237,28 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   charset, one of `contactPerson` alone cleared the city, one of `level` alone turned standard-output logging
   off. So `tab_server.py` reads them again, merges the form, and sends them whole. A `null` `proxyBaseUrl` unsets
   it (`""` stores an empty one). The log is `GET /rest/resource/{location}`: served whole, gzip, no length, no
-  Range, so it is streamed and only its end kept. `POST /rest/reload` and `/rest/reset` answer 200 at once on
+  Range, so it is streamed and only its end kept. A file that is not there is a 404 "Undefined resource
+  path." (2.27 and 2.28.5). GeoServer Cloud writes no log file: each service logs to its standard output,
+  and the log GET is that 404 on its pgconfig backend and a 0-byte file on its datadir one (measured on
+  Cloud 2.28.5.1 in the review of 2026-09-29), so the dialog says so for both. Nothing tells beforehand
+  without reading the file: `?operation=metadata` is a 500 on 2.27, and the library's
+  `get_resource_directory()` gets an HTML page on 2.28.5 and 3.0 (the API reads `format=json`, not the
+  `Accept` header it sends). `POST /rest/reload` and `/rest/reset` answer 200 at once on
   the sandbox. The web admin pages are `/web/wicket/bookmarkable/{class}` (a wrong class is a 404).
+- **Non-administrator accounts** (measured on 2.28.5 with restricted accounts, in the review of
+  2026-09-29). REST lists and GETs only what the account administers, and a resource it cannot see is a
+  404 ("No such workspace"), not a 403; `workspaces/default.json` is a 404 when the default workspace is
+  one of those. A workspace administrator can still `POST /rest/workspaces`
+  (201), and the new workspace is hidden from it, so *Add a Workspace* reads it back and says so. Global
+  styles and layer groups are readable, and writing one is a 405 "Cannot edit global resource , full
+  admin credentials required". GeoWebCache's REST applies no catalog filter: it lists every cached layer,
+  and a workspace administrator's DELETE of another workspace's cached layer answered 200.
+  `/rest/security/acl/catalog.json` is a 403 "Administrative privileges required". For whoever sets up
+  test accounts: `rest.properties` is first-match in file order, and rules POSTed through REST are
+  appended after `/**`, so they can never narrow it. `DELETE /rest/security/acl/rest/{rule}` cannot
+  address a rule that starts with `/` (a 404 with the slash stripped, a 400 for `%2F`, and Spring's
+  firewall rejects `%25`). A rule change through REST took effect only much later, and a deleted
+  account's cached login still passed for about 7 minutes.
 - **Library models that lose data** (row 62, measured on 2.28.5): `rest_service.get_layer()` keeps a single
   other style as the bare `{"name", "href"}` object GeoServer writes, and `Layer.asdict()` reads its keys as two
   styles named "name" and "href" (11 demo layers); `get_wms_store()`'s model drops `user`, `password`,
@@ -314,7 +350,10 @@ it is worked around here, so it can be fixed upstream. A workaround carries a
   take `application/xml`; the seed endpoint wants one request per gridset × format. `DELETE /gwc/rest/layers/{name}.json` drops
   the tiles and the configuration and leaves the layer published. `get_gwc_layer()` / `delete_gwc_layer()`
   take a workspace and a layer, so a global layer group (cached under its bare name) goes raw, and
-  `GwcEndpoints.layers(ws)` ignores its argument. Gridsets: the list is a JSON array of names; a JSON PUT
+  `GwcEndpoints.layers(ws)` ignores its argument. A GET of a layer GWC does not cache is a 404 "Unknown
+  layer" on 2.28.5 but a 500 on 2.27 (GWC 1.27) and 3.0 (GWC 2.0), and so is one of a gridset that does
+  not exist; `get_gwc_layer()` raises on the 500, so whether a layer is cached is read from
+  `layers.json`. Gridsets: the list is a JSON array of names; a JSON PUT
   fails the same way ("Duplicate field coords"), an XML PUT creates one (201), DELETE removes it, and
   deleting a gridset in use answers 500 with an empty body.
 - **Layer-group modes** are shown as GeoServer's web admin names them (`tab_layergroups._mode_label`: Single,

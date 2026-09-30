@@ -393,6 +393,44 @@ class TestLogAndCatalog(unittest.TestCase):
         dlg.show_error_message = dlg.show_warning_message = banners.append
         form, button = log_form(dlg, "logs/geoserver.log")
 
+        class Refused:
+            status_code, text = 403, "Access denied"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        with (
+            patch.object(tab_server.requests, "get", return_value=Refused()),
+            patch.object(tab_server, "QMessageBox", create=True) as box,
+        ):
+            button.click()
+        box.warning.assert_called_once()
+        parent, _title, text = box.warning.call_args.args
+        self.assertIs(parent, form)
+        self.assertIn("HTTP 403: Access denied", text)
+        self.assertEqual(banners, [])
+
+    def show_log(self, answer):
+        """Click Show the log over a server whose log GET gives `answer`:
+        (the box patched in, the log viewer patched in)."""
+        dlg = SyncDialog()
+        dlg.gs = FakeGS()
+        dlg.show_error_message = dlg.show_warning_message = self.fail
+        form, button = log_form(dlg, "logs/geoserver.log")
+        with (
+            patch.object(tab_server.requests, "get", return_value=answer),
+            patch.object(tab_server, "QMessageBox", create=True) as box,
+            patch.object(tab_server, "ResourceFormDialog") as viewer,
+        ):
+            button.click()
+        return form, box, viewer
+
+    def test_a_missing_log_file_is_explained_not_reported_as_a_404(self):
+        # GeoServer Cloud writes no log file (reported on its pgconfig
+        # backend): "Failed to read the log: HTTP 404: Undefined resource path."
         class Missing:
             status_code, text = 404, "Undefined resource path."
 
@@ -402,16 +440,33 @@ class TestLogAndCatalog(unittest.TestCase):
             def __exit__(self, *exc):
                 return False
 
-        with (
-            patch.object(tab_server.requests, "get", return_value=Missing()),
-            patch.object(tab_server, "QMessageBox", create=True) as box,
-        ):
-            button.click()
-        box.warning.assert_called_once()
-        parent, _title, text = box.warning.call_args.args
+        form, box, viewer = self.show_log(Missing())
+        box.warning.assert_not_called()
+        viewer.assert_not_called()
+        box.information.assert_called_once()
+        parent, _title, text = box.information.call_args.args
         self.assertIs(parent, form)
-        self.assertIn("HTTP 404: Undefined resource path.", text)
-        self.assertEqual(banners, [])
+        self.assertIn("GeoServer has written nothing to logs/geoserver.log", text)
+        self.assertIn("standard output", text)
+
+    def test_an_empty_log_is_explained_not_shown_as_an_empty_dialog(self):
+        # On its datadir backend GeoServer Cloud leaves a 0-byte file there.
+        class Empty:
+            status_code = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def iter_content(self, size):
+                return iter(())
+
+        _form, box, viewer = self.show_log(Empty())
+        viewer.assert_not_called()
+        box.information.assert_called_once()
+        self.assertIn("written nothing", box.information.call_args.args[2])
 
     def test_cancel_on_the_waiting_box_stops_that_download(self):
         # _log_tail stops on its event; nothing checked that the waiting

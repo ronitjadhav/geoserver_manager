@@ -315,10 +315,10 @@ class TestDatastoreUpdate(unittest.TestCase):
             {"host": "h"},
         )
 
-    def test_refuses_to_update_when_the_server_reports_no_type(self):
+    def test_refuses_to_update_when_the_server_reports_no_store(self):
         with self.assertRaises(RuntimeError):
             self.dlg._update_datastore_from_values(
-                {"workspace": "ws", "name": "store"}, {}, {}
+                {"workspace": "ws", "name": "store"}, "<html>Sign in</html>", {}
             )
 
 
@@ -463,7 +463,7 @@ class TestDefaultWorkspaceHandling(unittest.TestCase):
 
         class FakeGS:
             def get_workspace(inner, name):
-                return ({"name": name}, 404)
+                return ({"name": name}, 200 if ("create", name) in outer.calls else 404)
 
             def create_workspace(inner, name, isolated=False):
                 outer.calls.append(("create", name))

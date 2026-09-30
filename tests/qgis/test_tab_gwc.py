@@ -130,6 +130,7 @@ class FakeGS:
 
     def __init__(self, cached=("broken:layer", "tasmania", "topp:states")):
         self.cached = list(cached)
+        self.states_xml = STATES_XML  # what GET topp:states.xml answers
         self.calls = []
         outer = self
 
@@ -189,7 +190,7 @@ class FakeGS:
         if path == "/gwc/rest/layers/tasmania.json":
             return Response(TASMANIA)
         if path == "/gwc/rest/layers/topp:states.xml":
-            return Response(text=STATES_XML)
+            return Response(text=self.states_xml)
         if path == "/gwc/rest/gridsets.json":
             return Response(list(GRIDSETS))
         if path.startswith("/gwc/rest/gridsets/"):
@@ -546,13 +547,61 @@ class TestActions(unittest.TestCase):
         ]
 
     def test_saving_puts_the_xml_document_back(self):
-        values = GwcTabMixin._gwc_form_values(STATES_XML)
-        values["enabled"] = False
-        self.dlg._save_gwc_layer("topp:states", STATES_XML, values)
+        before = GwcTabMixin._gwc_form_values(STATES_XML)
+        self.dlg._save_gwc_layer("topp:states", before, dict(before, enabled=False))
         [(path, kwargs)] = self.puts()
         self.assertEqual(path, "/gwc/rest/layers/topp:states.xml")
         self.assertEqual(kwargs["headers"], {"Content-Type": "application/xml"})
         self.assertIn("<enabled>false</enabled>", kwargs["data"].decode())
+
+    def edit(self, meanwhile, **fields):
+        """Open topp:states, let another client change its cache, set the
+        spinboxes in `fields`, then Save."""
+        gs = self.gs
+
+        class Editing(ResourceFormDialog):
+            def exec(inner):
+                meanwhile(gs)
+                for key, number in fields.items():
+                    inner.get_widget(key).setValue(number)
+                return QDialog.DialogCode.Accepted
+
+        errors = []
+        self.dlg.show_error_message = errors.append
+        with patch.object(tab_gwc, "ResourceFormDialog", Editing):
+            self.dlg._show_gwc_layer_info(STATES_ROW)
+        return errors
+
+    def test_a_cache_removed_since_the_form_opened_is_not_recreated(self):
+        # Measured on 2.28.5: the XML PUT created the cache again, "saved".
+        errors = self.edit(lambda gs: gs.cached.remove("topp:states"), gutter=3)
+        self.assertEqual(self.puts(), [])
+        self.assertIn("no longer cached", errors[0])
+
+    def test_what_another_client_changed_meanwhile_survives_the_save(self):
+        # Measured on 2.28.5: a gutter-only Save put expireCache back to 0
+        # and dropped the zoom range and cached levels set meanwhile.
+        def reconfigure(gs):
+            gs.states_xml = STATES_XML.replace(
+                "<expireCache>0</expireCache>", "<expireCache>600</expireCache>"
+            ).replace(
+                "<zoomStart>0</zoomStart>\n      <zoomStop>12</zoomStop>",
+                "<zoomStart>2</zoomStart><zoomStop>9</zoomStop>"
+                "<minCachedLevel>3</minCachedLevel><maxCachedLevel>8</maxCachedLevel>",
+            )
+
+        self.assertEqual(self.edit(reconfigure, gutter=3), [])
+        [(_path, kwargs)] = self.puts()
+        root = ElementTree.fromstring(kwargs["data"])
+        self.assertEqual(root.findtext("gutter"), "3")
+        self.assertEqual(root.findtext("expireCache"), "600")
+        subset = root.find("gridSubsets/gridSubset")
+        self.assertEqual(
+            [subset.findtext(tag) for tag in ("gridSetName", "zoomStart", "zoomStop")],
+            ["EPSG:4326", "2", "9"],
+        )
+        self.assertEqual(subset.findtext("minCachedLevel"), "3")
+        self.assertEqual(subset.findtext("maxCachedLevel"), "8")
 
     def test_creating_puts_a_complete_document(self):
         values = {
@@ -589,8 +638,31 @@ class TestActions(unittest.TestCase):
         }
         with self.assertRaises(ValueError):
             self.dlg._create_gwc_layer_from_values(values)
-        self.assertIn(("get_gwc_layer", "topp", "states"), self.gs.calls)
+        self.assertIn(("GET", "/gwc/rest/layers.json", {}), self.gs.calls)
         self.assertEqual(self.puts(), [])
+
+    def test_a_layer_gwc_answers_500_for_is_not_cached(self):
+        # GWC 1.27 and 2.0 answer a layer they do not cache with a 500
+        # "Unknown layer", which the library raises on: Create always refused.
+        import requests
+
+        def unknown(workspace_name, layer):
+            response = requests.Response()
+            response.status_code = 500
+            response._content = f"Unknown layer: {workspace_name}:{layer}".encode()
+            response.url = f"http://gs/gwc/rest/layers/{workspace_name}:{layer}.json"
+            response.raise_for_status()  # as the library's client does
+
+        self.gs.get_gwc_layer = unknown
+        self.dlg._create_gwc_layer_from_values(
+            {
+                "layer": "topp:roads",
+                "gridsets": grid("EPSG:4326"),
+                "formats": fmts("image/png"),
+            }
+        )
+        [(path, _kwargs)] = self.puts()
+        self.assertEqual(path, "/gwc/rest/layers/topp:roads.xml")
 
     def test_truncate_asks_first_then_mass_truncates(self):
         self.dlg._confirm_delete = lambda question, labels=(), cascade="": False

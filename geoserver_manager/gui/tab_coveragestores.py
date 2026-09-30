@@ -1068,7 +1068,7 @@ class CoverageStoreTabMixin:
                 try:
                     raw_rest(client, "put", metadata_path, json={"coverage": metadata})
                 except Exception as error:  # the raster itself is published
-                    raise PartlySaved(f"{partly}: {error}") from error
+                    raise PartlySaved(f"{partly}: {self._error_text(error)}") from error
 
         def published(_result):
             self.show_success_message(

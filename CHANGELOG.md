@@ -392,6 +392,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **An edit keeps what another client saved meanwhile.** Saving a datastore,
+  a workspace or a tile cache now applies only the fields you changed onto
+  what GeoServer has at that moment. A store disabled, a charset, a service
+  title or a cache expiry changed elsewhere while the form was open is no
+  longer put back, and saving a workspace without changes sends nothing.
+- **Saving something deleted meanwhile says so** instead of recreating it. A
+  datastore deleted or renamed since its form opened came back empty,
+  without its layers; a removed tile cache came back; a workspace's own
+  service settings came back from the form's fields alone. Each was reported
+  as saved.
+- **Datastores without a type** (4 of the 5 demo stores on GeoServer 2.27,
+  or one created over REST without it) are listed, open in the parameter
+  editor and can be saved. The list reported them as not listable, and
+  opening one failed with a bare 'type'. Their names are refused for a new
+  store or a publish, as any taken name is.
+- **GeoServer 2.27 and 3.0:** *Add a Layer to the Cache* works. Their
+  GeoWebCache answers a layer it does not cache with an error, which refused
+  every layer.
+- A workspace administrator who adds a workspace that GeoServer then hides
+  from it is told so, instead of seeing 'created' over a list without it.
+- When GeoServer refuses to make a workspace the default, or to set a
+  published raster's title, the warning gives its reason instead of the
+  request's URL.
+- *Show the log* explains a log file that is missing or empty, as on
+  GeoServer Cloud, whose services log to their standard output. It used to
+  report an HTTP 404 or open an empty window.
 - **Tile cache:** a gridset's zoom range with only a first or only a last
   level is kept. The form showed it as "all" to "all", and every Save
   removed it. A range is refused only when its first level is after the

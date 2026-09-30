@@ -302,7 +302,7 @@ class WorkspaceTabMixin:
         for field in self._wms_fields()[1:]:
             dlg.set_field_visible(field["key"], own)
 
-    def _apply_wms_settings(self, workspace_name, values, existed):
+    def _apply_wms_settings(self, workspace_name, values, existed, before=None):
         """Create, update or remove one workspace's own WMS settings.
 
         TODO(#50): see _wms_settings; put_workspace_wms_settings() cannot
@@ -314,12 +314,17 @@ class WorkspaceTabMixin:
             if existed:
                 self._raw_rest("delete", path)
             return
+        self._put_service_settings(
+            path,
+            "wms",
+            self._wms_payload(workspace_name, values),
+            self._wms_payload(workspace_name, before) if existed and before else None,
+        )
 
-        # A partial PUT merges: GeoServer keeps every field this form does not
-        # model (watermark, buffers, metadata links, …), verified on 2.28.5,
-        # and the same PUT creates the settings when the workspace has none
-        # (a POST there answers 405).
-        settings = {
+    @staticmethod
+    def _wms_payload(workspace_name, values):
+        """The WMS settings the form's values make. Pure."""
+        return {
             "workspace": {"name": workspace_name},
             "name": "WMS",
             "enabled": values["wms_enabled"],
@@ -334,7 +339,42 @@ class WorkspaceTabMixin:
             # null"), while "" is accepted and reads back as no locale.
             "defaultLocale": values["wms_default_locale"].strip(),
         }
-        self._raw_rest("put", path, json={"wms": settings})
+
+    def _put_service_settings(self, path, service, settings, untouched=None):
+        """PUT one service's settings of a workspace. Runs in a worker.
+
+        A partial PUT merges: GeoServer keeps every field this form does not
+        model (watermark, buffers, metadata links, …), verified on 2.28.5,
+        and the same PUT creates the settings when the workspace has none
+        (a POST there answers 405). `untouched` is what the form would send
+        had nothing been edited, None for settings it creates: then only the
+        fields that differ go, and nothing when none do, so another client's
+        edits survive. Settings removed since the form opened are refused:
+        a PUT would recreate them with the edited fields alone (measured).
+        TODO(#50): the library reaches none of these paths (rows 25, 61).
+        """
+        if untouched is not None:
+            edits = {
+                key: value
+                for key, value in settings.items()
+                if untouched.get(key) != value
+            }
+            if not edits:
+                return
+            if self._raw_rest("get", path, accept=(404,)).status_code == 404:
+                raise RuntimeError(
+                    translate(
+                        "WorkspaceTabMixin",
+                        "its own {} settings were removed since the form opened. "
+                        "Open the workspace again to set them.",
+                    ).format(service.upper())
+                )
+            settings = {
+                "workspace": settings["workspace"],
+                "name": settings["name"],
+                **edits,
+            }
+        self._raw_rest("put", path, json={service: settings})
 
     # -- WFS, WCS and WMTS service settings -------------------------------------
 
@@ -445,13 +485,29 @@ class WorkspaceTabMixin:
         for field in self._service_fields(service)[1:]:
             dlg.set_field_visible(field["key"], own)
 
-    def _apply_service_settings(self, service, workspace_name, values, existed):
+    def _apply_service_settings(
+        self, service, workspace_name, values, existed, before=None
+    ):
         """Create, update or remove one workspace's own settings for a service."""
         path = self._service_settings_path(service, workspace_name)
         if not values[f"{service}_own"]:
             if existed:
                 self._raw_rest("delete", path)
             return
+        self._put_service_settings(
+            path,
+            service,
+            self._service_payload(service, workspace_name, values),
+            (
+                self._service_payload(service, workspace_name, before)
+                if existed and before
+                else None
+            ),
+        )
+
+    @staticmethod
+    def _service_payload(service, workspace_name, values):
+        """One service's settings the form's values make. Pure."""
         settings = {
             "workspace": {"name": workspace_name},
             "name": service.upper(),
@@ -462,8 +518,7 @@ class WorkspaceTabMixin:
         }
         if service == "wfs":
             settings["maxFeatures"] = values["wfs_max_features"]
-        # A partial PUT merges, and creates the settings when there are none.
-        self._raw_rest("put", path, json={service: settings})
+        return settings
 
     # -- Namespace ---------------------------------------------------------------
 
@@ -550,16 +605,29 @@ class WorkspaceTabMixin:
         if values["name"] != old_name:
             self._check_new_workspace(values)
 
-    def _save_workspace(self, values, old_name=None):
+    def _save_workspace(self, values, old_name=None, before=None):
         """Create (old_name None) or update a workspace from form values.
 
         Runs in a worker (_wait_for), so it shows nothing: it returns the
-        warning to show once it is back, or None.
+        warning to show once it is back, or None. `before` is what the edit
+        form gave back untouched: the workspace is then PUT only when its
+        name or its isolation changed.
         """
         name = values["name"]
         if old_name is None:
             self._check_new_workspace(values)
             self._check(self.gs.create_workspace(name, isolated=values["isolated"]))
+            # A workspace administrator may create one it is not shown (measured).
+            if not self._resource_exists(self.gs.get_workspace, name):
+                raise PartlySaved(
+                    translate(
+                        "WorkspaceTabMixin",
+                        "Workspace '{}' was created, but this account cannot see or "
+                        "manage it: GeoServer lists only the workspaces an account "
+                        "administers. Ask an administrator to grant it, or to "
+                        "delete it.",
+                    ).format(name)
+                )
             if (values.get("uri") or "").strip():
                 try:
                     self._put_namespace_uri(
@@ -577,21 +645,27 @@ class WorkspaceTabMixin:
             # One PUT, rename or not (create_workspace would POST, get a 409,
             # then PUT).
             self._check_workspace_rename(old_name, values)
-            self._put_workspace(old_name, name, values["isolated"])
+            if (
+                before is None
+                or name != old_name
+                or values["isolated"] != before.get("isolated")
+            ):
+                self._put_workspace(old_name, name, values["isolated"])
         if values["set_default"]:
             # Separate from the save: a 403 here must not report the (already
             # successful) create or rename as failed, nor skip the reload.
             try:
                 self._set_default_workspace(name)
             except Exception as e:
+                reason = self._error_text(e)
                 self.log(
-                    f"Set default workspace error: {e}",
+                    f"Set default workspace error: {reason}",
                     log_level=Qgis.MessageLevel.Warning,
                 )
                 return translate(
                     "WorkspaceTabMixin",
                     "Workspace '{}' saved, but it could not be made the default: {}",
-                ).format(name, e)
+                ).format(name, reason)
         return None
 
     def _add_workspace(self):
@@ -702,6 +776,7 @@ class WorkspaceTabMixin:
                 )
             )
             self._on_service_own_changed(dlg, service, box.isChecked())
+        before = dlg.get_values()  # as the form gives it back untouched
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
@@ -716,7 +791,7 @@ class WorkspaceTabMixin:
             lambda: warning.append(
                 self._wait_for_save(
                     lambda: self._save_workspace_and_wms(
-                        values, old_name, had_wms, had, uri
+                        values, old_name, had_wms, had, uri, before
                     )
                 )
             ),
@@ -735,14 +810,16 @@ class WorkspaceTabMixin:
             self._reload_current_tab()
 
     def _save_workspace_and_wms(
-        self, values, old_name, had_wms, had_services=None, old_uri=None
+        self, values, old_name, had_wms, had_services=None, old_uri=None, before=None
     ):
         """Save the workspace, then its namespace and services, in that order.
 
         A rename has to land first: the settings live under the workspace's
-        (new) name, and a rename keeps the URI.
+        (new) name, and a rename keeps the URI (both measured on 2.28.5).
+        `before` is what the form gave back untouched: with it, only what
+        the user changed is sent.
         """
-        warning = self._save_workspace(values, old_name=old_name)
+        warning = self._save_workspace(values, old_name=old_name, before=before)
         name = values["name"]
         uri = (values.get("uri") or "").strip()
         try:
@@ -751,11 +828,15 @@ class WorkspaceTabMixin:
                 self._put_namespace_uri(
                     name, uri or f"http://{name}", values["isolated"]
                 )
-            self._apply_wms_settings(name, values, had_wms)
+            self._apply_wms_settings(name, values, had_wms, before)
             for service in OTHER_SERVICES:
                 if f"{service}_own" in values:
                     self._apply_service_settings(
-                        service, name, values, (had_services or {}).get(service, False)
+                        service,
+                        name,
+                        values,
+                        (had_services or {}).get(service, False),
+                        before,
                     )
         except Exception as error:
             message = translate(

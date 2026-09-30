@@ -1262,6 +1262,43 @@ class TestRasterUploadRunsInATask(RasterFixture):
         self.assertIn("boom", warnings[0])
         self.assertEqual(outcomes, ["done"])
 
+    def test_a_refused_metadata_put_gives_geoservers_reason_not_the_url(self):
+        # The library raises HTTPError, whose text is the request URL alone.
+        import requests
+
+        layer = self.add_layer("dem")
+        warnings = []
+        self.dlg.show_warning_message = warnings.append
+        client = self.dlg.gs.rest_service.rest_client
+        put = client.put
+
+        def refuse_metadata(path, **kwargs):
+            if not path.endswith("/coverages/dem.json"):
+                return put(path, **kwargs)
+            response = requests.Response()
+            response.status_code = 403
+            response._content = b"Administrative privileges required"
+            response.url = f"http://localhost:8080/geoserver{path}"
+            response.raise_for_status()  # as the library's client does
+
+        client.put = refuse_metadata
+        self.dlg._publish_qgis_raster(
+            {
+                "name": "dem",
+                "workspace": "sf",
+                "qgis_layer": layer,
+                "replace": False,
+                "title": "Elevation",
+            }
+        )
+        waited = 0
+        while self.dlg._loading() and waited < 20000:
+            QTest.qWait(20)
+            waited += 20
+        (warning,) = warnings
+        self.assertIn("Administrative privileges required", warning)
+        self.assertNotIn("for url", warning)
+
     def test_a_replace_that_ends_after_the_dialog_closed_says_so_in_the_log(self):
         """The closing branch logged the failure alone, never that the
         replaced store may be left without its file."""
